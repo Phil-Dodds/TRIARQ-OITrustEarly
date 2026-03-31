@@ -1,0 +1,141 @@
+// styles.scss — Pathways OI Trust global styles
+// Import order is mandatory (D-151):
+//   1. TRIARQ design tokens
+//   2. Ionic theme map (before Ionic defaults)
+//   3. Ionic core
+
+@import 'styles/triarq.tokens.v1.css';
+@import 'styles/ionic.theme.map.scss';
+@import '@ionic/angular/css/core.css';
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+
+// Google Fonts — Roboto (D-151: font is Roboto, not Gill Sans or Lato)
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+// ── Global base ──────────────────────────────────────────────────────────────
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family:    var(--triarq-font-family);
+  font-size:      var(--triarq-text-body);
+  color:          var(--triarq-color-text-primary);
+  background:     var(--triarq-color-background);
+  line-height:    var(--triarq-line-height-body);
+  margin:         0;
+}
+
+h1 { font-size: var(--triarq-text-h1); line-height: var(--triarq-line-height-heading); font-weight: var(--triarq-font-weight-bold); }
+h2 { font-size: var(--triarq-text-h2); line-height: var(--triarq-line-height-heading); font-weight: var(--triarq-font-weight-bold); }
+h3 { font-size: var(--triarq-text-h3); line-height: var(--triarq-line-height-heading); font-weight: var(--triarq-font-weight-medium); }
+h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-heading); font-weight: var(--triarq-font-weight-medium); }
+
+// ── App shell layout ─────────────────────────────────────────────────────────
+.oi-app-shell {
+  display:        flex;
+  height:         100vh;
+  overflow:       hidden;
+}
+
+.oi-sidebar {
+  width:          var(--triarq-sidebar-width);
+  flex-shrink:    0;
+  background:     var(--triarq-color-sidebar-bg);
+  color:          var(--triarq-color-sidebar-text);
+  display:        flex;
+  flex-direction: column;
+  overflow-y:     auto;
+}
+
+.oi-main-content {
+  flex:           1;
+  overflow-y:     auto;
+  padding:        var(--triarq-space-lg);
+  background:     var(--triarq-color-background);
+}
+
+// ── Card ─────────────────────────────────────────────────────────────────────
+.oi-card {
+  background:     var(--triarq-color-surface);
+  border-radius:  var(--triarq-radius-card);
+  box-shadow:     var(--triarq-shadow-card);
+  padding:        var(--triarq-space-lg);
+  margin-bottom:  var(--triarq-space-md);
+}
+
+// ── Blocked action UX (D-140) ─────────────────────────────────────────────────
+.oi-blocked-action {
+  padding:        var(--triarq-space-md);
+  border-radius:  var(--triarq-radius-card);
+  background:     rgba(198, 40, 40, 0.06);
+  border:         1px solid rgba(198, 40, 40, 0.2);
+
+  .oi-blocked-primary {
+    color:        var(--triarq-color-text-primary);
+    font-size:    var(--triarq-text-body);
+    font-weight:  var(--triarq-font-weight-medium);
+    margin:       0 0 var(--triarq-space-xs) 0;
+  }
+
+  .oi-blocked-secondary {
+    color:        var(--triarq-color-text-secondary);
+    font-size:    var(--triarq-text-small);
+    margin:       0;
+  }
+}
+
+// ── Sidebar nav item ──────────────────────────────────────────────────────────
+.oi-nav-item {
+  display:        flex;
+  align-items:    center;
+  gap:            var(--triarq-space-sm);
+  padding:        var(--triarq-space-sm) var(--triarq-space-md);
+  color:          var(--triarq-color-sidebar-text);
+  text-decoration: none;
+  border-left:    4px solid transparent;
+  transition:     background var(--triarq-transition-fast),
+                  border-left-color var(--triarq-transition-fast);
+  cursor:         pointer;
+  font-size:      var(--triarq-text-small);
+
+  &:hover {
+    background:   rgba(255, 255, 255, 0.06);
+  }
+
+  &.active {
+    // D-151: active sidebar item uses --triarq-color-primary as left border
+    border-left-color: var(--triarq-color-primary);
+    background:   rgba(37, 112, 153, 0.15);
+    color:        #ffffff;
+    font-weight:  var(--triarq-font-weight-medium);
+  }
+}
+
+// ── Lifecycle status pills ────────────────────────────────────────────────────
+.oi-status-pill {
+  display:        inline-flex;
+  align-items:    center;
+  padding:        2px var(--triarq-space-sm);
+  border-radius:  var(--triarq-radius-pill);
+  font-size:      var(--triarq-text-caption);
+  font-weight:    var(--triarq-font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  &.status-canon     { background: rgba(46,125,50,0.12);  color: var(--triarq-color-canon); }
+  &.status-candidate { background: rgba(245,124,0,0.12);  color: var(--triarq-color-candidate); }
+  &.status-seed_review { background: rgba(37,112,153,0.12); color: var(--triarq-color-primary); }
+  &.status-draft     { background: rgba(92,99,112,0.12);  color: var(--triarq-color-text-secondary); }
+  &.status-archived  { background: rgba(92,99,112,0.12);  color: var(--triarq-color-text-disabled); }
+  &.status-superseded { background: rgba(92,99,112,0.12); color: var(--triarq-color-text-disabled); }
+}
+
+// ── Home screen card grid ─────────────────────────────────────────────────────
+.oi-card-grid {
+  display:               grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap:                   var(--triarq-space-md);
+}

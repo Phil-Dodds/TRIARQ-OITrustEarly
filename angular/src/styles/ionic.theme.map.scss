@@ -1,0 +1,31 @@
+// ionic.theme.map.scss
+// Pathways OI Trust — Ionic theme mapping
+// Import in global.scss BEFORE the Ionic default theme (D-151).
+// Maps Ionic CSS variables to TRIARQ design tokens.
+// PROVISIONAL — pending designer confirmation per Build A pending item (Section 10).
+
+:root {
+  // Primary
+  --ion-color-primary:          var(--triarq-color-primary);
+  --ion-color-primary-rgb:      37, 112, 153;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-shade:    var(--triarq-color-primary-dark);
+  --ion-color-primary-tint:     var(--triarq-color-primary-light);
+
+  // Background & surface
+  --ion-background-color:       var(--triarq-color-background);
+  --ion-card-background:        var(--triarq-color-surface);
+
+  // Typography
+  --ion-font-family:            var(--triarq-font-family);
+  --ion-text-color:             var(--triarq-color-text-primary);
+  --ion-text-color-rgb:         26, 29, 35;
+
+  // Border
+  --ion-border-color:           var(--triarq-color-border);
+  --ion-item-border-color:      var(--triarq-color-border);
+
+  // Toolbar
+  --ion-toolbar-background:     var(--triarq-color-surface);
+  --ion-toolbar-color:          var(--triarq-color-text-primary);
+}

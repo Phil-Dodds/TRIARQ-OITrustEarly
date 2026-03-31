@@ -1,0 +1,73 @@
+/* triarq.tokens.v1.css
+   Pathways OI Trust — Design Token Source of Truth
+   Import in styles.scss as the first import.
+
+   CRITICAL: --triarq-text-h2 is 60px.
+   The value below corrects the data entry error (D-151).
+*/
+
+:root {
+  /* ── Brand colours ─────────────────────────────────────────────────────── */
+  --triarq-color-primary:        #257099;
+  --triarq-color-primary-light:  #3a8ab8;
+  --triarq-color-primary-dark:   #1a5373;
+  --triarq-color-accent:         #f0a500;
+  --triarq-color-accent-light:   #f5bc40;
+  --triarq-color-success:        #2e7d32;
+  --triarq-color-warning:        #f57c00;
+  --triarq-color-error:          #c62828;
+  --triarq-color-canon:          #2e7d32;
+  --triarq-color-candidate:      #f57c00;
+
+  /* ── Neutrals ───────────────────────────────────────────────────────────── */
+  --triarq-color-surface:        #ffffff;
+  --triarq-color-background:     #f5f6f8;
+  --triarq-color-border:         #dde1e7;
+  --triarq-color-text-primary:   #1a1d23;
+  --triarq-color-text-secondary: #5c6370;
+  --triarq-color-text-disabled:  #9ea7b3;
+  --triarq-color-sidebar-bg:     #1e2533;
+  --triarq-color-sidebar-text:   #c8d0dc;
+
+  /* ── Typography ─────────────────────────────────────────────────────────── */
+  --triarq-font-family:     'Roboto', sans-serif;
+  --triarq-text-h1:         48px;
+  --triarq-text-h2:         60px;   /* CORRECTED — token file had 20px in error (D-151) */
+  --triarq-text-h3:         24px;
+  --triarq-text-h4:         20px;
+  --triarq-text-body:       16px;
+  --triarq-text-small:      14px;
+  --triarq-text-caption:    12px;
+  --triarq-font-weight-regular: 400;
+  --triarq-font-weight-medium:  500;
+  --triarq-font-weight-bold:    700;
+  --triarq-line-height-body:    1.5;
+  --triarq-line-height-heading: 1.2;
+
+  /* ── Spacing ────────────────────────────────────────────────────────────── */
+  --triarq-space-xs:   4px;
+  --triarq-space-sm:   8px;
+  --triarq-space-md:   16px;
+  --triarq-space-lg:   24px;
+  --triarq-space-xl:   32px;
+  --triarq-space-2xl:  48px;
+  --triarq-space-3xl:  64px;
+
+  /* ── Border radius ──────────────────────────────────────────────────────── */
+  --triarq-radius-card:    10px;
+  --triarq-radius-button:  5px;
+  --triarq-radius-input:   5px;
+  --triarq-radius-pill:    999px;
+
+  /* ── Shadows ────────────────────────────────────────────────────────────── */
+  --triarq-shadow-card:   0 2px 8px rgba(0, 0, 0, 0.08);
+  --triarq-shadow-modal:  0 8px 32px rgba(0, 0, 0, 0.16);
+
+  /* ── Sidebar ────────────────────────────────────────────────────────────── */
+  --triarq-sidebar-width:          240px;
+  --triarq-sidebar-active-border:  4px solid var(--triarq-color-primary);
+
+  /* ── Transitions ────────────────────────────────────────────────────────── */
+  --triarq-transition-fast:   150ms ease;
+  --triarq-transition-normal: 250ms ease;
+}

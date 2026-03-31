@@ -1,0 +1,31 @@
+// app.module.ts — Pathways OI Trust
+// Native Federation remote — exposed module: AppModule (D-143).
+// Feature modules are lazy-loaded. No eagerly imported feature code here.
+// Zero Supabase client imports — auth is in AuthService only.
+
+import { NgModule }             from '@angular/core';
+import { BrowserModule }        from '@angular/platform-browser';
+import { HttpClientModule }     from '@angular/common/http';
+import { IonicModule }          from '@ionic/angular';
+import { AppRoutingModule }     from './app-routing.module';
+import { AppComponent }         from './app.component';
+import { LoginComponent }       from './features/login/login.component';
+import { SidebarComponent }     from './shared/components/sidebar/sidebar.component';
+import { BlockedActionComponent } from './shared/components/blocked-action/blocked-action.component';
+
+@NgModule({
+  declarations: [
+    AppComponent,
+    LoginComponent,
+    SidebarComponent
+  ],
+  imports: [
+    BrowserModule,
+    HttpClientModule,
+    IonicModule.forRoot(),
+    AppRoutingModule,
+    BlockedActionComponent      // standalone — imported, not declared
+  ],
+  bootstrap: [AppComponent]
+})
+export class AppModule {}

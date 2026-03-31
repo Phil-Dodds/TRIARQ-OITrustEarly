@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -o \"C:/Users/PhilipDodds/Downloads/files \\(43\\).zip\")",
+      "Bash(unzip -o \"C:/Users/PhilipDodds/Downloads/files \\(42\\).zip\")",
+      "Bash(unzip -o \"canonical-documents-2026-03-30v2.zip\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\PhilipDodds\\\\OneDrive - Triarq Health\\\\Desktop\\\\OI Trust Project Keepsakes\\\\OI TRUST Early Builds\\\\angular\")",
+      "Bash(npm install)",
+      "Bash(npm start)",
+      "Bash(npm install dotenv --save)"
+    ]
+  }
+}

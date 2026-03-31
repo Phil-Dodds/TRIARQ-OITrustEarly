@@ -1,0 +1,64 @@
+<!-- home.component.html — Pathways OI Trust
+     Role-aware home screen (D-150). Presentation only.
+     No logic beyond simple conditionals — all role decisions are in the component. -->
+
+<div class="oi-home-screen">
+
+  <!-- Loading state -->
+  <div *ngIf="loading" class="oi-home-loading">
+    <ion-spinner name="crescent" color="primary"></ion-spinner>
+    <p>Loading your workspace…</p>
+  </div>
+
+  <!-- No Division — onboarding message (D-150) -->
+  <app-onboarding-message-card
+    *ngIf="showOnboarding"
+    [displayName]="profile?.display_name ?? ''">
+  </app-onboarding-message-card>
+
+  <!-- Main card grid — shown only when user has at least one Division -->
+  <div *ngIf="showMainCards" class="oi-card-grid">
+
+    <!-- Universal cards — all roles -->
+    <app-my-action-queue-card
+      [userId]="profile?.id ?? ''">
+    </app-my-action-queue-card>
+
+    <app-my-notifications-card
+      [userId]="profile?.id ?? ''">
+    </app-my-notifications-card>
+
+    <!-- Phil only -->
+    <app-system-health-card
+      *ngIf="showSystemHealth">
+    </app-system-health-card>
+
+    <!-- All roles -->
+    <app-oi-library-card
+      [userId]="profile?.id ?? ''">
+    </app-oi-library-card>
+
+    <!-- Phil + Admin -->
+    <app-divisions-card
+      *ngIf="showDivisions"
+      [userId]="profile?.id ?? ''">
+    </app-divisions-card>
+
+    <!-- Admin only -->
+    <app-user-management-card
+      *ngIf="showUserManagement">
+    </app-user-management-card>
+
+    <!-- DS + CB — shell present, data wired in Build C -->
+    <app-my-delivery-cycles-card
+      *ngIf="showDeliveryCycles"
+      [userId]="profile?.id ?? ''">
+    </app-my-delivery-cycles-card>
+
+    <!-- All roles — Chat stub only in Build A (Session 2026-03-29-A) -->
+    <app-embedded-chat-card>
+    </app-embedded-chat-card>
+
+  </div>
+
+</div>
