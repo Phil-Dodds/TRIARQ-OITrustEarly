@@ -7,7 +7,18 @@
       "Bash(dir /s /b \"C:\\\\Users\\\\PhilipDodds\\\\OneDrive - Triarq Health\\\\Desktop\\\\OI Trust Project Keepsakes\\\\OI TRUST Early Builds\\\\angular\")",
       "Bash(npm install)",
       "Bash(npm start)",
-      "Bash(npm install dotenv --save)"
+      "Bash(npm install dotenv --save)",
+      "Bash(npm install --save-dev angular-cli-ghpages)",
+      "Bash(npm install --save-dev angular-cli-ghpages --legacy-peer-deps)",
+      "Bash(npx ng build --configuration production --base-href \"https://Phil-Dodds.github.io/TRIARQ-OITrustEarly/\")",
+      "Bash(npx ng build --configuration production --baseHref \"https://Phil-Dodds.github.io/TRIARQ-OITrustEarly/\")",
+      "Bash(npx ng build --configuration=production)",
+      "Bash(dir \"C:\\\\Users\\\\PhilipDodds\\\\OneDrive - Triarq Health\\\\Desktop\\\\OI Trust Project Keepsakes\\\\OI TRUST Early Builds\\\\angular\\\\dist\\\\pathways-oi-trust\\\\browser\")",
+      "Bash(dir /b \"C:\\\\Users\\\\PhilipDodds\\\\OneDrive - Triarq Health\\\\Desktop\\\\OI Trust Project Keepsakes\\\\OI TRUST Early Builds\\\\angular\\\\dist\\\\pathways-oi-trust\")",
+      "Bash(npm install @angular/animations@17 --legacy-peer-deps)",
+      "Bash(npx ng build --configuration=production --verbose)",
+      "Bash(npx ngh --dir=dist/pathways-oi-trust/browser --repo=https://github.com/Phil-Dodds/TRIARQ-OITrustEarly.git --branch=gh-pages --name=\"Phil Dodds\" --email=\"pdodds@triarqhealth.com\" --no-silent)",
+      "Bash(gh api repos/Phil-Dodds/TRIARQ-OITrustEarly/branches --jq '.[].name')"
     ]
   }
 }

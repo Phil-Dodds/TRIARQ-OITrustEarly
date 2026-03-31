@@ -36,11 +36,11 @@
           "defaultConfiguration": "production"
         },
         "_build": {
-          "builder": "@angular-devkit/build-angular:browser",
+          "builder": "@angular-devkit/build-angular:application",
           "options": {
             "outputPath": "dist/pathways-oi-trust",
             "index": "src/index.html",
-            "main": "src/main.ts",
+            "browser": "src/main.ts",
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
             "assets": [
@@ -55,10 +55,7 @@
               "src/styles/ionic.theme.map.scss",
               "src/styles.scss"
             ],
-            "scripts": [],
-            "allowedCommonJsDependencies": [
-              "@ionic/core"
-            ]
+            "scripts": []
           },
           "configurations": {
             "production": {
@@ -73,8 +70,6 @@
               "sourceMap": false,
               "namedChunks": false,
               "extractLicenses": true,
-              "vendorChunk": false,
-              "buildOptimizer": true,
               "budgets": [
                 {
                   "type": "initial",
@@ -89,9 +84,7 @@
               ]
             },
             "development": {
-              "buildOptimizer": false,
               "optimization": false,
-              "vendorChunk": true,
               "extractLicenses": false,
               "sourceMap": true,
               "namedChunks": true
@@ -102,15 +95,15 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "pathways-oi-trust:_build:development",
+            "buildTarget": "pathways-oi-trust:_build:development",
             "port": 4201
           },
           "configurations": {
             "production": {
-              "browserTarget": "pathways-oi-trust:_build:production"
+              "buildTarget": "pathways-oi-trust:_build:production"
             },
             "development": {
-              "browserTarget": "pathways-oi-trust:_build:development"
+              "buildTarget": "pathways-oi-trust:_build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -118,7 +111,7 @@
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "pathways-oi-trust:_build"
+            "buildTarget": "pathways-oi-trust:_build"
           }
         },
         "test": {

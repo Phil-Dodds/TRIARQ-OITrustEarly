@@ -30,11 +30,20 @@ module.exports = withNativeFederation({
     })
   },
 
-  // Skip RxJS sub-packages that are rarely used and inflate the shared chunk.
+  // Skip packages that cause Native Federation bundler errors.
+  // Ionic/Stencil use conditional Node.js imports that esbuild can't resolve
+  // in a browser-only build context. RxJS sub-paths inflate the shared chunk.
   skip: [
     'rxjs/ajax',
     'rxjs/fetch',
     'rxjs/testing',
-    'rxjs/webSocket'
+    'rxjs/webSocket',
+    '@angular/animations/browser',
+    '@stencil/core',
+    '@ionic/core',
+    '@ionic/angular',
+    '@ionic/angular/standalone',
+    'ionicons',
+    'ionicons/icons'
   ]
 });

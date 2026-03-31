@@ -6,6 +6,7 @@
 import { NgModule }             from '@angular/core';
 import { BrowserModule }        from '@angular/platform-browser';
 import { HttpClientModule }     from '@angular/common/http';
+import { ReactiveFormsModule }  from '@angular/forms';
 import { IonicModule }          from '@ionic/angular';
 import { AppRoutingModule }     from './app-routing.module';
 import { AppComponent }         from './app.component';
@@ -22,6 +23,7 @@ import { BlockedActionComponent } from './shared/components/blocked-action/block
   imports: [
     BrowserModule,
     HttpClientModule,
+    ReactiveFormsModule,
     IonicModule.forRoot(),
     AppRoutingModule,
     BlockedActionComponent      // standalone — imported, not declared

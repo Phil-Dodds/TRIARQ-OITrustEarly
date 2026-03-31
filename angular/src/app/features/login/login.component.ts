@@ -42,7 +42,7 @@ type LoginState = 'idle' | 'sending' | 'sent' | 'error';
           <app-blocked-action
             *ngIf="state === 'error'"
             [primaryMessage]="errorMessage"
-            [secondaryMessage]="'Check the email address and try again. If you don\'t have an account, contact your System Admin.'">
+            [secondaryMessage]="contactAdminMessage">
           </app-blocked-action>
 
           <button type="submit"
@@ -123,6 +123,7 @@ type LoginState = 'idle' | 'sending' | 'sent' | 'error';
 export class LoginComponent {
   state:        LoginState = 'idle';
   errorMessage  = '';
+  readonly contactAdminMessage = "Check the email address and try again. If you don't have an account, contact your System Admin.";
 
   loginForm: FormGroup;
 

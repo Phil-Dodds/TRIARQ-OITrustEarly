@@ -29,8 +29,8 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
     this.showSidebar$ = this.router.events.pipe(
-      filter(e => e instanceof NavigationEnd),
-      map((e: NavigationEnd) =>
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map(e =>
         this.auth.isAuthenticated() && !e.urlAfterRedirects.startsWith('/login')
       )
     );
