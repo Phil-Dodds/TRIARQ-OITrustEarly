@@ -12,6 +12,7 @@
 require('dotenv').config();
 
 const express           = require('express');
+const cors              = require('cors');
 const { validateJwt }  = require('./middleware/jwt');
 
 const { search_documents }        = require('./tools/search_documents');
@@ -26,6 +27,17 @@ const { update_document_metadata } = require('./tools/update_document_metadata')
 
 const app  = express();
 const PORT = process.env.PORT || 3002;
+
+// ── CORS — allow GitHub Pages and local dev origins ───────────────────────────
+// Must be before validateJwt so OPTIONS preflight requests are answered.
+app.use(cors({
+  origin: [
+    'https://phil-dodds.github.io',
+    'http://localhost:4201'
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Increase limit for base64 file uploads (25MB raw → ~34MB base64)
 app.use(express.json({ limit: '40mb' }));

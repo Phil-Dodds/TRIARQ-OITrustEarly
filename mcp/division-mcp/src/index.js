@@ -13,6 +13,7 @@
 require('dotenv').config();
 
 const express    = require('express');
+const cors       = require('cors');
 const { validateJwt } = require('./middleware/jwt');
 
 const { create_division }          = require('./tools/create_division');
@@ -28,6 +29,17 @@ const { list_users }               = require('./tools/list_users');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
+
+// ── CORS — allow GitHub Pages and local dev origins ───────────────────────────
+// Must be before validateJwt so OPTIONS preflight requests are answered.
+app.use(cors({
+  origin: [
+    'https://phil-dodds.github.io',
+    'http://localhost:4201'
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 app.use(express.json({ limit: '1mb' }));
 

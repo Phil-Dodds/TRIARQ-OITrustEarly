@@ -11,6 +11,10 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
+    <!-- es-module-shims: required for Native Federation shimMode (D-143).
+         Must load synchronously (no async/defer) — the shim must intercept
+         type="module-shim" scripts before the browser processes them. -->
+    <script src="https://ga.jspm.io/npm:es-module-shims@1.10.1/dist/es-module-shims.js"></script>
     <!-- Roboto — TRIARQ brand font per D-151 -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
