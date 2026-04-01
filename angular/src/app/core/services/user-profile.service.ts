@@ -24,20 +24,26 @@ export class UserProfileService {
 
   /** Loads the current user's public.users profile via division-mcp. */
   async loadProfile(): Promise<User | null> {
+    const devEmail = this.auth.getDevEmail();
     const authUser = this.auth.getCurrentUser();
-    if (!authUser) return null;
+
+    // Require either a dev bypass email or a real Supabase session
+    if (!devEmail && !authUser) return null;
 
     this._loading$.next(true);
     try {
       const response = await firstValueFrom(
         this.mcp.call<User[]>('division', 'list_users', {})
       );
-      if (response.success && response.data) {
-        const profile = response.data.find(u => u.id === authUser.id) ?? null;
-        this._profile$.next(profile);
-        return profile;
-      }
-      return null;
+      if (!response.success || !response.data) return null;
+
+      // Dev bypass: match by email. Magic link: match by Supabase user ID.
+      const profile = devEmail
+        ? (response.data.find(u => u.email?.toLowerCase() === devEmail) ?? null)
+        : (response.data.find(u => u.id === authUser!.id) ?? null);
+
+      this._profile$.next(profile);
+      return profile;
     } catch {
       return null;
     } finally {
