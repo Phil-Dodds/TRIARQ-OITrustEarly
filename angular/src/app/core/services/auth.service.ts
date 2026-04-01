@@ -64,8 +64,15 @@ export class AuthService {
     });
   }
 
-  /** Resolves once the initial session check is complete. Used by authGuard. */
+  /**
+   * Resolves once auth state is ready for the guard to check.
+   * Dev bypass: resolves immediately — no token exchange needed.
+   * Magic link: waits for getSession() to complete so any hash token is processed.
+   */
   waitForInit(): Promise<boolean> {
+    if (localStorage.getItem(DEV_EMAIL_KEY)) {
+      return Promise.resolve(true);
+    }
     return firstValueFrom(this._initialized$.pipe(filter(v => v)));
   }
 
