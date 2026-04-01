@@ -48,6 +48,11 @@
                 "glob": "**/*",
                 "input": "src/assets",
                 "output": "/assets"
+              },
+              {
+                "glob": "es-module-shims.js",
+                "input": "node_modules/es-module-shims/dist",
+                "output": "/"
               }
             ],
             "styles": [
@@ -59,6 +64,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/TRIARQ-OITrustEarly/",
               "fileReplacements": [
                 {
                   "replace": "src/environments/environment.ts",
