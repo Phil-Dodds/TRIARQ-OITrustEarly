@@ -11,6 +11,11 @@
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light" />
+    <!-- esms-options MUST appear before es-module-shims.js loads.
+         The shim reads this at init time (synchronous head script).
+         The body esms-options tag added by Native Federation comes too
+         late — the head has not yet seen the body when the shim runs. -->
+    <script type="esms-options">{"shimMode":true}</script>
     <!-- es-module-shims: required for Native Federation shimMode (D-143).
          Served locally (not from CDN) to guarantee availability.
          Must load synchronously — shim must intercept type="module-shim"
