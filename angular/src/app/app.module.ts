@@ -10,14 +10,16 @@ import { ReactiveFormsModule }  from '@angular/forms';
 import { IonicModule }          from '@ionic/angular';
 import { AppRoutingModule }     from './app-routing.module';
 import { AppComponent }         from './app.component';
-import { LoginComponent }       from './features/login/login.component';
-import { SidebarComponent }     from './shared/components/sidebar/sidebar.component';
+import { LoginComponent }        from './features/login/login.component';
+import { AuthCallbackComponent } from './features/login/auth-callback.component';
+import { SidebarComponent }      from './shared/components/sidebar/sidebar.component';
 import { BlockedActionComponent } from './shared/components/blocked-action/blocked-action.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     LoginComponent,
+    AuthCallbackComponent,
     SidebarComponent
   ],
   imports: [

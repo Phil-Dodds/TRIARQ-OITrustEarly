@@ -64,6 +64,16 @@ export class HomeComponent implements OnInit {
   get showDivisions():       boolean { return this.isPhil || this.isAdmin; }
   get showUserManagement():  boolean { return this.isAdmin; }
   get showDeliveryCycles():  boolean { return this.isDS || this.isCB; }
-  get showOnboarding():      boolean { return !this.hasDivision && !this.loading; }
-  get showMainCards():       boolean { return this.hasDivision && !this.loading; }
+
+  // Phil and Admin always see the main cards — they need the Divisions card to
+  // bootstrap the hierarchy before they can have a division assignment themselves.
+  // Other roles see the onboarding message until an admin assigns them.
+  get showOnboarding(): boolean {
+    return !this.hasDivision && !this.loading && !this.isPhil && !this.isAdmin;
+  }
+  get showMainCards(): boolean {
+    if (this.loading) return false;
+    if (this.isPhil || this.isAdmin) return true;  // always visible for bootstrap
+    return this.hasDivision;
+  }
 }

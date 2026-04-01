@@ -1,13 +1,14 @@
 // login.component.ts — Pathways OI Trust
-// Email OTP / magic link login. No password field (D-142).
-// Reactive form. Presentation only — auth logic delegated to AuthService.
+// Dev-mode login: user enters TRIARQ email, no verification required.
+// Magic link (D-142) re-enable: swap devSignIn() call back to sendMagicLink()
+// and restore the 'sent' state template.
 
-import { Component, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ChangeDetectorRef, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
 import { Router }      from '@angular/router';
 
-type LoginState = 'idle' | 'sending' | 'sent' | 'error';
+type LoginState = 'idle' | 'signing-in' | 'error';
 
 @Component({
   selector:        'app-login',
@@ -18,12 +19,17 @@ type LoginState = 'idle' | 'sending' | 'sent' | 'error';
 
         <div class="oi-login-brand">
           <h3>Pathways OI Trust</h3>
-          <p class="oi-login-subtitle">Organisational Intelligence Platform</p>
+          <p class="oi-login-subtitle">Organizational Intelligence Platform</p>
         </div>
 
-        <!-- Idle / sending state -->
-        <form *ngIf="state === 'idle' || state === 'sending' || state === 'error'"
-              [formGroup]="loginForm"
+        <!-- Callback error notice — shown when redirected back from a failed magic link -->
+        <div *ngIf="callbackErrorPrimary" class="oi-callback-notice">
+          <p class="oi-notice-primary">{{ callbackErrorPrimary }}</p>
+          <p class="oi-notice-secondary">{{ callbackErrorSecondary }}</p>
+        </div>
+
+        <!-- Email form -->
+        <form [formGroup]="loginForm"
               (ngSubmit)="onSubmit()"
               novalidate>
 
@@ -42,26 +48,16 @@ type LoginState = 'idle' | 'sending' | 'sent' | 'error';
           <app-blocked-action
             *ngIf="state === 'error'"
             [primaryMessage]="errorMessage"
-            [secondaryMessage]="contactAdminMessage">
+            [secondaryMessage]="''">
           </app-blocked-action>
 
           <button type="submit"
                   class="oi-btn-primary"
-                  [disabled]="state === 'sending'">
-            {{ state === 'sending' ? 'Sending link…' : 'Send magic link' }}
+                  [disabled]="state === 'signing-in'">
+            {{ state === 'signing-in' ? 'Signing in…' : 'Sign in' }}
           </button>
 
         </form>
-
-        <!-- Sent state -->
-        <div *ngIf="state === 'sent'" class="oi-login-sent">
-          <p class="oi-sent-primary">Check your email</p>
-          <p class="oi-sent-secondary">
-            A sign-in link has been sent to <strong>{{ loginForm.value.email }}</strong>.
-            Click the link to access your workspace. The link expires in 1 hour.
-          </p>
-          <button class="oi-btn-ghost" (click)="reset()">Try a different email</button>
-        </div>
 
       </div>
     </div>
@@ -114,27 +110,70 @@ type LoginState = 'idle' | 'sending' | 'sent' | 'error';
     .oi-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
     .oi-btn-primary:hover:not(:disabled) { background: var(--triarq-color-primary-dark); }
 
+    .oi-callback-notice {
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      border-radius: var(--triarq-radius-card);
+      padding: var(--triarq-space-sm) var(--triarq-space-md);
+      margin-bottom: var(--triarq-space-md);
+    }
+    .oi-notice-primary { font-size: var(--triarq-text-small); font-weight: var(--triarq-font-weight-medium); margin: 0 0 var(--triarq-space-xs) 0; color: var(--triarq-color-text-primary); }
+    .oi-notice-secondary { font-size: var(--triarq-text-caption); color: var(--triarq-color-text-secondary); margin: 0; }
+
     .oi-login-sent { text-align: center; }
     .oi-sent-primary { font-size: var(--triarq-text-h4); font-weight: var(--triarq-font-weight-medium); margin-bottom: var(--triarq-space-sm); }
-    .oi-sent-secondary { font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); line-height: 1.6; }
+    .oi-sent-secondary { font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); line-height: 1.6; margin-bottom: var(--triarq-space-xs); }
+    .oi-sent-expiry { font-size: var(--triarq-text-caption); color: var(--triarq-color-text-secondary); margin: 0 0 var(--triarq-space-sm) 0; }
+    .oi-sent-browser-note {
+      font-size: var(--triarq-text-caption);
+      color: var(--triarq-color-text-secondary);
+      background: var(--triarq-color-surface);
+      border-radius: var(--triarq-radius-card);
+      padding: var(--triarq-space-xs) var(--triarq-space-sm);
+      margin: var(--triarq-space-sm) 0;
+      line-height: 1.5;
+    }
     .oi-btn-ghost { background: none; border: none; color: var(--triarq-color-primary); cursor: pointer; font-size: var(--triarq-text-small); margin-top: var(--triarq-space-md); text-decoration: underline; }
   `]
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   state:        LoginState = 'idle';
   errorMessage  = '';
-  readonly contactAdminMessage = "Check the email address and try again. If you don't have an account, contact your System Admin.";
+
+  // Shown when redirected back from a failed magic-link callback (re-enable path).
+  callbackErrorPrimary   = '';
+  callbackErrorSecondary = '';
 
   loginForm: FormGroup;
 
   constructor(
-    private readonly fb:   FormBuilder,
-    private readonly auth: AuthService,
-    private readonly cdr:  ChangeDetectorRef
+    private readonly fb:     FormBuilder,
+    private readonly auth:   AuthService,
+    private readonly router: Router,
+    private readonly cdr:    ChangeDetectorRef
   ) {
     this.loginForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]]
     });
+  }
+
+  ngOnInit(): void {
+    // Reads error reason passed via navigation state from AuthCallbackComponent
+    // (magic link re-enable path — harmless no-op in dev bypass mode).
+    const navState = history.state as { callbackError?: string };
+    if (navState?.callbackError) {
+      const code = navState.callbackError;
+      if (code === 'otp_expired') {
+        this.callbackErrorPrimary   = 'Your sign-in link has expired.';
+        this.callbackErrorSecondary = 'Links are valid for 1 hour. Request a new one below.';
+      } else if (code === 'otp_disabled') {
+        this.callbackErrorPrimary   = 'Sign-in links are not enabled for this account.';
+        this.callbackErrorSecondary = 'Contact your System Admin.';
+      } else {
+        this.callbackErrorPrimary   = 'Your sign-in link is invalid.';
+        this.callbackErrorSecondary = 'This can happen if the link was already used. Request a new one below.';
+      }
+    }
   }
 
   get emailInvalid(): boolean {
@@ -146,24 +185,20 @@ export class LoginComponent {
     this.loginForm.markAllAsTouched();
     if (this.loginForm.invalid) return;
 
-    this.state = 'sending';
+    this.state = 'signing-in';
     this.cdr.markForCheck();
 
-    const { error } = await this.auth.sendMagicLink(this.loginForm.value.email);
+    // Dev bypass — no email sent, navigates directly to home.
+    // Re-enable magic link: replace this block with sendMagicLink() call.
+    const { error } = this.auth.devSignIn(this.loginForm.value.email);
 
     if (error) {
       this.state        = 'error';
-      this.errorMessage = 'We couldn\'t send the sign-in link.';
-    } else {
-      this.state = 'sent';
+      this.errorMessage = error;
+      this.cdr.markForCheck();
+      return;
     }
 
-    this.cdr.markForCheck();
-  }
-
-  reset(): void {
-    this.state = 'idle';
-    this.loginForm.reset();
-    this.cdr.markForCheck();
+    await this.router.navigate(['/home'], { replaceUrl: true });
   }
 }

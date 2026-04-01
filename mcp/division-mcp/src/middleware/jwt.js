@@ -1,19 +1,20 @@
 // jwt.js
 // Pathways OI Trust — division-mcp
 // JWT validation middleware. Fires on every request before any tool logic.
-// Returns 401 on any failure — no exceptions, no bypasses (D-93, D-142).
+// Returns 401 on any failure — no exceptions (D-93, D-142).
 //
-// Uses Supabase auth.getUser() to validate tokens — works with both HS256
-// and RS256 signing (Supabase newer projects use asymmetric RS256).
-// No JWT secret or Key ID required. The Supabase service client handles
-// all cryptographic verification internally.
+// Two auth paths:
+//   1. Normal (magic link): Bearer <supabase-jwt> — validated via supabase.auth.getUser()
+//   2. Dev bypass: Bearer devbypass::<DEV_BYPASS_TOKEN>::<email> — active only when
+//      DEV_BYPASS_TOKEN env var is set. Looks up user by email in public.users.
+//      Remove DEV_BYPASS_TOKEN from Render env to disable dev bypass entirely.
 
 'use strict';
 
 const { supabase } = require('../db');
 
 /**
- * Validates the Supabase JWT from the Authorization header.
+ * Validates the Authorization header.
  * On success: attaches { user_id, email } to req.auth and calls next().
  * On failure: returns 401 with { success: false, error: string }.
  */
@@ -28,6 +29,53 @@ async function validateJwt(req, res, next) {
   }
 
   const token = authHeader.slice(7);
+
+  // ── Dev bypass ────────────────────────────────────────────────────────────
+  // Active only when DEV_BYPASS_TOKEN is set in the MCP server environment.
+  // Token format: devbypass::<DEV_BYPASS_TOKEN>::<email>
+  const DEV_BYPASS = process.env.DEV_BYPASS_TOKEN;
+  if (DEV_BYPASS && token.startsWith('devbypass::')) {
+    const parts = token.split('::');
+    // parts[0] = 'devbypass', parts[1] = bypass token, parts[2] = email
+    if (parts.length !== 3 || parts[1] !== DEV_BYPASS || !parts[2]) {
+      return res.status(401).json({
+        success: false,
+        error: 'Dev bypass token invalid or malformed.'
+      });
+    }
+
+    const devEmail = parts[2].toLowerCase();
+
+    try {
+      const { data: userRecord, error: userErr } = await supabase
+        .from('users')
+        .select('id, email')
+        .eq('email', devEmail)
+        .is('deleted_at', null)
+        .eq('is_active', true)
+        .single();
+
+      if (userErr || !userRecord) {
+        return res.status(401).json({
+          success: false,
+          error: `Dev bypass: no active user found for ${devEmail}.`
+        });
+      }
+
+      req.auth = {
+        user_id: userRecord.id,
+        email:   userRecord.email
+      };
+
+      return next();
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        error: 'Dev bypass: user lookup failed.'
+      });
+    }
+  }
+  // ── End dev bypass ────────────────────────────────────────────────────────
 
   try {
     const { data, error } = await supabase.auth.getUser(token);

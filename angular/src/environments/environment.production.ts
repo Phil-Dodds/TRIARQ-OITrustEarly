@@ -6,6 +6,10 @@ export const environment = {
   production:      true,
   supabaseUrl:     'https://dpnkxrrtqfqkhuzbljbw.supabase.co',
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRwbmt4cnJ0cWZxa2h1emJsamJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MjEzMjMsImV4cCI6MjA5MDM5NzMyM30.iAUiT3qpUpjxg1JMkybHII48hiEeJW449Gp3rl_UHFQ',
+  appUrl:          'https://phil-dodds.github.io/TRIARQ-OITrustEarly/auth/callback',
+  // Dev bypass — must match DEV_BYPASS_TOKEN env var on both Render MCP services.
+  // Remove from Render env vars when re-enabling magic link auth.
+  devBypassToken:  'dev-bypass-oi-trust-2026',
   divisionMcpUrl:  'https://division-mcp.onrender.com',
   documentMcpUrl:  'https://document-access-mcp.onrender.com'
 };
