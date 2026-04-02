@@ -1,5 +1,5 @@
 # CLAUDE.md
-Pathways OI Trust | Build A — Foundation | March 2026 | CONFIDENTIAL
+Pathways OI Trust | Build C — Delivery Cycle Tracker | April 2026 | CONFIDENTIAL
 Owner: Phil Sappington, EVP Performance & Governance
 
 ---
@@ -15,9 +15,9 @@ GOVERNING_DOCS_MCP_ENDPOINT=PLACEHOLDER — replace with Render URL for document
 ```
 
 After `get_session_context` returns:
-1. Confirm build scope is **Build A** before proceeding
+1. Confirm build scope is **Build C** before proceeding
 2. Read the Master Build Plan
-3. Read the Build A Specification
+3. Read the Build C Specification (`build-c-spec.md`)
 4. Begin work
 
 ---
@@ -57,17 +57,20 @@ Violation of either rule is a hard build error — not a soft gate.
 
 ---
 
-## Build A Scope
+## Build C Scope
 
-Build A delivers four things. Nothing else is in scope.
+Build C delivers the Delivery Cycle management layer. Nothing else is in scope.
 
-1. **Container / Division Hierarchy** — nine-Trust hierarchy, recursive Divisions, admin UI, role assignment
-2. **Bulk Knowledge Seed** — batch upload, ClamAV scan, seed_review state, batch approval, directory import
-3. **Document Access MCP** (`document-access-mcp`) — nine tools, human governance + agent consumption layers
-4. **Division MCP** (`division-mcp`) — ten tools, admin-only writes
-5. **Home Screen** — role-aware cards per D-150; Chat card is a **stub only** — no chat skill, no Vertex AI
+1. **Delivery Cycle MCP** (`delivery-cycle-mcp`) — 16 tools, full lifecycle management
+2. **Delivery Workstream Registry** — admin UI, create/manage Workstreams, gate enforcement integration
+3. **Delivery Cycle Dashboard** — role-aware, all cycles visible per Division access
+4. **Delivery Cycle Detail View** — Stage Track, milestone dates, artifact slots, gate records, event log
+5. **Gate Workflow** — Brief Review, Go to Build, Go to Deploy, Go to Release, Close Review
+6. **Cycle Artifact Tracking** — 26 seeded slots by stage, ad hoc attachment, MSO365 pointer model
+7. **Build Report OI Library Stub** — UI and data wired; OI Library submission completes in Build B
+8. **Jira Sync** — five governance fields read/write via MCP; graceful stub if unconfigured
 
-Embedded chat is **Build B**. Do not wire the chat skill or any Vertex AI dependency in Build A.
+OI Library submission workflow, embedded chat, and notification SLA timers are **Build B / D**. Do not wire them in Build C.
 
 ---
 
@@ -79,7 +82,7 @@ Applied to every table without exception.
 - `created_at` and `updated_at` timestamptz on all tables
 - Soft delete: `deleted_at` timestamptz — never hard delete
 - `WHERE deleted_at IS NULL` on every SELECT on soft-deletable tables
-- All foreign keys `ON DELETE RESTRICT` unless the Build A Specification explicitly states otherwise
+- All foreign keys `ON DELETE RESTRICT` unless the Build C Specification explicitly states otherwise
 - Parameterized statements only — no string interpolation in SQL
 
 RLS is **disabled**. JWT validation and Division-scoped access control live in the MCP layer.
@@ -88,7 +91,7 @@ RLS is **disabled**. JWT validation and Division-scoped access control live in t
 
 ## MCP Server Rules
 
-Applied to both `document-access-mcp` and `division-mcp`.
+Applied to `document-access-mcp`, `division-mcp`, and `delivery-cycle-mcp`.
 
 - Stateless Node.js on Render
 - JWT validation middleware fires on **every request** before any tool logic executes — 401 on failure, no exceptions
@@ -146,54 +149,69 @@ Never return error codes or silent failures. Source: D-140.
 ## Code Generation Rules
 
 - Generate tests alongside every code file — CB reviews coverage before QA
-- Confirm current build scope (Build A) before beginning any file
+- Confirm current build scope (Build C) before beginning any file
 - Never expand scope mid-build — a scope question requires stopping and asking, not inferring and building
 - If any environment variable placeholder is still unset when a dependent operation is attempted, stop and report which variable is missing
 
 ---
 
-## Build A Acceptance Criteria (summary)
+## Build C Acceptance Criteria (summary)
 
-Build A is complete when all of the following are demonstrable against real data:
+Build C is complete when all of the following are demonstrable against real data:
 
-- Nine-Trust Division hierarchy created via admin UI
-- Child Divisions created at least two levels deep
-- Users created, assigned to Divisions, role-aware home screen confirmed per role
-- Downward access inheritance works; upward access blocked
-- Admin/functional role separation enforced (allow_both=false hard block)
-- Batch upload: files scan clean, reach seed_review status
-- Batch approval: transitions to candidate, triggers document_embeddings rows
-- Home screen correct for all five roles (Phil, DS, CB, CE, Admin)
-- No-Division user sees onboarding message
-- Unauthenticated MCP call returns 401
+- Admin can create a Delivery Workstream, assign a lead, link to a Division, toggle active/inactive
+- DS or Phil can create a Delivery Cycle, select Workstream, set tier, see on dashboard
+- Dashboard renders intelligent headline, current stage, Pilot Start Date, Production Release Date per date state model
+- Cycle advances through at least three stages; gate records created at correct positions
+- Gate clearance on inactive Workstream returns correct blocked message; records workstream_active_at_clearance = false
+- Target date set by user; actual date recorded on gate clearance; date status correct per state model
+- Outcome Statement amber warning visible when null; inline edit sets value and clears warning
+- StageTrackComponent Full mode: 12 stages, 5 gate nodes, gate click opens gate record panel; Condensed mode on dashboard
+- All 26 artifact slots visible in correct stage groupings; attach works for external URL and ad hoc
+- Event log shows every stage advance, gate decision, artifact attachment, outcome set in order
+- Jira stub: sync panel visible; graceful message if unconfigured; five fields sync if configured
+- Build Report stub: slot present, attach works, OI Library submission button returns stub message
+- Unauthenticated call to delivery-cycle-mcp returns 401
 - Zero Supabase client imports in any Angular component or service
 
-Full acceptance criteria with demonstration method in Build A Specification Section 9.
+Full acceptance criteria in Build C Specification Section 8.
 
 ---
 
 ## Key Decision References
 
-Decisions are locked in `decisions-active.md`. Do not re-litigate locked decisions. If a decision reference appears below and seems to conflict with an instruction here, this file takes precedence for Build A execution — raise the conflict rather than resolving it silently.
+Decisions are locked in `decisions-active.md`. Do not re-litigate locked decisions. If a decision reference appears below and seems to conflict with an instruction here, this file takes precedence for Build C execution — raise the conflict rather than resolving it silently.
+
+**Carried from Build A (project-wide):**
 
 | Decision | What It Locks |
 |----------|--------------|
 | D-93 | MCP-only DB access; UI as presentation layer only |
-| D-131 | Permissions model: role-aware, permissions-deferred |
-| D-134 | Division as universal container primitive |
-| D-135 | Hierarchical admin model — downward only |
-| D-136 | System-level roles — one per user |
-| D-139 | Admin + functional role separation with override |
 | D-140 | Blocked action UX standard |
-| D-142 | Email OTP via Supabase Auth; 30-day session |
 | D-143 | Angular Native Federation remote |
 | D-144 | MCP server pattern |
-| D-145 | 13 seeded system artifact types |
-| D-146 | Supported file formats and size limits |
-| D-147 | Document Access MCP tool set |
-| D-150 | Home screen card definitions per role |
 | D-151 | Design token rules (h2=60px critical fix) |
 | D-155 | On-demand MCP tool loading |
-| Session 2026-03-29-A | Embedded chat is Build B — stub only in Build A |
-| Session 2026-03-29-B | Division MCP name (`division-mcp`) |
-| Session 2026-03-29-E | GCP account confirmed ready |
+
+**Build C specific:**
+
+| Decision | What It Locks |
+|----------|--------------|
+| D-67 | Jira link model — bidirectional, one cycle to multiple epics |
+| D-83 | Delivery Cycle as primary unit of work |
+| D-108 | 12-stage lifecycle with 5 gates |
+| D-113 | Cycle artifacts live on cycle until Build Report canonization |
+| D-115 | Cursor Prompt as BUILD phase working artifact |
+| D-117 | Jira MCP integration — OI Trust as system of record |
+| D-124 | Tier set at BRIEF stage |
+| D-125 | Append-only event log on every cycle |
+| D-154 | Five named gates |
+| ARCH-12 | Gate positions in 12-stage lifecycle |
+| ARCH-16 | Jira MCP read/write contract — five governance fields |
+| ARCH-23 | Delivery Workstream schema and gate enforcement |
+| ARCH-24 | Cycle artifact tracking tables |
+| ARCH-25 | StageTrackComponent contract |
+| Session 2026-03-24-A | Date field state model |
+| Session 2026-03-24-P | Build sequence revised to A→C→B→D→E→F |
+| Session 2026-03-25-F | Full artifact slot seed set (26 rows) |
+| Session 2026-03-25-G | MSO365 → OI Library pointer transition model |
