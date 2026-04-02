@@ -3,11 +3,15 @@
 // Acceptance criteria: users created, assigned to Divisions, role-aware home confirmed.
 // Roles: admin + phil (route protected by authGuard).
 // D-93:  McpService only — no direct Supabase access.
+// D-135: Trust-level assignment gives downward-inherited access to all child Divisions.
 // D-139: Only 'phil' role can set allow_both_admin_and_functional_roles = true.
 // D-140: Blocked action UX on all errors.
 //
 // NOTE: Sort by last login is not implemented — last_login_at is not in the
 // current schema. Requires schema addition before that column can be sorted.
+//
+// NOTE: Division assignment picker shows Trusts only (level 0). Trust membership
+// grants inherited access to all child Service Lines and Functions (D-135).
 
 import {
   Component,
@@ -20,6 +24,7 @@ import { RouterModule }        from '@angular/router';
 import {
   ReactiveFormsModule,
   FormBuilder,
+  FormControl,
   FormGroup,
   Validators
 } from '@angular/forms';
@@ -27,7 +32,15 @@ import { IonicModule }                 from '@ionic/angular';
 import { McpService }                  from '../../../core/services/mcp.service';
 import { UserProfileService }          from '../../../core/services/user-profile.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
-import { User, SystemRole }            from '../../../core/types/database';
+import { User, SystemRole, Division }  from '../../../core/types/database';
+
+/** get_user_divisions response shape */
+interface UserDivisionsData {
+  user_id:                    string;
+  display_name:               string;
+  directly_assigned_divisions: Division[];
+  all_accessible_divisions:   (Division & { access_type: 'direct' | 'inherited' })[];
+}
 
 @Component({
   selector: 'app-users',
@@ -41,7 +54,7 @@ import { User, SystemRole }            from '../../../core/types/database';
     BlockedActionComponent
   ],
   template: `
-    <div class="oi-card" style="max-width:900px;margin:var(--triarq-space-2xl) auto;">
+    <div class="oi-card" style="max-width:960px;margin:var(--triarq-space-2xl) auto;">
 
       <!-- Header ────────────────────────────────────────────────────────── -->
       <div style="display:flex;align-items:center;justify-content:space-between;
@@ -169,7 +182,7 @@ import { User, SystemRole }            from '../../../core/types/database';
 
         <!-- Column headers -->
         <div
-          style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 60px;
+          style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 130px;
                  gap:var(--triarq-space-sm);padding:var(--triarq-space-xs) var(--triarq-space-sm);
                  font-size:var(--triarq-text-small);font-weight:500;
                  color:var(--triarq-color-text-secondary);
@@ -185,12 +198,12 @@ import { User, SystemRole }            from '../../../core/types/database';
           <span></span>
         </div>
 
-        <!-- Each user row + optional inline edit -->
+        <!-- Each user row + optional inline panels -->
         <div *ngFor="let user of filteredSortedUsers">
 
           <!-- Row -->
           <div
-            style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 60px;
+            style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 130px;
                    gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
                    border-bottom:1px solid var(--triarq-color-border);
                    font-size:var(--triarq-text-small);align-items:center;"
@@ -217,19 +230,18 @@ import { User, SystemRole }            from '../../../core/types/database';
                   : 'var(--triarq-color-error)'"
               >{{ user.is_active ? 'Active' : 'Inactive' }}</span>
             </span>
-            <span style="text-align:right;">
+            <!-- Action buttons: Edit | Assign -->
+            <span style="display:flex;gap:var(--triarq-space-sm);justify-content:flex-end;">
               <button
-                *ngIf="editingUserId !== user.id"
-                (click)="startEdit(user)"
+                (click)="editingUserId === user.id ? cancelEdit() : startEdit(user)"
                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                        background:none;border:none;cursor:pointer;padding:0;"
-              >Edit</button>
+              >{{ editingUserId === user.id ? 'Cancel' : 'Edit' }}</button>
               <button
-                *ngIf="editingUserId === user.id"
-                (click)="cancelEdit()"
-                style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                (click)="divisionsUserId === user.id ? closeDivisions() : openDivisions(user)"
+                style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                        background:none;border:none;cursor:pointer;padding:0;"
-              >Cancel</button>
+              >{{ divisionsUserId === user.id ? 'Close' : 'Assign' }}</button>
             </span>
           </div>
 
@@ -286,6 +298,95 @@ import { User, SystemRole }            from '../../../core/types/database';
             </form>
           </div>
 
+          <!-- Division assignment panel -->
+          <div
+            *ngIf="divisionsUserId === user.id"
+            style="background:var(--triarq-color-background-subtle);
+                   padding:var(--triarq-space-sm) var(--triarq-space-md);
+                   border-bottom:1px solid var(--triarq-color-border);"
+          >
+            <div style="font-size:var(--triarq-text-small);font-weight:500;
+                        margin-bottom:var(--triarq-space-xs);">
+              Division Assignments — {{ user.display_name }}
+            </div>
+
+            <!-- Loading memberships -->
+            <div
+              *ngIf="loadingMemberships"
+              style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);"
+            >Loading…</div>
+
+            <!-- Current direct assignments -->
+            <div *ngIf="!loadingMemberships">
+              <div
+                *ngIf="userDirectDivisions.length === 0"
+                style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                       margin-bottom:var(--triarq-space-xs);"
+              >Not assigned to any Division.</div>
+
+              <div
+                *ngIf="userDirectDivisions.length > 0"
+                style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:var(--triarq-space-sm);"
+              >
+                <span
+                  *ngFor="let div of userDirectDivisions"
+                  style="display:inline-flex;align-items:center;gap:4px;
+                         background:var(--triarq-color-primary);color:#fff;
+                         border-radius:999px;padding:2px 10px 2px 12px;
+                         font-size:var(--triarq-text-small);"
+                >
+                  {{ div.division_name }}
+                  <button
+                    (click)="revokeAssignment(div.id)"
+                    [disabled]="revokingDivisionId === div.id"
+                    style="background:none;border:none;color:#fff;cursor:pointer;
+                           font-size:14px;line-height:1;padding:0 0 0 2px;opacity:0.8;"
+                    title="Remove"
+                  >{{ revokingDivisionId === div.id ? '…' : '×' }}</button>
+                </span>
+              </div>
+
+              <!-- Add a Trust -->
+              <div
+                *ngIf="availableTrusts.length > 0"
+                style="display:flex;gap:var(--triarq-space-sm);align-items:center;"
+              >
+                <select
+                  [formControl]="trustPickerControl"
+                  class="oi-input"
+                  style="max-width:300px;"
+                >
+                  <option value="">— Assign a Trust —</option>
+                  <option *ngFor="let t of availableTrusts" [value]="t.id">
+                    {{ t.division_name }}
+                  </option>
+                </select>
+                <button
+                  class="oi-btn-primary"
+                  (click)="submitAssign()"
+                  [disabled]="!trustPickerControl.value || assigning"
+                  style="font-size:var(--triarq-text-small);white-space:nowrap;"
+                >{{ assigning ? 'Assigning…' : 'Assign' }}</button>
+              </div>
+              <div
+                *ngIf="availableTrusts.length === 0 && !loadingMemberships"
+                style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);"
+              >Assigned to all available Trusts.</div>
+
+              <!-- Errors (D-140) -->
+              <div
+                *ngIf="assignError"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);
+                       margin-top:var(--triarq-space-xs);"
+              >{{ assignError }}</div>
+              <div
+                *ngIf="membershipsError"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);
+                       margin-top:var(--triarq-space-xs);"
+              >{{ membershipsError }}</div>
+            </div>
+          </div>
+
         </div>
 
         <!-- Zero results after filter -->
@@ -331,7 +432,7 @@ import { User, SystemRole }            from '../../../core/types/database';
 })
 export class UsersComponent implements OnInit {
 
-  // ── State ──────────────────────────────────────────────────────────────────
+  // ── User list state ────────────────────────────────────────────────────────
   users:           User[]       = [];
   loading          = false;
   showInviteForm   = false;
@@ -342,11 +443,7 @@ export class UsersComponent implements OnInit {
   blockedHint      = '';
   inviteForm!:     FormGroup;
 
-  editingUserId:   string | null = null;
-  editForm!:       FormGroup;
-  saving           = false;
-  editError        = '';
-
+  // ── Sort / filter state ────────────────────────────────────────────────────
   roleFilter:   string       = 'all';
   nameSortDir:  'asc'|'desc' = 'asc';
 
@@ -358,6 +455,24 @@ export class UsersComponent implements OnInit {
     { value: 'admin', label: 'Admin' },
     { value: 'phil',  label: 'Phil' }
   ];
+
+  // ── Edit user state ────────────────────────────────────────────────────────
+  editingUserId:   string | null = null;
+  editForm!:       FormGroup;
+  saving           = false;
+  editError        = '';
+
+  // ── Division assignment state ──────────────────────────────────────────────
+  divisionsUserId:       string | null = null;
+  userDirectDivisions:   Division[]    = [];
+  loadingMemberships     = false;
+  membershipsError       = '';
+  allTrusts:             Division[]    = [];
+  trustsLoaded           = false;
+  trustPickerControl     = new FormControl<string>('');
+  assigning              = false;
+  assignError            = '';
+  revokingDivisionId:    string | null = null;
 
   constructor(
     private readonly mcp:     McpService,
@@ -391,6 +506,12 @@ export class UsersComponent implements OnInit {
       return this.nameSortDir === 'asc' ? cmp : -cmp;
     });
     return result;
+  }
+
+  /** Trusts not yet directly assigned to the current divisions user. */
+  get availableTrusts(): Division[] {
+    const assignedIds = new Set(this.userDirectDivisions.map(d => d.id));
+    return this.allTrusts.filter(t => !assignedIds.has(t.id));
   }
 
   setRoleFilter(role: string): void {
@@ -479,8 +600,9 @@ export class UsersComponent implements OnInit {
 
   // ── Edit user ───────────────────────────────────────────────────────────────
   startEdit(user: User): void {
-    this.editingUserId = user.id;
-    this.editError     = '';
+    this.editingUserId  = user.id;
+    this.editError      = '';
+    this.divisionsUserId = null;  // close division panel if open
     this.editForm.setValue({
       display_name: user.display_name,
       system_role:  user.system_role,
@@ -524,6 +646,134 @@ export class UsersComponent implements OnInit {
         error: (err: { error?: string }) => {
           this.editError = err.error ?? 'Save failed. Check permissions and try again.';
           this.saving    = false;
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  // ── Division assignment ────────────────────────────────────────────────────
+  openDivisions(user: User): void {
+    this.divisionsUserId  = user.id;
+    this.editingUserId    = null;  // close edit panel if open
+    this.assignError      = '';
+    this.membershipsError = '';
+    this.trustPickerControl.setValue('');
+    this.userDirectDivisions = [];
+    this.loadMemberships(user.id);
+    this.loadTrustsOnce();
+    this.cdr.markForCheck();
+  }
+
+  closeDivisions(): void {
+    this.divisionsUserId     = null;
+    this.userDirectDivisions = [];
+    this.assignError         = '';
+    this.membershipsError    = '';
+    this.trustPickerControl.setValue('');
+    this.cdr.markForCheck();
+  }
+
+  private loadMemberships(userId: string): void {
+    this.loadingMemberships = true;
+    this.membershipsError   = '';
+    this.cdr.markForCheck();
+
+    this.mcp
+      .call<UserDivisionsData>('division', 'get_user_divisions', { user_id: userId })
+      .subscribe({
+        next: (res) => {
+          if (res.success && res.data) {
+            this.userDirectDivisions = res.data.directly_assigned_divisions ?? [];
+          } else {
+            this.membershipsError = res.error ?? 'Could not load Division assignments.';
+          }
+          this.loadingMemberships = false;
+          this.cdr.markForCheck();
+        },
+        error: (err: { error?: string }) => {
+          this.membershipsError   = err.error ?? 'Could not load Division assignments.';
+          this.loadingMemberships = false;
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  /** Loads the Trust list once per component lifetime — reused across all users. */
+  private loadTrustsOnce(): void {
+    if (this.trustsLoaded) { return; }
+
+    this.mcp
+      .call<Division[]>('division', 'list_divisions', { parent_division_id: null })
+      .subscribe({
+        next: (res) => {
+          if (res.success && res.data) {
+            this.allTrusts    = Array.isArray(res.data) ? res.data : [];
+            this.trustsLoaded = true;
+          }
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          // Non-fatal — picker just stays empty, user sees "no available Trusts" message.
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  submitAssign(): void {
+    const divisionId = this.trustPickerControl.value;
+    if (!divisionId || !this.divisionsUserId) { return; }
+    this.assigning   = true;
+    this.assignError = '';
+    this.cdr.markForCheck();
+
+    this.mcp
+      .call<unknown>('division', 'assign_user_to_division', {
+        user_id:     this.divisionsUserId,
+        division_id: divisionId
+      })
+      .subscribe({
+        next: (res) => {
+          if (res.success) {
+            this.trustPickerControl.setValue('');
+            this.loadMemberships(this.divisionsUserId!);
+          } else {
+            this.assignError = res.error ?? 'Assign failed.';
+          }
+          this.assigning = false;
+          this.cdr.markForCheck();
+        },
+        error: (err: { error?: string }) => {
+          this.assignError = err.error ?? 'Assign failed. Check permissions and try again.';
+          this.assigning   = false;
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  revokeAssignment(divisionId: string): void {
+    if (!this.divisionsUserId) { return; }
+    this.revokingDivisionId = divisionId;
+    this.assignError        = '';
+    this.cdr.markForCheck();
+
+    this.mcp
+      .call<unknown>('division', 'revoke_division_membership', {
+        user_id:     this.divisionsUserId,
+        division_id: divisionId
+      })
+      .subscribe({
+        next: (res) => {
+          if (res.success) {
+            this.loadMemberships(this.divisionsUserId!);
+          } else {
+            this.assignError = res.error ?? 'Remove failed.';
+          }
+          this.revokingDivisionId = null;
+          this.cdr.markForCheck();
+        },
+        error: (err: { error?: string }) => {
+          this.assignError        = err.error ?? 'Remove failed. Check permissions and try again.';
+          this.revokingDivisionId = null;
           this.cdr.markForCheck();
         }
       });
