@@ -68,7 +68,30 @@ async function create_user(params, caller_user_id) {
     };
   }
 
-  // Send Supabase Auth invite — this creates the auth.users record and sends the magic link email
+  // Dev bypass mode: skip Supabase Auth invite — user signs in via email only, no verification needed.
+  // Magic link re-enable: remove this block and the else below; the invite path becomes the only path.
+  if (process.env.DEV_BYPASS_TOKEN) {
+    const userId = require('crypto').randomUUID();
+    const { data: newUser, error: insertErr } = await supabase
+      .from('users')
+      .insert({
+        id:           userId,
+        email:        email.toLowerCase().trim(),
+        display_name: display_name.trim(),
+        system_role,
+        allow_both_admin_and_functional_roles: false,
+        is_active:    true
+      })
+      .select()
+      .single();
+
+    if (insertErr) {
+      return { success: false, error: `Failed to create user record: ${insertErr.message}` };
+    }
+    return { success: true, data: newUser };
+  }
+
+  // Magic link path: send Supabase Auth invite — creates auth.users record and sends the link email.
   const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
     email.toLowerCase().trim(),
     { data: { display_name, system_role } }
