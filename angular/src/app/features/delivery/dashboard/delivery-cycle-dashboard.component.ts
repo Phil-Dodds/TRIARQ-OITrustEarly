@@ -1,5 +1,5 @@
 // delivery-cycle-dashboard.component.ts — DeliveryCycleDashboardComponent
-// Route: /delivery
+// Route: /delivery/cycles  (moved from /delivery — D-172)
 // Spec: build-c-spec Section 5.2
 //
 // Displays all Delivery Cycles visible to the current user.
@@ -22,8 +22,8 @@ import {
   OnInit
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { CommonModule }       from '@angular/common';
-import { RouterModule }       from '@angular/router';
+import { CommonModule }           from '@angular/common';
+import { RouterModule, ActivatedRoute } from '@angular/router';
 import {
   ReactiveFormsModule,
   FormBuilder,
@@ -54,6 +54,20 @@ const GATE_LABELS: Record<GateName, string> = {
   close_review:  'Close Review'
 };
 
+// D-173: next gate derived from lifecycle stage (mirrors lifecycle.js NEXT_GATE_BY_STAGE)
+const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
+  BRIEF:    'brief_review',
+  DESIGN:   'go_to_build',
+  SPEC:     'go_to_build',
+  BUILD:    'go_to_deploy',
+  VALIDATE: 'go_to_deploy',
+  PILOT:    'go_to_release',
+  UAT:      'go_to_release',
+  RELEASE:  'close_review',
+  OUTCOME:  'close_review'
+  // COMPLETE, CANCELLED, ON_HOLD → no next gate (omitted = null)
+};
+
 const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   BRIEF: 'Brief', DESIGN: 'Design', SPEC: 'Spec', BUILD: 'Build',
   VALIDATE: 'Validate', PILOT: 'Pilot', UAT: 'UAT', RELEASE: 'Release',
@@ -70,6 +84,15 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
   imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent],
   template: `
     <div style="max-width:1200px;margin:var(--triarq-space-2xl) auto;padding:0 var(--triarq-space-md);">
+
+      <!-- ── Back link (D-172) ───────────────────────────────────────────── -->
+      <div style="margin-bottom:var(--triarq-space-sm);">
+        <a routerLink="/delivery"
+           style="font-size:var(--triarq-text-small);
+                  color:var(--triarq-color-primary);text-decoration:none;">
+          ← Delivery Cycle Tracking
+        </a>
+      </div>
 
       <!-- ── Page header ──────────────────────────────────────────────────── -->
       <div style="display:flex;align-items:flex-start;justify-content:space-between;
@@ -236,7 +259,16 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           </optgroup>
         </select>
 
-        <span *ngIf="filterStage || filterTier || filterWorkstream"
+        <!-- D-173: Next Gate filter — computed from lifecycle stage client-side -->
+        <select [(ngModel)]="filterNextGate" (ngModelChange)="applyFilters()" class="oi-input"
+                style="max-width:180px;font-size:var(--triarq-text-small);">
+          <option value="">All Next Gates</option>
+          <option *ngFor="let gate of gateNames" [value]="gate">
+            {{ GATE_LABELS[gate] }}
+          </option>
+        </select>
+
+        <span *ngIf="filterStage || filterTier || filterWorkstream || filterNextGate"
               (click)="clearFilters()"
               style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                      cursor:pointer;text-decoration:underline;">
@@ -447,6 +479,8 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   // D-166: division filter — server-side reload when changed
   filterDivision:           string  = '';
   includeChildDivisions:    boolean = false;
+  // D-173/D-175: next gate filter — computed client-side from lifecycle stage
+  filterNextGate:           string  = '';
 
   // Sort state
   sortField: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' = 'cycle_title';
@@ -454,9 +488,14 @@ export class DeliveryCycleDashboardComponent implements OnInit {
 
   // Expose constants to template
   readonly STAGE_LABEL_MAP = STAGE_LABEL_MAP;
+  readonly GATE_LABELS     = GATE_LABELS;
 
   readonly stages: LifecycleStage[] = [
     'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE','ON_HOLD','CANCELLED'
+  ];
+
+  readonly gateNames: GateName[] = [
+    'brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'
   ];
 
   constructor(
@@ -464,6 +503,7 @@ export class DeliveryCycleDashboardComponent implements OnInit {
     private readonly mcp:      McpService,
     private readonly profile:  UserProfileService,
     private readonly fb:       FormBuilder,
+    private readonly route:    ActivatedRoute,
     private readonly cdr:      ChangeDetectorRef
   ) {}
 
@@ -477,6 +517,17 @@ export class DeliveryCycleDashboardComponent implements OnInit {
     });
     const role = this.profile.getCurrentProfile()?.system_role;
     this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin';
+
+    // D-175: read query params from summary view drill-down and apply as initial filters.
+    // Query params: workstream_id, division_id, next_gate
+    const qp = this.route.snapshot.queryParams;
+    if (qp['workstream_id']) { this.filterWorkstream = qp['workstream_id'] as string; }
+    if (qp['next_gate'])     { this.filterNextGate   = qp['next_gate']     as string; }
+    if (qp['division_id']) {
+      this.filterDivision = qp['division_id'] as string;
+      // division_id param triggers server-side filter — handled in loadCycles()
+    }
+
     this.checkUserDivisions();
     this.loadWorkstreams();
     this.loadDivisions();
@@ -624,6 +675,12 @@ export class DeliveryCycleDashboardComponent implements OnInit {
         if (c.workstream_id !== this.filterWorkstream) { return false; }
       }
 
+      // D-173/D-175: next gate filter — computed from lifecycle stage
+      if (this.filterNextGate) {
+        const nextGate = NEXT_GATE_BY_STAGE[c.current_lifecycle_stage] ?? null;
+        if (nextGate !== this.filterNextGate) { return false; }
+      }
+
       return true;
     });
 
@@ -646,9 +703,9 @@ export class DeliveryCycleDashboardComponent implements OnInit {
     this.filterStage           = '';
     this.filterTier            = '';
     this.filterWorkstream      = '';
-    // Division filter requires server reload — only clear client-side filters here.
-    // Division is intentionally NOT cleared by "Clear filters" (it's a scope selection,
-    // not a content filter). User explicitly changes division via its own dropdown.
+    this.filterNextGate        = '';
+    // Division filter requires server reload — not cleared here.
+    // Division is intentionally NOT cleared by "Clear filters" (it's a scope selection).
     this.applyFilters();
   }
 
@@ -656,6 +713,7 @@ export class DeliveryCycleDashboardComponent implements OnInit {
     this.filterStage           = '';
     this.filterTier            = '';
     this.filterWorkstream      = '';
+    this.filterNextGate        = '';
     this.filterDivision        = '';
     this.includeChildDivisions = false;
     this.loadCycles();

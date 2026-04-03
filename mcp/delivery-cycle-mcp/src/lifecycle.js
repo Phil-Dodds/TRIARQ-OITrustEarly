@@ -54,11 +54,53 @@ function nextStage(current_stage) {
   return STAGE_SEQUENCE[idx + 1];
 }
 
+// Next gate that must be cleared from each current stage (D-173).
+// Used for summary views and filter labelling.
+// Returns null for terminal/pause stages.
+const NEXT_GATE_BY_STAGE = {
+  BRIEF:    'brief_review',
+  DESIGN:   'go_to_build',
+  SPEC:     'go_to_build',
+  BUILD:    'go_to_deploy',
+  VALIDATE: 'go_to_deploy',
+  PILOT:    'go_to_release',
+  UAT:      'go_to_release',
+  RELEASE:  'close_review',
+  OUTCOME:  'close_review',
+  COMPLETE:  null,
+  CANCELLED: null,
+  ON_HOLD:   null
+};
+
+// WIP category for each lifecycle stage (D-174).
+// Prep = BRIEF/DESIGN/SPEC. Build = BUILD/VALIDATE. Outcome = PILOT/UAT/RELEASE/OUTCOME.
+// COMPLETE, CANCELLED, ON_HOLD are excluded from WIP counting (null).
+const WIP_CATEGORY_BY_STAGE = {
+  BRIEF:    'prep',
+  DESIGN:   'prep',
+  SPEC:     'prep',
+  BUILD:    'build',
+  VALIDATE: 'build',
+  PILOT:    'outcome',
+  UAT:      'outcome',
+  RELEASE:  'outcome',
+  OUTCOME:  'outcome',
+  COMPLETE:  null,
+  CANCELLED: null,
+  ON_HOLD:   null
+};
+
+// WIP limit per category per workstream (D-174).
+const WIP_LIMIT = 4;
+
 module.exports = {
   STAGE_SEQUENCE,
   GATE_REQUIRED_TO_ENTER,
   GATE_MILESTONE_LABELS,
   ALL_GATES,
   TERMINAL_STAGES,
+  NEXT_GATE_BY_STAGE,
+  WIP_CATEGORY_BY_STAGE,
+  WIP_LIMIT,
   nextStage
 };

@@ -38,6 +38,7 @@ const { promote_artifact_to_oi_library } = require('./tools/promote_artifact_to_
 
 const { get_cycle_event_log }            = require('./tools/get_cycle_event_log');
 const { sync_jira_epic }                 = require('./tools/sync_jira_epic');
+const { get_delivery_summary }           = require('./tools/get_delivery_summary');
 
 const app  = express();
 const PORT = process.env.PORT || 3003;
@@ -72,7 +73,10 @@ const TOOLS = {
   get_cycle_event_log,
 
   // Jira sync
-  sync_jira_epic
+  sync_jira_epic,
+
+  // Dashboard hub summaries (D-171–D-176)
+  get_delivery_summary
 };
 
 // ── CORS — allow GitHub Pages and local dev origins ───────────────────────────

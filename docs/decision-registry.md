@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-171**
+**Next available: D-177**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -79,6 +79,12 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-168 | Claude Code mandatory debate/question before building | Claude Code | April 2026 | Active |
 | D-169 | Decision source tagging and registry protocol | Claude Code | April 2026 | Active |
 | D-170 | Phil and Admin have implicit access to all Divisions | Claude Code | April 2026 | Active |
+| D-171 | Delivery hub page at /delivery — four option cards, no data on load | Claude Code | April 2026 | Active |
+| D-172 | Delivery module sub-routes — hub, workstreams, divisions, gates, cycles, :cycle_id | Claude Code | April 2026 | Active |
+| D-173 | Next gate derived from current lifecycle stage (NEXT_GATE_BY_STAGE map) | Claude Code | April 2026 | Active |
+| D-174 | WIP categories: Prep/Build/Outcome, limit=4, ON_HOLD counted, COMPLETE/CANCELLED excluded | Claude Code | April 2026 | Active |
+| D-175 | Drill-down from summary views to /delivery/cycles via query params | Claude Code | April 2026 | Active |
+| D-176 | Division summary as flat indented list (not collapsible tree) | Claude Code | April 2026 | Active |
 
 ---
 

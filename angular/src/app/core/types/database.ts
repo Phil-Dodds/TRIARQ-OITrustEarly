@@ -306,3 +306,47 @@ export interface LifecycleTrackNode {
 
 /** Per-gate display state map passed into StageTrackComponent */
 export type GateStateMap = Record<GateName, GateDisplayState>;
+
+// ── Build C — Dashboard summary types (D-171–D-176) ──────────────────────────
+
+/** WIP category counts per workstream. Prep = BRIEF/DESIGN/SPEC; Build = BUILD/VALIDATE;
+ *  Outcome = PILOT/UAT/RELEASE/OUTCOME. Limit = 4 each (D-174). */
+export interface WorkstreamSummaryItem {
+  workstream_id:          string | null;  // null = cycles with no workstream assigned
+  workstream_name:        string;
+  home_division_id:       string | null;
+  home_division_name:     string;
+  active_status:          boolean;
+  total_active_cycles:    number;
+  wip_prep:               number;
+  wip_build:              number;
+  wip_outcome:            number;
+  wip_prep_exceeded:      boolean;
+  wip_build_exceeded:     boolean;
+  wip_outcome_exceeded:   boolean;
+  cycles_by_next_gate:    Record<GateName | 'none', number>;
+}
+
+/** Gate-level pending/upcoming/overdue summary for the Gate Summary view. */
+export interface GateSummaryItem {
+  gate_name:           GateName;
+  total_pending_count: number;  // cycles where this is their next gate
+  upcoming_count:      number;  // target date within 7 days (and not yet past)
+  overdue_count:       number;  // target date is in the past, no actual date set
+}
+
+/** Division-level active cycle count for the Division Summary view (D-176). */
+export interface DivisionSummaryItem {
+  division_id:         string;
+  division_name:       string;
+  division_level:      number;
+  parent_division_id:  string | null;
+  active_cycle_count:  number;
+}
+
+/** Full summary response from get_delivery_summary MCP tool. */
+export interface DeliverySummary {
+  workstream_summaries: WorkstreamSummaryItem[];
+  gate_summaries:       GateSummaryItem[];
+  division_summaries:   DivisionSummaryItem[];
+}

@@ -20,7 +20,8 @@ import {
   GateName,
   GateStatus,
   DateStatus,
-  PointerStatus
+  PointerStatus,
+  DeliverySummary
 } from '../types/database';
 
 @Injectable({ providedIn: 'root' })
@@ -150,6 +151,20 @@ export class DeliveryService {
 
   getEventLog(delivery_cycle_id: string): Observable<McpResponse<CycleEventLogEntry[]>> {
     return this.mcp.call<CycleEventLogEntry[]>('delivery', 'get_cycle_event_log', { delivery_cycle_id });
+  }
+
+  // ── Dashboard summary (D-171–D-176) ───────────────────────────────────────
+
+  /**
+   * Returns pre-aggregated summary data for all three hub sub-views.
+   * Optionally filtered to specific division IDs (pass empty/omit for all accessible).
+   * D-173: NEXT_GATE_BY_STAGE computed server-side.
+   * D-174: WIP category counts and exceeded flags computed server-side.
+   */
+  getDeliverySummary(params: {
+    division_ids?: string[];
+  } = {}): Observable<McpResponse<DeliverySummary>> {
+    return this.mcp.call<DeliverySummary>('delivery', 'get_delivery_summary', params as Record<string, unknown>);
   }
 
   // ── Jira sync ──────────────────────────────────────────────────────────────
