@@ -226,6 +226,34 @@ Full protocol and registry in `docs/decision-registry.md`.
 
 ---
 
+---
+
+## Principle 8 — Feature Stage Advancement Check
+
+**Statement:** At the end of every Claude Code session where features have been built or modified, Claude Code reviews `devStatus` in `NAV_ITEMS` and flags any feature that appears ready to advance — without advancing it silently.
+
+### Why this exists
+
+Dev status labels in the sidebar are only useful if they stay accurate. Without an explicit check, features silently outgrow their labels. A feature showing "Not Started" that is actually running in UAT misleads everyone who looks at it.
+
+### The check
+
+Claude Code compares each feature's current `devStatus` against the work done in the session using these signals:
+
+| From | To | Signal |
+|---|---|---|
+| `not-started` | `pilot` | Route, component, and MCP tool exist and are deployed. Basic happy path works. |
+| `pilot` | `uat` | Feature used with real data. Core flows work end-to-end. Blocked states handled. |
+| `uat` | `live` | Phil has reviewed. Acceptance criteria from Build Spec are met. No known blockers. |
+
+### The format
+
+> "Stage check: [Feature] may be ready to advance from [current] to [next]. Reason: [one sentence]. Want me to update it?"
+
+Claude Code does not update `devStatus` without explicit confirmation. It does not skip the check because the session was short or focused elsewhere.
+
+---
+
 ## Version History
 
 | Version | Date | Change |
@@ -233,6 +261,7 @@ Full protocol and registry in `docs/decision-registry.md`.
 | v1.0 | April 2026 | Initial document. Principles 1 (D-163) and 2 (D-164) added after Build C nav gap identified. Principles 3–5 carried from existing decisions P1, P2, D-140. |
 | v1.1 | April 2026 | Principle 6 (D-168) added: mandatory debate/question behavior for Claude Code sessions. |
 | v1.2 | April 2026 | Principle 7 (D-169) added: decision source tagging and registry protocol. |
+| v1.3 | April 2026 | Principle 8 added: feature stage advancement check at session close. |
 
 ---
 

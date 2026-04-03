@@ -190,6 +190,28 @@ Never return error codes or silent failures. Source: D-140.
 
 ---
 
+## Feature Stage Advancement — End-of-Session Check
+
+At the end of any session where features have been built, modified, or deployed, Claude Code must:
+
+1. Review the `devStatus` field for each item in `NAV_ITEMS` in `sidebar.component.ts`
+2. Compare each feature's current `devStatus` against the work done in the session
+3. Flag any item that appears ready to advance to the next stage — do not advance silently, but do call it out explicitly
+
+**Stage advancement signals to watch for:**
+- `not-started` → `pilot`: A route, component, and MCP tool exist and are deployed. Basic happy path works.
+- `pilot` → `uat`: Feature has been used with real data, core flows work end-to-end, blocked-action states are handled.
+- `uat` → `live`: Feature has been reviewed by Phil, acceptance criteria from the Build Specification are met, no known blocking issues.
+- `live` → (no change): Live means production-ready. Only regress if a breaking issue is found.
+
+**Format for the flag:**
+At session close, if any feature appears ready to advance, say:
+> "Stage check: [Feature Name] may be ready to advance from [current] to [next]. Reason: [one sentence]. Want me to update it?"
+
+Do not update `devStatus` without explicit confirmation. Do not skip the check because the session was focused on something else.
+
+---
+
 ## Build C Acceptance Criteria (summary)
 
 Build C is complete when all of the following are demonstrable against real data:
