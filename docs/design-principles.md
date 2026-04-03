@@ -140,11 +140,51 @@ Applies to: database schema columns, API response field names, Angular component
 
 ---
 
+## Principle 6 — Debate Before Building (D-168)
+
+**Statement:** Claude Code raises disagreements, conflicts, and ambiguities explicitly before writing any code. Silent resolution is a build error.
+
+This is a mandatory behavioral constraint, not a suggestion. It has the same standing as an architectural rule.
+
+### The four trigger conditions
+
+| Trigger | What Claude Code must do |
+|---|---|
+| **Disagrees with a design choice** | State the disagreement, explain the rationale, and present an alternative. Build only after hearing the response. |
+| **Unclear requirement** | Ask the question before building. Do not infer and build — inferences become decisions without review. |
+| **Conflict with a locked decision** | Surface the conflict explicitly. Name the decision (D-NNN), describe the conflict, and ask how to resolve it. Never build around a locked decision silently. |
+| **Multiple valid approaches with different trade-offs** | Present the options with their trade-offs. Recommend one if appropriate, but present the choice. |
+
+### Rules
+
+**Rule 1 — Raise before writing.** The debate or question must happen before a single line of code is written. Not after. Not as a comment in the code.
+
+**Rule 2 — State a position.** "I disagree because X" is more useful than "here are some thoughts." Claude Code should have a view and state it. Phil may override it — that is fine. The point is that the disagreement is on the record.
+
+**Rule 3 — One message, multiple issues.** If there are multiple debates or questions for a single task, raise them all in one message rather than sequentially after each build step.
+
+**Rule 4 — Override is explicit.** If Phil says "I hear you, do it anyway" or equivalent, Claude Code builds as directed and notes in the code comment that this was an explicit override. No further debate on that item.
+
+**Rule 5 — Do not ask about optional parameters.** This principle is about design conflicts and ambiguity — not about checking in on choices that are already clear. Do not add unnecessary questions to pad interaction.
+
+### What triggered this principle
+
+Build C and earlier builds occasionally resolved design ambiguities silently through implementation choices. Several required rollback or rework. The cost of a question is one exchange. The cost of a silent wrong choice is a build pass of rework. The asymmetry is clear.
+
+### Anti-patterns
+
+- Building what was asked and then noting "you might want to consider X" in a comment — should have been raised before building.
+- Asking "are you sure?" about a clear, unambiguous instruction — this principle applies to genuine conflicts and ambiguity, not hesitation.
+- Raising the same debate more than once after an explicit override — once overridden, it is done.
+
+---
+
 ## Version History
 
 | Version | Date | Change |
 |---|---|---|
 | v1.0 | April 2026 | Initial document. Principles 1 (D-163) and 2 (D-164) added after Build C nav gap identified. Principles 3–5 carried from existing decisions P1, P2, D-140. |
+| v1.1 | April 2026 | Principle 6 (D-168) added: mandatory debate/question behavior for Claude Code sessions. |
 
 ---
 

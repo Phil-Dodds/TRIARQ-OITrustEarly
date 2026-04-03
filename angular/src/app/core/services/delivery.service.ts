@@ -57,7 +57,7 @@ export class DeliveryService {
     cycle_title:         string;
     cycle_description?:  string;
     division_id:         string;
-    workstream_id:       string;
+    workstream_id?:      string;  // optional — D-165: recommended but not required at creation
     tier_classification: TierClassification;
   }): Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>('delivery', 'create_delivery_cycle', params as Record<string, unknown>);
@@ -68,10 +68,12 @@ export class DeliveryService {
   }
 
   listCycles(params: {
-    division_id?:            string;
-    current_lifecycle_stage?: string;
-    workstream_id?:          string;
-    tier_classification?:    TierClassification;
+    division_id?:              string;
+    include_child_divisions?:  boolean;   // D-166: when true, includes child division cycles
+    current_lifecycle_stage?:  string;
+    workstream_id?:            string;
+    filter_no_workstream?:     boolean;   // D-167: when true, returns only cycles with no workstream
+    tier_classification?:      TierClassification;
   } = {}): Observable<McpResponse<DeliveryCycle[]>> {
     return this.mcp.call<DeliveryCycle[]>('delivery', 'list_delivery_cycles', params as Record<string, unknown>);
   }

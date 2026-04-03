@@ -68,6 +68,15 @@ Entry point checklist — required before marking any feature done:
 
 Full principle in `docs/design-principles.md` (Principle 1).
 
+**Rule 4 — Debate Before Building (D-168).**
+Before writing any code, Claude Code must explicitly raise: (1) any design choice it disagrees with, stating its position and rationale; (2) any requirement that is unclear or ambiguous, asking before building; (3) any request that conflicts with a locked decision, naming the decision and describing the conflict; (4) any implementation path with multiple valid approaches that carry meaningfully different trade-offs.
+
+Silent resolution of conflicts is a hard build error, not a style preference.
+
+After Phil responds: if overridden, build as directed and note the override in the code comment. Do not re-debate after an explicit override.
+
+Full principle in `docs/design-principles.md` (Principle 6). Decision D-168.
+
 ---
 
 ## Build C Scope
@@ -230,3 +239,7 @@ Decisions are locked in `decisions-active.md`. Do not re-litigate locked decisio
 | Session 2026-03-24-P | Build sequence revised to A→C→B→D→E→F |
 | Session 2026-03-25-F | Full artifact slot seed set (26 rows) |
 | Session 2026-03-25-G | MSO365 → OI Library pointer transition model |
+| D-165 | Workstream optional at cycle creation; required before Brief Review gate |
+| D-166 | Division filter on dashboard; include child divisions toggle |
+| D-167 | Workstream filter: no-workstream and inactive shown as separate options |
+| D-168 | Claude Code must debate/question before building — silent conflict resolution is a build error |

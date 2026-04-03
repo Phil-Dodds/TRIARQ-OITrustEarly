@@ -1,11 +1,17 @@
 // submit_gate_for_approval.js
 // Pathways OI Trust — delivery-cycle-mcp
-// Submits a gate for approval. Validates workstream active_status.
-// If workstream inactive: sets gate_status = 'blocked', records workstream_active_at_clearance = false.
-// If workstream active: records workstream_active_at_clearance = true, gate stays 'pending' until
-// record_gate_decision is called.
-// Appends event log entry in both cases.
-// Source: ARCH-23, build-c-spec Section 4.1–4.2, D-140
+// Submits a gate for approval. Validates workstream assignment and active_status.
+//
+// D-165: Workstream must be assigned before any gate can be submitted.
+//   At brief_review: cycle has no workstream → blocked with assignment instruction.
+//   At all subsequent gates: workstream must also be assigned (invariant after brief_review clears).
+//
+// ARCH-23: If workstream inactive at gate time: gate_status = 'blocked',
+//   workstream_active_at_clearance = false recorded.
+// If workstream active: workstream_active_at_clearance = true, gate stays 'pending'
+//   until record_gate_decision is called.
+// Appends event log entry in all cases.
+// Source: D-140, D-165, ARCH-23, build-c-spec Section 4.1–4.2
 
 'use strict';
 
@@ -35,7 +41,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
-  // ── Fetch cycle and workstream ─────────────────────────────────────────────
+  // ── Fetch cycle ────────────────────────────────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
     .select('delivery_cycle_id, cycle_title, workstream_id, current_lifecycle_stage')
@@ -47,6 +53,31 @@ async function submit_gate_for_approval(params, caller_user_id) {
     return { success: false, error: 'Delivery Cycle not found or has been deleted.' };
   }
 
+  // ── D-165: Workstream must be assigned before any gate can be submitted ───
+  if (!cycle.workstream_id) {
+    const gateLabel = gate_name === 'brief_review'
+      ? 'Brief Review'
+      : `the ${gate_name.replace(/_/g, ' ')}`;
+
+    await supabase
+      .from('cycle_event_log')
+      .insert({
+        delivery_cycle_id,
+        event_type:        'gate_blocked',
+        event_description: `Gate '${gate_name}' blocked: no Workstream is assigned to this cycle.`,
+        actor_user_id:     caller_user_id,
+        event_metadata:    { gate_name, reason: 'no_workstream_assigned' }
+      });
+
+    return {
+      success: false,
+      error: `Cannot submit ${gateLabel} gate — this cycle has no Workstream assigned. ` +
+             `Assign a Workstream before submitting for approval. ` +
+             `An Admin or DS user can update the cycle's Workstream.`
+    };
+  }
+
+  // ── Fetch workstream ───────────────────────────────────────────────────────
   const { data: workstream, error: wsErr } = await supabase
     .from('delivery_workstreams')
     .select('workstream_name, active_status')
@@ -55,7 +86,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
     .single();
 
   if (wsErr || !workstream) {
-    return { success: false, error: 'Assigned Workstream not found.' };
+    return { success: false, error: 'Assigned Workstream not found. Contact an Admin to reassign a valid Workstream.' };
   }
 
   // ── Fetch gate record ─────────────────────────────────────────────────────
@@ -85,7 +116,6 @@ async function submit_gate_for_approval(params, caller_user_id) {
   const workstream_active = workstream.active_status;
 
   if (!workstream_active) {
-    // Block — record attempt with active=false, set status to blocked
     const { data: blocked_gate, error: blockErr } = await supabase
       .from('gate_records')
       .update({

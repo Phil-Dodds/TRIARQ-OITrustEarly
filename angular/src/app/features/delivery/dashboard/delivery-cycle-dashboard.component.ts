@@ -115,21 +115,23 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
             </div>
             <div>
               <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Delivery Workstream *
+                Delivery Workstream
+                <span style="font-weight:400;color:var(--triarq-color-text-secondary);"> — recommended</span>
               </label>
               <select formControlName="workstream_id" class="oi-input">
-                <option value="">— Select Workstream —</option>
+                <option value="">— Assign later —</option>
                 <option *ngFor="let ws of activeWorkstreams" [value]="ws.workstream_id">
                   {{ ws.workstream_name }}
                 </option>
               </select>
-              <div *ngIf="createForm.get('workstream_id')?.invalid && createForm.get('workstream_id')?.touched"
-                   style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                Workstream is required.
+              <div style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);margin-top:3px;">
+                Required before Brief Review gate. Can be assigned after creation.
               </div>
               <div *ngIf="activeWorkstreams.length === 0"
                    style="color:var(--triarq-color-sunray,#f5a623);font-size:var(--triarq-text-small);margin-top:2px;">
-                No active Workstreams found. An admin must create and activate one before a cycle can be created.
+                No active Workstreams found. Go to
+                <a routerLink="/admin/workstreams" style="color:var(--triarq-color-sunray,#f5a623);">Admin → Workstreams</a>
+                to create and activate one.
               </div>
             </div>
             <div>
@@ -176,11 +178,37 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <!-- ── Filters + sort row ──────────────────────────────────────────── -->
       <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;
                   margin-bottom:var(--triarq-space-md);align-items:center;">
+
+        <!-- D-166: Division filter — server-side reload. Only shown when user has multiple divisions. -->
+        <select *ngIf="userDivisions.length > 1"
+                [(ngModel)]="filterDivision"
+                (ngModelChange)="onDivisionFilterChange()"
+                class="oi-input"
+                style="max-width:200px;font-size:var(--triarq-text-small);">
+          <option value="">All My Divisions</option>
+          <option *ngFor="let d of userDivisions" [value]="d.id">{{ d.division_name }}</option>
+        </select>
+
+        <!-- D-166: Include child divisions — only visible when a division is selected -->
+        <label *ngIf="filterDivision"
+               style="display:flex;align-items:center;gap:6px;
+                      font-size:var(--triarq-text-small);
+                      color:var(--triarq-color-text-secondary);
+                      cursor:pointer;white-space:nowrap;">
+          <input type="checkbox"
+                 [(ngModel)]="includeChildDivisions"
+                 (ngModelChange)="onDivisionFilterChange()" />
+          Include child Divisions
+        </label>
+
+        <!-- Stage filter -->
         <select [(ngModel)]="filterStage" (ngModelChange)="applyFilters()" class="oi-input"
                 style="max-width:160px;font-size:var(--triarq-text-small);">
-          <option value="">All Lifecycle Stages</option>
+          <option value="">All Stages</option>
           <option *ngFor="let s of stages" [value]="s">{{ STAGE_LABEL_MAP[s] ?? s }}</option>
         </select>
+
+        <!-- Tier filter -->
         <select [(ngModel)]="filterTier" (ngModelChange)="applyFilters()" class="oi-input"
                 style="max-width:130px;font-size:var(--triarq-text-small);">
           <option value="">All Tiers</option>
@@ -188,13 +216,24 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           <option value="tier_2">Tier 2</option>
           <option value="tier_3">Tier 3</option>
         </select>
+
+        <!-- D-167: Workstream filter — "No workstream assigned" + active + inactive (separate groups) -->
         <select [(ngModel)]="filterWorkstream" (ngModelChange)="applyFilters()" class="oi-input"
-                style="max-width:200px;font-size:var(--triarq-text-small);">
+                style="max-width:220px;font-size:var(--triarq-text-small);">
           <option value="">All Workstreams</option>
-          <option *ngFor="let ws of workstreams" [value]="ws.workstream_id">
-            {{ ws.workstream_name }}
-          </option>
+          <option value="__none__">— No workstream assigned —</option>
+          <optgroup label="Active">
+            <option *ngFor="let ws of activeWorkstreams" [value]="ws.workstream_id">
+              {{ ws.workstream_name }}
+            </option>
+          </optgroup>
+          <optgroup *ngIf="inactiveWorkstreams.length > 0" label="Inactive">
+            <option *ngFor="let ws of inactiveWorkstreams" [value]="ws.workstream_id">
+              {{ ws.workstream_name }} (inactive)
+            </option>
+          </optgroup>
         </select>
+
         <span *ngIf="filterStage || filterTier || filterWorkstream"
               (click)="clearFilters()"
               style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
@@ -268,9 +307,15 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
             {{ STAGE_LABEL_MAP[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
           </span>
 
-          <!-- Workstream -->
+          <!-- Workstream — may be null (D-165: optional at creation) -->
           <span style="color:var(--triarq-color-text-secondary);">
-            {{ cycle.workstream?.workstream_name ?? workstreamName(cycle.workstream_id) }}
+            <span *ngIf="cycle.workstream_id">
+              {{ cycle.workstream?.workstream_name ?? workstreamName(cycle.workstream_id!) }}
+            </span>
+            <span *ngIf="!cycle.workstream_id"
+                  style="color:var(--triarq-color-sunray,#f5a623);font-size:var(--triarq-text-small);">
+              ⚠ No workstream
+            </span>
           </span>
 
           <!-- Tier badge -->
@@ -381,6 +426,8 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   workstreams:       DeliveryWorkstream[]  = [];
   activeWorkstreams: DeliveryWorkstream[]  = [];
   divisions:         Division[]            = [];
+  // D-166: user's directly-assigned divisions for the division filter dropdown
+  userDivisions:     Division[]            = [];
   loading            = false;
   hasDivision        = true;   // assumed true until division check completes
   divisionChecked    = false;
@@ -391,9 +438,13 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   createForm!:       FormGroup;
 
   // Filter state (ngModel bindings — not reactive form controls)
-  filterStage:      string = '';
-  filterTier:       string = '';
-  filterWorkstream: string = '';
+  filterStage:              string  = '';
+  filterTier:               string  = '';
+  // '__none__' = show cycles with no workstream assigned (D-167)
+  filterWorkstream:         string  = '';
+  // D-166: division filter — server-side reload when changed
+  filterDivision:           string  = '';
+  includeChildDivisions:    boolean = false;
 
   // Sort state
   sortField: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' = 'cycle_title';
@@ -415,9 +466,10 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    // D-165: workstream_id is optional at creation — no Validators.required.
     this.createForm = this.fb.group({
       cycle_title:         ['', Validators.required],
-      workstream_id:       ['', Validators.required],
+      workstream_id:       [''],
       tier_classification: ['', Validators.required],
       division_id:         ['', Validators.required]
     });
@@ -430,14 +482,6 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   }
 
   private async checkUserDivisions(): Promise<void> {
-    // Use cached value from home screen if available (avoids double call on normal navigation).
-    if (this.profile.hasAnyDivision()) {
-      this.hasDivision     = true;
-      this.divisionChecked = true;
-      this.cdr.markForCheck();
-      return;
-    }
-    // Direct navigation to /delivery bypasses home — check independently.
     const userId = this.profile.getCurrentProfile()?.id;
     if (!userId) {
       this.hasDivision     = false;
@@ -445,16 +489,23 @@ export class DeliveryCycleDashboardComponent implements OnInit {
       this.cdr.markForCheck();
       return;
     }
+
     try {
       const res = await firstValueFrom(
-        this.mcp.call<{ all_accessible_divisions: unknown[] }>(
-          'division', 'get_user_divisions', { user_id: userId }
-        )
+        this.mcp.call<{
+          all_accessible_divisions:      (Division & { access_type: string })[];
+          directly_assigned_divisions:   Division[];
+        }>('division', 'get_user_divisions', { user_id: userId })
       );
-      const divisions      = res.data?.all_accessible_divisions ?? [];
-      this.hasDivision     = divisions.length > 0;
-      this.divisionChecked = true;
+
+      const allDivisions    = res.data?.all_accessible_divisions ?? [];
+      this.hasDivision      = allDivisions.length > 0;
+      this.divisionChecked  = true;
       this.profile.setHasDivision(this.hasDivision);
+
+      // D-166: store directly-assigned divisions for the division filter dropdown.
+      // Child divisions appear via include_child_divisions toggle — not as separate items.
+      this.userDivisions = (res.data?.directly_assigned_divisions ?? []) as Division[];
     } catch {
       this.hasDivision     = false;
       this.divisionChecked = true;
@@ -467,12 +518,19 @@ export class DeliveryCycleDashboardComponent implements OnInit {
       next: (res) => {
         if (res.success && res.data) {
           this.workstreams       = Array.isArray(res.data) ? res.data : [];
-          this.activeWorkstreams = this.workstreams.filter(w => w.active_status);
+          this.activeWorkstreams = this.workstreams.filter(w =>  w.active_status);
+          // inactiveWorkstreams is a getter — no separate field needed
           this.cdr.markForCheck();
         }
       },
       error: () => {}
     });
+  }
+
+  // D-167: inactive workstreams shown as a separate group in the workstream filter.
+  // They are NOT merged with "no workstream" — different states require separate visibility.
+  get inactiveWorkstreams(): DeliveryWorkstream[] {
+    return this.workstreams.filter(w => !w.active_status);
   }
 
   private loadDivisions(): void {
@@ -490,7 +548,15 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   private loadCycles(): void {
     this.loading = true;
     this.cdr.markForCheck();
-    this.delivery.listCycles().subscribe({
+
+    // D-166: division filter is server-side — pass to MCP so access scoping is correct.
+    const params: Parameters<typeof this.delivery.listCycles>[0] = {};
+    if (this.filterDivision) {
+      params.division_id             = this.filterDivision;
+      params.include_child_divisions = this.includeChildDivisions;
+    }
+
+    this.delivery.listCycles(params).subscribe({
       next: (res) => {
         if (res.success && res.data) {
           this.cycles = Array.isArray(res.data) ? res.data : [];
@@ -506,11 +572,23 @@ export class DeliveryCycleDashboardComponent implements OnInit {
     });
   }
 
+  // Called when division filter or include_child_divisions changes — reloads from server
+  onDivisionFilterChange(): void {
+    this.loadCycles();
+  }
+
   applyFilters(): void {
     let result = this.cycles.filter(c => {
-      if (this.filterStage      && c.current_lifecycle_stage !== this.filterStage)      { return false; }
-      if (this.filterTier       && c.tier_classification     !== this.filterTier)       { return false; }
-      if (this.filterWorkstream && c.workstream_id           !== this.filterWorkstream) { return false; }
+      if (this.filterStage && c.current_lifecycle_stage !== this.filterStage) { return false; }
+      if (this.filterTier  && c.tier_classification    !== this.filterTier)  { return false; }
+
+      // D-167: workstream filter — '__none__' shows cycles with no workstream assigned
+      if (this.filterWorkstream === '__none__') {
+        if (c.workstream_id) { return false; }
+      } else if (this.filterWorkstream) {
+        if (c.workstream_id !== this.filterWorkstream) { return false; }
+      }
+
       return true;
     });
 
@@ -530,10 +608,22 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   }
 
   clearFilters(): void {
-    this.filterStage      = '';
-    this.filterTier       = '';
-    this.filterWorkstream = '';
+    this.filterStage           = '';
+    this.filterTier            = '';
+    this.filterWorkstream      = '';
+    // Division filter requires server reload — only clear client-side filters here.
+    // Division is intentionally NOT cleared by "Clear filters" (it's a scope selection,
+    // not a content filter). User explicitly changes division via its own dropdown.
     this.applyFilters();
+  }
+
+  clearAllFilters(): void {
+    this.filterStage           = '';
+    this.filterTier            = '';
+    this.filterWorkstream      = '';
+    this.filterDivision        = '';
+    this.includeChildDivisions = false;
+    this.loadCycles();
   }
 
   setSort(field: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification'): void {
@@ -573,9 +663,11 @@ export class DeliveryCycleDashboardComponent implements OnInit {
     this.createError = '';
     this.cdr.markForCheck();
 
+    // D-165: workstream_id is optional at creation. Only include if selected.
+    const workstreamId = this.createForm.value.workstream_id as string | '';
     this.delivery.createCycle({
       cycle_title:         this.createForm.value.cycle_title         as string,
-      workstream_id:       this.createForm.value.workstream_id       as string,
+      ...(workstreamId ? { workstream_id: workstreamId } : {}),
       tier_classification: this.createForm.value.tier_classification as TierClassification,
       division_id:         this.createForm.value.division_id         as string
     }).subscribe({

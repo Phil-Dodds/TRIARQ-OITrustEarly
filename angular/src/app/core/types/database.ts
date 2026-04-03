@@ -200,7 +200,7 @@ export interface DeliveryCycle {
   cycle_title:             string;
   cycle_description:       string | null;
   division_id:             string;
-  workstream_id:           string;
+  workstream_id:           string | null;  // nullable — D-165: optional at creation, required at Brief Review gate
   tier_classification:     TierClassification;
   current_lifecycle_stage: LifecycleStage;
   outcome_statement:       string | null;
