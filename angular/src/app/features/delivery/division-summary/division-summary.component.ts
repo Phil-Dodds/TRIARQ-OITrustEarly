@@ -5,7 +5,7 @@
 // Tree order: parent before children, siblings alphabetical.
 // Indentation: (division_level - 1) * 20px left padding.
 // Click a row → /delivery/cycles?division_id=X (D-175).
-// Toggle: "Display only my divisions" — hidden for phil/admin (D-170).
+// Toggle: "Display only my Divisions" — hidden for phil/admin (D-170).
 //
 // D-93: DeliveryService only — no direct Supabase access.
 
@@ -13,12 +13,14 @@ import {
   Component,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  OnInit
+  OnInit,
+  OnDestroy
 } from '@angular/core';
 import { CommonModule }         from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { FormsModule }          from '@angular/forms';
-import { firstValueFrom }       from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
+import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
@@ -57,7 +59,7 @@ import { DivisionSummaryItem, Division } from '../../../core/types/database';
         <input type="checkbox"
                [(ngModel)]="showMyDivisionsOnly"
                (ngModelChange)="onToggleChange()" />
-        Display only my divisions
+        Display only my Divisions
       </label>
 
       <!-- Loading -->
@@ -133,9 +135,9 @@ import { DivisionSummaryItem, Division } from '../../../core/types/database';
       <div *ngIf="!loading && !loadError && sortedDivisions.length === 0"
            style="text-align:center;padding:var(--triarq-space-xl);
                   color:var(--triarq-color-text-secondary);font-size:var(--triarq-text-small);">
-        No divisions found.
+        No Divisions found.
         <span *ngIf="!isPrivileged && showMyDivisionsOnly">
-          Try unchecking "Display only my divisions."
+          Try unchecking "Display only my Divisions."
         </span>
       </div>
 
@@ -153,7 +155,7 @@ import { DivisionSummaryItem, Division } from '../../../core/types/database';
     </div>
   `
 })
-export class DivisionSummaryComponent implements OnInit {
+export class DivisionSummaryComponent implements OnInit, OnDestroy {
 
   loading            = false;
   loadError          = '';
@@ -161,6 +163,8 @@ export class DivisionSummaryComponent implements OnInit {
   showMyDivisionsOnly = true;
   userDivisionIds:   string[] = [];
   divisionSummaries: DivisionSummaryItem[] = [];
+
+  private readonly profileSub = new Subscription();
 
   constructor(
     private readonly delivery: DeliveryService,
@@ -171,15 +175,26 @@ export class DivisionSummaryComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const currentProfile = this.profile.getCurrentProfile();
-    const role           = currentProfile?.system_role;
-    this.isPrivileged    = role === 'phil' || role === 'admin';
+    // Wait for profile$ to emit a non-null User — avoids race condition (D-177 fix).
+    this.profileSub.add(
+      this.profile.profile$.pipe(
+        filter((p): p is NonNullable<typeof p> => p !== null),
+        take(1)
+      ).subscribe(profile => {
+        const role        = profile.system_role;
+        this.isPrivileged = role === 'phil' || role === 'admin';
+        if (!this.isPrivileged) {
+          this.loadUserDivisions(profile.id ?? '');
+        } else {
+          this.loadSummary();
+        }
+        this.cdr.markForCheck();
+      })
+    );
+  }
 
-    if (!this.isPrivileged) {
-      this.loadUserDivisions(currentProfile?.id ?? '');
-    } else {
-      this.loadSummary();
-    }
+  ngOnDestroy(): void {
+    this.profileSub.unsubscribe();
   }
 
   private async loadUserDivisions(userId: string): Promise<void> {

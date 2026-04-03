@@ -5,7 +5,7 @@
 // "Upcoming" = next gate target date within 7 days and not yet passed.
 // "Overdue"  = next gate target date is in the past, no actual date set.
 // Click a row → drill down to /delivery/cycles?next_gate=X (D-175).
-// Toggle: "Display only my divisions" — hidden for phil/admin (D-170).
+// Toggle: "Display only my Divisions" — hidden for phil/admin (D-170).
 //
 // D-93: DeliveryService only — no direct Supabase access.
 
@@ -13,12 +13,14 @@ import {
   Component,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  OnInit
+  OnInit,
+  OnDestroy
 } from '@angular/core';
 import { CommonModule }         from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { FormsModule }          from '@angular/forms';
-import { firstValueFrom }       from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
+import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
@@ -52,7 +54,7 @@ const GATE_LABELS: Record<GateName, string> = {
         <p style="margin:0;font-size:var(--triarq-text-small);
                   color:var(--triarq-color-text-secondary);">
           Gates with target dates in the next 7 days and gates with overdue target dates.
-          Click a row to see all cycles pending that gate.
+          Click a Gate row to see all Delivery Cycles pending it.
         </p>
       </div>
 
@@ -65,7 +67,7 @@ const GATE_LABELS: Record<GateName, string> = {
         <input type="checkbox"
                [(ngModel)]="showMyDivisionsOnly"
                (ngModelChange)="onToggleChange()" />
-        Display only my divisions
+        Display only my Divisions
       </label>
 
       <!-- Loading -->
@@ -144,7 +146,7 @@ const GATE_LABELS: Record<GateName, string> = {
         <div *ngIf="gateSummaries.length === 0"
              style="text-align:center;padding:var(--triarq-space-xl);
                     color:var(--triarq-color-text-secondary);font-size:var(--triarq-text-small);">
-          No active cycles found in your divisions.
+          No active Delivery Cycles found in your Divisions.
         </div>
 
         <!-- Summary callout: overdue alert -->
@@ -156,15 +158,15 @@ const GATE_LABELS: Record<GateName, string> = {
             {{ totalOverdue }} overdue gate{{ totalOverdue === 1 ? '' : 's' }}
           </strong>
           <span style="color:var(--triarq-color-text-secondary);margin-left:6px;">
-            — these cycles have passed their target date with no approval recorded.
-            Click the relevant gate row to identify the cycles.
+            — these Delivery Cycles have passed their target Gate date with no approval recorded.
+            Click the relevant Gate row to identify the Delivery Cycles.
           </span>
         </div>
       </div>
     </div>
   `
 })
-export class GatesSummaryComponent implements OnInit {
+export class GatesSummaryComponent implements OnInit, OnDestroy {
 
   loading            = false;
   loadError          = '';
@@ -172,6 +174,8 @@ export class GatesSummaryComponent implements OnInit {
   showMyDivisionsOnly = true;
   userDivisionIds:   string[] = [];
   gateSummaries:     GateSummaryItem[] = [];
+
+  private readonly profileSub = new Subscription();
 
   constructor(
     private readonly delivery: DeliveryService,
@@ -182,15 +186,26 @@ export class GatesSummaryComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const currentProfile = this.profile.getCurrentProfile();
-    const role           = currentProfile?.system_role;
-    this.isPrivileged    = role === 'phil' || role === 'admin';
+    // Wait for profile$ to emit a non-null User — avoids race condition (D-177 fix).
+    this.profileSub.add(
+      this.profile.profile$.pipe(
+        filter((p): p is NonNullable<typeof p> => p !== null),
+        take(1)
+      ).subscribe(profile => {
+        const role        = profile.system_role;
+        this.isPrivileged = role === 'phil' || role === 'admin';
+        if (!this.isPrivileged) {
+          this.loadUserDivisions(profile.id ?? '');
+        } else {
+          this.loadSummary();
+        }
+        this.cdr.markForCheck();
+      })
+    );
+  }
 
-    if (!this.isPrivileged) {
-      this.loadUserDivisions(currentProfile?.id ?? '');
-    } else {
-      this.loadSummary();
-    }
+  ngOnDestroy(): void {
+    this.profileSub.unsubscribe();
   }
 
   private async loadUserDivisions(userId: string): Promise<void> {

@@ -40,7 +40,7 @@ const HUB_CARDS: HubCard[] = [
     icon:        '▷',
     description: 'Gates coming up in the next 7 days and gates with overdue target dates. ' +
                  'Use this to prioritize approval actions and identify stalled cycles. ' +
-                 'Click a gate row to see the cycles waiting on it.'
+                 'Click a Gate row to see the Delivery Cycles waiting on it.'
   },
   {
     title:       'All Delivery Cycles',

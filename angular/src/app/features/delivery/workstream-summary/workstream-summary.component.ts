@@ -5,7 +5,7 @@
 // Prep/Build/Outcome WIP with exceeded-limit indicator (D-174).
 // Gate count columns per D-173 NEXT_GATE_BY_STAGE mapping.
 // Click a count → drill down to /delivery/cycles with query params (D-175).
-// Toggle: "Display only my divisions" — hidden for phil/admin (D-170).
+// Toggle: "Display only my Divisions" — hidden for phil/admin (D-170).
 //
 // D-93: DeliveryService only — no direct Supabase access.
 // Principle 3: loading states and empty states answer What/Why/How.
@@ -14,15 +14,17 @@ import {
   Component,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  OnInit
+  OnInit,
+  OnDestroy
 } from '@angular/core';
-import { CommonModule }       from '@angular/common';
+import { CommonModule }         from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
-import { FormsModule }        from '@angular/forms';
-import { firstValueFrom }     from 'rxjs';
-import { DeliveryService }    from '../../../core/services/delivery.service';
-import { McpService }         from '../../../core/services/mcp.service';
-import { UserProfileService } from '../../../core/services/user-profile.service';
+import { FormsModule }          from '@angular/forms';
+import { firstValueFrom, Subscription } from 'rxjs';
+import { filter, take }         from 'rxjs/operators';
+import { DeliveryService }      from '../../../core/services/delivery.service';
+import { McpService }           from '../../../core/services/mcp.service';
+import { UserProfileService }   from '../../../core/services/user-profile.service';
 import {
   WorkstreamSummaryItem,
   GateName,
@@ -61,7 +63,7 @@ const ALL_GATES: GateName[] = [
         <h3 style="margin:8px 0 4px 0;">Workstream Summary</h3>
         <p style="margin:0;font-size:var(--triarq-text-small);
                   color:var(--triarq-color-text-secondary);">
-          WIP counts per workstream. Prep = Brief/Design/Spec, Build = Build/Validate,
+          Active Delivery Cycle count and WIP breakdown per Workstream. Prep = Brief/Design/Spec, Build = Build/Validate,
           Outcome = Pilot/UAT/Release/Outcome. Limit is 4 per category.
           Click any count to see the matching cycles.
         </p>
@@ -76,7 +78,7 @@ const ALL_GATES: GateName[] = [
         <input type="checkbox"
                [(ngModel)]="showMyDivisionsOnly"
                (ngModelChange)="onToggleChange()" />
-        Display only my divisions
+        Display only my Divisions
       </label>
 
       <!-- Loading -->
@@ -101,9 +103,9 @@ const ALL_GATES: GateName[] = [
       <div *ngIf="!loading && !loadError && groups.length === 0"
            style="text-align:center;padding:var(--triarq-space-xl);
                   color:var(--triarq-color-text-secondary);font-size:var(--triarq-text-small);">
-        No active workstreams found with cycles in your divisions.
+        No active Workstreams found with Delivery Cycles in your Divisions.
         <span *ngIf="!isPrivileged && showMyDivisionsOnly">
-          Try unchecking "Display only my divisions" to see all accessible workstreams.
+          Try unchecking "Display only my Divisions" to see all accessible Workstreams.
         </span>
       </div>
 
@@ -116,7 +118,7 @@ const ALL_GATES: GateName[] = [
                   color:var(--triarq-color-text-secondary);
                   border-bottom:2px solid var(--triarq-color-border);">
         <span>Workstream</span>
-        <span style="text-align:center;">Total</span>
+        <span style="text-align:center;">Active Cycles</span>
         <span style="text-align:center;">Prep</span>
         <span style="text-align:center;">Build</span>
         <span style="text-align:center;">Outcome</span>
@@ -211,7 +213,7 @@ const ALL_GATES: GateName[] = [
                   font-size:var(--triarq-text-small);font-weight:600;
                   border-top:2px solid var(--triarq-color-border);
                   color:var(--triarq-color-text-primary);">
-        <span>All workstreams</span>
+        <span>All Workstreams</span>
         <span style="text-align:center;">{{ totalCycles }}</span>
         <span style="text-align:center;"
               [style.color]="totalPrep > wipLimit ? 'var(--triarq-color-sunray,#f5a623)' : 'inherit'">
@@ -233,7 +235,7 @@ const ALL_GATES: GateName[] = [
     </div>
   `
 })
-export class WorkstreamSummaryComponent implements OnInit {
+export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
 
   loading            = false;
   loadError          = '';
@@ -246,6 +248,8 @@ export class WorkstreamSummaryComponent implements OnInit {
   readonly gates    = ALL_GATES;
   readonly wipLimit = 4;
 
+  private readonly profileSub = new Subscription();
+
   constructor(
     private readonly delivery: DeliveryService,
     private readonly mcp:      McpService,
@@ -255,15 +259,27 @@ export class WorkstreamSummaryComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const currentProfile = this.profile.getCurrentProfile();
-    const role           = currentProfile?.system_role;
-    this.isPrivileged    = role === 'phil' || role === 'admin';
+    // Wait for profile$ to emit a non-null User — avoids race condition where
+    // getCurrentProfile() returns null before async loadProfile() completes (D-177 fix).
+    this.profileSub.add(
+      this.profile.profile$.pipe(
+        filter((p): p is NonNullable<typeof p> => p !== null),
+        take(1)
+      ).subscribe(profile => {
+        const role        = profile.system_role;
+        this.isPrivileged = role === 'phil' || role === 'admin';
+        if (!this.isPrivileged) {
+          this.loadUserDivisions(profile.id ?? '');
+        } else {
+          this.loadSummary();
+        }
+        this.cdr.markForCheck();
+      })
+    );
+  }
 
-    if (!this.isPrivileged) {
-      this.loadUserDivisions(currentProfile?.id ?? '');
-    } else {
-      this.loadSummary();
-    }
+  ngOnDestroy(): void {
+    this.profileSub.unsubscribe();
   }
 
   private async loadUserDivisions(userId: string): Promise<void> {
@@ -343,7 +359,7 @@ export class WorkstreamSummaryComponent implements OnInit {
   get groups(): { divisionName: string; workstreams: WorkstreamSummaryItem[] }[] {
     const map = new Map<string, WorkstreamSummaryItem[]>();
     for (const ws of this.workstreamSummaries) {
-      const key = ws.home_division_name || '(No division assigned)';
+      const key = ws.home_division_name || '(No Division assigned)';
       if (!map.has(key)) { map.set(key, []); }
       map.get(key)!.push(ws);
     }

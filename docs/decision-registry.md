@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-177**
+**Next available: D-178**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -85,6 +85,7 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-174 | WIP categories: Prep/Build/Outcome, limit=4, ON_HOLD counted, COMPLETE/CANCELLED excluded | Claude Code | April 2026 | Active |
 | D-175 | Drill-down from summary views to /delivery/cycles via query params | Claude Code | April 2026 | Active |
 | D-176 | Division summary as flat indented list (not collapsible tree) | Claude Code | April 2026 | Active |
+| D-177 | Entity name capitalization in UI text (Division, Workstream, Delivery Cycle, Gate, etc.) | Claude Code | April 2026 | Active |
 
 ---
 
