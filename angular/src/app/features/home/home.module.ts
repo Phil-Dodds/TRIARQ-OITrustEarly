@@ -23,13 +23,13 @@ import { OnboardingMessageCardComponent } from './components/onboarding-message-
     OILibraryCardComponent,
     DivisionsCardComponent,
     UserManagementCardComponent,
-    MyDeliveryCyclesCardComponent,
     EmbeddedChatCardComponent,
     OnboardingMessageCardComponent
   ],
   imports: [
     CommonModule,
     IonicModule,
+    MyDeliveryCyclesCardComponent,
     RouterModule.forChild([{ path: '', component: HomeComponent }])
   ]
 })

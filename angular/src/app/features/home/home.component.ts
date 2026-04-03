@@ -63,7 +63,7 @@ export class HomeComponent implements OnInit {
   get showSystemHealth():    boolean { return this.isPhil; }
   get showDivisions():       boolean { return this.isPhil || this.isAdmin; }
   get showUserManagement():  boolean { return this.isAdmin; }
-  get showDeliveryCycles():  boolean { return this.isDS || this.isCB; }
+  get showDeliveryCycles():  boolean { return this.isPhil || this.isDS || this.isCB || this.isCE || this.isAdmin; }
 
   // Phil and Admin always see the main cards — they need the Divisions card to
   // bootstrap the hierarchy before they can have a division assignment themselves.

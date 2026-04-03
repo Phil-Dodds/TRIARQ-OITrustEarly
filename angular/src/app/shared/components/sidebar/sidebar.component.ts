@@ -14,12 +14,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home',           route: '/home',            roles: 'all' },
-  { label: 'OI Library',     route: '/library',         roles: 'all' },
-  { label: 'Divisions',      route: '/admin/divisions', roles: ['phil', 'admin'] },
-  { label: 'Users',          route: '/admin/users',     roles: ['phil', 'admin'] },
-  { label: 'Delivery Cycles',route: '/delivery',        roles: ['ds', 'cb'] },
-  { label: 'Chat',           route: '/chat',            roles: 'all' }
+  { label: 'Home',                    route: '/home',               roles: 'all' },
+  { label: 'OI Library',              route: '/library',            roles: 'all' },
+  { label: 'Delivery Cycle Tracking', route: '/delivery',           roles: ['phil', 'ds', 'cb', 'ce', 'admin'] },
+  { label: 'Chat',                    route: '/chat',               roles: 'all' },
+  { label: 'Divisions',               route: '/admin/divisions',    roles: ['phil', 'admin'] },
+  { label: 'Users',                   route: '/admin/users',        roles: ['phil', 'admin'] },
+  { label: 'Workstream Admin',        route: '/admin/workstreams',  roles: ['phil', 'admin'] },
 ];
 
 @Component({
