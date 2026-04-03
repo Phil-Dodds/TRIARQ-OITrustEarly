@@ -63,7 +63,10 @@ export class HomeComponent implements OnInit {
   get showSystemHealth():    boolean { return this.isPhil; }
   get showDivisions():       boolean { return this.isPhil || this.isAdmin; }
   get showUserManagement():  boolean { return this.isAdmin; }
-  get showDeliveryCycles():  boolean { return this.isPhil || this.isDS || this.isCB || this.isCE || this.isAdmin; }
+  // All roles see Delivery Cycle Tracking (D-163). Users without Division
+  // assignments see a contextual empty state on the dashboard explaining why
+  // no cycles appear and what needs to change.
+  get showDeliveryCycles():  boolean { return true; }
 
   // Phil and Admin always see the main cards — they need the Divisions card to
   // bootstrap the hierarchy before they can have a division assignment themselves.

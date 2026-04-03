@@ -21,6 +21,7 @@ import {
   ChangeDetectorRef,
   OnInit
 } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { CommonModule }       from '@angular/common';
 import { RouterModule }       from '@angular/router';
 import {
@@ -308,25 +309,47 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <!-- ── Empty states ─────────────────────────────────────────────────── -->
       <div *ngIf="!loading && filtered.length === 0"
            style="padding:var(--triarq-space-xl) 0;text-align:center;">
-        <!-- No cycles at all -->
-        <div *ngIf="cycles.length === 0">
+
+        <!-- State 1: No Division assignment — user can't see any cycles yet -->
+        <div *ngIf="divisionChecked && !hasDivision">
+          <div style="font-size:48px;margin-bottom:var(--triarq-space-sm);">◫</div>
           <div style="font-weight:500;color:var(--triarq-color-text-primary);margin-bottom:8px;">
-            No Delivery Cycles yet
+            No Division assignment yet
           </div>
           <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                      max-width:400px;margin:0 auto;">
+                      max-width:440px;margin:0 auto;line-height:1.6;">
+            Delivery Cycles are scoped to Divisions — you need to be assigned to at least
+            one Division before cycles appear here.
+          </div>
+          <div style="margin-top:var(--triarq-space-sm);font-size:var(--triarq-text-small);
+                      color:var(--triarq-color-text-secondary);">
+            Contact your administrator to be assigned to a Division.
+          </div>
+        </div>
+
+        <!-- State 2: Has Division, no cycles at all -->
+        <div *ngIf="hasDivision && cycles.length === 0">
+          <div style="font-weight:500;color:var(--triarq-color-text-primary);margin-bottom:8px;">
+            No active Delivery Cycles in your Divisions
+          </div>
+          <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                      max-width:440px;margin:0 auto;line-height:1.6;">
             <span *ngIf="canCreateCycle">
-              Use "+ New Cycle" above to create the first one. You'll need an active Workstream —
-              if none exist, go to Admin → Workstreams first.
+              Use "+ New Cycle" above to create the first one. A Delivery Cycle represents
+              a scoped unit of work moving through the 12-stage lifecycle. You'll need an
+              active Workstream — if none exist, go to
+              <a routerLink="/admin/workstreams"
+                 style="color:var(--triarq-color-primary);">Admin → Workstreams</a> first.
             </span>
             <span *ngIf="!canCreateCycle">
-              No cycles have been created yet in your Division. A DS, Phil, or Admin user
+              No cycles have been created yet in your Divisions. A DS, Phil, or Admin user
               can create cycles from this screen.
             </span>
           </div>
         </div>
-        <!-- Cycles exist but filters exclude them -->
-        <div *ngIf="cycles.length > 0">
+
+        <!-- State 3: Cycles exist but filters exclude all results -->
+        <div *ngIf="hasDivision && cycles.length > 0">
           <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
             No cycles match the selected filters.
             <span (click)="clearFilters()"
@@ -359,6 +382,8 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   activeWorkstreams: DeliveryWorkstream[]  = [];
   divisions:         Division[]            = [];
   loading            = false;
+  hasDivision        = true;   // assumed true until division check completes
+  divisionChecked    = false;
   canCreateCycle     = false;
   showCreateForm     = false;
   creating           = false;
@@ -398,9 +423,43 @@ export class DeliveryCycleDashboardComponent implements OnInit {
     });
     const role = this.profile.getCurrentProfile()?.system_role;
     this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin';
+    this.checkUserDivisions();
     this.loadWorkstreams();
     this.loadDivisions();
     this.loadCycles();
+  }
+
+  private async checkUserDivisions(): Promise<void> {
+    // Use cached value from home screen if available (avoids double call on normal navigation).
+    if (this.profile.hasAnyDivision()) {
+      this.hasDivision     = true;
+      this.divisionChecked = true;
+      this.cdr.markForCheck();
+      return;
+    }
+    // Direct navigation to /delivery bypasses home — check independently.
+    const userId = this.profile.getCurrentProfile()?.id;
+    if (!userId) {
+      this.hasDivision     = false;
+      this.divisionChecked = true;
+      this.cdr.markForCheck();
+      return;
+    }
+    try {
+      const res = await firstValueFrom(
+        this.mcp.call<{ all_accessible_divisions: unknown[] }>(
+          'division', 'get_user_divisions', { user_id: userId }
+        )
+      );
+      const divisions      = res.data?.all_accessible_divisions ?? [];
+      this.hasDivision     = divisions.length > 0;
+      this.divisionChecked = true;
+      this.profile.setHasDivision(this.hasDivision);
+    } catch {
+      this.hasDivision     = false;
+      this.divisionChecked = true;
+    }
+    this.cdr.markForCheck();
   }
 
   private loadWorkstreams(): void {

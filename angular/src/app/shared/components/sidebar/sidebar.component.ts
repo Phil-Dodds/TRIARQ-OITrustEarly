@@ -1,16 +1,19 @@
 // sidebar.component.ts — Pathways OI Trust
 // Role-aware navigation sidebar. Active item uses --triarq-color-primary left border (D-151).
+// Subscribes to profile$ so nav items update reactively when async profile load completes.
+// Fix: calling getCurrentProfile() once at init missed async loads — switched to profile$ subscription.
 
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { UserProfileService } from '../../../core/services/user-profile.service';
 import { AuthService }        from '../../../core/services/auth.service';
 import { Router }             from '@angular/router';
 import { SystemRole }         from '../../../core/types/database';
+import { Subscription }       from 'rxjs';
 
 interface NavItem {
-  label:    string;
-  route:    string;
-  roles:    SystemRole[] | 'all';
+  label: string;
+  route: string;
+  roles: SystemRole[] | 'all';
 }
 
 // D-163: Every feature must have a declared entry point in this list.
@@ -18,7 +21,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Home',                    route: '/home',      roles: 'all' },
   { label: 'OI Library',              route: '/library',   roles: 'all' },
-  { label: 'Delivery Cycle Tracking', route: '/delivery',  roles: ['phil', 'ds', 'cb', 'ce', 'admin'] },
+  { label: 'Delivery Cycle Tracking', route: '/delivery',  roles: 'all' },
   { label: 'Chat',                    route: '/chat',      roles: 'all' },
   { label: 'Admin',                   route: '/admin',     roles: ['phil', 'admin'] },
 ];
@@ -60,24 +63,38 @@ const NAV_ITEMS: NavItem[] = [
     .oi-signout-btn:hover { background: rgba(255,255,255,0.08); }
   `]
 })
-export class SidebarComponent implements OnInit {
+export class SidebarComponent implements OnInit, OnDestroy {
   visibleItems: NavItem[] = [];
   displayName = '';
+
+  private sub = new Subscription();
 
   constructor(
     private readonly profileService: UserProfileService,
     private readonly auth:           AuthService,
-    private readonly router:         Router
+    private readonly router:         Router,
+    private readonly cdr:            ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
-    const profile = this.profileService.getCurrentProfile();
-    this.displayName = profile?.display_name ?? '';
-    const role       = profile?.system_role ?? null;
-
-    this.visibleItems = NAV_ITEMS.filter(item =>
-      item.roles === 'all' || (role && item.roles.includes(role))
+    // Subscribe to profile$ so the sidebar updates reactively when the async
+    // profile load completes (home screen calls loadProfile() after init).
+    // Without this, getCurrentProfile() returns null at sidebar init time and
+    // role-restricted items never appear.
+    this.sub.add(
+      this.profileService.profile$.subscribe(profile => {
+        this.displayName  = profile?.display_name ?? '';
+        const role        = profile?.system_role ?? null;
+        this.visibleItems = NAV_ITEMS.filter(item =>
+          item.roles === 'all' || (role && (item.roles as SystemRole[]).includes(role))
+        );
+        this.cdr.markForCheck();
+      })
     );
+  }
+
+  ngOnDestroy(): void {
+    this.sub.unsubscribe();
   }
 
   async signOut(): Promise<void> {
