@@ -65,13 +65,15 @@ const NAV_ITEMS: NavItem[] = [
     .oi-brand-name { font-size: var(--triarq-text-small); font-weight: var(--triarq-font-weight-bold); color: #fff; letter-spacing: 0.5px; }
     .oi-nav-list { list-style: none; padding: var(--triarq-space-sm) 0; margin: 0; flex: 1; }
 
-    .oi-nav-item { display: flex; flex-direction: column; }
-    .oi-nav-label { display: block; }
+    .oi-nav-item { display: flex; flex-direction: row; align-items: center;
+                   justify-content: space-between; gap: 6px; }
+    .oi-nav-label { flex: 1; }
     .oi-dev-status {
-      display: block;
+      display: inline;
       font-size: 10px;
       letter-spacing: 0.3px;
-      margin-top: 1px;
+      white-space: nowrap;
+      flex-shrink: 0;
       opacity: 0.85;
     }
 

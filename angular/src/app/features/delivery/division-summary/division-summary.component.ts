@@ -67,11 +67,15 @@ import { DivisionSummaryItem, Division } from '../../../core/types/database';
         Loading division summary…
       </div>
 
-      <!-- Error -->
+      <!-- Error (D-140: state what is blocked and what needs to change) -->
       <div *ngIf="loadError && !loading"
-           style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);
-                  padding:var(--triarq-space-md);">
-        {{ loadError }}
+           style="padding:var(--triarq-space-md);max-width:560px;">
+        <div style="color:var(--triarq-color-error);font-weight:500;margin-bottom:4px;">
+          Division summary could not load.
+        </div>
+        <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+          {{ loadError }}
+        </div>
       </div>
 
       <!-- Column header -->
@@ -208,17 +212,28 @@ export class DivisionSummaryComponent implements OnInit {
         if (res.success && res.data) {
           this.divisionSummaries = res.data.division_summaries;
         } else {
-          this.loadError = res.error ?? 'Could not load division summary.';
+          this.loadError = this.friendlyError(res.error);
         }
         this.loading = false;
         this.cdr.markForCheck();
       },
-      error: () => {
-        this.loadError = 'Could not load division summary. Please try again.';
+      error: (err: { error?: string }) => {
+        this.loadError = this.friendlyError(err?.error);
         this.loading   = false;
         this.cdr.markForCheck();
       }
     });
+  }
+
+  private friendlyError(serverMsg?: string): string {
+    if (!serverMsg) {
+      return 'Unable to reach the server. Check your connection and try again.';
+    }
+    if (serverMsg.includes('not found') && serverMsg.includes('get_delivery_summary')) {
+      return 'The summary feature is still deploying to the server. ' +
+             'This takes 1–2 minutes after a new release. Reload the page to try again.';
+    }
+    return serverMsg;
   }
 
   onToggleChange(): void {
