@@ -2,6 +2,11 @@
 // Returns all Divisions a user has active membership in, with inherited access.
 // Downward-only inheritance: membership in a Division grants access to all
 // child Divisions recursively (D-135).
+//
+// D-170: Phil ('phil') and Admin ('admin') have implicit access to ALL Divisions.
+// They do not require — and should not require — explicit Division membership assignments.
+// When the queried user has a privileged role, all active Divisions are returned,
+// tagged with access_type = 'privileged'.
 
 'use strict';
 
@@ -17,10 +22,10 @@ async function get_user_divisions(params, caller_user_id) {
 
   if (!user_id) return { success: false, error: 'user_id is required.' };
 
-  // Verify user exists
+  // Verify user exists and get their role
   const { data: user, error: userErr } = await supabase
     .from('users')
-    .select('id, display_name')
+    .select('id, display_name, system_role')
     .eq('id', user_id)
     .is('deleted_at', null)
     .single();
@@ -29,7 +34,38 @@ async function get_user_divisions(params, caller_user_id) {
     return { success: false, error: 'User not found.' };
   }
 
-  // Get directly assigned Divisions (active memberships)
+  // ── D-170: Phil and Admin have implicit access to all Divisions ───────────
+  // No membership assignment required. Return all active divisions.
+  if (user.system_role === 'phil' || user.system_role === 'admin') {
+    const { data: allDivisions, error: allErr } = await supabase
+      .from('divisions')
+      .select('id, division_name, division_level, parent_division_id, division_type_label')
+      .is('deleted_at', null)
+      .order('division_level')
+      .order('division_name');
+
+    if (allErr) {
+      return { success: false, error: `Failed to fetch Divisions: ${allErr.message}` };
+    }
+
+    const privilegedDivisions = (allDivisions || []).map(d => ({
+      ...d,
+      access_type: 'privileged'
+    }));
+
+    return {
+      success: true,
+      data: {
+        user_id,
+        display_name:               user.display_name,
+        directly_assigned_divisions: privilegedDivisions,  // all = directly accessible for filter purposes
+        all_accessible_divisions:    privilegedDivisions
+      }
+    };
+  }
+
+  // ── Standard path: direct memberships + inherited child access (D-135) ───
+
   const { data: memberships, error: memErr } = await supabase
     .from('division_memberships')
     .select('division_id, assigned_at')
@@ -46,9 +82,9 @@ async function get_user_divisions(params, caller_user_id) {
       success: true,
       data: {
         user_id,
-        display_name: user.display_name,
+        display_name:               user.display_name,
         directly_assigned_divisions: [],
-        all_accessible_divisions: []
+        all_accessible_divisions:    []
       }
     };
   }
@@ -95,9 +131,9 @@ async function get_user_divisions(params, caller_user_id) {
     success: true,
     data: {
       user_id,
-      display_name: user.display_name,
+      display_name:               user.display_name,
       directly_assigned_divisions: directDivisions || [],
-      all_accessible_divisions: annotated
+      all_accessible_divisions:    annotated
     }
   };
 }

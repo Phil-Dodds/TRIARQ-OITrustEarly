@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-170**
+**Next available: D-171**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -78,6 +78,7 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-167 | Workstream filter: no-workstream and inactive as separate options | Claude Code | April 2026 | Active |
 | D-168 | Claude Code mandatory debate/question before building | Claude Code | April 2026 | Active |
 | D-169 | Decision source tagging and registry protocol | Claude Code | April 2026 | Active |
+| D-170 | Phil and Admin have implicit access to all Divisions | Claude Code | April 2026 | Active |
 
 ---
 

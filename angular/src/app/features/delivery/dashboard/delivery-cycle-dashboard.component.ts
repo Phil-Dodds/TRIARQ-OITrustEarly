@@ -179,14 +179,16 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;
                   margin-bottom:var(--triarq-space-md);align-items:center;">
 
-        <!-- D-166: Division filter — server-side reload. Only shown when user has multiple divisions. -->
-        <select *ngIf="userDivisions.length > 1"
+        <!-- D-166/D-170: Division filter — server-side reload.
+             Phil/Admin see all divisions; others see their directly-assigned divisions.
+             Only shown when there is more than one option to choose from. -->
+        <select *ngIf="filterDivisionOptions.length > 1"
                 [(ngModel)]="filterDivision"
                 (ngModelChange)="onDivisionFilterChange()"
                 class="oi-input"
                 style="max-width:200px;font-size:var(--triarq-text-small);">
-          <option value="">All My Divisions</option>
-          <option *ngFor="let d of userDivisions" [value]="d.id">{{ d.division_name }}</option>
+          <option value="">All Divisions</option>
+          <option *ngFor="let d of filterDivisionOptions" [value]="d.id">{{ d.division_name }}</option>
         </select>
 
         <!-- D-166: Include child divisions — only visible when a division is selected -->
@@ -482,7 +484,21 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   }
 
   private async checkUserDivisions(): Promise<void> {
-    const userId = this.profile.getCurrentProfile()?.id;
+    const currentProfile = this.profile.getCurrentProfile();
+    const userId         = currentProfile?.id;
+    const role           = currentProfile?.system_role;
+
+    // D-170: Phil and Admin have implicit access to all Divisions — no assignment needed.
+    // Skip MCP call entirely. Division filter will be populated from this.divisions
+    // (loaded by loadDivisions()) via the filterDivisionOptions getter.
+    if (role === 'phil' || role === 'admin') {
+      this.hasDivision     = true;
+      this.divisionChecked = true;
+      this.profile.setHasDivision(true);
+      this.cdr.markForCheck();
+      return;
+    }
+
     if (!userId) {
       this.hasDivision     = false;
       this.divisionChecked = true;
@@ -490,27 +506,46 @@ export class DeliveryCycleDashboardComponent implements OnInit {
       return;
     }
 
+    // Use cached value from home screen if available (avoids double call on normal navigation).
+    if (this.profile.hasAnyDivision()) {
+      this.hasDivision     = true;
+      this.divisionChecked = true;
+      this.cdr.markForCheck();
+      // Still need to load userDivisions for the filter — fall through to MCP call below
+      // only if userDivisions is empty (meaning we haven't loaded them yet this session).
+      if (this.userDivisions.length > 0) { return; }
+    }
+
     try {
       const res = await firstValueFrom(
         this.mcp.call<{
-          all_accessible_divisions:      (Division & { access_type: string })[];
-          directly_assigned_divisions:   Division[];
+          all_accessible_divisions:    (Division & { access_type: string })[];
+          directly_assigned_divisions: Division[];
         }>('division', 'get_user_divisions', { user_id: userId })
       );
 
-      const allDivisions    = res.data?.all_accessible_divisions ?? [];
-      this.hasDivision      = allDivisions.length > 0;
-      this.divisionChecked  = true;
+      const allDivisions   = res.data?.all_accessible_divisions ?? [];
+      this.hasDivision     = allDivisions.length > 0;
+      this.divisionChecked = true;
       this.profile.setHasDivision(this.hasDivision);
 
       // D-166: store directly-assigned divisions for the division filter dropdown.
-      // Child divisions appear via include_child_divisions toggle — not as separate items.
       this.userDivisions = (res.data?.directly_assigned_divisions ?? []) as Division[];
     } catch {
       this.hasDivision     = false;
       this.divisionChecked = true;
     }
     this.cdr.markForCheck();
+  }
+
+  // D-170: Phil and Admin use all loaded divisions for the filter (no assignment needed).
+  // Other roles use only their directly-assigned divisions.
+  get filterDivisionOptions(): Division[] {
+    const role = this.profile.getCurrentProfile()?.system_role;
+    if (role === 'phil' || role === 'admin') {
+      return this.divisions;
+    }
+    return this.userDivisions;
   }
 
   private loadWorkstreams(): void {

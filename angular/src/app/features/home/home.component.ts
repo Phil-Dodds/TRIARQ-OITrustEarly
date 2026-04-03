@@ -39,6 +39,14 @@ export class HomeComponent implements OnInit {
   }
 
   private async checkDivisionMembership(): Promise<void> {
+    // D-170: Phil and Admin have implicit access to all Divisions — no assignment needed.
+    // Skip the membership check entirely; treat as fully provisioned.
+    if (this.role === 'phil' || this.role === 'admin') {
+      this.hasDivision = true;
+      this.profileService.setHasDivision(true);
+      return;
+    }
+
     try {
       const response = await firstValueFrom(
         this.mcp.call<{ all_accessible_divisions: unknown[] }>(
