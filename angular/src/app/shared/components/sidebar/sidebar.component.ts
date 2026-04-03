@@ -1,7 +1,7 @@
 // sidebar.component.ts — Pathways OI Trust
 // Role-aware navigation sidebar. Active item uses --triarq-color-primary left border (D-151).
 // Subscribes to profile$ so nav items update reactively when async profile load completes.
-// Fix: calling getCurrentProfile() once at init missed async loads — switched to profile$ subscription.
+// devStatus field shows build development stage per nav item — visual only, no routing effect.
 
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { UserProfileService } from '../../../core/services/user-profile.service';
@@ -10,20 +10,24 @@ import { Router }             from '@angular/router';
 import { SystemRole }         from '../../../core/types/database';
 import { Subscription }       from 'rxjs';
 
+type DevStatus = 'live' | 'uat' | 'pilot' | 'not-started';
+
 interface NavItem {
-  label: string;
-  route: string;
-  roles: SystemRole[] | 'all';
+  label:     string;
+  route:     string;
+  roles:     SystemRole[] | 'all';
+  devStatus: DevStatus;
 }
 
 // D-163: Every feature must have a declared entry point in this list.
 // D-164: Admin functions are never individual sidebar links — they belong under /admin (Admin hub).
+// devStatus reflects current build stage. Update when a feature advances.
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home',                    route: '/home',      roles: 'all' },
-  { label: 'OI Library',              route: '/library',   roles: 'all' },
-  { label: 'Delivery Cycle Tracking', route: '/delivery',  roles: 'all' },
-  { label: 'Chat',                    route: '/chat',      roles: 'all' },
-  { label: 'Admin',                   route: '/admin',     roles: ['phil', 'admin'] },
+  { label: 'Home',                    route: '/home',      roles: 'all',              devStatus: 'uat'         },
+  { label: 'OI Library',              route: '/library',   roles: 'all',              devStatus: 'not-started' },
+  { label: 'Delivery Cycle Tracking', route: '/delivery',  roles: 'all',              devStatus: 'uat'         },
+  { label: 'Chat',                    route: '/chat',      roles: 'all',              devStatus: 'not-started' },
+  { label: 'Admin',                   route: '/admin',     roles: ['phil', 'admin'],  devStatus: 'uat'         },
 ];
 
 @Component({
@@ -41,7 +45,10 @@ const NAV_ITEMS: NavItem[] = [
              routerLinkActive="active"
              class="oi-nav-item"
              [attr.aria-label]="item.label">
-            {{ item.label }}
+            <span class="oi-nav-label">{{ item.label }}</span>
+            <span class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
+              {{ statusLabel(item.devStatus) }}
+            </span>
           </a>
         </li>
       </ul>
@@ -57,6 +64,23 @@ const NAV_ITEMS: NavItem[] = [
     .oi-sidebar-brand { padding: var(--triarq-space-lg) var(--triarq-space-md); border-bottom: 1px solid rgba(255,255,255,0.1); }
     .oi-brand-name { font-size: var(--triarq-text-small); font-weight: var(--triarq-font-weight-bold); color: #fff; letter-spacing: 0.5px; }
     .oi-nav-list { list-style: none; padding: var(--triarq-space-sm) 0; margin: 0; flex: 1; }
+
+    .oi-nav-item { display: flex; flex-direction: column; }
+    .oi-nav-label { display: block; }
+    .oi-dev-status {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.3px;
+      margin-top: 1px;
+      opacity: 0.85;
+    }
+
+    /* Status colors */
+    .status-live        { color: #6fcf97; }
+    .status-uat         { color: var(--triarq-color-sunray, #f5a623); }
+    .status-pilot       { color: #56ccf2; }
+    .status-not-started { color: rgba(255,255,255,0.35); }
+
     .oi-sidebar-footer { padding: var(--triarq-space-md); border-top: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: var(--triarq-space-xs); }
     .oi-sidebar-user { font-size: var(--triarq-text-caption); color: var(--triarq-color-sidebar-text); }
     .oi-signout-btn { background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--triarq-color-sidebar-text); border-radius: var(--triarq-radius-button); padding: var(--triarq-space-xs) var(--triarq-space-sm); cursor: pointer; font-size: var(--triarq-text-caption); }
@@ -77,10 +101,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // Subscribe to profile$ so the sidebar updates reactively when the async
-    // profile load completes (home screen calls loadProfile() after init).
-    // Without this, getCurrentProfile() returns null at sidebar init time and
-    // role-restricted items never appear.
     this.sub.add(
       this.profileService.profile$.subscribe(profile => {
         this.displayName  = profile?.display_name ?? '';
@@ -95,6 +115,15 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.sub.unsubscribe();
+  }
+
+  statusLabel(status: DevStatus): string {
+    switch (status) {
+      case 'live':        return '** Live';
+      case 'uat':         return '** UAT';
+      case 'pilot':       return '** Pilot';
+      case 'not-started': return '** Not Started';
+    }
   }
 
   async signOut(): Promise<void> {
