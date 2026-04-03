@@ -283,6 +283,17 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         Loading cycles…
       </div>
 
+      <!-- ── Load error (D-140) ─────────────────────────────────────────── -->
+      <div *ngIf="loadError && !loading"
+           style="padding:var(--triarq-space-md);max-width:600px;">
+        <div style="color:var(--triarq-color-error);font-weight:500;margin-bottom:4px;">
+          Delivery Cycles could not load.
+        </div>
+        <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+          {{ loadError }}
+        </div>
+      </div>
+
       <!-- ── Table header with sort ───────────────────────────────────────── -->
       <div *ngIf="!loading && filtered.length > 0"
            style="display:grid;grid-template-columns:3fr 1fr 2fr 1fr 110px 130px 130px 24px;
@@ -386,7 +397,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       </div>
 
       <!-- ── Empty states ─────────────────────────────────────────────────── -->
-      <div *ngIf="!loading && filtered.length === 0"
+      <div *ngIf="!loading && !loadError && filtered.length === 0"
            style="padding:var(--triarq-space-xl) 0;text-align:center;">
 
         <!-- State 1: No Division assignment — user can't see any cycles yet -->
@@ -463,6 +474,7 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   // D-166: user's directly-assigned divisions for the division filter dropdown
   userDivisions:     Division[]            = [];
   loading            = false;
+  loadError          = '';
   hasDivision        = true;   // assumed true until division check completes
   divisionChecked    = false;
   canCreateCycle     = false;
@@ -645,14 +657,18 @@ export class DeliveryCycleDashboardComponent implements OnInit {
     this.delivery.listCycles(params).subscribe({
       next: (res) => {
         if (res.success && res.data) {
-          this.cycles = Array.isArray(res.data) ? res.data : [];
+          this.cycles    = Array.isArray(res.data) ? res.data : [];
+          this.loadError = '';
           this.applyFilters();
+        } else {
+          this.loadError = res.error ?? 'Delivery Cycles could not be loaded.';
         }
         this.loading = false;
         this.cdr.markForCheck();
       },
-      error: () => {
-        this.loading = false;
+      error: (err: { error?: string }) => {
+        this.loadError = err?.error ?? 'Unable to reach the server. Check your connection and try again.';
+        this.loading   = false;
         this.cdr.markForCheck();
       }
     });

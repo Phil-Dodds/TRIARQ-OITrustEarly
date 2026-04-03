@@ -34,6 +34,19 @@ async function validateJwt(req, res, next) {
   // Active only when DEV_BYPASS_TOKEN is set in the MCP server environment.
   // Token format: devbypass::<DEV_BYPASS_TOKEN>::<email>
   const DEV_BYPASS = process.env.DEV_BYPASS_TOKEN;
+
+  // If Angular sent a devbypass token but this server does not have DEV_BYPASS_TOKEN
+  // configured, fail early with a clear config error instead of a misleading JWT message.
+  if (!DEV_BYPASS && token.startsWith('devbypass::')) {
+    return res.status(401).json({
+      success: false,
+      error:
+        'Dev bypass token received but DEV_BYPASS_TOKEN is not configured on this MCP server. ' +
+        'Add DEV_BYPASS_TOKEN to the Render environment variables for this service ' +
+        'and redeploy.'
+    });
+  }
+
   if (DEV_BYPASS && token.startsWith('devbypass::')) {
     const parts = token.split('::');
     if (parts.length !== 3 || parts[1] !== DEV_BYPASS || !parts[2]) {

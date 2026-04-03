@@ -138,6 +138,17 @@ import { DeliveryWorkstream, Division, User } from '../../../core/types/database
         Loading workstreams…
       </div>
 
+      <!-- ── Load error (D-140) ─────────────────────────────────────────── -->
+      <div *ngIf="loadError && !loading"
+           style="padding:var(--triarq-space-md);max-width:600px;">
+        <div style="color:var(--triarq-color-error);font-weight:500;margin-bottom:4px;">
+          Workstreams could not load.
+        </div>
+        <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+          {{ loadError }}
+        </div>
+      </div>
+
       <!-- ── Workstream list ──────────────────────────────────────────────── -->
       <div *ngIf="!loading && workstreams.length > 0">
         <div style="display:grid;grid-template-columns:3fr 2fr 2fr 1fr 120px;
@@ -216,7 +227,7 @@ import { DeliveryWorkstream, Division, User } from '../../../core/types/database
       </div>
 
       <!-- ── Empty state — Design Principle 4.2 ───────────────────────────── -->
-      <div *ngIf="!loading && workstreams.length === 0"
+      <div *ngIf="!loading && !loadError && workstreams.length === 0"
            style="padding:var(--triarq-space-xl) 0;text-align:center;">
         <div style="font-weight:500;color:var(--triarq-color-text-primary);margin-bottom:8px;">
           No Workstreams yet
@@ -246,6 +257,7 @@ export class WorkstreamAdminComponent implements OnInit {
   divisions:         Division[]           = [];
   users:             User[]               = [];
   loading            = false;
+  loadError          = '';
   loadingUsers       = false;
   showCreateForm     = false;
   creating           = false;
@@ -306,18 +318,22 @@ export class WorkstreamAdminComponent implements OnInit {
   }
 
   private loadWorkstreams(): void {
-    this.loading = true;
+    this.loading   = true;
+    this.loadError = '';
     this.cdr.markForCheck();
     this.delivery.listWorkstreams().subscribe({
       next: (res) => {
         if (res.success && res.data) {
           this.workstreams = Array.isArray(res.data) ? res.data : [];
+        } else {
+          this.loadError = res.error ?? 'Workstreams could not be loaded.';
         }
         this.loading = false;
         this.cdr.markForCheck();
       },
-      error: () => {
-        this.loading = false;
+      error: (err: { error?: string }) => {
+        this.loadError = err?.error ?? 'Unable to reach the server. Check your connection and try again.';
+        this.loading   = false;
         this.cdr.markForCheck();
       }
     });

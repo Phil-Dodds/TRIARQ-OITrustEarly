@@ -12,18 +12,13 @@
 
 'use strict';
 
-const { createClient } = require('@supabase/supabase-js');
+const { supabase } = require('../db');
 const {
   NEXT_GATE_BY_STAGE,
   WIP_CATEGORY_BY_STAGE,
   WIP_LIMIT,
   ALL_GATES
 } = require('../lifecycle');
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
 
 async function get_delivery_summary(params, caller_id) {
   const { division_ids: requested_division_ids } = params;
