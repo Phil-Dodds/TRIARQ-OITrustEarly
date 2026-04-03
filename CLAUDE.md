@@ -77,6 +77,19 @@ After Phil responds: if overridden, build as directed and note the override in t
 
 Full principle in `docs/design-principles.md` (Principle 6). Decision D-168.
 
+**Rule 5 — Decision Source Tagging and Registry Protocol (D-169).**
+Before allocating any new decision number, Claude Code must:
+1. Read `docs/decision-registry.md` to find the current "Next available" number.
+2. Check that the number is not already claimed in `decisions-active.md`.
+3. Write the decision with a source tag: `| Source: Claude Code | [date] |`
+4. Update the "Next available" field in the registry in the same commit.
+
+If Claude Code finds a collision (number taken by a different decision), it takes the next unclaimed number, adds a `COLLISION` note in the registry row, and surfaces the conflict to Phil before committing.
+
+Claude Chat-originated decisions are tagged `| Source: Claude Chat |`. When Phil asks Claude Code to commit a chat-originated decision, Claude Code follows the same allocation protocol and notes the chat origin in the source tag.
+
+This rule exists to prevent silent collision of D-numbers between Claude Code and Claude Chat sessions. Full protocol in `docs/decision-registry.md`. Decision D-169.
+
 ---
 
 ## Build C Scope
@@ -243,3 +256,4 @@ Decisions are locked in `decisions-active.md`. Do not re-litigate locked decisio
 | D-166 | Division filter on dashboard; include child divisions toggle |
 | D-167 | Workstream filter: no-workstream and inactive shown as separate options |
 | D-168 | Claude Code must debate/question before building — silent conflict resolution is a build error |
+| D-169 | Decision source tagging + registry protocol — read docs/decision-registry.md before allocating any D-number |

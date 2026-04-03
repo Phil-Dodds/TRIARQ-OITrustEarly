@@ -179,12 +179,60 @@ Build C and earlier builds occasionally resolved design ambiguities silently thr
 
 ---
 
+---
+
+## Principle 7 — Decision Source Tagging and Registry Protocol (D-169)
+
+**Statement:** Every decision is tagged with its originating session type. A registry file is the authoritative master list of all allocated decision numbers. Claude Code reads the registry before allocating any new number.
+
+### The source tag format
+
+Every decision in `decisions-active.md` ends with:
+```
+| Source: Claude Code | April 2026 |
+| Source: Claude Chat | April 2026 |
+| Source: Design Session | April 2026 |
+```
+
+### Why this matters
+
+Claude Chat and Claude Code operate in separate contexts. Both can allocate decision numbers. Without source tagging, there is no way to tell which session originated a decision. Without a registry, two sessions can claim the same number for different decisions — silently.
+
+Source tagging makes collisions visible at a glance. The registry prevents them from happening in the first place.
+
+### Claude Code allocation protocol
+
+1. Read `docs/decision-registry.md` — find "Next available"
+2. Confirm the number is not taken in `decisions-active.md`
+3. Write the decision with `| Source: Claude Code | [date] |`
+4. Update "Next available" in the registry in the same commit as the decision
+
+### Claude Chat allocation protocol
+
+Claude Chat cannot write files. Protocol:
+1. Claude Chat checks the registry file (provided in context) for the current next-available number
+2. Claude Chat states the number it is claiming in the conversation
+3. Phil asks Claude Code to commit the decision in the next code session
+4. Claude Code follows the Code allocation protocol and tags with `| Source: Claude Chat | [date] |`
+
+### Collision resolution
+
+If Claude Code finds a claimed number that conflicts:
+1. Take the next available unclaimed number
+2. Add `COLLISION — see [other decision title]` note in the registry for the conflicting row
+3. Surface the conflict to Phil before committing — do not silently resolve
+
+Full protocol and registry in `docs/decision-registry.md`.
+
+---
+
 ## Version History
 
 | Version | Date | Change |
 |---|---|---|
 | v1.0 | April 2026 | Initial document. Principles 1 (D-163) and 2 (D-164) added after Build C nav gap identified. Principles 3–5 carried from existing decisions P1, P2, D-140. |
 | v1.1 | April 2026 | Principle 6 (D-168) added: mandatory debate/question behavior for Claude Code sessions. |
+| v1.2 | April 2026 | Principle 7 (D-169) added: decision source tagging and registry protocol. |
 
 ---
 
