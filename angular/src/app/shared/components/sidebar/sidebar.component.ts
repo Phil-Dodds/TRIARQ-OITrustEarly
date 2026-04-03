@@ -13,14 +13,14 @@ interface NavItem {
   roles:    SystemRole[] | 'all';
 }
 
+// D-163: Every feature must have a declared entry point in this list.
+// D-164: Admin functions are never individual sidebar links — they belong under /admin (Admin hub).
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home',                    route: '/home',               roles: 'all' },
-  { label: 'OI Library',              route: '/library',            roles: 'all' },
-  { label: 'Delivery Cycle Tracking', route: '/delivery',           roles: ['phil', 'ds', 'cb', 'ce', 'admin'] },
-  { label: 'Chat',                    route: '/chat',               roles: 'all' },
-  { label: 'Divisions',               route: '/admin/divisions',    roles: ['phil', 'admin'] },
-  { label: 'Users',                   route: '/admin/users',        roles: ['phil', 'admin'] },
-  { label: 'Workstream Admin',        route: '/admin/workstreams',  roles: ['phil', 'admin'] },
+  { label: 'Home',                    route: '/home',      roles: 'all' },
+  { label: 'OI Library',              route: '/library',   roles: 'all' },
+  { label: 'Delivery Cycle Tracking', route: '/delivery',  roles: ['phil', 'ds', 'cb', 'ce', 'admin'] },
+  { label: 'Chat',                    route: '/chat',      roles: 'all' },
+  { label: 'Admin',                   route: '/admin',     roles: ['phil', 'admin'] },
 ];
 
 @Component({

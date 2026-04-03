@@ -43,9 +43,9 @@ VERTEX_MODEL=PLACEHOLDER — locked in Build B (ARCH-19)
 
 ---
 
-## Two Non-Negotiable Architectural Rules
+## Non-Negotiable Architectural Rules
 
-These override any other instruction, any framework default, and any apparent shortcut.
+These override any other instruction, any framework default, and any apparent shortcut. Violation of any rule is a hard build error — not a soft gate.
 
 **Rule 1 — MCP-Only Database Access.**
 All database calls go through MCP servers. No direct Supabase client calls from any Angular component or service — ever. If a component needs data, it calls an Angular service. The service calls the MCP endpoint. The MCP server validates the JWT, enforces Division scope, and queries Supabase. There is no shorter path.
@@ -53,7 +53,20 @@ All database calls go through MCP servers. No direct Supabase client calls from 
 **Rule 2 — UI as Presentation Layer Only.**
 Angular components render data. They contain no prompts, no business logic, and no SQL. Skill files own prompt logic. MCP servers own business logic and data access. Components own display.
 
-Violation of either rule is a hard build error — not a soft gate.
+**Rule 3 — Workflow Entry Point Completeness (D-163).**
+A feature is not done until its entry point is declared and wired. Before writing any component, identify which entry point type the feature uses and implement it in the same commit:
+
+- **Sidebar nav item** → add to `NAV_ITEMS` in `sidebar.component.ts` with correct `roles` array
+- **Home page card** → add `showX` getter in `home.component.ts`, wire card in `home.component.html`
+- **Action Queue / Notification** → wire to action queue or notifications system
+
+Entry point checklist — required before marking any feature done:
+- [ ] Entry point type declared and implemented
+- [ ] Role array correct — all permitted roles included
+- [ ] If admin function: added to Admin hub card grid, NOT as a loose sidebar link
+- [ ] If sequential workflow: steps, prerequisites, and D-140 blocked-action messages defined
+
+Full principle in `docs/design-principles.md` (Principle 1).
 
 ---
 
@@ -192,6 +205,8 @@ Decisions are locked in `decisions-active.md`. Do not re-litigate locked decisio
 | D-144 | MCP server pattern |
 | D-151 | Design token rules (h2=60px critical fix) |
 | D-155 | On-demand MCP tool loading |
+| D-163 | Workflow Entry Point Completeness — every feature needs a wired entry point |
+| D-164 | Admin Hub Consolidation — all admin functions under /admin, never loose sidebar links |
 
 **Build C specific:**
 

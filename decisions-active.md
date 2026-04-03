@@ -55,6 +55,14 @@ These principles apply to every effort, not just this system.
 
 ## LOCKED DECISIONS — OPERATIVE
 
+### UX and Navigation Principles
+
+**D-163** — Workflow Entry Point Completeness. Every user-facing function must be reachable from exactly one declared entry point: sidebar nav item (user-initiated, persistent), home page card (role-relevant summary), or action queue / notification (system-triggered). A feature with no wired entry point is incomplete regardless of whether the route and component exist. Admin functions are never standalone sidebar links — they belong in the Admin hub (D-164). Entry point role arrays must include every permitted role. Full principle in docs/design-principles.md. Triggered by: Build C Delivery Cycle Tracking nav gap (sidebar restricted to ds/cb, excluding Phil; home card was non-functional stub). Source: April 2026 post-Build-C review.
+
+**D-164** — Admin Hub Consolidation. All administrative functions are grouped under a single Admin hub at `/admin`, accessible via one sidebar entry for `['phil','admin']` roles. The hub renders a card grid — one card per admin function. No admin sub-function appears as a direct sidebar link. Admin sub-routes (`/admin/workstreams`, `/admin/divisions`, `/admin/users`, etc.) remain stable as functions are added. Each hub card follows Principle 3 (Visible Context) — states what the function does and why. Full principle in docs/design-principles.md. Source: April 2026 post-Build-C review.
+
+
+
 ### System Scope & Architecture Principles
 
 **37** — System Hierarchy, Container Types, and Multi-Tenancy. Six-level hierarchy with configurable governance settings at every level. Platform level sits above all Organizations (managed by TRIARQ). Level 1 naming resolved as Trust (D-70) and Division as collective noun (D-71). Governance settings at each level are configurable — default is inherit from parent. Phil's visibility is a system constant that cannot be toggled off by any Sub-Division configuration. Schema is multi-tenant from day one — every entity carries org_tenant_id. Demo runs as single-tenant. Standing up a second Org-Tenant is a configuration exercise. UI label is Organization. Connects to: D-70, D-71, D-72, D-85, D-134, D-135.
