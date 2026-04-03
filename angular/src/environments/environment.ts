@@ -11,6 +11,7 @@ export const environment = {
   // Dev bypass — must match DEV_BYPASS_TOKEN env var on both Render MCP services.
   // Remove from Render env vars when re-enabling magic link auth.
   devBypassToken:  'dev-bypass-oi-trust-2026',
-  divisionMcpUrl:  'http://localhost:3001',             // Replace with Render URL after deploy
-  documentMcpUrl:  'http://localhost:3002'              // Replace with Render URL after deploy
+  divisionMcpUrl:      'http://localhost:3001',             // Replace with Render URL after deploy
+  documentMcpUrl:      'http://localhost:3002',             // Replace with Render URL after deploy
+  deliveryCycleMcpUrl: 'http://localhost:3003'              // Replace with Render URL after deploy
 };

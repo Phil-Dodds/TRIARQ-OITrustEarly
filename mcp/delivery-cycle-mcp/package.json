@@ -1,0 +1,21 @@
+{
+  "name": "delivery-cycle-mcp",
+  "version": "1.0.0",
+  "description": "Pathways OI Trust — Delivery Cycle MCP Server. Full lifecycle management for Delivery Cycles, Workstreams, gates, artifacts, and Jira sync.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test tests/"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

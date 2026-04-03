@@ -13,9 +13,10 @@ import { IonicModule }  from '@ionic/angular';
     ReactiveFormsModule,
     IonicModule,
     RouterModule.forChild([
-      { path: '',          redirectTo: 'divisions', pathMatch: 'full' },
-      { path: 'divisions', loadComponent: () => import('./divisions/divisions.component').then(c => c.DivisionsComponent) },
-      { path: 'users',     loadComponent: () => import('./users/users.component').then(c => c.UsersComponent) }
+      { path: '',               redirectTo: 'divisions', pathMatch: 'full' },
+      { path: 'divisions',     loadComponent: () => import('./divisions/divisions.component').then(c => c.DivisionsComponent) },
+      { path: 'users',         loadComponent: () => import('./users/users.component').then(c => c.UsersComponent) },
+      { path: 'workstreams',   loadComponent: () => import('../delivery/workstream-admin/workstream-admin.component').then(c => c.WorkstreamAdminComponent) }
     ])
   ]
 })

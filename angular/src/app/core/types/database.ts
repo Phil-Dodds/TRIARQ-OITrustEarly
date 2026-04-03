@@ -163,8 +163,146 @@ export interface Notification {
 
 // ── MCP response envelope ─────────────────────────────────────────────────────
 export interface McpResponse<T = unknown> {
-  success: boolean;
-  data?:   T;
-  error?:  string;
-  message?: string;
+  success:       boolean;
+  data?:         T;
+  error?:        string;
+  message?:      string;
+  stub_message?: string;
 }
+
+// ── Build C — Delivery Cycle types ────────────────────────────────────────────
+
+export type TierClassification  = 'tier_1' | 'tier_2' | 'tier_3';
+export type LifecycleStage      = 'BRIEF' | 'DESIGN' | 'SPEC' | 'BUILD' | 'VALIDATE' | 'PILOT' | 'UAT' | 'RELEASE' | 'OUTCOME' | 'COMPLETE' | 'CANCELLED' | 'ON_HOLD';
+export type GateName            = 'brief_review' | 'go_to_build' | 'go_to_deploy' | 'go_to_release' | 'close_review';
+export type GateStatus          = 'pending' | 'approved' | 'returned' | 'blocked';
+export type DateStatus          = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'complete';
+export type PointerStatus       = 'external_only' | 'promoted' | 'oi_only';
+export type JiraSyncStatus      = 'unsynced' | 'synced' | 'error';
+export type GateDisplayState    = 'pending' | 'blocked' | 'complete' | 'upcoming';
+
+export interface DeliveryWorkstream {
+  workstream_id:         string;
+  workstream_name:       string;
+  home_division_id:      string;
+  workstream_lead_user_id: string;
+  active_status:         boolean;
+  created_at:            string;
+  updated_at:            string;
+  deleted_at:            string | null;
+  // Joined
+  home_division_name?:   string;
+  lead_display_name?:    string;
+}
+
+export interface DeliveryCycle {
+  delivery_cycle_id:       string;
+  cycle_title:             string;
+  cycle_description:       string | null;
+  division_id:             string;
+  workstream_id:           string;
+  tier_classification:     TierClassification;
+  current_lifecycle_stage: LifecycleStage;
+  outcome_statement:       string | null;
+  outcome_set_by_user_id:  string | null;
+  outcome_set_at:          string | null;
+  cycle_owner_user_id:     string;
+  jira_epic_key:           string | null;
+  created_at:              string;
+  updated_at:              string;
+  deleted_at:              string | null;
+  // Joined
+  workstream?:             DeliveryWorkstream;
+  division_name?:          string;
+  owner_display_name?:     string;
+  milestone_dates?:        CycleMilestoneDate[];
+  gate_records?:           GateRecord[];
+  jira_links?:             JiraLink[];
+  artifacts?:              CycleArtifact[];
+}
+
+export interface CycleMilestoneDate {
+  milestone_id:          string;
+  delivery_cycle_id:     string;
+  gate_name:             GateName;
+  milestone_label:       string;
+  target_date:           string | null;
+  actual_date:           string | null;
+  date_status:           DateStatus;
+  status_override_reason: string | null;
+  created_at:            string;
+  updated_at:            string;
+}
+
+export interface GateRecord {
+  gate_record_id:              string;
+  delivery_cycle_id:           string;
+  gate_name:                   GateName;
+  gate_status:                 GateStatus;
+  approver_user_id:            string | null;
+  approver_decision_at:        string | null;
+  approver_notes:              string | null;
+  workstream_active_at_clearance: boolean | null;
+  created_at:                  string;
+  updated_at:                  string;
+}
+
+export interface CycleEventLogEntry {
+  event_id:          string;
+  delivery_cycle_id: string;
+  event_type:        string;
+  event_description: string;
+  actor_user_id:     string | null;
+  event_metadata:    Record<string, unknown> | null;
+  created_at:        string;
+}
+
+export interface CycleArtifactType {
+  artifact_type_id:   string;
+  artifact_type_name: string;
+  lifecycle_stage:    string;
+  guidance_text:      string;
+  sort_order:         number;
+  gate_required:      boolean;
+  required_at_gate:   GateName | null;
+}
+
+export interface CycleArtifact {
+  cycle_artifact_id:      string;
+  delivery_cycle_id:      string;
+  artifact_type_id:       string | null;
+  display_name:           string;
+  external_url:           string | null;
+  oi_library_artifact_id: string | null;
+  pointer_status:         PointerStatus;
+  attached_by_user_id:    string;
+  attached_at:            string;
+  created_at:             string;
+  updated_at:             string;
+  deleted_at:             string | null;
+  // Joined
+  artifact_type_name?:    string;
+  lifecycle_stage?:       string;
+}
+
+export interface JiraLink {
+  jira_link_id:      string;
+  delivery_cycle_id: string;
+  jira_epic_key:     string;
+  jira_project_key:  string;
+  sync_status:       JiraSyncStatus;
+  last_synced_at:    string | null;
+  last_sync_error:   string | null;
+  created_at:        string;
+  updated_at:        string;
+}
+
+/** Ordered lifecycle track node — used by StageTrackComponent */
+export interface LifecycleTrackNode {
+  type:     'stage' | 'gate';
+  id:       string;           // stage name or gate name
+  label:    string;
+}
+
+/** Per-gate display state map passed into StageTrackComponent */
+export type GateStateMap = Record<GateName, GateDisplayState>;

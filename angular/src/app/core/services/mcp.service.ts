@@ -24,10 +24,12 @@ export class McpService {
    * @param tool    - tool name (verb_noun)
    * @param params  - tool parameters object
    */
-  call<T>(server: 'division' | 'document', tool: string, params: Record<string, unknown> = {}): Observable<McpResponse<T>> {
+  call<T>(server: 'division' | 'document' | 'delivery', tool: string, params: Record<string, unknown> = {}): Observable<McpResponse<T>> {
     const baseUrl = server === 'division'
       ? environment.divisionMcpUrl
-      : environment.documentMcpUrl;
+      : server === 'delivery'
+        ? environment.deliveryCycleMcpUrl
+        : environment.documentMcpUrl;
 
     const token = this.auth.getAccessToken();
     if (!token) {

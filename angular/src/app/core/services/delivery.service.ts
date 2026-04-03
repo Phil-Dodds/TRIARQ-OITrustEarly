@@ -1,0 +1,161 @@
+// delivery.service.ts — Pathways OI Trust
+// Angular service for all delivery-cycle-mcp tool calls.
+// Components never call McpService directly — they call this service.
+// D-93: MCP-only DB access. Rule 2: UI as presentation layer only.
+
+import { Injectable }  from '@angular/core';
+import { Observable }  from 'rxjs';
+import { McpService }  from './mcp.service';
+import {
+  McpResponse,
+  DeliveryWorkstream,
+  DeliveryCycle,
+  CycleMilestoneDate,
+  GateRecord,
+  CycleEventLogEntry,
+  CycleArtifactType,
+  CycleArtifact,
+  JiraLink,
+  TierClassification,
+  GateName,
+  GateStatus,
+  DateStatus,
+  PointerStatus
+} from '../types/database';
+
+@Injectable({ providedIn: 'root' })
+export class DeliveryService {
+  constructor(private readonly mcp: McpService) {}
+
+  // ── Workstream tools ───────────────────────────────────────────────────────
+
+  createWorkstream(params: {
+    workstream_name:       string;
+    home_division_id:      string;
+    workstream_lead_user_id: string;
+  }): Observable<McpResponse<DeliveryWorkstream>> {
+    return this.mcp.call<DeliveryWorkstream>('delivery', 'create_delivery_workstream', params as Record<string, unknown>);
+  }
+
+  listWorkstreams(params: {
+    home_division_id?: string;
+    active_status?:    boolean;
+  } = {}): Observable<McpResponse<DeliveryWorkstream[]>> {
+    return this.mcp.call<DeliveryWorkstream[]>('delivery', 'list_delivery_workstreams', params as Record<string, unknown>);
+  }
+
+  updateWorkstreamActiveStatus(params: {
+    workstream_id: string;
+    active_status: boolean;
+  }): Observable<McpResponse<DeliveryWorkstream>> {
+    return this.mcp.call<DeliveryWorkstream>('delivery', 'update_workstream_active_status', params as Record<string, unknown>);
+  }
+
+  // ── Delivery Cycle tools ───────────────────────────────────────────────────
+
+  createCycle(params: {
+    cycle_title:         string;
+    cycle_description?:  string;
+    division_id:         string;
+    workstream_id:       string;
+    tier_classification: TierClassification;
+  }): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'create_delivery_cycle', params as Record<string, unknown>);
+  }
+
+  getCycle(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'get_delivery_cycle', { delivery_cycle_id });
+  }
+
+  listCycles(params: {
+    division_id?:            string;
+    current_lifecycle_stage?: string;
+    workstream_id?:          string;
+    tier_classification?:    TierClassification;
+  } = {}): Observable<McpResponse<DeliveryCycle[]>> {
+    return this.mcp.call<DeliveryCycle[]>('delivery', 'list_delivery_cycles', params as Record<string, unknown>);
+  }
+
+  advanceStage(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'advance_cycle_stage', { delivery_cycle_id });
+  }
+
+  setOutcomeStatement(params: {
+    delivery_cycle_id: string;
+    outcome_statement: string;
+  }): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'set_outcome_statement', params as Record<string, unknown>);
+  }
+
+  // ── Gate tools ─────────────────────────────────────────────────────────────
+
+  submitGateForApproval(params: {
+    delivery_cycle_id: string;
+    gate_name:         GateName;
+  }): Observable<McpResponse<GateRecord>> {
+    return this.mcp.call<GateRecord>('delivery', 'submit_gate_for_approval', params as Record<string, unknown>);
+  }
+
+  recordGateDecision(params: {
+    delivery_cycle_id: string;
+    gate_name:         GateName;
+    decision:          'approved' | 'returned';
+    approver_notes?:   string;
+  }): Observable<McpResponse<GateRecord>> {
+    return this.mcp.call<GateRecord>('delivery', 'record_gate_decision', params as Record<string, unknown>);
+  }
+
+  // ── Milestone date tools ───────────────────────────────────────────────────
+
+  setMilestoneTargetDate(params: {
+    delivery_cycle_id: string;
+    gate_name:         GateName;
+    target_date:       string;
+  }): Observable<McpResponse<CycleMilestoneDate>> {
+    return this.mcp.call<CycleMilestoneDate>('delivery', 'set_milestone_target_date', params as Record<string, unknown>);
+  }
+
+  updateMilestoneStatus(params: {
+    delivery_cycle_id:      string;
+    gate_name:              GateName;
+    date_status:            DateStatus;
+    status_override_reason?: string;
+  }): Observable<McpResponse<CycleMilestoneDate>> {
+    return this.mcp.call<CycleMilestoneDate>('delivery', 'update_milestone_status', params as Record<string, unknown>);
+  }
+
+  // ── Artifact tools ─────────────────────────────────────────────────────────
+
+  attachArtifact(params: {
+    delivery_cycle_id:      string;
+    artifact_type_id?:      string;
+    display_name:           string;
+    external_url?:          string;
+    oi_library_artifact_id?: string;
+    pointer_status?:        PointerStatus;
+  }): Observable<McpResponse<CycleArtifact>> {
+    return this.mcp.call<CycleArtifact>('delivery', 'attach_cycle_artifact', params as Record<string, unknown>);
+  }
+
+  promoteArtifact(params: {
+    cycle_artifact_id:      string;
+    oi_library_artifact_id: string;
+  }): Observable<McpResponse<CycleArtifact>> {
+    return this.mcp.call<CycleArtifact>('delivery', 'promote_artifact_to_oi_library', params as Record<string, unknown>);
+  }
+
+  // ── Event log ──────────────────────────────────────────────────────────────
+
+  getEventLog(delivery_cycle_id: string): Observable<McpResponse<CycleEventLogEntry[]>> {
+    return this.mcp.call<CycleEventLogEntry[]>('delivery', 'get_cycle_event_log', { delivery_cycle_id });
+  }
+
+  // ── Jira sync ──────────────────────────────────────────────────────────────
+
+  syncJiraEpic(params: {
+    delivery_cycle_id: string;
+    jira_epic_key:     string;
+  }): Observable<McpResponse<{ jira_epic_key: string; sync_status: string; last_synced_at?: string; stub?: boolean; message?: string }>> {
+    return this.mcp.call('delivery', 'sync_jira_epic', params as Record<string, unknown>);
+  }
+}
