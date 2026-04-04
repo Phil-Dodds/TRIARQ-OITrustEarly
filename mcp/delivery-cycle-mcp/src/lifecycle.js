@@ -54,6 +54,46 @@ function nextStage(current_stage) {
   return STAGE_SEQUENCE[idx + 1];
 }
 
+/**
+ * Returns the previous stage in STAGE_SEQUENCE before current_stage.
+ * Returns null if current_stage is BRIEF (nothing before it) or not in the sequence.
+ */
+function prevStage(current_stage) {
+  const idx = STAGE_SEQUENCE.indexOf(current_stage);
+  if (idx <= 0) return null;
+  return STAGE_SEQUENCE[idx - 1];
+}
+
+/**
+ * Returns the gate_name values that must be reset to 'pending' when a cycle
+ * regresses from current_stage to target_stage (D-179).
+ *
+ * Logic: any gate that guards entry to a stage whose index is strictly between
+ * target_stage and current_stage (i.e. from target_stage+1 to current_stage,
+ * inclusive on the current end) is reset.
+ *
+ * Example: regress BUILD → SPEC
+ *   Stages at indices toIdx+1…fromIdx: BUILD → guarded by 'go_to_build' → reset.
+ *
+ * Example: regress VALIDATE → BUILD
+ *   Stages at indices toIdx+1…fromIdx: VALIDATE → no gate guards VALIDATE → [].
+ *
+ * @param {string} target_stage - the stage the cycle is being moved TO
+ * @param {string} current_stage - the stage the cycle is currently in
+ * @returns {string[]} gate_names to reset, in lifecycle order
+ */
+function gatesResetOnRegressionTo(target_stage, current_stage) {
+  const fromIdx = STAGE_SEQUENCE.indexOf(current_stage);
+  const toIdx   = STAGE_SEQUENCE.indexOf(target_stage);
+  if (fromIdx === -1 || toIdx === -1 || toIdx >= fromIdx) return [];
+  const gates = [];
+  for (let i = toIdx + 1; i <= fromIdx; i++) {
+    const gate = GATE_REQUIRED_TO_ENTER[STAGE_SEQUENCE[i]];
+    if (gate) gates.push(gate);
+  }
+  return gates;
+}
+
 // Next gate that must be cleared from each current stage (D-173).
 // Used for summary views and filter labelling.
 // Returns null for terminal/pause stages.
@@ -102,5 +142,7 @@ module.exports = {
   NEXT_GATE_BY_STAGE,
   WIP_CATEGORY_BY_STAGE,
   WIP_LIMIT,
-  nextStage
+  nextStage,
+  prevStage,
+  gatesResetOnRegressionTo
 };

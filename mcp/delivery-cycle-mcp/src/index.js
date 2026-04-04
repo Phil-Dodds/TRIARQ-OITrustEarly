@@ -25,6 +25,9 @@ const { create_delivery_cycle }          = require('./tools/create_delivery_cycl
 const { get_delivery_cycle }             = require('./tools/get_delivery_cycle');
 const { list_delivery_cycles }           = require('./tools/list_delivery_cycles');
 const { advance_cycle_stage }            = require('./tools/advance_cycle_stage');
+const { reverse_cycle_stage }            = require('./tools/reverse_cycle_stage');
+const { set_cycle_on_hold }              = require('./tools/set_cycle_on_hold');
+const { resume_cycle_from_hold }         = require('./tools/resume_cycle_from_hold');
 const { set_outcome_statement }          = require('./tools/set_outcome_statement');
 
 const { submit_gate_for_approval }       = require('./tools/submit_gate_for_approval');
@@ -55,6 +58,9 @@ const TOOLS = {
   get_delivery_cycle,
   list_delivery_cycles,
   advance_cycle_stage,
+  reverse_cycle_stage,
+  set_cycle_on_hold,
+  resume_cycle_from_hold,
   set_outcome_statement,
 
   // Gate workflow

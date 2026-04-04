@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-179**
+**Next available: D-180**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -87,6 +87,7 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-176 | Division summary as flat indented list (not collapsible tree) | Claude Code | April 2026 | Active |
 | D-177 | Entity name capitalization in UI text (Division, Workstream, Delivery Cycle, Gate, etc.) | Claude Code | April 2026 | Active |
 | D-178 | Processing State Standard: Three-Tier Loading Pattern | Claude Code | April 2026 | Active |
+| D-179 | Stage Regression Gate Reset Rule — two-call confirm pattern, gatesResetOnRegressionTo() | Claude Code | April 2026 | Active |
 
 ---
 
