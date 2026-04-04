@@ -71,6 +71,8 @@ async function list_delivery_cycles(params, caller_user_id) {
       current_lifecycle_stage,
       outcome_statement,
       cycle_owner_user_id,
+      assigned_ds_user_id,
+      assigned_cb_user_id,
       jira_epic_key,
       created_at,
       updated_at
@@ -123,7 +125,37 @@ async function list_delivery_cycles(params, caller_user_id) {
     return { success: false, error: `Failed to list Delivery Cycles: ${error.message}` };
   }
 
-  return { success: true, data: cycles || [] };
+  if (!cycles || cycles.length === 0) {
+    return { success: true, data: [] };
+  }
+
+  // ── Resolve DS / CB display names (migration 024 columns) ────────────────
+  // Collect all unique user IDs that need display names (DS + CB across all cycles).
+  const userIdSet = new Set();
+  cycles.forEach(c => {
+    if (c.assigned_ds_user_id) { userIdSet.add(c.assigned_ds_user_id); }
+    if (c.assigned_cb_user_id) { userIdSet.add(c.assigned_cb_user_id); }
+  });
+
+  let userMap = {};
+  if (userIdSet.size > 0) {
+    const { data: userRows } = await supabase
+      .from('users')
+      .select('id, display_name')
+      .in('id', Array.from(userIdSet))
+      .is('deleted_at', null);
+    if (userRows) {
+      userRows.forEach(u => { userMap[u.id] = u.display_name; });
+    }
+  }
+
+  const enriched = cycles.map(c => ({
+    ...c,
+    assigned_ds_display_name: c.assigned_ds_user_id ? (userMap[c.assigned_ds_user_id] ?? null) : null,
+    assigned_cb_display_name: c.assigned_cb_user_id ? (userMap[c.assigned_cb_user_id] ?? null) : null
+  }));
+
+  return { success: true, data: enriched };
 }
 
 /**

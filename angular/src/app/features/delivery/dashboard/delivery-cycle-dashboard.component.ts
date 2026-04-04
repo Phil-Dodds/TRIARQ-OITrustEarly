@@ -288,13 +288,15 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
       <div *ngIf="loading">
         <div *ngFor="let _ of skeletonRows"
-             style="display:grid;grid-template-columns:3fr 1fr 2fr 1fr 110px 130px 130px 24px;
+             style="display:grid;grid-template-columns:3fr 1fr 2fr 1fr 100px 100px 110px 130px 130px 24px;
                     gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
                     border-bottom:1px solid var(--triarq-color-border);align-items:center;">
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:20px;border-radius:999px;width:60px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:20px;border-radius:999px;width:40px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:14px;border-radius:4px;width:70px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:14px;border-radius:4px;width:70px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
@@ -315,7 +317,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
 
       <!-- ── Table header with sort ───────────────────────────────────────── -->
       <div *ngIf="!loading && filtered.length > 0"
-           style="display:grid;grid-template-columns:3fr 1fr 2fr 1fr 110px 130px 130px 24px;
+           style="display:grid;grid-template-columns:3fr 1fr 2fr 1fr 100px 100px 110px 130px 130px 24px;
                   gap:var(--triarq-space-sm);padding:var(--triarq-space-xs) var(--triarq-space-sm);
                   font-size:var(--triarq-text-small);font-weight:500;
                   color:var(--triarq-color-text-secondary);
@@ -330,8 +332,10 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         <span style="cursor:pointer;user-select:none;" (click)="setSort('tier_classification')">
           Tier {{ sortIcon('tier_classification') }}
         </span>
+        <span>DS</span>
+        <span>CB</span>
         <span>Gate Track</span>
-        <span>Pilot Start Date</span>
+        <span>Pilot Start</span>
         <span>Release Date</span>
         <span></span>
       </div>
@@ -340,7 +344,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <div *ngFor="let cycle of filtered">
         <div
           [routerLink]="['/delivery', cycle.delivery_cycle_id]"
-          style="display:grid;grid-template-columns:3fr 1fr 2fr 1fr 110px 130px 130px 24px;
+          style="display:grid;grid-template-columns:3fr 1fr 2fr 1fr 100px 100px 110px 130px 130px 24px;
                  gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
                  border-bottom:1px solid var(--triarq-color-border);
                  font-size:var(--triarq-text-small);align-items:center;
@@ -387,6 +391,24 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                 [style.background]="tierPillBg(cycle.tier_classification)"
                 style="font-size:10px;justify-self:start;">
             {{ tierLabel(cycle.tier_classification) }}
+          </span>
+
+          <!-- Delivery Specialist -->
+          <span style="color:var(--triarq-color-text-secondary);overflow:hidden;
+                       text-overflow:ellipsis;white-space:nowrap;"
+                [title]="cycle.assigned_ds_display_name ?? ''">
+            <span *ngIf="cycle.assigned_ds_display_name">{{ cycle.assigned_ds_display_name }}</span>
+            <span *ngIf="!cycle.assigned_ds_display_name"
+                  style="font-style:italic;font-size:10px;">—</span>
+          </span>
+
+          <!-- Capability Builder -->
+          <span style="color:var(--triarq-color-text-secondary);overflow:hidden;
+                       text-overflow:ellipsis;white-space:nowrap;"
+                [title]="cycle.assigned_cb_display_name ?? ''">
+            <span *ngIf="cycle.assigned_cb_display_name">{{ cycle.assigned_cb_display_name }}</span>
+            <span *ngIf="!cycle.assigned_cb_display_name"
+                  style="font-style:italic;font-size:10px;">—</span>
           </span>
 
           <!-- Condensed gate track -->
