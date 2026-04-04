@@ -27,7 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'OI Library',              route: '/library',        roles: 'all',             devStatus: 'not-started' },
   { label: 'Delivery Cycle Tracking', route: '/delivery',       roles: 'all',             devStatus: 'uat'         },
   { label: 'Chat',                    route: '/chat',           roles: 'all',             devStatus: 'not-started' },
-  { label: 'Contact an Admin',        route: '/contact-admin',  roles: 'all',             devStatus: 'pilot'       },
+  { label: 'Contact an Admin',        route: '/contact-admin',  roles: 'all',             devStatus: 'uat'         },
   { label: 'Admin',                   route: '/admin',          roles: ['phil', 'admin'], devStatus: 'uat'         },
 ];
 
