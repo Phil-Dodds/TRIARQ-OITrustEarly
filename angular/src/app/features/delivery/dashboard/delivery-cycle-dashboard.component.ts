@@ -20,9 +20,11 @@ import {
   Component,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  OnInit
+  OnInit,
+  OnDestroy
 } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { Subscription } from 'rxjs';
+import { firstValueFrom, filter, take } from 'rxjs';
 import { CommonModule }           from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import {
@@ -505,7 +507,8 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
     </div>
   `
 })
-export class DeliveryCycleDashboardComponent implements OnInit {
+export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
+  private profileSub?: Subscription;
 
   cycles:            DeliveryCycle[]       = [];
   filtered:          DeliveryCycle[]       = [];
@@ -571,23 +574,28 @@ export class DeliveryCycleDashboardComponent implements OnInit {
       tier_classification: ['', Validators.required],
       division_id:         ['', Validators.required]
     });
-    const role = this.profile.getCurrentProfile()?.system_role;
-    this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin';
-
     // D-175: read query params from summary view drill-down and apply as initial filters.
-    // Query params: workstream_id, division_id, next_gate
     const qp = this.route.snapshot.queryParams;
     if (qp['workstream_id']) { this.filterWorkstream = qp['workstream_id'] as string; }
     if (qp['next_gate'])     { this.filterNextGate   = qp['next_gate']     as string; }
-    if (qp['division_id']) {
-      this.filterDivision = qp['division_id'] as string;
-      // division_id param triggers server-side filter — handled in loadCycles()
-    }
+    if (qp['division_id'])   { this.filterDivision   = qp['division_id']   as string; }
 
-    this.checkUserDivisions();
     this.loadWorkstreams();
     this.loadDivisions();
     this.loadCycles();
+
+    // Subscribe to profile — fires immediately if already loaded, or when it arrives.
+    // canCreateCycle and checkUserDivisions() depend on system_role, which is only
+    // available after the profile MCP call completes. Reading it synchronously here
+    // produces null when the component is the first page loaded (race condition).
+    this.profileSub = this.profile.profile$
+      .pipe(filter(p => p !== null), take(1))
+      .subscribe(() => {
+        const role = this.profile.getCurrentProfile()?.system_role;
+        this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin';
+        this.checkUserDivisions();
+        this.cdr.markForCheck();
+      });
   }
 
   private async checkUserDivisions(): Promise<void> {
@@ -968,5 +976,9 @@ export class DeliveryCycleDashboardComponent implements OnInit {
     if (diff < 0)  { return 'var(--triarq-color-error, #d32f2f)'; }   // overdue
     if (diff <= 4) { return 'var(--triarq-color-sunray, #f5a623)'; }  // within 4 days
     return 'var(--triarq-color-text-secondary)';
+  }
+
+  ngOnDestroy(): void {
+    this.profileSub?.unsubscribe();
   }
 }
