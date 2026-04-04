@@ -4,6 +4,18 @@ Owner: Phil Sappington, EVP Performance & Governance
 
 ---
 
+## Tool Permission Preferences
+
+Read `docs/claude-tool-preferences.json` at session start and follow it exactly:
+
+**Allowed without asking:** `git`, `ls`, `cat`, `npm`, `pytest`
+
+**Must ask before running:** `rm`, `sudo`, `docker`, `database_migrations`
+- State what will be deleted/changed, why it is needed, and wait for explicit "go ahead" before executing.
+- For `database_migrations`: describe the migration (tables affected, operations, reversibility) and wait for confirmation before applying.
+
+---
+
 ## Session Initialization — HARD PAUSE RULE
 
 Read this file completely before writing any code or calling any tool.

@@ -1,0 +1,19 @@
+{
+  "description": "Claude Code tool permission preferences for the Pathways OI Trust project.",
+  "last_updated": "2026-04-04",
+
+  "allowed_tools": [
+    "git",
+    "ls",
+    "cat",
+    "npm",
+    "pytest"
+  ],
+
+  "ask_for_permission_on": [
+    "rm",
+    "sudo",
+    "docker",
+    "database_migrations"
+  ]
+}
