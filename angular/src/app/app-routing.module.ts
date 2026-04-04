@@ -41,6 +41,12 @@ const routes: Routes = [
     loadChildren: () => import('./features/delivery/delivery.module').then(m => m.DeliveryModule)
   },
 
+  {
+    path: 'contact-admin',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/contact-admin/contact-admin.component').then(m => m.ContactAdminComponent)
+  },
+
   { path: '',      redirectTo: 'home', pathMatch: 'full' },
   { path: '**',   redirectTo: 'home' }
 ];

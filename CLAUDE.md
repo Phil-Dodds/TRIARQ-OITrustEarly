@@ -9,7 +9,7 @@ Owner: Phil Sappington, EVP Performance & Governance
 Full rules in `docs/claude-tool-preferences.json`. Summary:
 
 **Allowed without asking:**
-`git`, `ls`, `find`, `cat`, `grep`, `cp`, `mv`, `mkdir`, `npm`, `npx`, `node`, `python3`, `pytest`, `curl`, `gh`
+All common shell commands — `git`, `ls`, `find`, `cd`, `pwd`, `cat`, `grep`, `head`, `tail`, `cp`, `mv`, `mkdir`, `touch`, `echo`, `npm`, `npx`, `node`, `python3`, `pytest`, `curl`, `gh`, `xargs`, `sed`, `awk`, `sort`, `diff`, and any other standard read or build operation. When in doubt, run it — the ask list is narrow and explicit.
 
 **`rm`:** Free on build artifacts (`dist/`, `node_modules/`, `*.tmp`). Ask before deleting source files, migration files, or docs.
 

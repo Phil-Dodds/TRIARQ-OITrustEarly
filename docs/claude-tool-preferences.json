@@ -4,26 +4,28 @@
 
   "allowed_tools": [
     "git",
-    "ls", "find",
-    "cat", "grep", "rg",
-    "cp", "mv", "mkdir", "touch",
+    "ls", "find", "cd", "pwd",
+    "cat", "grep", "rg", "head", "tail", "wc", "sort", "uniq", "diff",
+    "cp", "mv", "mkdir", "touch", "echo",
     "npm", "npx", "node",
     "python3", "pytest",
     "curl",
-    "gh"
+    "gh",
+    "xargs", "sed", "awk"
   ],
 
   "ask_for_permission_on": [
-    "rm -rf <source directories>",
+    "rm -rf <source directories or migration/doc files>",
     "git reset --hard",
     "git push --force",
     "sudo"
   ],
 
   "notes": {
-    "rm": "Safe to run on build artifacts (dist/, node_modules/, *.tmp). Ask before deleting source files, migration files, or docs.",
-    "database_migrations": "Removed from ask list — migrations are SQL files I write; Phil applies them manually via the Supabase dashboard. The workflow already enforces the gate.",
-    "docker": "Removed from ask list — not used in this project. Will flag naturally if it ever comes up.",
-    "sudo": "Should never be needed in this project. If I think I need it, something is wrong — flag it rather than ask."
+    "general": "When in doubt about whether something is allowed, prefer running it. The ask list is narrow and explicit. Everything else is allowed.",
+    "rm": "Free on build artifacts (dist/, node_modules/, *.tmp). Ask before deleting source files, migration files, or docs.",
+    "database_migrations": "Not applicable — I write SQL files, Phil applies them manually via Supabase dashboard.",
+    "docker": "Not used in this project. Flag if it ever comes up.",
+    "sudo": "Should never be needed. If I think I need it, something is wrong with the approach."
   }
 }

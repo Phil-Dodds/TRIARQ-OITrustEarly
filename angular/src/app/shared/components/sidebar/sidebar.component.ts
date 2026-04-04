@@ -23,11 +23,12 @@ interface NavItem {
 // D-164: Admin functions are never individual sidebar links — they belong under /admin (Admin hub).
 // devStatus reflects current build stage. Update when a feature advances.
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home',                    route: '/home',      roles: 'all',              devStatus: 'uat'         },
-  { label: 'OI Library',              route: '/library',   roles: 'all',              devStatus: 'not-started' },
-  { label: 'Delivery Cycle Tracking', route: '/delivery',  roles: 'all',              devStatus: 'uat'         },
-  { label: 'Chat',                    route: '/chat',      roles: 'all',              devStatus: 'not-started' },
-  { label: 'Admin',                   route: '/admin',     roles: ['phil', 'admin'],  devStatus: 'uat'         },
+  { label: 'Home',                    route: '/home',           roles: 'all',             devStatus: 'uat'         },
+  { label: 'OI Library',              route: '/library',        roles: 'all',             devStatus: 'not-started' },
+  { label: 'Delivery Cycle Tracking', route: '/delivery',       roles: 'all',             devStatus: 'uat'         },
+  { label: 'Chat',                    route: '/chat',           roles: 'all',             devStatus: 'not-started' },
+  { label: 'Contact an Admin',        route: '/contact-admin',  roles: 'all',             devStatus: 'pilot'       },
+  { label: 'Admin',                   route: '/admin',          roles: ['phil', 'admin'], devStatus: 'uat'         },
 ];
 
 @Component({

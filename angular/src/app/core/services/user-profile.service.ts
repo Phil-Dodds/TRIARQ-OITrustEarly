@@ -72,6 +72,36 @@ export class UserProfileService {
     this._hasDivision = value;
   }
 
+  /**
+   * Returns all active users whose system_role is 'phil' or 'admin'.
+   * Used by the Contact an Admin screen — available to all roles.
+   */
+  listAdmins(): Observable<User[]> {
+    return new Observable(observer => {
+      firstValueFrom(this.mcp.call<User[]>('division', 'list_users', {}))
+        .then(response => {
+          if (!response.success || !response.data) {
+            observer.next([]);
+          } else {
+            const admins = response.data
+              .filter(u => u.is_active && (u.system_role === 'phil' || u.system_role === 'admin'))
+              .sort((a, b) => {
+                // Phil first, then alphabetical by display_name
+                if (a.system_role === 'phil') return -1;
+                if (b.system_role === 'phil') return 1;
+                return (a.display_name ?? '').localeCompare(b.display_name ?? '');
+              });
+            observer.next(admins);
+          }
+          observer.complete();
+        })
+        .catch(() => {
+          observer.next([]);
+          observer.complete();
+        });
+    });
+  }
+
   clearProfile(): void {
     this._profile$.next(null);
     this._hasDivision = false;
