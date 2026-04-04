@@ -676,14 +676,21 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   }
 
   private loadDivisions(): void {
-    this.mcp.call<Division[]>('division', 'list_divisions', {}).subscribe({
+    // all_levels:true returns all divisions across the hierarchy, not just root trusts.
+    // Needed so the Owner Division create-form dropdown has a full list to choose from.
+    this.mcp.call<Division[]>('division', 'list_divisions', { all_levels: true }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
           this.divisions = Array.isArray(res.data) ? res.data : [];
-          this.cdr.markForCheck();
+        } else if (!res.success) {
+          this.loadError = res.error ?? 'Could not load Divisions.';
         }
+        this.cdr.markForCheck();
       },
-      error: () => {}
+      error: (err: { error?: string }) => {
+        this.loadError = err?.error ?? 'Could not load Divisions.';
+        this.cdr.markForCheck();
+      }
     });
   }
 

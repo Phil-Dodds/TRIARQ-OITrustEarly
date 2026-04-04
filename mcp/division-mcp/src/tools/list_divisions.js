@@ -7,11 +7,12 @@ const { supabase } = require('../db');
 
 /**
  * @param {object} params
- * @param {string} [params.parent_division_id] - if omitted, returns root Trusts
+ * @param {string}  [params.parent_division_id] - if omitted and all_levels not set, returns root Trusts
+ * @param {boolean} [params.all_levels]          - when true, returns all divisions across all levels
  * @param {string} caller_user_id
  */
 async function list_divisions(params, caller_user_id) {
-  const { parent_division_id } = params;
+  const { parent_division_id, all_levels } = params;
 
   let query = supabase
     .from('divisions')
@@ -19,7 +20,9 @@ async function list_divisions(params, caller_user_id) {
     .is('deleted_at', null)
     .order('division_name');
 
-  if (parent_division_id) {
+  if (all_levels) {
+    // Return all divisions regardless of hierarchy level — used by create forms
+  } else if (parent_division_id) {
     query = query.eq('parent_division_id', parent_division_id);
   } else {
     // Root Trusts have no parent
