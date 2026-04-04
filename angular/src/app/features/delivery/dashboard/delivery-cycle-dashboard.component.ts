@@ -14,6 +14,7 @@
 // Session 2026-03-24-B: blank date cells when date not set — no placeholder text.
 // Session 2026-03-24-C: headline 6-rule priority logic.
 // Design Principle 4.2: every screen states What/Why/How for empty states.
+// D-178: Three-tier loading standard applied — Tier 1 skeleton, Tier 2 button spinner, Tier 3 overlay.
 
 import {
   Component,
@@ -36,6 +37,7 @@ import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { StageTrackComponent }  from '../stage-track/stage-track.component';
+import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 import {
   DeliveryCycle,
   Division,
@@ -81,7 +83,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
   selector: 'app-delivery-cycle-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent],
   template: `
     <div style="max-width:1200px;margin:var(--triarq-space-2xl) auto;padding:0 var(--triarq-space-md);">
 
@@ -114,88 +116,95 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         </button>
       </div>
 
-      <!-- ── Create form ──────────────────────────────────────────────────── -->
-      <div *ngIf="showCreateForm" class="oi-card"
-           style="margin-bottom:var(--triarq-space-md);padding:var(--triarq-space-md);">
-        <h4 style="margin:0 0 4px 0;font-size:var(--triarq-text-body);">New Delivery Cycle</h4>
-        <p style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-small);
-                  color:var(--triarq-color-text-secondary);">
-          The cycle starts in Brief stage. Set a title that describes the deliverable,
-          not the team or initiative name.
-        </p>
-        <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
-          <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:3fr 2fr 1fr;">
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Cycle Title *
-              </label>
-              <input formControlName="cycle_title" class="oi-input"
-                     placeholder="e.g. Member Attribution Model — Q2 Build" />
-              <div *ngIf="createForm.get('cycle_title')?.invalid && createForm.get('cycle_title')?.touched"
-                   style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                Cycle title is required.
+      <!-- ── Create form (D-178 Tier 3: section overlay) ────────────────── -->
+      <div *ngIf="showCreateForm" style="position:relative;">
+        <app-loading-overlay [visible]="creating" message="Creating Cycle…"></app-loading-overlay>
+        <div class="oi-card"
+             style="margin-bottom:var(--triarq-space-md);padding:var(--triarq-space-md);">
+          <h4 style="margin:0 0 4px 0;font-size:var(--triarq-text-body);">New Delivery Cycle</h4>
+          <p style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-small);
+                    color:var(--triarq-color-text-secondary);">
+            The cycle starts in Brief stage. Set a title that describes the deliverable,
+            not the team or initiative name.
+          </p>
+          <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
+            <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:3fr 2fr 1fr;">
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  Cycle Title *
+                </label>
+                <input formControlName="cycle_title" class="oi-input"
+                       placeholder="e.g. Member Attribution Model — Q2 Build" />
+                <div *ngIf="createForm.get('cycle_title')?.invalid && createForm.get('cycle_title')?.touched"
+                     style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
+                  Cycle title is required.
+                </div>
+              </div>
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  Delivery Workstream
+                  <span style="font-weight:400;color:var(--triarq-color-text-secondary);"> — recommended</span>
+                </label>
+                <select formControlName="workstream_id" class="oi-input">
+                  <option value="">— Assign later —</option>
+                  <option *ngFor="let ws of activeWorkstreams" [value]="ws.workstream_id">
+                    {{ ws.workstream_name }}
+                  </option>
+                </select>
+                <div style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);margin-top:3px;">
+                  Required before Brief Review gate. Can be assigned after creation.
+                </div>
+                <div *ngIf="activeWorkstreams.length === 0"
+                     style="color:var(--triarq-color-sunray,#f5a623);font-size:var(--triarq-text-small);margin-top:2px;">
+                  No active Workstreams found. Go to
+                  <a routerLink="/admin/workstreams" style="color:var(--triarq-color-sunray,#f5a623);">Admin → Workstreams</a>
+                  to create and activate one.
+                </div>
+              </div>
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  Tier Classification *
+                </label>
+                <select formControlName="tier_classification" class="oi-input">
+                  <option value="">— Select Tier —</option>
+                  <option value="tier_1">Tier 1</option>
+                  <option value="tier_2">Tier 2</option>
+                  <option value="tier_3">Tier 3</option>
+                </select>
+                <div *ngIf="createForm.get('tier_classification')?.invalid && createForm.get('tier_classification')?.touched"
+                     style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
+                  Tier is required. Tier is set at Brief stage and locked thereafter.
+                </div>
               </div>
             </div>
-            <div>
+            <div style="margin-top:var(--triarq-space-sm);max-width:400px;">
               <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Delivery Workstream
-                <span style="font-weight:400;color:var(--triarq-color-text-secondary);"> — recommended</span>
+                Owner Division *
               </label>
-              <select formControlName="workstream_id" class="oi-input">
-                <option value="">— Assign later —</option>
-                <option *ngFor="let ws of activeWorkstreams" [value]="ws.workstream_id">
-                  {{ ws.workstream_name }}
-                </option>
+              <select formControlName="division_id" class="oi-input">
+                <option value="">— Select Division —</option>
+                <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
               </select>
-              <div style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);margin-top:3px;">
-                Required before Brief Review gate. Can be assigned after creation.
-              </div>
-              <div *ngIf="activeWorkstreams.length === 0"
-                   style="color:var(--triarq-color-sunray,#f5a623);font-size:var(--triarq-text-small);margin-top:2px;">
-                No active Workstreams found. Go to
-                <a routerLink="/admin/workstreams" style="color:var(--triarq-color-sunray,#f5a623);">Admin → Workstreams</a>
-                to create and activate one.
-              </div>
             </div>
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Tier Classification *
-              </label>
-              <select formControlName="tier_classification" class="oi-input">
-                <option value="">— Select Tier —</option>
-                <option value="tier_1">Tier 1</option>
-                <option value="tier_2">Tier 2</option>
-                <option value="tier_3">Tier 3</option>
-              </select>
-              <div *ngIf="createForm.get('tier_classification')?.invalid && createForm.get('tier_classification')?.touched"
-                   style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                Tier is required. Tier is set at Brief stage and locked thereafter.
+            <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
+              <!-- D-178 Tier 2: button spinner while creating -->
+              <button type="submit" class="oi-btn-primary"
+                      [disabled]="createForm.invalid || creating">
+                <ion-spinner *ngIf="creating" name="crescent"
+                             style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
+                </ion-spinner>
+                {{ creating ? 'Creating…' : 'Create Cycle' }}
+              </button>
+              <div *ngIf="createError"
+                   style="font-size:var(--triarq-text-small);">
+                <span style="color:var(--triarq-color-error);font-weight:500;">{{ createError }}</span>
+                <span style="color:var(--triarq-color-text-secondary);margin-left:6px;">
+                  Check that the Workstream is active and you have Division access.
+                </span>
               </div>
             </div>
-          </div>
-          <div style="margin-top:var(--triarq-space-sm);max-width:400px;">
-            <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-              Owner Division *
-            </label>
-            <select formControlName="division_id" class="oi-input">
-              <option value="">— Select Division —</option>
-              <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
-            </select>
-          </div>
-          <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-            <button type="submit" class="oi-btn-primary"
-                    [disabled]="createForm.invalid || creating">
-              {{ creating ? 'Creating…' : 'Create Cycle' }}
-            </button>
-            <div *ngIf="createError"
-                 style="font-size:var(--triarq-text-small);">
-              <span style="color:var(--triarq-color-error);font-weight:500;">{{ createError }}</span>
-              <span style="color:var(--triarq-color-text-secondary);margin-left:6px;">
-                Check that the Workstream is active and you have Division access.
-              </span>
-            </div>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
 
       <!-- ── Filters + sort row ──────────────────────────────────────────── -->
@@ -276,11 +285,21 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         </span>
       </div>
 
-      <!-- ── Loading ──────────────────────────────────────────────────────── -->
-      <div *ngIf="loading"
-           style="text-align:center;padding:var(--triarq-space-xl);
-                  color:var(--triarq-color-text-secondary);">
-        Loading cycles…
+      <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
+      <div *ngIf="loading">
+        <div *ngFor="let _ of skeletonRows"
+             style="display:grid;grid-template-columns:3fr 1fr 2fr 1fr 110px 130px 130px 24px;
+                    gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
+                    border-bottom:1px solid var(--triarq-color-border);align-items:center;">
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:20px;border-radius:999px;width:60px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:20px;border-radius:999px;width:40px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;width:16px;"></ion-skeleton-text>
+        </div>
       </div>
 
       <!-- ── Load error (D-140) ─────────────────────────────────────────── -->
@@ -509,6 +528,9 @@ export class DeliveryCycleDashboardComponent implements OnInit {
   readonly gateNames: GateName[] = [
     'brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'
   ];
+
+  // D-178 Tier 1: skeleton rows for loading state
+  readonly skeletonRows = [1, 2, 3, 4, 5];
 
   constructor(
     private readonly delivery: DeliveryService,

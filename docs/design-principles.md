@@ -254,6 +254,47 @@ Claude Code does not update `devStatus` without explicit confirmation. It does n
 
 ---
 
+## Principle 9 — Processing State Standard: Three-Tier Loading Pattern (D-178)
+
+**Statement:** Every MCP call, query, and transaction displays a loading indicator appropriate to its operation type. Lazy omission of a loading state is a build error, not a style preference. All three tiers are applied at build time — never deferred as retrofits (Rule 8).
+
+### The three tiers
+
+| Tier | When | Implementation |
+|---|---|---|
+| **Tier 1 — Skeleton screen** | Data loads: tables, lists, cards | `ion-skeleton-text animated` rows matching the expected content layout. Replaces all "Loading…" text. |
+| **Tier 2 — Button spinner** | Inline actions: save, toggle, submit single field | `ion-spinner name="crescent"` replaces button label; button `[disabled]="true"` during processing. No overlay. |
+| **Tier 3 — Section overlay** | CRUD: create, full form save, delete, gate action | `LoadingOverlayComponent` covers the active form. Sidebar and other panels remain interactive. |
+
+### Rules
+
+**Rule 1 — Sidebar is never locked.** Other panels and navigation remain active during all tiers. Only the scope of the operation is covered.
+
+**Rule 2 — Overlay lifts on success or error.** Error appears within the form after the overlay clears — the overlay does not persist on the error state.
+
+**Rule 3 — Async card loading is scoped.** Dashboard and summary cards use Tier 1 scoped to the card. Other cards remain interactive and resolve independently.
+
+**Rule 4 — Completion toast is narrow.** `ion-toast` is emitted only for operations exceeding 3 seconds where the user may have navigated away. It is not used for routine fast operations.
+
+**Rule 5 — No "Loading…" text.** Plain text loading states are an anti-pattern. Every data load uses Tier 1 skeleton rows. Every action uses Tier 2 or Tier 3.
+
+### Shared implementation
+
+- `LoadingOverlayComponent` — standalone, OnPush — at `/shared/components/loading-overlay/`
+- Inputs: `[visible]: boolean`, `[message]: string`
+- Parent element must be `position:relative` for the overlay to scope correctly
+- Tier 1 uses `ion-skeleton-text` directly in component templates
+- Tier 2 uses `ion-spinner name="crescent"` inline in button templates
+
+### Anti-patterns
+
+- "Loading cycles…" text — replace with Tier 1 skeleton rows
+- Button text change to "Creating…" with no spinner — add Tier 2 `ion-spinner`
+- Inline create form with no overlay — add Tier 3 `LoadingOverlayComponent`
+- Processing state with no visual feedback — build error
+
+---
+
 ## Version History
 
 | Version | Date | Change |

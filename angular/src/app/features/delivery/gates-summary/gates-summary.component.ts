@@ -8,6 +8,7 @@
 // Toggle: "Display only my Divisions" — hidden for phil/admin (D-170).
 //
 // D-93: DeliveryService only — no direct Supabase access.
+// D-178: Three-tier loading standard applied — Tier 1 skeleton only.
 
 import {
   Component,
@@ -19,6 +20,7 @@ import {
 import { CommonModule }         from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { FormsModule }          from '@angular/forms';
+import { IonicModule }          from '@ionic/angular';
 import { firstValueFrom, Subscription } from 'rxjs';
 import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
@@ -38,7 +40,7 @@ const GATE_LABELS: Record<GateName, string> = {
   selector:        'app-gates-summary',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, RouterModule, FormsModule],
+  imports:         [CommonModule, RouterModule, FormsModule, IonicModule],
   template: `
     <div style="max-width:800px;margin:var(--triarq-space-2xl) auto;
                 padding:0 var(--triarq-space-md);">
@@ -70,11 +72,17 @@ const GATE_LABELS: Record<GateName, string> = {
         Display only my Divisions
       </label>
 
-      <!-- Loading -->
-      <div *ngIf="loading"
-           style="text-align:center;padding:var(--triarq-space-xl);
-                  color:var(--triarq-color-text-secondary);">
-        Loading gate summary…
+      <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
+      <div *ngIf="loading">
+        <div *ngFor="let _ of skeletonRows"
+             style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;
+                    gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
+                    border-bottom:1px solid var(--triarq-color-border);align-items:center;">
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+        </div>
       </div>
 
       <!-- Error (D-140: state what is blocked and what needs to change) -->
@@ -174,6 +182,9 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
   showMyDivisionsOnly = true;
   userDivisionIds:   string[] = [];
   gateSummaries:     GateSummaryItem[] = [];
+
+  // D-178 Tier 1: skeleton rows for loading state
+  readonly skeletonRows = [1, 2, 3, 4, 5];
 
   private readonly profileSub = new Subscription();
 

@@ -10,6 +10,7 @@
 // D-93: McpService via DeliveryService only. No Supabase imports.
 // D-140: Every blocked action states what is blocked AND what needs to change.
 // Rule 2: Presentation only.
+// D-178: Three-tier loading standard applied — Tier 1 skeleton, Tier 2 button spinner, Tier 3 overlay.
 
 import {
   Component,
@@ -29,12 +30,13 @@ import { IonicModule }         from '@ionic/angular';
 import { DeliveryService }     from '../../../core/services/delivery.service';
 import { McpService }          from '../../../core/services/mcp.service';
 import { DeliveryWorkstream, Division, User } from '../../../core/types/database';
+import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 
 @Component({
   selector: 'app-workstream-admin',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, IonicModule],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, IonicModule, LoadingOverlayComponent],
   template: `
     <div class="oi-card" style="max-width:960px;margin:var(--triarq-space-2xl) auto;">
 
@@ -57,85 +59,98 @@ import { DeliveryWorkstream, Division, User } from '../../../core/types/database
         </button>
       </div>
 
-      <!-- ── Create form ──────────────────────────────────────────────────── -->
-      <div *ngIf="showCreateForm"
-           style="background:var(--triarq-color-background-subtle);
-                  border-radius:8px;padding:var(--triarq-space-md);
-                  margin-bottom:var(--triarq-space-md);">
-        <h4 style="margin:0 0 4px 0;font-size:var(--triarq-text-body);">New Workstream</h4>
-        <p style="margin:0 0 var(--triarq-space-sm) 0;
-                  font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-          The Workstream Lead is accountable for gate reviews on cycles within this Workstream.
-          The Home Division scopes which users can see cycles assigned here.
-        </p>
-        <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
-          <div style="display:grid;gap:var(--triarq-space-sm);
-                      grid-template-columns:2fr 1fr 1fr;">
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Workstream Name *
-              </label>
-              <input formControlName="workstream_name" class="oi-input"
-                     placeholder="e.g. Clinical Operations Delivery" />
-              <div *ngIf="createForm.get('workstream_name')?.invalid && createForm.get('workstream_name')?.touched"
-                   style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                Workstream Name is required.
+      <!-- ── Create form (D-178 Tier 3: section overlay) ────────────────── -->
+      <div *ngIf="showCreateForm" style="position:relative;">
+        <app-loading-overlay [visible]="creating" message="Creating Workstream…"></app-loading-overlay>
+        <div style="background:var(--triarq-color-background-subtle);
+                    border-radius:8px;padding:var(--triarq-space-md);
+                    margin-bottom:var(--triarq-space-md);">
+          <h4 style="margin:0 0 4px 0;font-size:var(--triarq-text-body);">New Workstream</h4>
+          <p style="margin:0 0 var(--triarq-space-sm) 0;
+                    font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+            The Workstream Lead is accountable for gate reviews on cycles within this Workstream.
+            The Home Division scopes which users can see cycles assigned here.
+          </p>
+          <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
+            <div style="display:grid;gap:var(--triarq-space-sm);
+                        grid-template-columns:2fr 1fr 1fr;">
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  Workstream Name *
+                </label>
+                <input formControlName="workstream_name" class="oi-input"
+                       placeholder="e.g. Clinical Operations Delivery" />
+                <div *ngIf="createForm.get('workstream_name')?.invalid && createForm.get('workstream_name')?.touched"
+                     style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
+                  Workstream Name is required.
+                </div>
+              </div>
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  Home Division *
+                </label>
+                <select formControlName="home_division_id" class="oi-input">
+                  <option value="">— Select Division —</option>
+                  <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
+                </select>
+                <div *ngIf="createForm.get('home_division_id')?.invalid && createForm.get('home_division_id')?.touched"
+                     style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
+                  Home Division is required.
+                </div>
+              </div>
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  Workstream Lead *
+                </label>
+                <select formControlName="workstream_lead_user_id" class="oi-input">
+                  <option value="">— Select Lead —</option>
+                  <option *ngFor="let u of users" [value]="u.id">
+                    {{ u.display_name }}
+                  </option>
+                </select>
+                <div *ngIf="createForm.get('workstream_lead_user_id')?.invalid && createForm.get('workstream_lead_user_id')?.touched"
+                     style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
+                  Workstream Lead is required.
+                </div>
+                <div *ngIf="users.length === 0 && !loadingUsers"
+                     style="color:var(--triarq-color-sunray,#f5a623);font-size:var(--triarq-text-small);margin-top:2px;">
+                  No users found. Ensure users have been created in Admin → Users.
+                </div>
               </div>
             </div>
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Home Division *
-              </label>
-              <select formControlName="home_division_id" class="oi-input">
-                <option value="">— Select Division —</option>
-                <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
-              </select>
-              <div *ngIf="createForm.get('home_division_id')?.invalid && createForm.get('home_division_id')?.touched"
-                   style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                Home Division is required.
+            <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
+              <!-- D-178 Tier 2: button spinner while creating -->
+              <button type="submit" class="oi-btn-primary"
+                      [disabled]="createForm.invalid || creating">
+                <ion-spinner *ngIf="creating" name="crescent"
+                             style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
+                </ion-spinner>
+                {{ creating ? 'Creating…' : 'Create Workstream' }}
+              </button>
+              <div *ngIf="createError"
+                   style="font-size:var(--triarq-text-small);">
+                <span style="color:var(--triarq-color-error);font-weight:500;">{{ createError }}</span>
+                <span style="color:var(--triarq-color-text-secondary);margin-left:6px;">
+                  Check that the selected Division and Lead are valid.
+                </span>
               </div>
             </div>
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Workstream Lead *
-              </label>
-              <select formControlName="workstream_lead_user_id" class="oi-input">
-                <option value="">— Select Lead —</option>
-                <option *ngFor="let u of users" [value]="u.id">
-                  {{ u.display_name }}
-                </option>
-              </select>
-              <div *ngIf="createForm.get('workstream_lead_user_id')?.invalid && createForm.get('workstream_lead_user_id')?.touched"
-                   style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                Workstream Lead is required.
-              </div>
-              <div *ngIf="users.length === 0 && !loadingUsers"
-                   style="color:var(--triarq-color-sunray,#f5a623);font-size:var(--triarq-text-small);margin-top:2px;">
-                No users found. Ensure users have been created in Admin → Users.
-              </div>
-            </div>
-          </div>
-          <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-            <button type="submit" class="oi-btn-primary"
-                    [disabled]="createForm.invalid || creating">
-              {{ creating ? 'Creating…' : 'Create Workstream' }}
-            </button>
-            <div *ngIf="createError"
-                 style="font-size:var(--triarq-text-small);">
-              <span style="color:var(--triarq-color-error);font-weight:500;">{{ createError }}</span>
-              <span style="color:var(--triarq-color-text-secondary);margin-left:6px;">
-                Check that the selected Division and Lead are valid.
-              </span>
-            </div>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
 
-      <!-- ── Loading ──────────────────────────────────────────────────────── -->
-      <div *ngIf="loading"
-           style="text-align:center;padding:var(--triarq-space-xl);
-                  color:var(--triarq-color-text-secondary);">
-        Loading workstreams…
+      <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
+      <div *ngIf="loading">
+        <div *ngFor="let _ of skeletonRows"
+             style="display:grid;grid-template-columns:3fr 2fr 2fr 1fr 120px;
+                    gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
+                    border-bottom:1px solid var(--triarq-color-border);align-items:center;">
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+        </div>
       </div>
 
       <!-- ── Load error (D-140) ─────────────────────────────────────────── -->
@@ -190,11 +205,16 @@ import { DeliveryWorkstream, Division, User } from '../../../core/types/database
               </span>
             </span>
             <span style="display:flex;justify-content:flex-end;">
+              <!-- D-178 Tier 2: spinner on toggle button -->
               <button
                 (click)="toggleActive(ws)"
                 [disabled]="togglingId === ws.workstream_id"
                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
-                       background:none;border:none;cursor:pointer;padding:0;">
+                       background:none;border:none;cursor:pointer;padding:0;
+                       display:flex;align-items:center;gap:4px;">
+                <ion-spinner *ngIf="togglingId === ws.workstream_id" name="crescent"
+                             style="width:14px;height:14px;vertical-align:middle;">
+                </ion-spinner>
                 {{ togglingId === ws.workstream_id ? '…' : (ws.active_status ? 'Deactivate' : 'Activate') }}
               </button>
             </span>
@@ -268,6 +288,9 @@ export class WorkstreamAdminComponent implements OnInit {
   toggleError        = '';
   toggleErrorWsId:   string | null        = null;
   createForm!:       FormGroup;
+
+  // D-178 Tier 1: skeleton rows for loading state
+  readonly skeletonRows = [1, 2, 3, 4, 5];
 
   constructor(
     private readonly delivery: DeliveryService,

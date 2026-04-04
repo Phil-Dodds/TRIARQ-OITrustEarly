@@ -4,6 +4,7 @@
 // Click an artifact to view detail at /library/:id.
 // D-93:  McpService only — no direct Supabase access.
 // D-140: Blocked action UX on all errors.
+// D-178: Three-tier loading standard applied — Tier 1 skeleton, Tier 2 button spinner.
 
 import {
   Component,
@@ -55,7 +56,11 @@ import { Artifact }                    from '../../core/types/database';
             style="flex:1;"
             placeholder="Search by title…"
           />
+          <!-- D-178 Tier 2: spinner on Search button while searching -->
           <button type="submit" class="oi-btn-primary" [disabled]="searching">
+            <ion-spinner *ngIf="searching" name="crescent"
+                         style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
+            </ion-spinner>
             {{ searching ? 'Searching…' : 'Search' }}
           </button>
           <button
@@ -74,12 +79,20 @@ import { Artifact }                    from '../../core/types/database';
         [secondaryMessage]="blockedHint"
       ></app-blocked-action>
 
-      <!-- Loading ───────────────────────────────────────────────────────── -->
-      <div
-        *ngIf="loading"
-        style="text-align:center;padding:var(--triarq-space-xl);
-               color:var(--triarq-color-text-secondary);"
-      >Loading…</div>
+      <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
+      <div *ngIf="loading">
+        <div *ngFor="let _ of skeletonRows"
+             style="display:flex;align-items:flex-start;justify-content:space-between;
+                    padding:var(--triarq-space-sm) var(--triarq-space-md);
+                    border-radius:6px;margin-bottom:6px;
+                    border:1px solid var(--triarq-color-border);gap:var(--triarq-space-md);">
+          <div style="flex:1;min-width:0;">
+            <ion-skeleton-text animated style="height:16px;border-radius:4px;margin-bottom:6px;"></ion-skeleton-text>
+            <ion-skeleton-text animated style="height:12px;border-radius:4px;width:60%;"></ion-skeleton-text>
+          </div>
+          <ion-skeleton-text animated style="height:20px;width:70px;border-radius:999px;flex-shrink:0;"></ion-skeleton-text>
+        </div>
+      </div>
 
       <!-- Artifact list ─────────────────────────────────────────────────── -->
       <div *ngIf="!loading">
@@ -164,6 +177,9 @@ export class OILibraryComponent implements OnInit {
   blockedMessage  = '';
   blockedHint     = '';
   searchForm!:    FormGroup;
+
+  // D-178 Tier 1: skeleton rows for loading state
+  readonly skeletonRows = [1, 2, 3, 4];
 
   constructor(
     private readonly mcp: McpService,

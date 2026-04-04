@@ -9,6 +9,7 @@
 // Hierarchy: Trust (level 0) → Service Line (level 1) → Function (level 2).
 // Labels are interim pending Mike confirmation of D-L2/L3.
 // Full terms per spec: Trust / Service Line Division / Function Division.
+// D-178: Three-tier loading standard applied — Tier 1 skeleton, Tier 2 button spinners, Tier 3 overlays.
 
 import {
   Component,
@@ -27,6 +28,7 @@ import {
 import { IonicModule }                 from '@ionic/angular';
 import { McpService }                  from '../../../core/services/mcp.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
+import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { Division }                    from '../../../core/types/database';
 
 interface Crumb { id: string | null; name: string; }
@@ -54,7 +56,8 @@ const TYPE_LABELS: Record<number, string> = {
     RouterModule,
     ReactiveFormsModule,
     IonicModule,
-    BlockedActionComponent
+    BlockedActionComponent,
+    LoadingOverlayComponent
   ],
   template: `
     <div class="oi-card" style="max-width:900px;margin:var(--triarq-space-2xl) auto;">
@@ -101,91 +104,108 @@ const TYPE_LABELS: Record<number, string> = {
         [secondaryMessage]="blockedHint"
       ></app-blocked-action>
 
-      <!-- Edit form ─────────────────────────────────────────────────────── -->
-      <div
-        *ngIf="showEditForm"
-        style="background:var(--triarq-color-background-subtle);
-               border-radius:8px;padding:var(--triarq-space-md);
-               margin-bottom:var(--triarq-space-md);"
-      >
-        <h4 style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-body);">
-          Rename {{ editLabel }}
-        </h4>
-        <form [formGroup]="editDivisionForm" (ngSubmit)="submitEditDivision()">
-          <div>
-            <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-              {{ editLabel }} Name *
-            </label>
-            <input
-              formControlName="division_name"
-              class="oi-input"
-              style="width:100%;max-width:420px;"
-            />
-            <div
-              *ngIf="editDivisionForm.get('division_name')?.invalid && editDivisionForm.get('division_name')?.touched"
-              style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-            >Name is required.</div>
-          </div>
-          <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-            <button type="submit" class="oi-btn-primary" [disabled]="editDivisionForm.invalid || savingDivision">
-              {{ savingDivision ? 'Saving…' : 'Save' }}
-            </button>
-            <span
-              *ngIf="editDivisionError"
-              style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);"
-            >{{ editDivisionError }}</span>
-          </div>
-        </form>
+      <!-- Edit form (D-178 Tier 3: section overlay) ─────────────────────── -->
+      <div *ngIf="showEditForm" style="position:relative;">
+        <app-loading-overlay [visible]="savingDivision" message="Saving…"></app-loading-overlay>
+        <div
+          style="background:var(--triarq-color-background-subtle);
+                 border-radius:8px;padding:var(--triarq-space-md);
+                 margin-bottom:var(--triarq-space-md);"
+        >
+          <h4 style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-body);">
+            Rename {{ editLabel }}
+          </h4>
+          <form [formGroup]="editDivisionForm" (ngSubmit)="submitEditDivision()">
+            <div>
+              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                {{ editLabel }} Name *
+              </label>
+              <input
+                formControlName="division_name"
+                class="oi-input"
+                style="width:100%;max-width:420px;"
+              />
+              <div
+                *ngIf="editDivisionForm.get('division_name')?.invalid && editDivisionForm.get('division_name')?.touched"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
+              >Name is required.</div>
+            </div>
+            <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
+              <!-- D-178 Tier 2: button spinner while saving -->
+              <button type="submit" class="oi-btn-primary" [disabled]="editDivisionForm.invalid || savingDivision">
+                <ion-spinner *ngIf="savingDivision" name="crescent"
+                             style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
+                </ion-spinner>
+                {{ savingDivision ? 'Saving…' : 'Save' }}
+              </button>
+              <span
+                *ngIf="editDivisionError"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);"
+              >{{ editDivisionError }}</span>
+            </div>
+          </form>
+        </div>
       </div>
 
-      <!-- Create form ───────────────────────────────────────────────────── -->
-      <div
-        *ngIf="showCreateForm"
-        style="background:var(--triarq-color-background-subtle);
-               border-radius:8px;padding:var(--triarq-space-md);
-               margin-bottom:var(--triarq-space-md);"
-      >
-        <h4 style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-body);">
-          Create {{ levelLabel }}{{ isAtRoot ? '' : ' under "' + currentParentName + '"' }}
-        </h4>
-        <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
-          <div>
-            <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-              {{ levelLabel }} Name *
-            </label>
-            <input
-              formControlName="division_name"
-              class="oi-input"
-              [placeholder]="namePlaceholder"
-              style="width:100%;max-width:420px;"
-            />
-            <div
-              *ngIf="createForm.get('division_name')?.invalid && createForm.get('division_name')?.touched"
-              style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-            >{{ levelLabel }} name is required.</div>
-          </div>
-          <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-            <button type="submit" class="oi-btn-primary" [disabled]="createForm.invalid || creating">
-              {{ creating ? 'Creating…' : 'Create' }}
-            </button>
-            <span
-              *ngIf="createError"
-              style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);"
-            >{{ createError }}</span>
-            <span
-              *ngIf="createSuccess"
-              style="color:var(--triarq-color-success,#2e7d32);font-size:var(--triarq-text-small);"
-            >Created successfully.</span>
-          </div>
-        </form>
+      <!-- Create form (D-178 Tier 3: section overlay) ───────────────────── -->
+      <div *ngIf="showCreateForm" style="position:relative;">
+        <app-loading-overlay [visible]="creating" message="Creating {{ levelLabel }}…"></app-loading-overlay>
+        <div
+          style="background:var(--triarq-color-background-subtle);
+                 border-radius:8px;padding:var(--triarq-space-md);
+                 margin-bottom:var(--triarq-space-md);"
+        >
+          <h4 style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-body);">
+            Create {{ levelLabel }}{{ isAtRoot ? '' : ' under "' + currentParentName + '"' }}
+          </h4>
+          <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
+            <div>
+              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                {{ levelLabel }} Name *
+              </label>
+              <input
+                formControlName="division_name"
+                class="oi-input"
+                [placeholder]="namePlaceholder"
+                style="width:100%;max-width:420px;"
+              />
+              <div
+                *ngIf="createForm.get('division_name')?.invalid && createForm.get('division_name')?.touched"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
+              >{{ levelLabel }} name is required.</div>
+            </div>
+            <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
+              <!-- D-178 Tier 2: button spinner while creating -->
+              <button type="submit" class="oi-btn-primary" [disabled]="createForm.invalid || creating">
+                <ion-spinner *ngIf="creating" name="crescent"
+                             style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
+                </ion-spinner>
+                {{ creating ? 'Creating…' : 'Create' }}
+              </button>
+              <span
+                *ngIf="createError"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);"
+              >{{ createError }}</span>
+              <span
+                *ngIf="createSuccess"
+                style="color:var(--triarq-color-success,#2e7d32);font-size:var(--triarq-text-small);"
+              >Created successfully.</span>
+            </div>
+          </form>
+        </div>
       </div>
 
-      <!-- Loading ───────────────────────────────────────────────────────── -->
-      <div
-        *ngIf="loading"
-        style="text-align:center;padding:var(--triarq-space-xl);
-               color:var(--triarq-color-text-secondary);"
-      >Loading…</div>
+      <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
+      <div *ngIf="loading">
+        <div *ngFor="let _ of skeletonRows"
+             style="display:flex;align-items:center;justify-content:space-between;
+                    padding:var(--triarq-space-sm) var(--triarq-space-md);
+                    border-radius:6px;margin-bottom:6px;
+                    border:1px solid var(--triarq-color-border);gap:var(--triarq-space-sm);">
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;flex:1;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:20px;width:80px;border-radius:999px;"></ion-skeleton-text>
+        </div>
+      </div>
 
       <!-- Division list ─────────────────────────────────────────────────── -->
       <div *ngIf="!loading">
@@ -251,6 +271,9 @@ export class DivisionsComponent implements OnInit {
   blockedHint         = '';
   createForm!:        FormGroup;
   editDivisionForm!:  FormGroup;
+
+  // D-178 Tier 1: skeleton rows for loading state
+  readonly skeletonRows = [1, 2, 3, 4, 5];
 
   constructor(
     private readonly mcp: McpService,

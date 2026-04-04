@@ -12,6 +12,7 @@
 //
 // NOTE: Division assignment picker shows Trusts only (level 0). Trust membership
 // grants inherited access to all child Service Lines and Functions (D-135).
+// D-178: Three-tier loading standard applied — Tier 1 skeleton, Tier 2 button spinners, Tier 3 overlays.
 
 import {
   Component,
@@ -32,6 +33,7 @@ import { IonicModule }                 from '@ionic/angular';
 import { McpService }                  from '../../../core/services/mcp.service';
 import { UserProfileService }          from '../../../core/services/user-profile.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
+import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { User, SystemRole, Division }  from '../../../core/types/database';
 
 /** get_user_divisions response shape */
@@ -51,7 +53,8 @@ interface UserDivisionsData {
     RouterModule,
     ReactiveFormsModule,
     IonicModule,
-    BlockedActionComponent
+    BlockedActionComponent,
+    LoadingOverlayComponent
   ],
   template: `
     <div class="oi-card" style="max-width:960px;margin:var(--triarq-space-2xl) auto;">
@@ -74,86 +77,99 @@ interface UserDivisionsData {
         [secondaryMessage]="blockedHint"
       ></app-blocked-action>
 
-      <!-- Add user form ─────────────────────────────────────────────────── -->
-      <div
-        *ngIf="showInviteForm"
-        style="background:var(--triarq-color-background-subtle);
-               border-radius:8px;padding:var(--triarq-space-md);
-               margin-bottom:var(--triarq-space-md);"
-      >
-        <h4 style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-body);">
-          Add New User
-        </h4>
-        <form [formGroup]="inviteForm" (ngSubmit)="submitInvite()">
-          <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:1fr 1fr 1fr;">
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Email Address *
-              </label>
-              <input
-                formControlName="email"
-                type="email"
-                class="oi-input"
-                placeholder="user@triarqhealth.com"
-              />
-              <div
-                *ngIf="inviteForm.get('email')?.invalid && inviteForm.get('email')?.touched"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-              >Valid email is required.</div>
+      <!-- Add user form (D-178 Tier 3: section overlay) ─────────────────── -->
+      <div *ngIf="showInviteForm" style="position:relative;">
+        <app-loading-overlay [visible]="inviting" message="Creating User…"></app-loading-overlay>
+        <div
+          style="background:var(--triarq-color-background-subtle);
+                 border-radius:8px;padding:var(--triarq-space-md);
+                 margin-bottom:var(--triarq-space-md);"
+        >
+          <h4 style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-body);">
+            Add New User
+          </h4>
+          <form [formGroup]="inviteForm" (ngSubmit)="submitInvite()">
+            <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:1fr 1fr 1fr;">
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  Email Address *
+                </label>
+                <input
+                  formControlName="email"
+                  type="email"
+                  class="oi-input"
+                  placeholder="user@triarqhealth.com"
+                />
+                <div
+                  *ngIf="inviteForm.get('email')?.invalid && inviteForm.get('email')?.touched"
+                  style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
+                >Valid email is required.</div>
+              </div>
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  Display Name *
+                </label>
+                <input
+                  formControlName="display_name"
+                  class="oi-input"
+                  placeholder="First Last"
+                />
+                <div
+                  *ngIf="inviteForm.get('display_name')?.invalid && inviteForm.get('display_name')?.touched"
+                  style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
+                >Display name is required.</div>
+              </div>
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  System Role *
+                </label>
+                <select formControlName="system_role" class="oi-input">
+                  <option value="">— Select role —</option>
+                  <option value="ds">DS — Domain Strategist</option>
+                  <option value="cb">CB — Capability Builder</option>
+                  <option value="ce">CE — Context Engineer</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <div
+                  *ngIf="inviteForm.get('system_role')?.invalid && inviteForm.get('system_role')?.touched"
+                  style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
+                >Role is required.</div>
+              </div>
             </div>
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Display Name *
-              </label>
-              <input
-                formControlName="display_name"
-                class="oi-input"
-                placeholder="First Last"
-              />
-              <div
-                *ngIf="inviteForm.get('display_name')?.invalid && inviteForm.get('display_name')?.touched"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-              >Display name is required.</div>
+            <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
+              <!-- D-178 Tier 2: button spinner while creating user -->
+              <button type="submit" class="oi-btn-primary" [disabled]="inviteForm.invalid || inviting">
+                <ion-spinner *ngIf="inviting" name="crescent"
+                             style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
+                </ion-spinner>
+                {{ inviting ? 'Creating…' : 'Create User' }}
+              </button>
+              <span
+                *ngIf="inviteError"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);"
+              >{{ inviteError }}</span>
+              <span
+                *ngIf="inviteSuccess"
+                style="color:var(--triarq-color-success,#2e7d32);font-size:var(--triarq-text-small);"
+              >User created. They can sign in now with their &#64;triarqhealth.com email.</span>
             </div>
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                System Role *
-              </label>
-              <select formControlName="system_role" class="oi-input">
-                <option value="">— Select role —</option>
-                <option value="ds">DS — Domain Strategist</option>
-                <option value="cb">CB — Capability Builder</option>
-                <option value="ce">CE — Context Engineer</option>
-                <option value="admin">Admin</option>
-              </select>
-              <div
-                *ngIf="inviteForm.get('system_role')?.invalid && inviteForm.get('system_role')?.touched"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-              >Role is required.</div>
-            </div>
-          </div>
-          <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-            <button type="submit" class="oi-btn-primary" [disabled]="inviteForm.invalid || inviting">
-              {{ inviting ? 'Creating…' : 'Create User' }}
-            </button>
-            <span
-              *ngIf="inviteError"
-              style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);"
-            >{{ inviteError }}</span>
-            <span
-              *ngIf="inviteSuccess"
-              style="color:var(--triarq-color-success,#2e7d32);font-size:var(--triarq-text-small);"
-            >User created. They can sign in now with their &#64;triarqhealth.com email.</span>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
 
-      <!-- Loading ───────────────────────────────────────────────────────── -->
-      <div
-        *ngIf="loading"
-        style="text-align:center;padding:var(--triarq-space-xl);
-               color:var(--triarq-color-text-secondary);"
-      >Loading users…</div>
+      <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
+      <div *ngIf="loading">
+        <div *ngFor="let _ of skeletonRows"
+             style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 130px;
+                    gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
+                    border-bottom:1px solid var(--triarq-color-border);align-items:center;">
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:20px;border-radius:999px;width:50px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:20px;border-radius:999px;width:60px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+        </div>
+      </div>
 
       <!-- Filter / Sort bar ─────────────────────────────────────────────── -->
       <div
@@ -245,57 +261,68 @@ interface UserDivisionsData {
             </span>
           </div>
 
-          <!-- Inline edit form -->
+          <!-- Inline edit form (D-178 Tier 3: section overlay) -->
           <div
             *ngIf="editingUserId === user.id"
-            style="background:var(--triarq-color-background-subtle);
-                   padding:var(--triarq-space-sm) var(--triarq-space-md);
-                   border-bottom:1px solid var(--triarq-color-border);"
+            style="position:relative;"
           >
-            <form [formGroup]="editForm" (ngSubmit)="submitEdit()">
-              <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:2fr 1fr 1fr auto;
-                          align-items:end;">
-                <div>
-                  <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                    Display Name *
-                  </label>
-                  <input formControlName="display_name" class="oi-input" style="width:100%;" />
+            <app-loading-overlay [visible]="saving" message="Saving…"></app-loading-overlay>
+            <div
+              style="background:var(--triarq-color-background-subtle);
+                     padding:var(--triarq-space-sm) var(--triarq-space-md);
+                     border-bottom:1px solid var(--triarq-color-border);"
+            >
+              <form [formGroup]="editForm" (ngSubmit)="submitEdit()">
+                <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:2fr 1fr 1fr auto;
+                            align-items:end;">
+                  <div>
+                    <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                      Display Name *
+                    </label>
+                    <input formControlName="display_name" class="oi-input" style="width:100%;" />
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                      Role *
+                    </label>
+                    <select formControlName="system_role" class="oi-input">
+                      <option value="ds">DS — Domain Strategist</option>
+                      <option value="cb">CB — Capability Builder</option>
+                      <option value="ce">CE — Context Engineer</option>
+                      <option value="admin">Admin</option>
+                      <option value="phil">Phil</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                      Status
+                    </label>
+                    <select formControlName="is_active" class="oi-input">
+                      <option [ngValue]="true">Active</option>
+                      <option [ngValue]="false">Inactive</option>
+                    </select>
+                  </div>
+                  <div>
+                    <!-- D-178 Tier 2: button spinner while saving -->
+                    <button
+                      type="submit"
+                      class="oi-btn-primary"
+                      [disabled]="editForm.invalid || saving"
+                      style="white-space:nowrap;"
+                    >
+                      <ion-spinner *ngIf="saving" name="crescent"
+                                   style="width:14px;height:14px;vertical-align:middle;margin-right:4px;">
+                      </ion-spinner>
+                      {{ saving ? 'Saving…' : 'Save' }}
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                    Role *
-                  </label>
-                  <select formControlName="system_role" class="oi-input">
-                    <option value="ds">DS — Domain Strategist</option>
-                    <option value="cb">CB — Capability Builder</option>
-                    <option value="ce">CE — Context Engineer</option>
-                    <option value="admin">Admin</option>
-                    <option value="phil">Phil</option>
-                  </select>
-                </div>
-                <div>
-                  <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                    Status
-                  </label>
-                  <select formControlName="is_active" class="oi-input">
-                    <option [ngValue]="true">Active</option>
-                    <option [ngValue]="false">Inactive</option>
-                  </select>
-                </div>
-                <div>
-                  <button
-                    type="submit"
-                    class="oi-btn-primary"
-                    [disabled]="editForm.invalid || saving"
-                    style="white-space:nowrap;"
-                  >{{ saving ? 'Saving…' : 'Save' }}</button>
-                </div>
-              </div>
-              <div
-                *ngIf="editError"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:var(--triarq-space-xs);"
-              >{{ editError }}</div>
-            </form>
+                <div
+                  *ngIf="editError"
+                  style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:var(--triarq-space-xs);"
+                >{{ editError }}</div>
+              </form>
+            </div>
           </div>
 
           <!-- Division assignment panel -->
@@ -336,13 +363,20 @@ interface UserDivisionsData {
                          font-size:var(--triarq-text-small);"
                 >
                   {{ div.division_name }}
+                  <!-- D-178 Tier 2: spinner on Revoke button -->
                   <button
                     (click)="revokeAssignment(div.id)"
                     [disabled]="revokingDivisionId === div.id"
                     style="background:none;border:none;color:#fff;cursor:pointer;
-                           font-size:14px;line-height:1;padding:0 0 0 2px;opacity:0.8;"
+                           font-size:14px;line-height:1;padding:0 0 0 2px;opacity:0.8;
+                           display:inline-flex;align-items:center;"
                     title="Remove"
-                  >{{ revokingDivisionId === div.id ? '…' : '×' }}</button>
+                  >
+                    <ion-spinner *ngIf="revokingDivisionId === div.id" name="crescent"
+                                 style="width:12px;height:12px;color:#fff;">
+                    </ion-spinner>
+                    <span *ngIf="revokingDivisionId !== div.id">×</span>
+                  </button>
                 </span>
               </div>
 
@@ -361,12 +395,18 @@ interface UserDivisionsData {
                     {{ t.division_name }}
                   </option>
                 </select>
+                <!-- D-178 Tier 2: spinner on Assign button -->
                 <button
                   class="oi-btn-primary"
                   (click)="submitAssign()"
                   [disabled]="!trustPickerControl.value || assigning"
                   style="font-size:var(--triarq-text-small);white-space:nowrap;"
-                >{{ assigning ? 'Assigning…' : 'Assign' }}</button>
+                >
+                  <ion-spinner *ngIf="assigning" name="crescent"
+                               style="width:14px;height:14px;vertical-align:middle;margin-right:4px;">
+                  </ion-spinner>
+                  {{ assigning ? 'Assigning…' : 'Assign' }}
+                </button>
               </div>
               <div
                 *ngIf="availableTrusts.length === 0 && !loadingMemberships"
@@ -473,6 +513,9 @@ export class UsersComponent implements OnInit {
   assigning              = false;
   assignError            = '';
   revokingDivisionId:    string | null = null;
+
+  // D-178 Tier 1: skeleton rows for loading state
+  readonly skeletonRows = [1, 2, 3, 4, 5];
 
   constructor(
     private readonly mcp:     McpService,
