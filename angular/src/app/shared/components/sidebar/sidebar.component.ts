@@ -10,7 +10,7 @@ import { Router }             from '@angular/router';
 import { SystemRole }         from '../../../core/types/database';
 import { Subscription }       from 'rxjs';
 
-type DevStatus = 'live' | 'uat' | 'pilot' | 'not-started';
+type DevStatus = 'new' | 'uat' | 'pilot' | 'not-started';
 
 interface NavItem {
   label:     string;
@@ -79,7 +79,7 @@ const NAV_ITEMS: NavItem[] = [
     }
 
     /* Status colors */
-    .status-live        { color: #6fcf97; }
+    .status-new         { color: #6fcf97; }
     .status-uat         { color: var(--triarq-color-sunray, #f5a623); }
     .status-pilot       { color: #56ccf2; }
     .status-not-started { color: rgba(255,255,255,0.35); }
@@ -122,7 +122,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   statusLabel(status: DevStatus): string {
     switch (status) {
-      case 'live':        return '** Live';
+      case 'new':         return '** New';
       case 'uat':         return '** UAT';
       case 'pilot':       return '** Pilot';
       case 'not-started': return '** Not Started';
