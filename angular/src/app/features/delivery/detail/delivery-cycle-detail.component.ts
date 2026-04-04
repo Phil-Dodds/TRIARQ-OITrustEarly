@@ -33,8 +33,9 @@ import {
   Validators
 } from '@angular/forms';
 import { IonicModule }         from '@ionic/angular';
-import { DeliveryService }     from '../../../core/services/delivery.service';
-import { StageTrackComponent } from '../stage-track/stage-track.component';
+import { DeliveryService }         from '../../../core/services/delivery.service';
+import { StageTrackComponent }     from '../stage-track/stage-track.component';
+import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 import {
   DeliveryCycle,
   CycleMilestoneDate,
@@ -67,13 +68,25 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, IonicModule, StageTrackComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent],
   template: `
-    <!-- Loading -->
-    <div *ngIf="loading"
-         style="text-align:center;padding:var(--triarq-space-xl);
-                color:var(--triarq-color-text-secondary);">
-      Loading cycle…
+    <!-- D-178 Tier 1: Skeleton screen for initial cycle load -->
+    <div *ngIf="loading" style="max-width:1100px;margin:var(--triarq-space-xl) auto;
+                                padding:0 var(--triarq-space-md);">
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+        <ion-skeleton-text animated style="width:28%;height:16px;border-radius:4px;margin-bottom:8px;"></ion-skeleton-text>
+        <ion-skeleton-text animated style="width:55%;height:22px;border-radius:4px;margin-bottom:6px;"></ion-skeleton-text>
+        <ion-skeleton-text animated style="width:38%;height:13px;border-radius:4px;"></ion-skeleton-text>
+      </div>
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+        <ion-skeleton-text animated style="width:22%;height:15px;border-radius:4px;margin-bottom:8px;"></ion-skeleton-text>
+        <ion-skeleton-text animated style="width:78%;height:13px;border-radius:4px;margin-bottom:4px;"></ion-skeleton-text>
+        <ion-skeleton-text animated style="width:55%;height:13px;border-radius:4px;"></ion-skeleton-text>
+      </div>
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+        <ion-skeleton-text animated style="width:18%;height:15px;border-radius:4px;margin-bottom:10px;"></ion-skeleton-text>
+        <ion-skeleton-text animated style="width:100%;height:44px;border-radius:8px;"></ion-skeleton-text>
+      </div>
     </div>
 
     <!-- Load error — D-140: what is blocked + what to do -->
@@ -122,8 +135,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             class="oi-btn-primary"
             (click)="advanceStage()"
             [disabled]="advancing"
-            style="white-space:nowrap;font-size:var(--triarq-text-small);">
-            {{ advancing ? 'Advancing…' : 'Advance Stage' }}
+            style="white-space:nowrap;font-size:var(--triarq-text-small);
+                   display:flex;align-items:center;gap:6px;">
+            <ion-spinner *ngIf="advancing" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+            <span>{{ advancing ? 'Advancing…' : 'Advance Stage' }}</span>
           </button>
         </div>
         <!-- Advance error — D-140 -->
@@ -173,8 +188,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             style="width:100%;resize:vertical;"
           ></textarea>
           <div style="margin-top:var(--triarq-space-xs);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-            <button class="oi-btn-primary" (click)="saveOutcome()" [disabled]="savingOutcome">
-              {{ savingOutcome ? 'Saving…' : 'Save' }}
+            <button class="oi-btn-primary" (click)="saveOutcome()" [disabled]="savingOutcome"
+                    style="display:flex;align-items:center;gap:6px;">
+              <ion-spinner *ngIf="savingOutcome" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+              <span>{{ savingOutcome ? 'Saving…' : 'Save' }}</span>
             </button>
             <button (click)="cancelOutcomeEdit()"
                     style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
@@ -263,8 +280,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 <button class="oi-btn-primary"
                         (click)="saveMilestoneDate(m.gate_name)"
                         [disabled]="savingMilestone"
-                        style="font-size:10px;padding:2px 6px;white-space:nowrap;">
-                  {{ savingMilestone ? '…' : 'Set' }}
+                        style="font-size:10px;padding:2px 6px;white-space:nowrap;
+                               display:flex;align-items:center;gap:4px;">
+                  <ion-spinner *ngIf="savingMilestone" name="crescent" style="width:12px;height:12px;"></ion-spinner>
+                  <span>{{ savingMilestone ? '…' : 'Set' }}</span>
                 </button>
                 <button (click)="cancelMilestoneEdit()"
                         style="background:none;border:none;cursor:pointer;
@@ -295,7 +314,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </div>
 
         <!-- ── Gate Record Panel ────────────────────────────────────────── -->
-        <div class="oi-card">
+        <!-- D-178 Tier 3: position:relative required for overlay -->
+        <div class="oi-card" style="position:relative;">
+          <app-loading-overlay [visible]="gateActionBusy" message="Processing gate…"></app-loading-overlay>
           <div style="font-weight:500;margin-bottom:var(--triarq-space-sm);">
             Gate Record
             <span *ngIf="selectedGate" style="font-weight:400;color:var(--triarq-color-text-secondary);">
@@ -326,10 +347,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               Use the "Submit for Approval" button below when the cycle is ready for this gate review.
             </p>
             <button class="oi-btn-primary"
-                    style="margin-top:var(--triarq-space-sm);font-size:var(--triarq-text-small);"
+                    style="margin-top:var(--triarq-space-sm);font-size:var(--triarq-text-small);
+                           display:flex;align-items:center;gap:6px;"
                     (click)="submitGate(selectedGate!)"
                     [disabled]="gateActionBusy">
-              {{ gateActionBusy ? '…' : 'Submit for Approval' }}
+              <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+              <span>Submit for Approval</span>
             </button>
             <div *ngIf="gateActionError"
                  style="margin-top:var(--triarq-space-xs);font-size:var(--triarq-text-small);">
@@ -374,8 +397,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               <button class="oi-btn-primary"
                       (click)="submitGate(selectedGate!)"
                       [disabled]="gateActionBusy"
-                      style="font-size:var(--triarq-text-small);">
-                {{ gateActionBusy ? '…' : 'Submit for Approval' }}
+                      style="font-size:var(--triarq-text-small);
+                             display:flex;align-items:center;gap:6px;">
+                <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                <span>Submit for Approval</span>
               </button>
             </div>
 
@@ -402,16 +427,21 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   <button type="button" class="oi-btn-primary"
                           (click)="recordDecisionWithValue(selectedGate!, 'approved')"
                           [disabled]="gateActionBusy"
-                          style="font-size:var(--triarq-text-small);">
-                    ✓ Approve
+                          style="font-size:var(--triarq-text-small);
+                                 display:flex;align-items:center;gap:6px;">
+                    <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                    <span>✓ Approve</span>
                   </button>
                   <button type="button"
                           (click)="recordDecisionWithValue(selectedGate!, 'returned')"
                           [disabled]="gateActionBusy"
                           style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);
                                  background:none;border:1px solid var(--triarq-color-error);
-                                 border-radius:5px;padding:6px 12px;cursor:pointer;">
-                    ✗ Return
+                                 border-radius:5px;padding:6px 12px;cursor:pointer;
+                                 display:flex;align-items:center;gap:6px;">
+                    <ion-spinner *ngIf="gateActionBusy" name="crescent"
+                                 style="width:14px;height:14px;color:var(--triarq-color-error);"></ion-spinner>
+                    <span>✗ Return</span>
                   </button>
                 </div>
               </form>
@@ -449,11 +479,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           (full submission completes in Build B).
         </p>
 
-        <!-- Attach form -->
+        <!-- Attach form — D-178 Tier 3: position:relative for overlay -->
         <div *ngIf="showAttachForm"
              style="background:var(--triarq-color-background-subtle);
                     border-radius:6px;padding:var(--triarq-space-sm);
-                    margin-bottom:var(--triarq-space-sm);">
+                    margin-bottom:var(--triarq-space-sm);position:relative;">
+          <app-loading-overlay [visible]="attaching" message="Attaching artifact…"></app-loading-overlay>
           <form [formGroup]="attachForm" (ngSubmit)="submitAttach()">
             <div style="display:grid;gap:var(--triarq-space-xs);grid-template-columns:2fr 3fr auto;">
               <div>
@@ -471,8 +502,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               <div style="display:flex;align-items:flex-end;gap:4px;">
                 <button type="submit" class="oi-btn-primary"
                         [disabled]="attachForm.invalid || attaching"
-                        style="font-size:var(--triarq-text-small);white-space:nowrap;">
-                  {{ attaching ? '…' : 'Attach' }}
+                        style="font-size:var(--triarq-text-small);white-space:nowrap;
+                               display:flex;align-items:center;gap:6px;">
+                  <ion-spinner *ngIf="attaching" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                  <span>{{ attaching ? 'Attaching…' : 'Attach' }}</span>
                 </button>
                 <button type="button" (click)="cancelAttach()"
                         style="background:none;border:none;cursor:pointer;
@@ -558,8 +591,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   class="oi-btn-primary"
                   (click)="triggerJiraSync()"
                   [disabled]="syncing"
-                  style="font-size:var(--triarq-text-small);">
-            {{ syncing ? 'Syncing…' : 'Sync Now' }}
+                  style="font-size:var(--triarq-text-small);
+                         display:flex;align-items:center;gap:6px;">
+            <ion-spinner *ngIf="syncing" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+            <span>{{ syncing ? 'Syncing…' : 'Sync Now' }}</span>
           </button>
         </div>
         <div *ngIf="!jiraLink"
@@ -603,9 +638,14 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           Append-only record of all stage advances, gate decisions, artifact attachments,
           and outcome changes. Oldest events at the top.
         </div>
-        <div *ngIf="loadingEvents"
-             style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-          Loading events…
+        <!-- D-178 Tier 1: skeleton for event log load -->
+        <div *ngIf="loadingEvents">
+          <div *ngFor="let _ of [1,2,3]"
+               style="display:grid;grid-template-columns:140px 1fr;gap:var(--triarq-space-sm);
+                      padding:var(--triarq-space-xs) 0;border-bottom:1px solid var(--triarq-color-border);">
+            <ion-skeleton-text animated style="height:13px;border-radius:4px;"></ion-skeleton-text>
+            <ion-skeleton-text animated style="height:13px;border-radius:4px;"></ion-skeleton-text>
+          </div>
         </div>
         <div *ngIf="!loadingEvents && events.length === 0"
              style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
