@@ -13,7 +13,8 @@
 //   - Appends event log entry
 // Build C: approver defaults to Phil's user_id (see spec Section 4.2). RACI-configured
 // approver assignment is Build B.
-// Source: D-154, ARCH-12, build-c-spec Section 4.1
+// Supplement Section 1: caller must be Phil or the gate's designated approver_user_id.
+// Source: D-154, ARCH-12, build-c-spec Section 4.1, supplement Section 1
 
 'use strict';
 
@@ -50,10 +51,10 @@ async function record_gate_decision(params, caller_user_id) {
     };
   }
 
-  // ── Fetch gate record ─────────────────────────────────────────────────────
+  // ── Fetch gate record (includes approver_user_id for permission check) ────
   const { data: gate_record, error: gateErr } = await supabase
     .from('gate_records')
-    .select('gate_record_id, gate_status')
+    .select('gate_record_id, gate_status, approver_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .eq('gate_name', gate_name)
     .is('deleted_at', null)
@@ -80,6 +81,30 @@ async function record_gate_decision(params, caller_user_id) {
 
   if (cycleErr || !cycle) {
     return { success: false, error: 'Delivery Cycle not found or has been deleted.' };
+  }
+
+  // ── Supplement Section 1: caller must be Phil or the gate's designated approver ──
+  // Build C: approver_user_id is null → Phil approves. Build B wires RACI-configured approvers.
+  const { data: caller } = await supabase
+    .from('users')
+    .select('system_role')
+    .eq('id', caller_user_id)
+    .is('deleted_at', null)
+    .single();
+
+  const isPhil              = caller?.system_role === 'phil';
+  const isDesignatedApprover = gate_record.approver_user_id === caller_user_id;
+  // When no approver configured, Phil is the fallback (Build C default)
+  const approverUnconfigured = !gate_record.approver_user_id;
+
+  if (!isPhil && !isDesignatedApprover) {
+    const reason = approverUnconfigured
+      ? 'No approver has been configured for this gate — Phil is the default approver.'
+      : 'You are not the designated approver for this gate.';
+    return {
+      success: false,
+      error: `You do not have authority to approve or return this gate. ${reason}`
+    };
   }
 
   // ── Record the gate decision ──────────────────────────────────────────────

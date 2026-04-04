@@ -142,9 +142,10 @@ import { LoadingOverlayComponent } from '../../../shared/components/loading-over
       <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
       <div *ngIf="loading">
         <div *ngFor="let _ of skeletonRows"
-             style="display:grid;grid-template-columns:3fr 2fr 2fr 1fr 120px;
+             style="display:grid;grid-template-columns:3fr 2fr 2fr 80px 1fr 100px;
                     gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
                     border-bottom:1px solid var(--triarq-color-border);align-items:center;">
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
@@ -164,83 +165,187 @@ import { LoadingOverlayComponent } from '../../../shared/components/loading-over
         </div>
       </div>
 
-      <!-- ── Workstream list ──────────────────────────────────────────────── -->
-      <div *ngIf="!loading && workstreams.length > 0">
-        <div style="display:grid;grid-template-columns:3fr 2fr 2fr 1fr 120px;
-                    gap:var(--triarq-space-sm);padding:var(--triarq-space-xs) var(--triarq-space-sm);
-                    font-size:var(--triarq-text-small);font-weight:500;
-                    color:var(--triarq-color-text-secondary);
-                    border-bottom:2px solid var(--triarq-color-border);">
-          <span>Workstream Name</span>
-          <span>Home Division</span>
-          <span>Workstream Lead</span>
-          <span>Active Status</span>
-          <span></span>
-        </div>
+      <!-- ── Filter toggle: Active / Inactive / All ────────────────────────── -->
+      <div *ngIf="!loading && workstreams.length > 0"
+           style="display:flex;gap:4px;margin-bottom:var(--triarq-space-sm);">
+        <button *ngFor="let f of ['active','inactive','all']"
+                (click)="activeFilter = f"
+                [style.fontWeight]="activeFilter === f ? '600' : '400'"
+                [style.color]="activeFilter === f ? 'var(--triarq-color-primary)' : 'var(--triarq-color-text-secondary)'"
+                [style.borderColor]="activeFilter === f ? 'var(--triarq-color-primary)' : 'var(--triarq-color-border)'"
+                style="font-size:var(--triarq-text-small);background:none;
+                       border:1px solid;border-radius:5px;padding:3px 10px;cursor:pointer;">
+          {{ f | titlecase }}
+        </button>
+        <span style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                     margin-left:8px;align-self:center;">
+          {{ filteredWorkstreams.length }} of {{ workstreams.length }}
+        </span>
+      </div>
 
-        <div *ngFor="let ws of workstreams">
-          <!-- Row -->
-          <div style="display:grid;grid-template-columns:3fr 2fr 2fr 1fr 120px;
-                      gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
-                      border-bottom:1px solid var(--triarq-color-border);
-                      font-size:var(--triarq-text-small);align-items:center;">
-            <span style="font-weight:500;color:var(--triarq-color-text-primary);">
-              {{ ws.workstream_name }}
-            </span>
-            <span style="color:var(--triarq-color-text-secondary);">
-              {{ ws.home_division_name ?? divisionName(ws.home_division_id) }}
-            </span>
-            <span style="color:var(--triarq-color-text-secondary);">
-              {{ ws.lead_display_name ?? leadName(ws.workstream_lead_user_id) }}
-            </span>
-            <span>
-              <span class="oi-pill"
-                    [style.background]="ws.active_status
-                      ? 'var(--triarq-color-background-subtle)'
-                      : 'var(--triarq-color-error-light,#fdecea)'"
-                    [style.color]="ws.active_status
-                      ? 'var(--triarq-color-text-secondary)'
-                      : 'var(--triarq-color-error)'">
-                {{ ws.active_status ? 'Active' : 'Inactive' }}
-              </span>
-            </span>
-            <span style="display:flex;justify-content:flex-end;">
-              <!-- D-178 Tier 2: spinner on toggle button -->
-              <button
-                (click)="toggleActive(ws)"
-                [disabled]="togglingId === ws.workstream_id"
-                style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
-                       background:none;border:none;cursor:pointer;padding:0;
-                       display:flex;align-items:center;gap:4px;">
-                <ion-spinner *ngIf="togglingId === ws.workstream_id" name="crescent"
-                             style="width:14px;height:14px;vertical-align:middle;">
-                </ion-spinner>
-                {{ togglingId === ws.workstream_id ? '…' : (ws.active_status ? 'Deactivate' : 'Activate') }}
-              </button>
-            </span>
+      <!-- ── Workstream list ──────────────────────────────────────────────── -->
+      <div *ngIf="!loading && workstreams.length > 0"
+           style="display:flex;gap:var(--triarq-space-md);">
+
+        <!-- List panel -->
+        <div style="flex:1;min-width:0;">
+          <div style="display:grid;grid-template-columns:3fr 2fr 2fr 80px 1fr 100px;
+                      gap:var(--triarq-space-sm);padding:var(--triarq-space-xs) var(--triarq-space-sm);
+                      font-size:var(--triarq-text-small);font-weight:500;
+                      color:var(--triarq-color-text-secondary);
+                      border-bottom:2px solid var(--triarq-color-border);">
+            <span>Workstream Name</span>
+            <span>Home Division</span>
+            <span>Workstream Lead</span>
+            <span style="text-align:center;">Active Cycles</span>
+            <span>Status</span>
+            <span></span>
           </div>
 
-          <!-- D-140: Deactivation warning — what changes and what the impact is -->
-          <div *ngIf="toggleWarning && toggleWarningWsId === ws.workstream_id"
-               style="background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
-                      padding:var(--triarq-space-sm) var(--triarq-space-md);
-                      font-size:var(--triarq-text-small);">
-            <div style="font-weight:500;margin-bottom:4px;">{{ toggleWarning }}</div>
-            <div style="color:var(--triarq-color-text-secondary);">
-              Open cycles on this Workstream cannot clear gates until it is reactivated.
-              Reactivate this Workstream to restore gate review for its cycles.
+          <div *ngFor="let ws of filteredWorkstreams">
+            <!-- Row — click to open detail panel -->
+            <div (click)="selectWorkstream(ws)"
+                 style="display:grid;grid-template-columns:3fr 2fr 2fr 80px 1fr 100px;
+                        gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
+                        border-bottom:1px solid var(--triarq-color-border);
+                        font-size:var(--triarq-text-small);align-items:center;cursor:pointer;"
+                 [style.background]="selectedWs?.workstream_id === ws.workstream_id
+                   ? 'var(--triarq-color-background-subtle)'
+                   : ws.active_status ? 'transparent' : '#fff8f8'">
+              <span style="font-weight:500;color:var(--triarq-color-text-primary);">
+                {{ ws.workstream_name }}
+              </span>
+              <span style="color:var(--triarq-color-text-secondary);">
+                {{ ws.home_division_name ?? divisionName(ws.home_division_id) }}
+              </span>
+              <span style="color:var(--triarq-color-text-secondary);">
+                {{ ws.lead_display_name ?? leadName(ws.workstream_lead_user_id) }}
+              </span>
+              <span style="text-align:center;color:var(--triarq-color-text-secondary);">
+                {{ ws.active_cycle_count ?? '—' }}
+              </span>
+              <span>
+                <span class="oi-pill"
+                      [style.background]="ws.active_status
+                        ? 'var(--triarq-color-background-subtle)'
+                        : 'var(--triarq-color-error-light,#fdecea)'"
+                      [style.color]="ws.active_status
+                        ? 'var(--triarq-color-text-secondary)'
+                        : 'var(--triarq-color-error)'">
+                  {{ ws.active_status ? 'Active' : 'Inactive' }}
+                </span>
+              </span>
+              <span style="display:flex;justify-content:flex-end;" (click)="$event.stopPropagation()">
+                <!-- D-178 Tier 2: spinner on toggle button -->
+                <button
+                  (click)="toggleActive(ws)"
+                  [disabled]="togglingId === ws.workstream_id"
+                  style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
+                         background:none;border:none;cursor:pointer;padding:0;
+                         display:flex;align-items:center;gap:4px;">
+                  <ion-spinner *ngIf="togglingId === ws.workstream_id" name="crescent"
+                               style="width:14px;height:14px;vertical-align:middle;">
+                  </ion-spinner>
+                  {{ togglingId === ws.workstream_id ? '…' : (ws.active_status ? 'Deactivate' : 'Activate') }}
+                </button>
+              </span>
+            </div>
+
+            <!-- Amber warning band for inactive workstreams -->
+            <div *ngIf="!ws.active_status"
+                 style="background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
+                        padding:var(--triarq-space-xs) var(--triarq-space-md);
+                        font-size:var(--triarq-text-small);">
+              <span style="font-weight:500;">Inactive</span>
+              <span style="color:var(--triarq-color-text-secondary);margin-left:6px;">
+                Gate review is blocked for all cycles on this Workstream.
+                <span *ngIf="(ws.active_cycle_count ?? 0) > 0">
+                  {{ ws.active_cycle_count }} open cycle{{ ws.active_cycle_count === 1 ? '' : 's' }} affected.
+                </span>
+                Reactivate to restore gate clearance.
+              </span>
+            </div>
+
+            <!-- D-140: Deactivation warning — what changes and what the impact is -->
+            <div *ngIf="toggleWarning && toggleWarningWsId === ws.workstream_id"
+                 style="background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
+                        padding:var(--triarq-space-sm) var(--triarq-space-md);
+                        font-size:var(--triarq-text-small);">
+              <div style="font-weight:500;margin-bottom:4px;">{{ toggleWarning }}</div>
+              <div style="color:var(--triarq-color-text-secondary);">
+                Open cycles on this Workstream cannot clear gates until it is reactivated.
+                Reactivate this Workstream to restore gate review for its cycles.
+              </div>
+            </div>
+
+            <!-- D-140: Toggle error — what failed and what to do -->
+            <div *ngIf="toggleError && toggleErrorWsId === ws.workstream_id"
+                 style="background:var(--triarq-color-error-light,#fdecea);
+                        border-left:4px solid var(--triarq-color-error);
+                        padding:var(--triarq-space-sm) var(--triarq-space-md);
+                        font-size:var(--triarq-text-small);">
+              <div style="font-weight:500;color:var(--triarq-color-error);">{{ toggleError }}</div>
+              <div style="color:var(--triarq-color-text-secondary);margin-top:4px;">
+                Check your admin permissions and try again. Contact your System Admin if the problem persists.
+              </div>
             </div>
           </div>
 
-          <!-- D-140: Toggle error — what failed and what to do -->
-          <div *ngIf="toggleError && toggleErrorWsId === ws.workstream_id"
-               style="background:var(--triarq-color-error-light,#fdecea);
-                      border-left:4px solid var(--triarq-color-error);
-                      padding:var(--triarq-space-sm) var(--triarq-space-md);
-                      font-size:var(--triarq-text-small);">
-            <div style="font-weight:500;color:var(--triarq-color-error);">{{ toggleError }}</div>
-            <div style="color:var(--triarq-color-text-secondary);margin-top:4px;">
-              Check your admin permissions and try again. Contact your System Admin if the problem persists.
+          <div *ngIf="filteredWorkstreams.length === 0 && workstreams.length > 0"
+               style="padding:var(--triarq-space-md);font-size:var(--triarq-text-small);
+                      color:var(--triarq-color-text-secondary);">
+            No {{ activeFilter }} workstreams. Use the filter above to switch views.
+          </div>
+        </div>
+
+        <!-- Detail right panel — shown when a workstream is selected -->
+        <div *ngIf="selectedWs"
+             style="width:260px;flex-shrink:0;border-left:1px solid var(--triarq-color-border);
+                    padding-left:var(--triarq-space-md);">
+          <div style="display:flex;align-items:center;justify-content:space-between;
+                      margin-bottom:var(--triarq-space-sm);">
+            <span style="font-weight:500;font-size:var(--triarq-text-small);">Workstream Details</span>
+            <button (click)="selectedWs = null"
+                    style="background:none;border:none;cursor:pointer;
+                           color:var(--triarq-color-text-secondary);font-size:14px;">✕</button>
+          </div>
+          <div style="font-size:var(--triarq-text-small);display:grid;
+                      gap:var(--triarq-space-xs);">
+            <div>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Name</div>
+              <div style="font-weight:500;">{{ selectedWs.workstream_name }}</div>
+            </div>
+            <div>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Home Division</div>
+              <div>{{ selectedWs.home_division_name ?? divisionName(selectedWs.home_division_id) }}</div>
+            </div>
+            <div>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Workstream Lead</div>
+              <div>{{ selectedWs.lead_display_name ?? leadName(selectedWs.workstream_lead_user_id) }}</div>
+            </div>
+            <div>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Status</div>
+              <span class="oi-pill"
+                    [style.background]="selectedWs.active_status
+                      ? 'var(--triarq-color-background-subtle)'
+                      : 'var(--triarq-color-error-light,#fdecea)'"
+                    [style.color]="selectedWs.active_status
+                      ? 'var(--triarq-color-text-secondary)'
+                      : 'var(--triarq-color-error)'">
+                {{ selectedWs.active_status ? 'Active' : 'Inactive' }}
+              </span>
+            </div>
+            <div>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Active Cycles</div>
+              <div>{{ selectedWs.active_cycle_count ?? '—' }}</div>
+            </div>
+            <div style="margin-top:var(--triarq-space-xs);">
+              <a [routerLink]="['/delivery']"
+                 [queryParams]="{ workstream_id: selectedWs.workstream_id }"
+                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
+                        text-decoration:none;">
+                View cycles →
+              </a>
             </div>
           </div>
         </div>
@@ -288,6 +393,21 @@ export class WorkstreamAdminComponent implements OnInit {
   toggleError        = '';
   toggleErrorWsId:   string | null        = null;
   createForm!:       FormGroup;
+
+  // Group F: filter toggle + detail panel
+  activeFilter: string               = 'active';
+  selectedWs:   DeliveryWorkstream | null = null;
+
+  get filteredWorkstreams(): DeliveryWorkstream[] {
+    if (this.activeFilter === 'active')   { return this.workstreams.filter(w => w.active_status); }
+    if (this.activeFilter === 'inactive') { return this.workstreams.filter(w => !w.active_status); }
+    return this.workstreams;
+  }
+
+  selectWorkstream(ws: DeliveryWorkstream): void {
+    this.selectedWs = this.selectedWs?.workstream_id === ws.workstream_id ? null : ws;
+    this.cdr.markForCheck();
+  }
 
   // D-178 Tier 1: skeleton rows for loading state
   readonly skeletonRows = [1, 2, 3, 4, 5];

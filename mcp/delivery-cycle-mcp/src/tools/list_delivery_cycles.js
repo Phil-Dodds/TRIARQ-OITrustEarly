@@ -3,16 +3,18 @@
 // Returns Delivery Cycles visible to the authenticated user, filtered by Division access.
 //
 // Optional filters:
-//   division_id             — filter to a specific Division
-//   include_child_divisions — when true + division_id set, expand to include child Divisions (D-166)
-//   lifecycle_stage         — filter by current stage
-//   workstream_id           — filter by specific workstream
-//   filter_no_workstream    — when true, return only cycles with no workstream assigned (D-167)
-//   tier_classification     — filter by tier
+//   division_id               — filter to a specific Division
+//   include_child_divisions   — when true + division_id set, expand to include child Divisions (D-166)
+//   lifecycle_stage           — filter by current stage
+//   workstream_id             — filter by specific workstream
+//   filter_no_workstream      — when true, return only cycles with no workstream assigned (D-167)
+//   tier_classification       — filter by tier
+//   assigned_to_current_user  — when true, return only cycles where the caller is the assigned DS or CB
 //
 // D-165: workstream_id may be null on cycles created without a workstream assignment.
 // D-166: division filter supports child division inheritance via include_child_divisions flag.
 // D-167: filter_no_workstream surfaces cycles awaiting workstream assignment.
+// Build C supplement: assigned_to_current_user powers the My Delivery Cycles home card.
 
 'use strict';
 
@@ -26,6 +28,7 @@ const { supabase } = require('../db');
  * @param {string}  [params.workstream_id]
  * @param {boolean} [params.filter_no_workstream]
  * @param {string}  [params.tier_classification]
+ * @param {boolean} [params.assigned_to_current_user]
  * @param {string} caller_user_id - from JWT
  */
 async function list_delivery_cycles(params, caller_user_id) {
@@ -35,7 +38,8 @@ async function list_delivery_cycles(params, caller_user_id) {
     lifecycle_stage,
     workstream_id,
     filter_no_workstream,
-    tier_classification
+    tier_classification,
+    assigned_to_current_user
   } = params;
 
   // ── Resolve accessible division IDs for this user ─────────────────────────
@@ -116,6 +120,11 @@ async function list_delivery_cycles(params, caller_user_id) {
   // Apply tier filter
   if (tier_classification) {
     query = query.eq('tier_classification', tier_classification);
+  }
+
+  // Build C supplement: filter to cycles where caller is assigned DS or CB
+  if (assigned_to_current_user) {
+    query = query.or(`assigned_ds_user_id.eq.${caller_user_id},assigned_cb_user_id.eq.${caller_user_id}`);
   }
 
   const { data: cycles, error } = await query;

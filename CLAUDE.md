@@ -215,10 +215,10 @@ At the end of any session where features have been built, modified, or deployed,
 3. Flag any item that appears ready to advance to the next stage — do not advance silently, but do call it out explicitly
 
 **Stage advancement signals to watch for:**
-- `not-started` → `pilot`: A route, component, and MCP tool exist and are deployed. Basic happy path works.
-- `pilot` → `uat`: Feature has been used with real data, core flows work end-to-end, blocked-action states are handled.
-- `uat` → `live`: Feature has been reviewed by Phil, acceptance criteria from the Build Specification are met, no known blocking issues.
-- `live` → (no change): Live means production-ready. Only regress if a breaking issue is found.
+- `not-started` → `uat`: A route, component, and MCP tool exist and are deployed. Basic happy path works.
+- `uat` → `pilot`: Feature has been used with real data, core flows work end-to-end, blocked-action states are handled.
+- `pilot` → `new`: Feature has been reviewed by Phil, acceptance criteria from the Build Specification are met, no known blocking issues. Badge signals users to notice the new feature.
+- `new` → (badge removed): Once a feature is no longer new, remove the devStatus badge row from NAV_ITEMS entirely. Do not leave it set to any further value.
 
 **Format for the flag:**
 At session close, if any feature appears ready to advance, say:

@@ -1,7 +1,7 @@
 // my-delivery-cycles-card.component.ts
-// Home screen card — Delivery Cycle Tracking summary.
-// Shows active cycles for the current user's divisions with attention flags.
-// Wired to DeliveryService in Build C.
+// Home screen card — My Delivery Cycles summary.
+// Shows active cycles where the current user is the assigned DS or CB (assigned_to_current_user).
+// Build C supplement: uses assigned_to_current_user filter to scope to this user's own cycles.
 // D-93: DeliveryService only — no direct Supabase.
 // Rule 2: Presentation only.
 
@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { IonicModule }  from '@ionic/angular';
 import { DeliveryService } from '../../../core/services/delivery.service';
 import { DeliveryCycle, LifecycleStage, GateName } from '../../../core/types/database';
 
@@ -29,12 +30,12 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
   selector: 'app-my-delivery-cycles-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, IonicModule],
   template: `
     <div class="oi-card oi-home-card">
       <div style="display:flex;align-items:center;justify-content:space-between;
                   margin-bottom:var(--triarq-space-md);">
-        <h4 style="margin:0;font-size:var(--triarq-text-h4);">Delivery Cycle Tracking</h4>
+        <h4 style="margin:0;font-size:var(--triarq-text-h4);">My Delivery Cycles</h4>
         <a routerLink="/delivery"
            style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                   text-decoration:none;">
@@ -42,10 +43,15 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
         </a>
       </div>
 
-      <!-- Loading -->
-      <div *ngIf="loading"
-           style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-        Loading cycles…
+      <!-- D-178 Tier 1: Skeleton for initial load -->
+      <div *ngIf="loading">
+        <div *ngFor="let _ of [1,2,3]"
+             style="display:flex;align-items:center;justify-content:space-between;
+                    padding:var(--triarq-space-xs) 0;
+                    border-bottom:1px solid var(--triarq-color-border);gap:var(--triarq-space-sm);">
+          <ion-skeleton-text animated style="flex:1;height:14px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="width:52px;height:18px;border-radius:999px;"></ion-skeleton-text>
+        </div>
       </div>
 
       <!-- Attention banner -->
@@ -95,10 +101,10 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
       <!-- Empty state -->
       <div *ngIf="!loading && activeCycles.length === 0"
            style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-        No active Delivery Cycles in your Divisions.
+        No active cycles assigned to you.
         <a routerLink="/delivery"
            style="color:var(--triarq-color-primary);text-decoration:none;display:block;margin-top:4px;">
-          Go to Delivery Cycle Tracking →
+          Go to Delivery Dashboard →
         </a>
       </div>
     </div>
@@ -121,7 +127,7 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.delivery.listCycles().subscribe({
+    this.delivery.listCycles({ assigned_to_current_user: true }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
           const all = Array.isArray(res.data) ? res.data : [];

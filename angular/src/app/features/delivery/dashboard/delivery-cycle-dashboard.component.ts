@@ -411,7 +411,23 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           </option>
         </select>
 
-        <span *ngIf="filterStage || filterTier || filterWorkstream || filterNextGate"
+        <!-- D-172: Assigned DS filter — only shown when there are multiple DS in the loaded result set -->
+        <select *ngIf="dsFilterOptions.length > 1"
+                [(ngModel)]="filterDs" (ngModelChange)="applyFilters()" class="oi-input"
+                style="max-width:180px;font-size:var(--triarq-text-small);">
+          <option value="">All Domain Strategists</option>
+          <option *ngFor="let ds of dsFilterOptions" [value]="ds.user_id">{{ ds.display_name }}</option>
+        </select>
+
+        <!-- D-172: Assigned CB filter — only shown when there are multiple CB in the loaded result set -->
+        <select *ngIf="cbFilterOptions.length > 1"
+                [(ngModel)]="filterCb" (ngModelChange)="applyFilters()" class="oi-input"
+                style="max-width:180px;font-size:var(--triarq-text-small);">
+          <option value="">All Capability Builders</option>
+          <option *ngFor="let cb of cbFilterOptions" [value]="cb.user_id">{{ cb.display_name }}</option>
+        </select>
+
+        <span *ngIf="filterStage || filterTier || filterWorkstream || filterNextGate || filterDs || filterCb"
               (click)="clearFilters()"
               style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                      cursor:pointer;text-decoration:underline;">
@@ -677,6 +693,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   includeChildDivisions:    boolean = false;
   // D-173/D-175: next gate filter — computed client-side from lifecycle stage
   filterNextGate:           string  = '';
+  // D-172: Assigned DS and Assigned CB filters — client-side, derived from loaded cycles
+  filterDs:                 string  = '';
+  filterCb:                 string  = '';
 
   // Sort state
   sortField: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' = 'cycle_title';
@@ -841,6 +860,32 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return this.workstreams.filter(w => !w.active_status);
   }
 
+  // D-172: Unique DS options derived from loaded cycles — only show people who appear in current result set.
+  get dsFilterOptions(): { user_id: string; display_name: string }[] {
+    const seen = new Map<string, string>();
+    for (const c of this.cycles) {
+      if (c.assigned_ds_user_id && c.assigned_ds_display_name) {
+        seen.set(c.assigned_ds_user_id, c.assigned_ds_display_name);
+      }
+    }
+    return Array.from(seen.entries())
+      .map(([user_id, display_name]) => ({ user_id, display_name }))
+      .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  }
+
+  // D-172: Unique CB options derived from loaded cycles.
+  get cbFilterOptions(): { user_id: string; display_name: string }[] {
+    const seen = new Map<string, string>();
+    for (const c of this.cycles) {
+      if (c.assigned_cb_user_id && c.assigned_cb_display_name) {
+        seen.set(c.assigned_cb_user_id, c.assigned_cb_display_name);
+      }
+    }
+    return Array.from(seen.entries())
+      .map(([user_id, display_name]) => ({ user_id, display_name }))
+      .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  }
+
   private loadDivisions(): void {
     // all_levels:true returns all divisions across the hierarchy, not just root trusts.
     // Needed so the Owner Division create-form dropdown has a full list to choose from.
@@ -914,6 +959,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         if (nextGate !== this.filterNextGate) { return false; }
       }
 
+      // D-172: Assigned DS filter
+      if (this.filterDs && c.assigned_ds_user_id !== this.filterDs) { return false; }
+
+      // D-172: Assigned CB filter
+      if (this.filterCb && c.assigned_cb_user_id !== this.filterCb) { return false; }
+
       return true;
     });
 
@@ -937,6 +988,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterTier            = '';
     this.filterWorkstream      = '';
     this.filterNextGate        = '';
+    this.filterDs              = '';
+    this.filterCb              = '';
     // Division filter requires server reload — not cleared here.
     // Division is intentionally NOT cleared by "Clear filters" (it's a scope selection).
     this.applyFilters();
@@ -947,6 +1000,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterTier            = '';
     this.filterWorkstream      = '';
     this.filterNextGate        = '';
+    this.filterDs              = '';
+    this.filterCb              = '';
     this.filterDivision        = '';
     this.includeChildDivisions = false;
     this.loadCycles();

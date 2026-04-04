@@ -18,7 +18,7 @@
 // If workstream active: workstream_active_at_clearance = true, gate stays 'pending'
 //   until record_gate_decision is called.
 // Appends event log entry in all cases.
-// Source: D-140, D-165, ARCH-23, CC-006, build-c-spec Section 4.1–4.2
+// Source: D-140, D-165, ARCH-23, CC-006, build-c-spec Section 4.1–4.2, supplement Section 1
 
 'use strict';
 
@@ -58,6 +58,27 @@ async function submit_gate_for_approval(params, caller_user_id) {
 
   if (cycleErr || !cycle) {
     return { success: false, error: 'Delivery Cycle not found or has been deleted.' };
+  }
+
+  // ── Supplement Section 1: caller must be Phil, the assigned DS, or the assigned CB ──
+  const { data: caller } = await supabase
+    .from('users')
+    .select('system_role')
+    .eq('id', caller_user_id)
+    .is('deleted_at', null)
+    .single();
+
+  const callerRole   = caller?.system_role ?? '';
+  const isPhil       = callerRole === 'phil';
+  const isAssignedDs = cycle.assigned_ds_user_id === caller_user_id;
+  const isAssignedCb = cycle.assigned_cb_user_id === caller_user_id;
+
+  if (!isPhil && !isAssignedDs && !isAssignedCb) {
+    return {
+      success: false,
+      error: 'You do not have authority to submit this gate for approval. ' +
+             'Only the assigned Domain Strategist, the assigned Capability Builder, or Phil can submit gates.'
+    };
   }
 
   // ── D-165: Workstream must be assigned before any gate can be submitted ───

@@ -90,6 +90,7 @@ export class DeliveryService {
     workstream_id?:            string;
     filter_no_workstream?:     boolean;   // D-167: when true, returns only cycles with no workstream
     tier_classification?:      TierClassification;
+    assigned_to_current_user?: boolean;   // Build C supplement: when true, returns only cycles where caller is DS or CB
   } = {}): Observable<McpResponse<DeliveryCycle[]>> {
     return this.mcp.call<DeliveryCycle[]>('delivery', 'list_delivery_cycles', params as Record<string, unknown>);
   }

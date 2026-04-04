@@ -545,10 +545,24 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <p style="margin:0 0 8px 0;">
               <strong>{{ GATE_LABELS[selectedGate] }}</strong> has not been submitted yet.
             </p>
-            <p style="margin:0;">
+
+            <!-- Not Yet Active: gate is premature for current cycle stage -->
+            <div *ngIf="isGateNotYetActive(selectedGate!)"
+                 style="background:#f5f5f5;border-radius:6px;padding:var(--triarq-space-xs);
+                        margin-bottom:var(--triarq-space-xs);">
+              <span style="font-weight:500;color:var(--triarq-color-text-secondary);">Not Yet Active</span>
+              <div style="margin-top:2px;color:var(--triarq-color-text-secondary);">
+                This gate becomes available as the cycle progresses through earlier stages.
+                Advance the cycle to enable this gate review.
+              </div>
+            </div>
+
+            <p *ngIf="!isGateNotYetActive(selectedGate!)" style="margin:0;">
               Use the "Submit for Approval" button below when the cycle is ready for this gate review.
             </p>
-            <button class="oi-btn-primary"
+            <!-- Submit button: only shown when caller has submit authority and gate is reachable -->
+            <button *ngIf="callerCanSubmitGates && !isGateNotYetActive(selectedGate!)"
+                    class="oi-btn-primary"
                     style="margin-top:var(--triarq-space-sm);font-size:var(--triarq-text-small);
                            display:flex;align-items:center;gap:6px;"
                     (click)="submitGate(selectedGate!)"
@@ -556,6 +570,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
               <span>Submit for Approval</span>
             </button>
+            <!-- No submit authority — D-140: tell user what they need -->
+            <div *ngIf="!callerCanSubmitGates && !isGateNotYetActive(selectedGate!)"
+                 style="margin-top:var(--triarq-space-xs);color:var(--triarq-color-text-secondary);">
+              Only the assigned DS, CB, or Phil can submit this gate.
+              Contact the cycle owner or an Admin to submit for approval.
+            </div>
             <div *ngIf="gateActionError"
                  style="margin-top:var(--triarq-space-xs);font-size:var(--triarq-text-small);">
               <span style="color:var(--triarq-color-error);font-weight:500;">{{ gateActionError }}</span>
@@ -593,8 +613,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               {{ selectedGateRecord.approver_notes }}
             </div>
 
-            <!-- Submit action (gate pending, not yet submitted) -->
-            <div *ngIf="selectedGateRecord.gate_status === 'returned' || selectedGateRecord.gate_status === 'pending'"
+            <!-- Submit action: only when caller has submit authority -->
+            <div *ngIf="(selectedGateRecord.gate_status === 'returned' || selectedGateRecord.gate_status === 'pending')
+                        && selectedGateRecord.current_user_gate_authority?.can_submit !== false"
                  style="margin-bottom:var(--triarq-space-sm);">
               <button class="oi-btn-primary"
                       (click)="submitGate(selectedGate!)"
@@ -606,8 +627,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               </button>
             </div>
 
-            <!-- Approver decision form — shown when gate is pending -->
-            <div *ngIf="selectedGateRecord.gate_status === 'pending'"
+            <!-- Approver decision form — only when caller has approve authority -->
+            <div *ngIf="selectedGateRecord.gate_status === 'pending'
+                        && selectedGateRecord.current_user_gate_authority?.can_approve"
                  style="border-top:1px solid var(--triarq-color-border);
                         padding-top:var(--triarq-space-sm);margin-top:var(--triarq-space-sm);">
               <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;">
@@ -625,15 +647,36 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   placeholder="Approver Return Notes (required if returning)"
                   style="width:100%;resize:none;font-size:var(--triarq-text-small);"
                 ></textarea>
-                <div style="display:flex;gap:var(--triarq-space-sm);margin-top:var(--triarq-space-xs);">
-                  <button type="button" class="oi-btn-primary"
-                          (click)="recordDecisionWithValue(selectedGate!, 'approved')"
-                          [disabled]="gateActionBusy"
-                          style="font-size:var(--triarq-text-small);
-                                 display:flex;align-items:center;gap:6px;">
-                    <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-                    <span>✓ Approve</span>
-                  </button>
+                <div style="display:flex;gap:var(--triarq-space-sm);margin-top:var(--triarq-space-xs);
+                            align-items:center;flex-wrap:wrap;">
+                  <!-- Approve: two-step confirmation -->
+                  <ng-container *ngIf="!approveConfirming">
+                    <button type="button" class="oi-btn-primary"
+                            (click)="approveConfirming = true"
+                            [disabled]="gateActionBusy"
+                            style="font-size:var(--triarq-text-small);
+                                   display:flex;align-items:center;gap:6px;">
+                      <span>✓ Approve</span>
+                    </button>
+                  </ng-container>
+                  <ng-container *ngIf="approveConfirming">
+                    <span style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+                      Approve this gate? This cannot be undone.
+                    </span>
+                    <button type="button" class="oi-btn-primary"
+                            (click)="recordDecisionWithValue(selectedGate!, 'approved')"
+                            [disabled]="gateActionBusy"
+                            style="font-size:var(--triarq-text-small);
+                                   display:flex;align-items:center;gap:6px;">
+                      <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                      <span>Confirm Approve</span>
+                    </button>
+                    <button type="button" (click)="approveConfirming = false"
+                            style="font-size:var(--triarq-text-small);background:none;border:none;
+                                   cursor:pointer;color:var(--triarq-color-text-secondary);">
+                      Cancel
+                    </button>
+                  </ng-container>
                   <button type="button"
                           (click)="recordDecisionWithValue(selectedGate!, 'returned')"
                           [disabled]="gateActionBusy"
@@ -647,6 +690,15 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   </button>
                 </div>
               </form>
+            </div>
+
+            <!-- No approve authority — shown when gate is pending but caller can't approve -->
+            <div *ngIf="selectedGateRecord.gate_status === 'pending'
+                        && !selectedGateRecord.current_user_gate_authority?.can_approve"
+                 style="border-top:1px solid var(--triarq-color-border);
+                        padding-top:var(--triarq-space-sm);margin-top:var(--triarq-space-sm);
+                        font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+              This gate is awaiting approval. Only the designated approver or Phil can record a decision.
             </div>
 
             <!-- Gate action feedback — D-140 -->
@@ -731,12 +783,18 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           {{ promoteStubMessage }}
         </div>
 
-        <!-- Artifacts by lifecycle stage -->
-        <div *ngFor="let group of artifactsByStage">
+        <!-- Artifacts by lifecycle stage — Group C: future stage groups are dimmed -->
+        <div *ngFor="let group of artifactsByStage"
+             [style.opacity]="group.isFuture ? '0.5' : '1'">
           <div style="font-size:var(--triarq-text-small);font-weight:500;
-                      color:var(--triarq-color-primary);
-                      margin:var(--triarq-space-sm) 0 var(--triarq-space-xs) 0;">
+                      margin:var(--triarq-space-sm) 0 var(--triarq-space-xs) 0;
+                      display:flex;align-items:center;gap:var(--triarq-space-xs);"
+               [style.color]="group.isFuture ? 'var(--triarq-color-text-secondary)' : 'var(--triarq-color-primary)'">
             {{ group.stage }}
+            <span *ngIf="group.isFuture"
+                  style="font-size:10px;font-weight:400;font-style:italic;">
+              — available when cycle reaches {{ group.stage }}
+            </span>
           </div>
           <div *ngFor="let slot of group.slots"
                style="display:grid;grid-template-columns:2fr 3fr 110px;
@@ -760,13 +818,14 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               Not yet attached
             </span>
             <span style="text-align:right;">
-              <button *ngIf="!slot.external_url"
+              <!-- Attach and OI Library actions hidden for future stage groups -->
+              <button *ngIf="!slot.external_url && !group.isFuture"
                       (click)="openAttachForm(slot.artifact_type_id ?? '')"
                       style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                              background:none;border:none;cursor:pointer;padding:0;">
                 Attach
               </button>
-              <button *ngIf="slot.external_url && slot.pointer_status === 'external_only'"
+              <button *ngIf="slot.external_url && slot.pointer_status === 'external_only' && !group.isFuture"
                       (click)="promoteArtifact(slot)"
                       style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
                              background:none;border:none;cursor:pointer;padding:0;"
@@ -789,7 +848,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         <div style="display:flex;align-items:center;justify-content:space-between;
                     margin-bottom:var(--triarq-space-xs);">
           <span style="font-weight:500;">Jira Sync</span>
-          <button *ngIf="jiraLink"
+          <!-- State 3: link present + configured — Sync Now button -->
+          <button *ngIf="jiraLink && !syncStubMessage"
                   class="oi-btn-primary"
                   (click)="triggerJiraSync()"
                   [disabled]="syncing"
@@ -799,12 +859,65 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <span>{{ syncing ? 'Syncing…' : 'Sync Now' }}</span>
           </button>
         </div>
-        <div *ngIf="!jiraLink"
-             style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-          No Jira epic linked to this cycle. Link a Jira epic key to enable
-          two-way sync of the five governance fields (ARCH-16).
+
+        <!-- State 1: No Jira link yet — show + Link button and inline form -->
+        <div *ngIf="!jiraLink">
+          <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                      margin-bottom:var(--triarq-space-xs);">
+            No Jira epic linked to this cycle. Link a Jira epic key to enable
+            two-way sync of the five governance fields (ARCH-16).
+          </div>
+          <div *ngIf="!showJiraLinkForm">
+            <button (click)="showJiraLinkForm = true; jiraLinkError = ''"
+                    style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
+                           background:none;border:none;cursor:pointer;padding:0;">
+              + Link Jira Epic
+            </button>
+          </div>
+          <div *ngIf="showJiraLinkForm"
+               style="display:flex;align-items:center;gap:var(--triarq-space-sm);flex-wrap:wrap;">
+            <input [formControl]="jiraEpicKeyCtrl"
+                   class="oi-input"
+                   placeholder="e.g. OIT-123"
+                   style="font-size:var(--triarq-text-small);max-width:160px;" />
+            <button class="oi-btn-primary"
+                    (click)="linkJiraEpic()"
+                    [disabled]="jiraEpicKeyCtrl.invalid || linkingJiraEpic"
+                    style="font-size:var(--triarq-text-small);
+                           display:flex;align-items:center;gap:6px;">
+              <ion-spinner *ngIf="linkingJiraEpic" name="crescent"
+                           style="width:14px;height:14px;"></ion-spinner>
+              <span>Link</span>
+            </button>
+            <button (click)="showJiraLinkForm = false; jiraLinkError = ''"
+                    style="font-size:var(--triarq-text-small);background:none;border:none;
+                           cursor:pointer;color:var(--triarq-color-text-secondary);">
+              Cancel
+            </button>
+            <span *ngIf="jiraLinkError"
+                  style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);">
+              {{ jiraLinkError }}
+            </span>
+          </div>
         </div>
-        <div *ngIf="jiraLink">
+
+        <!-- State 2: Link present but Jira not configured -->
+        <div *ngIf="jiraLink && syncStubMessage"
+             style="font-size:var(--triarq-text-small);">
+          <div>
+            Epic: <strong>{{ jiraLink.jira_epic_key }}</strong>
+          </div>
+          <div style="background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
+                      border-radius:0 6px 6px 0;
+                      padding:var(--triarq-space-xs) var(--triarq-space-sm);
+                      margin-top:var(--triarq-space-xs);">
+            <div style="font-weight:500;margin-bottom:2px;">Jira sync not yet configured</div>
+            <div style="color:var(--triarq-color-text-secondary);">{{ syncStubMessage }}</div>
+          </div>
+        </div>
+
+        <!-- State 3: Link present + configured -->
+        <div *ngIf="jiraLink && !syncStubMessage">
           <div style="font-size:var(--triarq-text-small);">
             Epic: <strong>{{ jiraLink.jira_epic_key }}</strong>
             &nbsp;·&nbsp; Sync Status:
@@ -823,11 +936,6 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <div *ngIf="jiraLink.last_sync_error"
                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
             Last sync error: {{ jiraLink.last_sync_error }}
-          </div>
-          <div *ngIf="syncStubMessage"
-               style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                      margin-top:4px;">
-            {{ syncStubMessage }}
           </div>
         </div>
       </div>
@@ -925,6 +1033,15 @@ export class DeliveryCycleDetailComponent implements OnInit {
   // Jira
   syncing         = false;
   syncStubMessage = '';
+
+  // Jira link form — State 1: no link yet
+  showJiraLinkForm  = false;   // form visible toggle
+  linkingJiraEpic   = false;   // API call in progress
+  jiraEpicKeyCtrl   = new FormControl('', Validators.required);
+  jiraLinkError     = '';
+
+  // Gate approve confirmation step
+  approveConfirming = false;
 
   // ON_HOLD
   holdBusy        = false;
@@ -1044,6 +1161,39 @@ export class DeliveryCycleDetailComponent implements OnInit {
     return this.cycle?.jira_links?.[0] ?? null;
   }
 
+  /**
+   * Supplement Section 1: can the current caller submit gates on this cycle?
+   * Derived from can_submit on any gate record (same value for all — based on role/assignment).
+   * Defaults true when no gate records have authority info yet.
+   */
+  get callerCanSubmitGates(): boolean {
+    const gateWithAuth = this.cycle?.gate_records?.find(g => g.current_user_gate_authority != null);
+    return gateWithAuth?.current_user_gate_authority?.can_submit ?? true;
+  }
+
+  /**
+   * Returns true when the selected gate has not yet been reached in the lifecycle
+   * and submitting it would be premature. Gates are "not yet active" when the cycle
+   * is more than one stage before the gate's trigger point.
+   */
+  isGateNotYetActive(gateName: GateName): boolean {
+    if (!this.cycle) { return false; }
+    // Minimum stage index the cycle must be at before the gate becomes active
+    const GATE_MIN_STAGE_IDX: Partial<Record<GateName, number>> = {
+      go_to_build:   2,  // SPEC (index 2)
+      go_to_deploy:  4,  // VALIDATE (index 4)
+      go_to_release: 6,  // UAT (index 6)
+      close_review:  8   // OUTCOME (index 8)
+    };
+    const STAGE_ORDER: LifecycleStage[] = [
+      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE'
+    ];
+    const minIdx = GATE_MIN_STAGE_IDX[gateName];
+    if (minIdx === undefined) { return false; } // brief_review is always reachable from BRIEF
+    const currentIdx = STAGE_ORDER.indexOf(this.cycle.current_lifecycle_stage);
+    return currentIdx >= 0 && currentIdx < minIdx;
+  }
+
   get canAdvance(): boolean {
     const terminal: LifecycleStage[] = ['COMPLETE', 'CANCELLED', 'ON_HOLD'];
     return !!this.cycle && !terminal.includes(this.cycle.current_lifecycle_stage);
@@ -1075,15 +1225,24 @@ export class DeliveryCycleDetailComponent implements OnInit {
       .map(g => GATE_LABELS[g.gate_name]);
   }
 
-  /** Group cycle artifacts by lifecycle_stage for the artifacts panel */
-  get artifactsByStage(): { stage: string; slots: CycleArtifact[] }[] {
+  /** Group cycle artifacts by lifecycle_stage for the artifacts panel.
+   *  Group C: isFuture=true when the stage is beyond the current lifecycle stage — slots are dimmed. */
+  get artifactsByStage(): { stage: string; slots: CycleArtifact[]; isFuture: boolean }[] {
     const artifacts = this.cycle?.artifacts;
     if (!artifacts?.length) { return []; }
+    const STAGE_ORDER: string[] = [
+      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE'
+    ];
+    const currentIdx = STAGE_ORDER.indexOf(this.cycle?.current_lifecycle_stage as string ?? '');
     const stages = [...new Set(artifacts.map(a => a.lifecycle_stage ?? 'General'))];
-    return stages.map(stage => ({
-      stage,
-      slots: artifacts.filter(a => (a.lifecycle_stage ?? 'General') === stage)
-    }));
+    return stages.map(stage => {
+      const stageIdx = STAGE_ORDER.indexOf(stage);
+      return {
+        stage,
+        slots:    artifacts.filter(a => (a.lifecycle_stage ?? 'General') === stage),
+        isFuture: currentIdx >= 0 && stageIdx > currentIdx
+      };
+    });
   }
 
   // ── Outcome ────────────────────────────────────────────────────────────────
@@ -1364,6 +1523,7 @@ export class DeliveryCycleDetailComponent implements OnInit {
     this.selectedGateRecord = this.cycle?.gate_records?.find(g => g.gate_name === gate) ?? null;
     this.gateActionError    = '';
     this.gateActionHint     = '';
+    this.approveConfirming  = false;
     this.gateDecisionForm.reset();
     this.cdr.markForCheck();
   }
@@ -1561,6 +1721,36 @@ export class DeliveryCycleDetailComponent implements OnInit {
   }
 
   // ── Jira sync ──────────────────────────────────────────────────────────────
+
+  /** State 1: Link a Jira epic to this cycle using the epic key form. */
+  linkJiraEpic(): void {
+    if (!this.cycle || !this.jiraEpicKeyCtrl.value?.trim()) { return; }
+    this.linkingJiraEpic = true;
+    this.jiraLinkError   = '';
+    this.cdr.markForCheck();
+
+    this.delivery.syncJiraEpic({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      jira_epic_key:     this.jiraEpicKeyCtrl.value.trim()
+    }).subscribe({
+      next: (res) => {
+        if (res.success || res.data?.['stub']) {
+          this.showJiraLinkForm = false;
+          this.jiraEpicKeyCtrl.reset();
+          this.loadCycle(this.cycle!.delivery_cycle_id);
+        } else {
+          this.jiraLinkError = res.error ?? 'Could not link epic. Check the key and try again.';
+        }
+        this.linkingJiraEpic = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.jiraLinkError   = 'Could not reach the server. Check your connection and try again.';
+        this.linkingJiraEpic = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
 
   triggerJiraSync(): void {
     if (!this.cycle || !this.jiraLink) { return; }

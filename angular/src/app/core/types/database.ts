@@ -251,6 +251,11 @@ export interface GateRecord {
   workstream_active_at_clearance: boolean | null;
   created_at:                  string;
   updated_at:                  string;
+  // Supplement Section 1: populated by get_delivery_cycle for the calling user
+  current_user_gate_authority?: {
+    can_submit:  boolean;
+    can_approve: boolean;
+  };
 }
 
 export interface CycleEventLogEntry {
