@@ -73,6 +73,28 @@ export class UserProfileService {
   }
 
   /**
+   * Returns all active users sorted by display_name.
+   * Used by DS/CB assignment pickers — available to all roles.
+   */
+  listUsers(): Observable<User[]> {
+    return new Observable(observer => {
+      firstValueFrom(this.mcp.call<User[]>('division', 'list_users', {}))
+        .then(response => {
+          if (!response.success || !response.data) {
+            observer.next([]);
+          } else {
+            const users = response.data
+              .filter(u => u.is_active)
+              .sort((a, b) => (a.display_name ?? '').localeCompare(b.display_name ?? ''));
+            observer.next(users);
+          }
+          observer.complete();
+        })
+        .catch(() => { observer.next([]); observer.complete(); });
+    });
+  }
+
+  /**
    * Returns all active users whose system_role is 'phil' or 'admin'.
    * Used by the Contact an Admin screen — available to all roles.
    */

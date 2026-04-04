@@ -79,6 +79,14 @@ export class DeliveryService {
     return this.mcp.call<DeliveryCycle[]>('delivery', 'list_delivery_cycles', params as Record<string, unknown>);
   }
 
+  assignDsCb(params: {
+    delivery_cycle_id:     string;
+    assigned_ds_user_id?:  string | null;
+    assigned_cb_user_id?:  string | null;
+  }): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'assign_ds_cb_to_cycle', params as Record<string, unknown>);
+  }
+
   advanceStage(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>('delivery', 'advance_cycle_stage', { delivery_cycle_id });
   }

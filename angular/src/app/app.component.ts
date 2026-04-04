@@ -1,9 +1,13 @@
 // app.component.ts — Pathways OI Trust
 // Root shell. Shows sidebar when authenticated, hides it on /login.
+// Loads the user profile once at app startup so the sidebar has role data
+// regardless of which route the user lands on first (fixes Admin hidden on
+// direct navigation to non-home routes).
 
 import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { Router, NavigationEnd }  from '@angular/router';
 import { AuthService }            from './core/services/auth.service';
+import { UserProfileService }     from './core/services/user-profile.service';
 import { filter, map }            from 'rxjs/operators';
 import { Observable }             from 'rxjs';
 
@@ -23,8 +27,9 @@ export class AppComponent implements OnInit {
   showSidebar$!: Observable<boolean>;
 
   constructor(
-    private readonly router: Router,
-    private readonly auth:   AuthService
+    private readonly router:         Router,
+    private readonly auth:           AuthService,
+    private readonly profileService: UserProfileService
   ) {}
 
   ngOnInit(): void {
@@ -34,5 +39,13 @@ export class AppComponent implements OnInit {
         this.auth.isAuthenticated() && !e.urlAfterRedirects.startsWith('/login')
       )
     );
+
+    // Load profile at app startup so sidebar role-filtering works on any
+    // first-landing route, not just /home. HomeComponent also calls
+    // loadProfile() — UserProfileService is idempotent on repeat calls
+    // (subsequent calls from HomeComponent are still fine).
+    if (this.auth.isAuthenticated()) {
+      this.profileService.loadProfile();
+    }
   }
 }

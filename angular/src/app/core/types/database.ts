@@ -207,6 +207,9 @@ export interface DeliveryCycle {
   outcome_set_by_user_id:  string | null;
   outcome_set_at:          string | null;
   cycle_owner_user_id:     string;
+  assigned_ds_user_id:     string | null;  // Delivery Specialist — migration 024
+  assigned_cb_user_id:     string | null;  // Capability Builder — migration 024
+  pre_hold_lifecycle_stage: LifecycleStage | null;  // Stores stage before ON_HOLD — migration 024
   jira_epic_key:           string | null;
   created_at:              string;
   updated_at:              string;
@@ -215,6 +218,8 @@ export interface DeliveryCycle {
   workstream?:             DeliveryWorkstream;
   division_name?:          string;
   owner_display_name?:     string;
+  assigned_ds_display_name?: string;
+  assigned_cb_display_name?: string;
   milestone_dates?:        CycleMilestoneDate[];
   gate_records?:           GateRecord[];
   jira_links?:             JiraLink[];

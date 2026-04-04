@@ -28,6 +28,7 @@ const { advance_cycle_stage }            = require('./tools/advance_cycle_stage'
 const { reverse_cycle_stage }            = require('./tools/reverse_cycle_stage');
 const { set_cycle_on_hold }              = require('./tools/set_cycle_on_hold');
 const { resume_cycle_from_hold }         = require('./tools/resume_cycle_from_hold');
+const { assign_ds_cb_to_cycle }          = require('./tools/assign_ds_cb_to_cycle');
 const { set_outcome_statement }          = require('./tools/set_outcome_statement');
 
 const { submit_gate_for_approval }       = require('./tools/submit_gate_for_approval');
@@ -61,6 +62,7 @@ const TOOLS = {
   reverse_cycle_stage,
   set_cycle_on_hold,
   resume_cycle_from_hold,
+  assign_ds_cb_to_cycle,
   set_outcome_statement,
 
   // Gate workflow

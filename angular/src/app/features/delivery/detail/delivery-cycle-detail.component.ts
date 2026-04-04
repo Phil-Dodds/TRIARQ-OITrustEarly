@@ -34,8 +34,10 @@ import {
 } from '@angular/forms';
 import { IonicModule }         from '@ionic/angular';
 import { DeliveryService }         from '../../../core/services/delivery.service';
+import { UserProfileService }      from '../../../core/services/user-profile.service';
 import { StageTrackComponent }     from '../stage-track/stage-track.component';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
+import { User }                    from '../../../core/types/database';
 import {
   DeliveryCycle,
   CycleMilestoneDate,
@@ -128,6 +130,92 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               {{ cycle.workstream?.workstream_name ?? cycle.workstream_id }}
               &nbsp;·&nbsp;
               {{ cycle.division_name ?? cycle.division_id }}
+            </div>
+
+            <!-- DS / CB assignment row -->
+            <div style="display:flex;gap:var(--triarq-space-lg);margin-top:var(--triarq-space-sm);
+                        flex-wrap:wrap;">
+
+              <!-- Delivery Specialist -->
+              <div style="font-size:var(--triarq-text-small);">
+                <span style="color:var(--triarq-color-text-secondary);">DS: </span>
+                <span *ngIf="!editingDs">
+                  <span *ngIf="cycle.assigned_ds_user_id" style="font-weight:500;">
+                    {{ cycle.assigned_ds_display_name ?? cycle.assigned_ds_user_id }}
+                  </span>
+                  <span *ngIf="!cycle.assigned_ds_user_id"
+                        style="color:var(--triarq-color-text-secondary);font-style:italic;">
+                    Unassigned
+                  </span>
+                  <button (click)="startDsEdit()"
+                          style="margin-left:6px;font-size:10px;color:var(--triarq-color-primary);
+                                 background:none;border:none;cursor:pointer;padding:0;">
+                    {{ cycle.assigned_ds_user_id ? 'Change' : 'Assign' }}
+                  </button>
+                </span>
+                <span *ngIf="editingDs" style="display:inline-flex;align-items:center;gap:4px;">
+                  <select [formControl]="dsControl" class="oi-input"
+                          style="font-size:11px;padding:2px 4px;">
+                    <option value="">— Unassign —</option>
+                    <option *ngFor="let u of allUsers" [value]="u.id">{{ u.display_name }}</option>
+                  </select>
+                  <button class="oi-btn-primary" (click)="saveDs()"
+                          [disabled]="savingDs"
+                          style="font-size:10px;padding:2px 8px;
+                                 display:flex;align-items:center;gap:4px;">
+                    <ion-spinner *ngIf="savingDs" name="crescent" style="width:12px;height:12px;"></ion-spinner>
+                    <span>Set</span>
+                  </button>
+                  <button (click)="cancelDsEdit()"
+                          style="background:none;border:none;cursor:pointer;
+                                 color:var(--triarq-color-text-secondary);font-size:12px;">✕</button>
+                </span>
+                <span *ngIf="dsError"
+                      style="color:var(--triarq-color-error);font-size:10px;margin-left:4px;">
+                  {{ dsError }}
+                </span>
+              </div>
+
+              <!-- Capability Builder -->
+              <div style="font-size:var(--triarq-text-small);">
+                <span style="color:var(--triarq-color-text-secondary);">CB: </span>
+                <span *ngIf="!editingCb">
+                  <span *ngIf="cycle.assigned_cb_user_id" style="font-weight:500;">
+                    {{ cycle.assigned_cb_display_name ?? cycle.assigned_cb_user_id }}
+                  </span>
+                  <span *ngIf="!cycle.assigned_cb_user_id"
+                        style="color:var(--triarq-color-text-secondary);font-style:italic;">
+                    Unassigned
+                  </span>
+                  <button (click)="startCbEdit()"
+                          style="margin-left:6px;font-size:10px;color:var(--triarq-color-primary);
+                                 background:none;border:none;cursor:pointer;padding:0;">
+                    {{ cycle.assigned_cb_user_id ? 'Change' : 'Assign' }}
+                  </button>
+                </span>
+                <span *ngIf="editingCb" style="display:inline-flex;align-items:center;gap:4px;">
+                  <select [formControl]="cbControl" class="oi-input"
+                          style="font-size:11px;padding:2px 4px;">
+                    <option value="">— Unassign —</option>
+                    <option *ngFor="let u of allUsers" [value]="u.id">{{ u.display_name }}</option>
+                  </select>
+                  <button class="oi-btn-primary" (click)="saveCb()"
+                          [disabled]="savingCb"
+                          style="font-size:10px;padding:2px 8px;
+                                 display:flex;align-items:center;gap:4px;">
+                    <ion-spinner *ngIf="savingCb" name="crescent" style="width:12px;height:12px;"></ion-spinner>
+                    <span>Set</span>
+                  </button>
+                  <button (click)="cancelCbEdit()"
+                          style="background:none;border:none;cursor:pointer;
+                                 color:var(--triarq-color-text-secondary);font-size:12px;">✕</button>
+                </span>
+                <span *ngIf="cbError"
+                      style="color:var(--triarq-color-error);font-size:10px;margin-left:4px;">
+                  {{ cbError }}
+                </span>
+              </div>
+
             </div>
           </div>
           <button
@@ -724,15 +812,27 @@ export class DeliveryCycleDetailComponent implements OnInit {
   syncing         = false;
   syncStubMessage = '';
 
+  // DS / CB assignment
+  allUsers:   User[] = [];
+  editingDs   = false;
+  savingDs    = false;
+  dsError     = '';
+  dsControl   = new FormControl('');
+  editingCb   = false;
+  savingCb    = false;
+  cbError     = '';
+  cbControl   = new FormControl('');
+
   // Expose constants to template
   readonly GATE_LABELS     = GATE_LABELS;
   readonly STAGE_LABEL_MAP = STAGE_LABEL_MAP;
 
   constructor(
-    private readonly route:    ActivatedRoute,
-    private readonly delivery: DeliveryService,
-    private readonly fb:       FormBuilder,
-    private readonly cdr:      ChangeDetectorRef
+    private readonly route:          ActivatedRoute,
+    private readonly delivery:       DeliveryService,
+    private readonly profileService: UserProfileService,
+    private readonly fb:             FormBuilder,
+    private readonly cdr:            ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -743,6 +843,18 @@ export class DeliveryCycleDetailComponent implements OnInit {
     });
     const cycleId = this.route.snapshot.paramMap.get('cycle_id');
     if (cycleId) { this.loadCycle(cycleId); }
+    // Load user list for DS/CB picker dropdowns
+    this.loadAllUsers();
+  }
+
+  private loadAllUsers(): void {
+    this.profileService.listUsers().subscribe({
+      next: (users) => {
+        this.allUsers = users;
+        this.cdr.markForCheck();
+      },
+      error: () => {}
+    });
   }
 
   private loadCycle(cycleId: string): void {
@@ -851,6 +963,86 @@ export class DeliveryCycleDetailComponent implements OnInit {
     this.editingOutcome = false;
     this.outcomeError   = '';
     this.cdr.markForCheck();
+  }
+
+  // ── DS / CB assignment ─────────────────────────────────────────────────────
+
+  startDsEdit(): void {
+    this.dsControl.setValue(this.cycle?.assigned_ds_user_id ?? '');
+    this.editingDs = true;
+    this.dsError   = '';
+    this.cdr.markForCheck();
+  }
+
+  cancelDsEdit(): void { this.editingDs = false; this.dsError = ''; this.cdr.markForCheck(); }
+
+  saveDs(): void {
+    if (!this.cycle) { return; }
+    this.savingDs = true;
+    this.dsError  = '';
+    this.cdr.markForCheck();
+
+    this.delivery.assignDsCb({
+      delivery_cycle_id:    this.cycle.delivery_cycle_id,
+      assigned_ds_user_id:  this.dsControl.value || null
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.cycle!.assigned_ds_user_id      = res.data.assigned_ds_user_id;
+          this.cycle!.assigned_ds_display_name = this.allUsers.find(u => u.id === res.data!.assigned_ds_user_id)?.display_name;
+          this.editingDs = false;
+          this.loadEvents(this.cycle!.delivery_cycle_id);
+        } else {
+          this.dsError = res.error ?? 'Assignment failed.';
+        }
+        this.savingDs = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.dsError  = err.error ?? 'Assignment failed. Check permissions and try again.';
+        this.savingDs = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  startCbEdit(): void {
+    this.cbControl.setValue(this.cycle?.assigned_cb_user_id ?? '');
+    this.editingCb = true;
+    this.cbError   = '';
+    this.cdr.markForCheck();
+  }
+
+  cancelCbEdit(): void { this.editingCb = false; this.cbError = ''; this.cdr.markForCheck(); }
+
+  saveCb(): void {
+    if (!this.cycle) { return; }
+    this.savingCb = true;
+    this.cbError  = '';
+    this.cdr.markForCheck();
+
+    this.delivery.assignDsCb({
+      delivery_cycle_id:    this.cycle.delivery_cycle_id,
+      assigned_cb_user_id:  this.cbControl.value || null
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.cycle!.assigned_cb_user_id      = res.data.assigned_cb_user_id;
+          this.cycle!.assigned_cb_display_name = this.allUsers.find(u => u.id === res.data!.assigned_cb_user_id)?.display_name;
+          this.editingCb = false;
+          this.loadEvents(this.cycle!.delivery_cycle_id);
+        } else {
+          this.cbError = res.error ?? 'Assignment failed.';
+        }
+        this.savingCb = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.cbError  = err.error ?? 'Assignment failed. Check permissions and try again.';
+        this.savingCb = false;
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   saveOutcome(): void {
