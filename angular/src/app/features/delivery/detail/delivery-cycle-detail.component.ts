@@ -218,17 +218,131 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
             </div>
           </div>
-          <button
-            *ngIf="canAdvance"
-            class="oi-btn-primary"
-            (click)="advanceStage()"
-            [disabled]="advancing"
-            style="white-space:nowrap;font-size:var(--triarq-text-small);
-                   display:flex;align-items:center;gap:6px;">
-            <ion-spinner *ngIf="advancing" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-            <span>{{ advancing ? 'Advancing…' : 'Advance Stage' }}</span>
-          </button>
+          <!-- Action button group: Advance | Regress | On Hold / Resume -->
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+            <button
+              *ngIf="canAdvance"
+              class="oi-btn-primary"
+              (click)="advanceStage()"
+              [disabled]="advancing || holdBusy || regressBusy"
+              style="white-space:nowrap;font-size:var(--triarq-text-small);
+                     display:flex;align-items:center;gap:6px;">
+              <ion-spinner *ngIf="advancing" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+              <span>{{ advancing ? 'Advancing…' : 'Advance Stage' }}</span>
+            </button>
+
+            <!-- Secondary actions row -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+
+              <!-- Regress Stage — D-179 two-call pattern -->
+              <button *ngIf="canRegress && !regressConfirming"
+                      (click)="initiateRegress()"
+                      [disabled]="regressBusy || holdBusy || advancing"
+                      style="font-size:11px;color:var(--triarq-color-text-secondary);
+                             background:none;border:1px solid var(--triarq-color-border);
+                             border-radius:5px;padding:3px 8px;cursor:pointer;">
+                <ion-spinner *ngIf="regressBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
+                ↩ Regress Stage
+              </button>
+
+              <!-- Resume from Hold — only when ON_HOLD -->
+              <button *ngIf="cycle.current_lifecycle_stage === 'ON_HOLD'"
+                      (click)="resumeFromHold()"
+                      [disabled]="holdBusy"
+                      style="font-size:11px;color:var(--triarq-color-primary);
+                             background:none;border:1px solid var(--triarq-color-primary);
+                             border-radius:5px;padding:3px 8px;cursor:pointer;
+                             display:flex;align-items:center;gap:4px;">
+                <ion-spinner *ngIf="holdBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
+                ▶ Resume from Hold
+              </button>
+
+              <!-- Place on Hold — only when NOT on hold and NOT terminal -->
+              <button *ngIf="canPlaceOnHold && !showHoldReason"
+                      (click)="showHoldReason = true"
+                      style="font-size:11px;color:var(--triarq-color-text-secondary);
+                             background:none;border:1px solid var(--triarq-color-border);
+                             border-radius:5px;padding:3px 8px;cursor:pointer;">
+                ⏸ Place on Hold
+              </button>
+            </div>
+          </div>
         </div>
+
+        <!-- ── Hold reason inline form ─────────────────────────────────────── -->
+        <div *ngIf="showHoldReason"
+             style="margin-top:var(--triarq-space-xs);padding:var(--triarq-space-xs);
+                    border:1px solid var(--triarq-color-border);border-radius:5px;
+                    background:var(--triarq-color-background-subtle);">
+          <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;">
+            Place cycle on hold
+          </div>
+          <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:6px;">
+            The current stage will be preserved and restored when the cycle resumes.
+          </div>
+          <input [formControl]="holdReasonCtrl" class="oi-input"
+                 placeholder="Hold reason (optional)"
+                 style="font-size:var(--triarq-text-small);margin-bottom:6px;width:100%;" />
+          <div style="display:flex;gap:6px;">
+            <button class="oi-btn-primary"
+                    (click)="placeOnHold()"
+                    [disabled]="holdBusy"
+                    style="font-size:11px;padding:3px 10px;display:flex;align-items:center;gap:4px;">
+              <ion-spinner *ngIf="holdBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
+              {{ holdBusy ? 'Placing…' : 'Confirm Hold' }}
+            </button>
+            <button (click)="showHoldReason = false; holdReasonCtrl.reset(); holdError = ''"
+                    style="font-size:11px;background:none;border:none;cursor:pointer;
+                           color:var(--triarq-color-text-secondary);">
+              Cancel
+            </button>
+          </div>
+          <div *ngIf="holdError"
+               style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
+            {{ holdError }}
+          </div>
+        </div>
+
+        <!-- ── Regress Stage confirm panel — D-179 ───────────────────────── -->
+        <div *ngIf="regressConfirming && regressPreview"
+             style="margin-top:var(--triarq-space-xs);padding:var(--triarq-space-xs);
+                    border:1px solid var(--triarq-color-sunray,#f5a623);border-radius:5px;
+                    background:#fff8e1;">
+          <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;">
+            Regress to {{ regressPreview.target_stage }}?
+          </div>
+          <div *ngIf="regressPreview.gates_to_reset?.length"
+               style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:4px;">
+            These gate records will be reset to pending:
+            <strong style="color:var(--triarq-color-text-primary);">
+              {{ regressPreview.gates_to_reset.join(', ') }}
+            </strong>
+          </div>
+          <div *ngIf="regressPreview.warning"
+               style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);margin-bottom:6px;">
+            {{ regressPreview.warning }}
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="oi-btn-primary"
+                    (click)="confirmRegress()"
+                    [disabled]="regressBusy"
+                    style="font-size:11px;padding:3px 10px;background:var(--triarq-color-sunray,#f5a623);
+                           display:flex;align-items:center;gap:4px;">
+              <ion-spinner *ngIf="regressBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
+              {{ regressBusy ? 'Regressing…' : 'Confirm Regress' }}
+            </button>
+            <button (click)="cancelRegress()"
+                    style="font-size:11px;background:none;border:none;cursor:pointer;
+                           color:var(--triarq-color-text-secondary);">
+              Cancel
+            </button>
+          </div>
+          <div *ngIf="regressError"
+               style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
+            {{ regressError }}
+          </div>
+        </div>
+
         <!-- Advance error — D-140 -->
         <div *ngIf="advanceError"
              style="margin-top:var(--triarq-space-xs);font-size:var(--triarq-text-small);">
@@ -812,6 +926,18 @@ export class DeliveryCycleDetailComponent implements OnInit {
   syncing         = false;
   syncStubMessage = '';
 
+  // ON_HOLD
+  holdBusy        = false;
+  holdError       = '';
+  showHoldReason  = false;
+  holdReasonCtrl  = new FormControl('');
+
+  // Stage regression (D-179 two-call pattern)
+  regressPreview:    { target_stage: string; gates_to_reset: string[]; warning?: string } | null = null;
+  regressConfirming  = false;  // awaiting confirm click
+  regressBusy        = false;
+  regressError       = '';
+
   // DS / CB assignment
   allUsers:   User[] = [];
   editingDs   = false;
@@ -919,8 +1045,18 @@ export class DeliveryCycleDetailComponent implements OnInit {
   }
 
   get canAdvance(): boolean {
-    const terminal: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
+    const terminal: LifecycleStage[] = ['COMPLETE', 'CANCELLED', 'ON_HOLD'];
     return !!this.cycle && !terminal.includes(this.cycle.current_lifecycle_stage);
+  }
+
+  get canRegress(): boolean {
+    const blocked: LifecycleStage[] = ['BRIEF', 'COMPLETE', 'CANCELLED', 'ON_HOLD'];
+    return !!this.cycle && !blocked.includes(this.cycle.current_lifecycle_stage);
+  }
+
+  get canPlaceOnHold(): boolean {
+    const blocked: LifecycleStage[] = ['COMPLETE', 'CANCELLED', 'ON_HOLD'];
+    return !!this.cycle && !blocked.includes(this.cycle.current_lifecycle_stage);
   }
 
   /**
@@ -1095,6 +1231,127 @@ export class DeliveryCycleDetailComponent implements OnInit {
       error: (err: { error?: string }) => {
         this.advanceError = err.error ?? 'Advance failed. Check gate status and Workstream.';
         this.advancing    = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // ── Stage regression — D-179 two-call pattern ─────────────────────────────
+
+  /** Call 1: fetch preview (target stage + gates that will reset). */
+  initiateRegress(): void {
+    if (!this.cycle) { return; }
+    this.regressBusy  = true;
+    this.regressError = '';
+    this.cdr.markForCheck();
+
+    this.delivery.reverseStage({ delivery_cycle_id: this.cycle.delivery_cycle_id }).subscribe({
+      next: (res) => {
+        if (res.success && res.data?.['requires_confirmation']) {
+          this.regressPreview    = res.data as { target_stage: string; gates_to_reset: string[]; warning?: string };
+          this.regressConfirming = true;
+        } else {
+          this.regressError = res.error ?? 'Unable to preview stage regression.';
+        }
+        this.regressBusy = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.regressError = err.error ?? 'Could not reach the server.';
+        this.regressBusy  = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  /** Call 2: user confirmed — execute regression. */
+  confirmRegress(): void {
+    if (!this.cycle) { return; }
+    this.regressBusy  = true;
+    this.regressError = '';
+    this.cdr.markForCheck();
+
+    this.delivery.reverseStage({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      confirmed:         true
+    }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.regressConfirming = false;
+          this.regressPreview    = null;
+          this.loadCycle(this.cycle!.delivery_cycle_id);
+        } else {
+          this.regressError = res.error ?? 'Stage regression failed.';
+        }
+        this.regressBusy = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.regressError = err.error ?? 'Stage regression failed.';
+        this.regressBusy  = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  cancelRegress(): void {
+    this.regressConfirming = false;
+    this.regressPreview    = null;
+    this.regressError      = '';
+    this.cdr.markForCheck();
+  }
+
+  // ── ON_HOLD ────────────────────────────────────────────────────────────────
+
+  placeOnHold(): void {
+    if (!this.cycle) { return; }
+    this.holdBusy  = true;
+    this.holdError = '';
+    this.cdr.markForCheck();
+
+    const reason = this.holdReasonCtrl.value?.trim() || undefined;
+    this.delivery.setOnHold({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      ...(reason ? { hold_reason: reason } : {})
+    }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.showHoldReason = false;
+          this.holdReasonCtrl.reset();
+          this.loadCycle(this.cycle!.delivery_cycle_id);
+        } else {
+          this.holdError = res.error ?? 'Could not place cycle on hold.';
+        }
+        this.holdBusy = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.holdError = err.error ?? 'Could not place cycle on hold.';
+        this.holdBusy  = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  resumeFromHold(): void {
+    if (!this.cycle) { return; }
+    this.holdBusy  = true;
+    this.holdError = '';
+    this.cdr.markForCheck();
+
+    this.delivery.resumeFromHold(this.cycle.delivery_cycle_id).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.loadCycle(this.cycle!.delivery_cycle_id);
+        } else {
+          this.holdError = res.error ?? 'Could not resume cycle from hold.';
+        }
+        this.holdBusy = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.holdError = err.error ?? 'Could not resume cycle from hold.';
+        this.holdBusy  = false;
         this.cdr.markForCheck();
       }
     });

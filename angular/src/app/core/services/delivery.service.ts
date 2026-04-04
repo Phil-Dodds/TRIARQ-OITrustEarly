@@ -91,6 +91,30 @@ export class DeliveryService {
     return this.mcp.call<DeliveryCycle>('delivery', 'advance_cycle_stage', { delivery_cycle_id });
   }
 
+  /**
+   * D-179: Two-call pattern for stage regression.
+   * Without confirmed → returns preview ({ requires_confirmation, target_stage, gates_to_reset, warning }).
+   * With confirmed:true → executes regression, returns updated DeliveryCycle.
+   */
+  reverseStage(params: {
+    delivery_cycle_id: string;
+    confirmed?:        boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }): Observable<McpResponse<any>> {
+    return this.mcp.call('delivery', 'reverse_cycle_stage', params as Record<string, unknown>);
+  }
+
+  setOnHold(params: {
+    delivery_cycle_id: string;
+    hold_reason?:      string;
+  }): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'set_cycle_on_hold', params as Record<string, unknown>);
+  }
+
+  resumeFromHold(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'resume_cycle_from_hold', { delivery_cycle_id });
+  }
+
   setOutcomeStatement(params: {
     delivery_cycle_id: string;
     outcome_statement: string;
