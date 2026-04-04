@@ -6,13 +6,17 @@ Owner: Phil Sappington, EVP Performance & Governance
 
 ## Tool Permission Preferences
 
-Read `docs/claude-tool-preferences.json` at session start and follow it exactly:
+Full rules in `docs/claude-tool-preferences.json`. Summary:
 
-**Allowed without asking:** `git`, `ls`, `cat`, `npm`, `pytest`
+**Allowed without asking:**
+`git`, `ls`, `find`, `cat`, `grep`, `cp`, `mv`, `mkdir`, `npm`, `npx`, `node`, `python3`, `pytest`, `curl`, `gh`
 
-**Must ask before running:** `rm`, `sudo`, `docker`, `database_migrations`
-- State what will be deleted/changed, why it is needed, and wait for explicit "go ahead" before executing.
-- For `database_migrations`: describe the migration (tables affected, operations, reversibility) and wait for confirmation before applying.
+**`rm`:** Free on build artifacts (`dist/`, `node_modules/`, `*.tmp`). Ask before deleting source files, migration files, or docs.
+
+**Must ask before running:** `git reset --hard`, `git push --force`, `sudo`
+- State what will change, why, and wait for explicit confirmation before executing.
+
+**Not applicable here:** `docker`, direct database execution — not used in this project. Flag if they ever come up.
 
 ---
 
