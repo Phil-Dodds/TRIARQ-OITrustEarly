@@ -8,7 +8,11 @@
 // It does not need to be active at creation — active status is checked at gate time (ARCH-23).
 // Workstream must be assigned before Brief Review gate can be submitted.
 //
-// Source: D-83, D-108, D-124, D-125, D-165, build-c-spec Section 4.1
+// CC-006 (Session 2026-04-04): cycle_owner_user_id removed — same person as assigned_ds_user_id.
+// assigned_ds_user_id is nullable at creation; required before Brief Review gate (enforced in submit_gate_for_approval).
+// assigned_cb_user_id is nullable at creation; required before Go to Build gate.
+//
+// Source: D-83, D-108, D-124, D-125, D-165, CC-006, build-c-spec Section 4.1
 
 'use strict';
 
@@ -17,13 +21,20 @@ const { GATE_MILESTONE_LABELS, ALL_GATES } = require('../lifecycle');
 
 /**
  * @param {object} params
- * @param {string} params.cycle_title
- * @param {string} [params.cycle_description]
- * @param {string} params.division_id
- * @param {string} [params.workstream_id]        — Optional at creation (D-165)
- * @param {string} params.tier_classification    — 'tier_1' | 'tier_2' | 'tier_3'
- * @param {string} params.cycle_owner_user_id
- * @param {string} [params.jira_epic_key]
+ * @param {string}  params.cycle_title
+ * @param {string}  [params.cycle_description]
+ * @param {string}  params.division_id
+ * @param {string}  [params.workstream_id]         — Optional at creation (D-165)
+ * @param {string}  params.tier_classification     — 'tier_1' | 'tier_2' | 'tier_3'
+ * @param {string}  [params.assigned_ds_user_id]   — Optional at creation (CC-006); required before Brief Review gate
+ * @param {string}  [params.outcome_statement]      — Optional; can be set at creation or later
+ * @param {string}  [params.jira_epic_key]          — Optional Jira Epic Key
+ * @param {object}  [params.milestone_target_dates] — Optional gate target dates at creation
+ * @param {string}  [params.milestone_target_dates.brief_review]
+ * @param {string}  [params.milestone_target_dates.go_to_build]
+ * @param {string}  [params.milestone_target_dates.go_to_deploy]
+ * @param {string}  [params.milestone_target_dates.go_to_release]
+ * @param {string}  [params.milestone_target_dates.close_review]
  * @param {string} caller_user_id - from JWT
  */
 async function create_delivery_cycle(params, caller_user_id) {
@@ -33,8 +44,10 @@ async function create_delivery_cycle(params, caller_user_id) {
     division_id,
     workstream_id,
     tier_classification,
-    cycle_owner_user_id,
-    jira_epic_key
+    assigned_ds_user_id,
+    outcome_statement,
+    jira_epic_key,
+    milestone_target_dates
   } = params;
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -52,9 +65,8 @@ async function create_delivery_cycle(params, caller_user_id) {
   if (!['tier_1', 'tier_2', 'tier_3'].includes(tier_classification)) {
     return { success: false, error: 'tier_classification must be one of: tier_1, tier_2, tier_3.' };
   }
-  if (!cycle_owner_user_id) {
-    return { success: false, error: 'cycle_owner_user_id is required.' };
-  }
+  // assigned_ds_user_id is optional at creation (CC-006) — required before Brief Review gate.
+  // No required check here — gate enforcement is in submit_gate_for_approval.
 
   // ── Caller role check ─────────────────────────────────────────────────────
   const { data: caller, error: callerErr } = await supabase
@@ -107,16 +119,18 @@ async function create_delivery_cycle(params, caller_user_id) {
     return { success: false, error: 'division_id not found or has been deleted.' };
   }
 
-  // ── Verify cycle owner exists ─────────────────────────────────────────────
-  const { data: owner, error: ownerErr } = await supabase
-    .from('users')
-    .select('id, is_active')
-    .eq('id', cycle_owner_user_id)
-    .is('deleted_at', null)
-    .single();
+  // ── Verify assigned DS exists (if provided) ───────────────────────────────
+  if (assigned_ds_user_id) {
+    const { data: ds, error: dsErr } = await supabase
+      .from('users')
+      .select('id, is_active')
+      .eq('id', assigned_ds_user_id)
+      .is('deleted_at', null)
+      .single();
 
-  if (ownerErr || !owner) {
-    return { success: false, error: 'cycle_owner_user_id not found or has been deleted.' };
+    if (dsErr || !ds) {
+      return { success: false, error: 'assigned_ds_user_id not found or has been deleted.' };
+    }
   }
 
   // ── Insert cycle ──────────────────────────────────────────────────────────
@@ -129,8 +143,9 @@ async function create_delivery_cycle(params, caller_user_id) {
       workstream_id:           workstream_id || null,
       tier_classification,
       current_lifecycle_stage: 'BRIEF',
-      cycle_owner_user_id,
-      jira_epic_key:           jira_epic_key || null
+      assigned_ds_user_id:     assigned_ds_user_id || null,  // CC-006: nullable at creation
+      outcome_statement:       outcome_statement   || null,
+      jira_epic_key:           jira_epic_key       || null
     })
     .select()
     .single();
@@ -142,10 +157,13 @@ async function create_delivery_cycle(params, caller_user_id) {
   const cycle_id = cycle.delivery_cycle_id;
 
   // ── Seed five milestone_dates rows ────────────────────────────────────────
+  // Apply target dates at seed time if supplied in milestone_target_dates param.
+  const targetDates = milestone_target_dates || {};
   const milestoneRows = ALL_GATES.map(gate_name => ({
     delivery_cycle_id: cycle_id,
     gate_name,
     milestone_label:   GATE_MILESTONE_LABELS[gate_name],
+    target_date:       targetDates[gate_name] || null,
     date_status:       'not_started'
   }));
 
@@ -177,18 +195,23 @@ async function create_delivery_cycle(params, caller_user_id) {
     ? `in ${workstream.workstream_name}`
     : 'with no Workstream assigned (assign before Brief Review gate)';
 
+  const dsDesc = assigned_ds_user_id
+    ? ` DS assigned at creation.`
+    : ` No DS assigned yet (required before Brief Review gate).`;
+
   await supabase
     .from('cycle_event_log')
     .insert({
       delivery_cycle_id: cycle_id,
       event_type:        'cycle_created',
-      event_description: `Delivery Cycle "${cycle.cycle_title}" created at ${tier_classification} ${workstreamDesc}.`,
+      event_description: `Delivery Cycle "${cycle.cycle_title}" created at ${tier_classification} ${workstreamDesc}.${dsDesc}`,
       actor_user_id:     caller_user_id,
       event_metadata: {
         tier_classification,
-        workstream_id:   workstream_id || null,
-        workstream_name: workstream?.workstream_name || null,
-        division_id
+        workstream_id:       workstream_id       || null,
+        workstream_name:     workstream?.workstream_name || null,
+        division_id,
+        assigned_ds_user_id: assigned_ds_user_id || null
       }
     });
 

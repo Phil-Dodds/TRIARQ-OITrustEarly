@@ -39,8 +39,13 @@ export class DeliveryService {
   }
 
   listWorkstreams(params: {
-    home_division_id?: string;
-    active_status?:    boolean;
+    // Scope mode (CC-002 Workstream Picker)
+    scope_type?:        'division_tree' | 'trust' | 'user_divisions' | 'all';
+    scope_division_id?: string;   // Required when scope_type = 'division_tree'
+    include_inactive?:  boolean;  // Default false — inactive excluded from picker unless toggled
+    // Legacy filters (still supported when scope params absent)
+    home_division_id?:  string;
+    active_status?:     boolean;
   } = {}): Observable<McpResponse<DeliveryWorkstream[]>> {
     return this.mcp.call<DeliveryWorkstream[]>('delivery', 'list_delivery_workstreams', params as Record<string, unknown>);
   }
@@ -55,11 +60,21 @@ export class DeliveryService {
   // ── Delivery Cycle tools ───────────────────────────────────────────────────
 
   createCycle(params: {
-    cycle_title:         string;
-    cycle_description?:  string;
-    division_id:         string;
-    workstream_id?:      string;  // optional — D-165: recommended but not required at creation
-    tier_classification: TierClassification;
+    cycle_title:              string;
+    cycle_description?:       string;
+    division_id:              string;
+    workstream_id?:           string;          // optional — D-165
+    tier_classification:      TierClassification;
+    assigned_ds_user_id?:     string;          // optional — CC-006: required before Brief Review gate
+    outcome_statement?:       string;          // optional at creation
+    jira_epic_key?:           string;          // optional
+    milestone_target_dates?:  {               // optional gate target dates at creation
+      brief_review?:   string;
+      go_to_build?:    string;
+      go_to_deploy?:   string;
+      go_to_release?:  string;
+      close_review?:   string;
+    };
   }): Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>('delivery', 'create_delivery_cycle', params as Record<string, unknown>);
   }

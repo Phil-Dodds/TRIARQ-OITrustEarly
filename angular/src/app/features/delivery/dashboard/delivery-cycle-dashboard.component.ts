@@ -40,6 +40,7 @@ import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { StageTrackComponent }  from '../stage-track/stage-track.component';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
+import { WorkstreamPickerComponent } from '../../../shared/pickers/workstream-picker/workstream-picker.component';
 import {
   DeliveryCycle,
   Division,
@@ -85,7 +86,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
   selector: 'app-delivery-cycle-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent, WorkstreamPickerComponent],
   template: `
     <div style="max-width:1200px;margin:var(--triarq-space-2xl) auto;padding:0 var(--triarq-space-md);">
 
@@ -119,6 +120,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       </div>
 
       <!-- ── Create form (D-178 Tier 3: section overlay) ────────────────── -->
+      <!-- CC-004: Rich creation page — field order: Division → Title → Workstream → Tier → DS → Outcome → Jira → Gate dates -->
       <div *ngIf="showCreateForm" style="position:relative;">
         <app-loading-overlay [visible]="creating" message="Creating Cycle…"></app-loading-overlay>
         <div class="oi-card"
@@ -126,11 +128,27 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           <h4 style="margin:0 0 4px 0;font-size:var(--triarq-text-body);">New Delivery Cycle</h4>
           <p style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-small);
                     color:var(--triarq-color-text-secondary);">
-            The cycle starts in Brief stage. Set a title that describes the deliverable,
-            not the team or initiative name.
+            The cycle starts in Brief stage. Title should describe the deliverable, not the team or initiative.
           </p>
           <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
-            <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:3fr 2fr 1fr;">
+
+            <!-- Row 1: Division + Cycle Title -->
+            <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:1fr 2fr;
+                        margin-bottom:var(--triarq-space-sm);">
+              <div>
+                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                  Owner Division *
+                </label>
+                <select formControlName="division_id" class="oi-input"
+                        (change)="onCreateDivisionChange()">
+                  <option value="">— Select Division —</option>
+                  <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
+                </select>
+                <div *ngIf="createForm.get('division_id')?.invalid && createForm.get('division_id')?.touched"
+                     style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
+                  Division is required.
+                </div>
+              </div>
               <div>
                 <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
                   Cycle Title *
@@ -142,25 +160,40 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                   Cycle title is required.
                 </div>
               </div>
+            </div>
+
+            <!-- Row 2: Workstream (picker) + Tier -->
+            <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:2fr 1fr;
+                        margin-bottom:var(--triarq-space-sm);">
               <div>
                 <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
                   Delivery Workstream
                   <span style="font-weight:400;color:var(--triarq-color-text-secondary);"> — recommended</span>
                 </label>
-                <select formControlName="workstream_id" class="oi-input">
-                  <option value="">— Assign later —</option>
-                  <option *ngFor="let ws of activeWorkstreams" [value]="ws.workstream_id">
-                    {{ ws.workstream_name }}
-                  </option>
-                </select>
-                <div style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);margin-top:3px;">
-                  Required before Brief Review gate. Can be assigned after creation.
+                <!-- Picker trigger row -->
+                <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);">
+                  <button type="button" class="oi-input"
+                          style="text-align:left;cursor:pointer;background:#fff;flex:1;"
+                          (click)="openWorkstreamPicker()">
+                    <span *ngIf="!createSelectedWorkstream"
+                          style="color:var(--triarq-color-text-secondary);">
+                      — Assign later —
+                    </span>
+                    <span *ngIf="createSelectedWorkstream">
+                      {{ createSelectedWorkstream.workstream_name }}
+                      <span style="font-size:10px;color:var(--triarq-color-text-secondary);margin-left:4px;">
+                        ({{ createSelectedWorkstream.home_division_name ?? '' }})
+                      </span>
+                    </span>
+                  </button>
+                  <button *ngIf="createSelectedWorkstream" type="button"
+                          (click)="clearCreateWorkstream()"
+                          style="background:none;border:none;cursor:pointer;
+                                 color:var(--triarq-color-text-secondary);font-size:12px;"
+                          title="Remove Workstream">✕</button>
                 </div>
-                <div *ngIf="activeWorkstreams.length === 0"
-                     style="color:var(--triarq-color-sunray,#f5a623);font-size:var(--triarq-text-small);margin-top:2px;">
-                  No active Workstreams found. Go to
-                  <a routerLink="/admin/workstreams" style="color:var(--triarq-color-sunray,#f5a623);">Admin → Workstreams</a>
-                  to create and activate one.
+                <div style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);margin-top:3px;">
+                  Required before Brief Review gate. Assign now or after creation.
                 </div>
               </div>
               <div>
@@ -175,20 +208,111 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                 </select>
                 <div *ngIf="createForm.get('tier_classification')?.invalid && createForm.get('tier_classification')?.touched"
                      style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                  Tier is required. Tier is set at Brief stage and locked thereafter.
+                  Tier is required. Set at Brief stage and locked thereafter.
                 </div>
               </div>
             </div>
-            <div style="margin-top:var(--triarq-space-sm);max-width:400px;">
+
+            <!-- Row 3: DS assignment (auto-populated or blank) -->
+            <div style="margin-bottom:var(--triarq-space-sm);max-width:400px;">
               <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Owner Division *
+                Delivery Specialist
+                <span style="font-weight:400;color:var(--triarq-color-text-secondary);"> — required before Brief Review gate</span>
               </label>
-              <select formControlName="division_id" class="oi-input">
-                <option value="">— Select Division —</option>
-                <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
-              </select>
+              <div *ngIf="autoAssignedDsDisplayName"
+                   style="font-size:var(--triarq-text-small);padding:6px var(--triarq-space-sm);
+                          background:var(--triarq-color-background-subtle);border-radius:5px;
+                          border:1px solid var(--triarq-color-border);">
+                {{ autoAssignedDsDisplayName }}
+                <span style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);margin-left:6px;">
+                  (pre-assigned — you)
+                </span>
+              </div>
+              <div *ngIf="!autoAssignedDsDisplayName"
+                   style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);
+                          padding:6px 0;">
+                DS assignment can be added after creation. Required before Brief Review gate can proceed.
+              </div>
             </div>
-            <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
+
+            <!-- Row 4: Outcome Statement -->
+            <div style="margin-bottom:var(--triarq-space-sm);">
+              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                Outcome Statement
+                <span style="font-weight:400;color:var(--triarq-color-text-secondary);"> — optional at creation</span>
+              </label>
+              <textarea formControlName="outcome_statement"
+                        class="oi-input"
+                        rows="2"
+                        style="resize:vertical;"
+                        placeholder="What measurable result will this cycle deliver?">
+              </textarea>
+            </div>
+
+            <!-- Row 5: Jira Epic Key -->
+            <div style="margin-bottom:var(--triarq-space-sm);max-width:300px;">
+              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                Jira Epic Key
+                <span style="font-weight:400;color:var(--triarq-color-text-secondary);"> — optional</span>
+              </label>
+              <input formControlName="jira_epic_key" class="oi-input"
+                     placeholder="e.g. PROJ-123" />
+            </div>
+
+            <!-- Row 6: Gate target dates -->
+            <div style="margin-bottom:var(--triarq-space-sm);">
+              <div style="font-size:var(--triarq-text-small);font-weight:500;
+                          margin-bottom:var(--triarq-space-xs);">
+                Target Dates
+                <span style="font-weight:400;color:var(--triarq-color-text-secondary);"> — all optional at creation</span>
+              </div>
+              <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:repeat(5,1fr);">
+                <div>
+                  <label style="display:block;font-size:var(--triarq-text-caption);
+                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
+                    Brief Review
+                  </label>
+                  <input type="date" formControlName="milestone_brief_review" class="oi-input"
+                         style="font-size:var(--triarq-text-small);" />
+                </div>
+                <div>
+                  <label style="display:block;font-size:var(--triarq-text-caption);
+                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
+                    Go to Build
+                  </label>
+                  <input type="date" formControlName="milestone_go_to_build" class="oi-input"
+                         style="font-size:var(--triarq-text-small);" />
+                </div>
+                <div>
+                  <label style="display:block;font-size:var(--triarq-text-caption);
+                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
+                    Pilot Start (Go to Deploy)
+                  </label>
+                  <input type="date" formControlName="milestone_go_to_deploy" class="oi-input"
+                         style="font-size:var(--triarq-text-small);" />
+                </div>
+                <div>
+                  <label style="display:block;font-size:var(--triarq-text-caption);
+                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
+                    Production Release (Go to Release)
+                  </label>
+                  <input type="date" formControlName="milestone_go_to_release" class="oi-input"
+                         style="font-size:var(--triarq-text-small);" />
+                </div>
+                <div>
+                  <label style="display:block;font-size:var(--triarq-text-caption);
+                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
+                    Close Review
+                  </label>
+                  <input type="date" formControlName="milestone_close_review" class="oi-input"
+                         style="font-size:var(--triarq-text-small);" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Submit row -->
+            <div style="display:flex;gap:var(--triarq-space-sm);align-items:center;
+                        margin-top:var(--triarq-space-sm);">
               <!-- D-178 Tier 2: button spinner while creating -->
               <button type="submit" class="oi-btn-primary"
                       [disabled]="createForm.invalid || creating">
@@ -201,13 +325,21 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                    style="font-size:var(--triarq-text-small);">
                 <span style="color:var(--triarq-color-error);font-weight:500;">{{ createError }}</span>
                 <span style="color:var(--triarq-color-text-secondary);margin-left:6px;">
-                  Check that the Workstream is active and you have Division access.
+                  Check that the Division is valid and you have the required role.
                 </span>
               </div>
             </div>
           </form>
         </div>
       </div>
+
+      <!-- ── Workstream Picker modal ─────────────────────────────────────── -->
+      <app-workstream-picker
+        *ngIf="showWorkstreamPicker"
+        [cycleDivisionId]="createForm.get('division_id')?.value || null"
+        [currentWorkstreamId]="createSelectedWorkstream?.workstream_id ?? null"
+        (workstreamSelected)="onWorkstreamSelected($event)">
+      </app-workstream-picker>
 
       <!-- ── Filters + sort row ──────────────────────────────────────────── -->
       <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;
@@ -527,6 +659,14 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   createError        = '';
   createForm!:       FormGroup;
 
+  // CC-004: Create form — workstream picker state
+  showWorkstreamPicker      = false;
+  createSelectedWorkstream: DeliveryWorkstream | null = null;
+
+  // CC-006: DS auto-assignment — pre-populate if current user is DS role
+  autoAssignedDsUserId:       string | null = null;
+  autoAssignedDsDisplayName:  string | null = null;
+
   // Filter state (ngModel bindings — not reactive form controls)
   filterStage:              string  = '';
   filterTier:               string  = '';
@@ -567,12 +707,21 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // D-165: workstream_id is optional at creation — no Validators.required.
+    // CC-004: Rich create form — field order: Division → Title → Workstream → Tier → Outcome → Jira → Dates.
+    // workstream_id is stored separately in createSelectedWorkstream (not a form control — uses picker modal).
+    // assigned_ds_user_id comes from autoAssignedDsUserId (auto-populated, not a form field).
+    // D-165: workstream is optional at creation. CC-006: DS nullable at creation.
     this.createForm = this.fb.group({
-      cycle_title:         ['', Validators.required],
-      workstream_id:       [''],
-      tier_classification: ['', Validators.required],
-      division_id:         ['', Validators.required]
+      division_id:              ['', Validators.required],
+      cycle_title:              ['', Validators.required],
+      tier_classification:      ['', Validators.required],
+      outcome_statement:        [''],
+      jira_epic_key:            [''],
+      milestone_brief_review:   [''],
+      milestone_go_to_build:    [''],
+      milestone_go_to_deploy:   [''],
+      milestone_go_to_release:  [''],
+      milestone_close_review:   ['']
     });
     // D-175: read query params from summary view drill-down and apply as initial filters.
     const qp = this.route.snapshot.queryParams;
@@ -591,8 +740,17 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.profileSub = this.profile.profile$
       .pipe(filter(p => p !== null), take(1))
       .subscribe(() => {
-        const role = this.profile.getCurrentProfile()?.system_role;
-        this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin';
+        const p    = this.profile.getCurrentProfile();
+        const role = p?.system_role;
+        this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin' || role === 'cb' || role === 'ce';
+
+        // CC-006: Pre-populate DS if caller is DS role.
+        // Most cycles are created by their own DS — this eliminates a required picker call for the common case.
+        if (role === 'ds' && p?.id && p?.display_name) {
+          this.autoAssignedDsUserId      = p.id;
+          this.autoAssignedDsDisplayName = p.display_name;
+        }
+
         this.checkUserDivisions();
         this.cdr.markForCheck();
       });
@@ -821,7 +979,37 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   toggleCreateForm(): void {
     this.showCreateForm = !this.showCreateForm;
     this.createError    = '';
-    if (this.showCreateForm) { this.createForm.reset(); }
+    if (this.showCreateForm) {
+      this.createForm.reset();
+      this.createSelectedWorkstream = null;
+      this.showWorkstreamPicker     = false;
+    }
+    this.cdr.markForCheck();
+  }
+
+  // CC-002: Workstream picker — open/close/select/clear
+  openWorkstreamPicker(): void {
+    this.showWorkstreamPicker = true;
+    this.cdr.markForCheck();
+  }
+
+  onWorkstreamSelected(ws: DeliveryWorkstream | null): void {
+    this.showWorkstreamPicker = false;
+    if (ws) {
+      this.createSelectedWorkstream = ws;
+    }
+    this.cdr.markForCheck();
+  }
+
+  clearCreateWorkstream(): void {
+    this.createSelectedWorkstream = null;
+    this.cdr.markForCheck();
+  }
+
+  // Called when the Division dropdown changes in the create form.
+  // Clears the workstream selection since it was scoped to the previous division.
+  onCreateDivisionChange(): void {
+    this.createSelectedWorkstream = null;
     this.cdr.markForCheck();
   }
 
@@ -831,17 +1019,33 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.createError = '';
     this.cdr.markForCheck();
 
-    // D-165: workstream_id is optional at creation. Only include if selected.
-    const workstreamId = this.createForm.value.workstream_id as string | '';
+    const v = this.createForm.value;
+
+    // Build milestone_target_dates object — only include gates where a date was entered
+    const milestone_target_dates: Record<string, string> = {};
+    if (v.milestone_brief_review)  { milestone_target_dates['brief_review']  = v.milestone_brief_review  as string; }
+    if (v.milestone_go_to_build)   { milestone_target_dates['go_to_build']   = v.milestone_go_to_build   as string; }
+    if (v.milestone_go_to_deploy)  { milestone_target_dates['go_to_deploy']  = v.milestone_go_to_deploy  as string; }
+    if (v.milestone_go_to_release) { milestone_target_dates['go_to_release'] = v.milestone_go_to_release as string; }
+    if (v.milestone_close_review)  { milestone_target_dates['close_review']  = v.milestone_close_review  as string; }
+
     this.delivery.createCycle({
-      cycle_title:         this.createForm.value.cycle_title         as string,
-      ...(workstreamId ? { workstream_id: workstreamId } : {}),
-      tier_classification: this.createForm.value.tier_classification as TierClassification,
-      division_id:         this.createForm.value.division_id         as string
+      cycle_title:         v.cycle_title         as string,
+      tier_classification: v.tier_classification as TierClassification,
+      division_id:         v.division_id         as string,
+      // D-165: workstream optional — only include if user selected one via picker
+      ...(this.createSelectedWorkstream ? { workstream_id: this.createSelectedWorkstream.workstream_id } : {}),
+      // CC-006: DS auto-assignment — only include if auto-populated (caller is DS role)
+      ...(this.autoAssignedDsUserId ? { assigned_ds_user_id: this.autoAssignedDsUserId } : {}),
+      // Optional fields — only send if non-empty
+      ...(v.outcome_statement?.trim() ? { outcome_statement: v.outcome_statement.trim() as string } : {}),
+      ...(v.jira_epic_key?.trim()     ? { jira_epic_key:     v.jira_epic_key.trim()     as string } : {}),
+      ...(Object.keys(milestone_target_dates).length > 0 ? { milestone_target_dates } : {})
     }).subscribe({
       next: (res) => {
         if (res.success) {
-          this.showCreateForm = false;
+          this.showCreateForm           = false;
+          this.createSelectedWorkstream = null;
           this.createForm.reset();
           this.loadCycles();
         } else {

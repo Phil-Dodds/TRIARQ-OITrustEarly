@@ -70,7 +70,6 @@ async function list_delivery_cycles(params, caller_user_id) {
       tier_classification,
       current_lifecycle_stage,
       outcome_statement,
-      cycle_owner_user_id,
       assigned_ds_user_id,
       assigned_cb_user_id,
       jira_epic_key,

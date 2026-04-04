@@ -182,17 +182,18 @@ export type JiraSyncStatus      = 'unsynced' | 'synced' | 'error';
 export type GateDisplayState    = 'pending' | 'blocked' | 'complete' | 'upcoming';
 
 export interface DeliveryWorkstream {
-  workstream_id:         string;
-  workstream_name:       string;
-  home_division_id:      string;
+  workstream_id:           string;
+  workstream_name:         string;
+  home_division_id:        string;
   workstream_lead_user_id: string;
-  active_status:         boolean;
-  created_at:            string;
-  updated_at:            string;
-  deleted_at:            string | null;
-  // Joined
-  home_division_name?:   string;
-  lead_display_name?:    string;
+  active_status:           boolean;
+  created_at:              string;
+  updated_at:              string;
+  deleted_at:              string | null;
+  // Joined / computed (list_delivery_workstreams enrichment)
+  home_division_name?:     string;
+  lead_display_name?:      string;
+  active_cycle_count?:     number;
 }
 
 export interface DeliveryCycle {
@@ -206,8 +207,8 @@ export interface DeliveryCycle {
   outcome_statement:       string | null;
   outcome_set_by_user_id:  string | null;
   outcome_set_at:          string | null;
-  cycle_owner_user_id:     string;
-  assigned_ds_user_id:     string | null;  // Delivery Specialist — migration 024
+  // cycle_owner_user_id removed — migration 025 (CC-006): redundant with assigned_ds_user_id
+  assigned_ds_user_id:     string | null;  // Delivery Specialist — nullable at creation, required before Brief Review (CC-006)
   assigned_cb_user_id:     string | null;  // Capability Builder — migration 024
   pre_hold_lifecycle_stage: LifecycleStage | null;  // Stores stage before ON_HOLD — migration 024
   jira_epic_key:           string | null;
