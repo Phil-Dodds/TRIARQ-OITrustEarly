@@ -291,9 +291,11 @@ export interface CycleArtifact {
   created_at:             string;
   updated_at:             string;
   deleted_at:             string | null;
-  // Joined
-  artifact_type_name?:    string;
-  lifecycle_stage?:       string;
+  // Joined — populated by get_delivery_cycle when artifacts are returned with full type metadata
+  artifact_type_name?:      string;
+  lifecycle_stage?:         string;
+  guidance_text?:           string;   // from cycle_artifact_types.guidance_text — shown in slot UI (Item 2)
+  attached_by_display_name?: string;  // resolved from attached_by_user_id — shown as tappable chip (D-181)
 }
 
 export interface JiraLink {

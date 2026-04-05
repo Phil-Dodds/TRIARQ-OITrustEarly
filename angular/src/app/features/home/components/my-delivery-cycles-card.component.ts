@@ -16,12 +16,33 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { IonicModule }  from '@ionic/angular';
 import { DeliveryService } from '../../../core/services/delivery.service';
-import { DeliveryCycle, LifecycleStage, GateName } from '../../../core/types/database';
+import { DeliveryCycle, LifecycleStage, GateName, TierClassification } from '../../../core/types/database';
 
 const STAGE_LABEL: Partial<Record<LifecycleStage, string>> = {
   BRIEF: 'Brief', DESIGN: 'Design', SPEC: 'Spec', BUILD: 'Build',
   VALIDATE: 'Validate', PILOT: 'Pilot', UAT: 'UAT', RELEASE: 'Release',
   OUTCOME: 'Outcome', COMPLETE: 'Complete', CANCELLED: 'Cancelled', ON_HOLD: 'On Hold'
+};
+
+const GATE_LABEL: Record<GateName, string> = {
+  brief_review:  'Brief Review',
+  go_to_build:   'Go to Build',
+  go_to_deploy:  'Go to Deploy',
+  go_to_release: 'Go to Release',
+  close_review:  'Close Review'
+};
+
+// D-173: next gate derived from stage — mirrors NEXT_GATE_BY_STAGE in delivery-cycle-detail
+const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
+  BRIEF:    'brief_review',
+  DESIGN:   'go_to_build',
+  SPEC:     'go_to_build',
+  BUILD:    'go_to_deploy',
+  VALIDATE: 'go_to_deploy',
+  PILOT:    'go_to_release',
+  UAT:      'go_to_release',
+  RELEASE:  'close_review',
+  OUTCOME:  'close_review'
 };
 
 const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
@@ -36,21 +57,15 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
       <div style="display:flex;align-items:center;justify-content:space-between;
                   margin-bottom:var(--triarq-space-md);">
         <h4 style="margin:0;font-size:var(--triarq-text-h4);">My Delivery Cycles</h4>
-        <a routerLink="/delivery"
-           style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
-                  text-decoration:none;">
-          View all →
-        </a>
       </div>
 
       <!-- D-178 Tier 1: Skeleton for initial load -->
       <div *ngIf="loading">
         <div *ngFor="let _ of [1,2,3]"
-             style="display:flex;align-items:center;justify-content:space-between;
-                    padding:var(--triarq-space-xs) 0;
-                    border-bottom:1px solid var(--triarq-color-border);gap:var(--triarq-space-sm);">
-          <ion-skeleton-text animated style="flex:1;height:14px;border-radius:4px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="width:52px;height:18px;border-radius:999px;"></ion-skeleton-text>
+             style="padding:var(--triarq-space-xs) 0;
+                    border-bottom:1px solid var(--triarq-color-border);">
+          <ion-skeleton-text animated style="width:60%;height:14px;border-radius:4px;margin-bottom:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="width:40%;height:11px;border-radius:4px;"></ion-skeleton-text>
         </div>
       </div>
 
@@ -63,38 +78,54 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
         ⚠ {{ attentionCount }} cycle{{ attentionCount === 1 ? '' : 's' }} need{{ attentionCount === 1 ? 's' : '' }} attention
       </div>
 
-      <!-- Active cycle list -->
+      <!-- Active cycle list — S6: next gate + target date + tier badge per row -->
       <div *ngIf="!loading && activeCycles.length > 0">
         <div *ngFor="let cycle of activeCycles"
-             style="display:flex;align-items:center;justify-content:space-between;
-                    padding:var(--triarq-space-xs) 0;
-                    border-bottom:1px solid var(--triarq-color-border);
-                    font-size:var(--triarq-text-small);gap:var(--triarq-space-sm);">
-          <a [routerLink]="['/delivery', cycle.delivery_cycle_id]"
-             style="color:var(--triarq-color-text-primary);text-decoration:none;
-                    font-weight:500;flex:1;min-width:0;
-                    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-             [title]="cycle.cycle_title">
-            {{ cycle.cycle_title }}
-          </a>
-          <span style="font-size:10px;padding:2px 8px;border-radius:999px;
-                       background:var(--triarq-color-background-subtle);
-                       color:var(--triarq-color-text-secondary);white-space:nowrap;flex-shrink:0;">
-            {{ STAGE_LABEL[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
-          </span>
-          <span *ngIf="needsAttention(cycle)"
-                style="color:var(--triarq-color-sunray,#f5a623);flex-shrink:0;"
-                title="Needs attention">⚠</span>
-        </div>
+             style="padding:var(--triarq-space-xs) 0;
+                    border-bottom:1px solid var(--triarq-color-border);">
 
-        <!-- Show more link if truncated -->
-        <div *ngIf="totalActive > activeCycles.length"
-             style="margin-top:var(--triarq-space-xs);font-size:var(--triarq-text-small);
-                    color:var(--triarq-color-text-secondary);">
-          <a routerLink="/delivery"
-             style="color:var(--triarq-color-primary);text-decoration:none;">
-            + {{ totalActive - activeCycles.length }} more active cycle{{ totalActive - activeCycles.length === 1 ? '' : 's' }}
-          </a>
+          <!-- Row 1: cycle title + tier badge + attention indicator -->
+          <div style="display:flex;align-items:center;gap:var(--triarq-space-xs);
+                      margin-bottom:2px;flex-wrap:wrap;">
+            <a [routerLink]="['/delivery', cycle.delivery_cycle_id]"
+               style="color:var(--triarq-color-text-primary);text-decoration:none;
+                      font-weight:500;font-size:var(--triarq-text-small);
+                      flex:1;min-width:0;
+                      overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+               [title]="cycle.cycle_title">
+              {{ cycle.cycle_title }}
+            </a>
+            <!-- Tier badge — S6 -->
+            <span class="oi-pill"
+                  [style.background]="tierPillBg(cycle.tier_classification)"
+                  style="font-size:9px;flex-shrink:0;">
+              T{{ tierShort(cycle.tier_classification) }}
+            </span>
+            <span *ngIf="needsAttention(cycle)"
+                  style="color:var(--triarq-color-sunray,#f5a623);flex-shrink:0;font-size:12px;"
+                  title="Needs attention">⚠</span>
+          </div>
+
+          <!-- Row 2: next gate + target date (S6) -->
+          <div style="font-size:10px;color:var(--triarq-color-text-secondary);
+                      display:flex;align-items:center;gap:var(--triarq-space-xs);">
+            <span *ngIf="nextGateLabel(cycle)" style="display:flex;align-items:center;gap:4px;">
+              <span style="font-weight:500;color:var(--triarq-color-text-primary);">
+                {{ nextGateLabel(cycle) }}
+              </span>
+              <span *ngIf="nextGateTargetDate(cycle)"
+                    [style.color]="nextGateDateColor(cycle)">
+                · {{ nextGateTargetDate(cycle) }}
+              </span>
+              <span *ngIf="!nextGateTargetDate(cycle)"
+                    style="font-style:italic;">— no target date set</span>
+            </span>
+            <span *ngIf="!nextGateLabel(cycle)"
+                  style="font-style:italic;">
+              {{ STAGE_LABEL[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
+            </span>
+          </div>
+
         </div>
       </div>
 
@@ -102,9 +133,15 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
       <div *ngIf="!loading && activeCycles.length === 0"
            style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
         No active cycles assigned to you.
+      </div>
+
+      <!-- Footer: "View all [N] cycles →" (S6) -->
+      <div style="margin-top:var(--triarq-space-sm);padding-top:var(--triarq-space-xs);
+                  border-top:1px solid var(--triarq-color-border);">
         <a routerLink="/delivery"
-           style="color:var(--triarq-color-primary);text-decoration:none;display:block;margin-top:4px;">
-          Go to Delivery Dashboard →
+           style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
+                  text-decoration:none;">
+          View all {{ totalActive > 0 ? totalActive + ' ' : '' }}cycle{{ totalActive === 1 ? '' : 's' }} →
         </a>
       </div>
     </div>
@@ -120,6 +157,7 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
 
   readonly STAGE_LABEL = STAGE_LABEL;
   private readonly MAX_SHOWN = 5;
+  private readonly TODAY = new Date().toISOString().slice(0, 10);
 
   constructor(
     private readonly delivery: DeliveryService,
@@ -150,13 +188,48 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
   }
 
   needsAttention(cycle: DeliveryCycle): boolean {
-    // Blocked gate
     if (cycle.gate_records?.some(g => g.gate_status === 'blocked')) { return true; }
-    // Overdue milestone
-    const today = new Date().toISOString().slice(0, 10);
-    if (cycle.milestone_dates?.some(m => m.target_date && !m.actual_date && m.target_date < today)) {
+    if (cycle.milestone_dates?.some(m => m.target_date && !m.actual_date && m.target_date < this.TODAY)) {
       return true;
     }
     return false;
+  }
+
+  /** S6: next gate name label for this cycle, null when terminal */
+  nextGateLabel(cycle: DeliveryCycle): string | null {
+    const gate = NEXT_GATE_BY_STAGE[cycle.current_lifecycle_stage];
+    return gate ? GATE_LABEL[gate] : null;
+  }
+
+  /** S6: target date for the next gate's milestone row */
+  nextGateTargetDate(cycle: DeliveryCycle): string | null {
+    const gate = NEXT_GATE_BY_STAGE[cycle.current_lifecycle_stage];
+    if (!gate) { return null; }
+    return cycle.milestone_dates?.find(m => m.gate_name === gate)?.target_date ?? null;
+  }
+
+  /** S6: color the target date based on proximity to today */
+  nextGateDateColor(cycle: DeliveryCycle): string {
+    const date = this.nextGateTargetDate(cycle);
+    if (!date) { return 'var(--triarq-color-text-secondary)'; }
+    if (date < this.TODAY) { return 'var(--triarq-color-error)'; }
+    // Within 7 days → amber
+    const daysAway = (new Date(date).getTime() - new Date(this.TODAY).getTime()) / 86_400_000;
+    if (daysAway <= 7) { return 'var(--triarq-color-sunray,#f5a623)'; }
+    return 'var(--triarq-color-text-secondary)';
+  }
+
+  /** S6: tier badge pill color */
+  tierPillBg(tier: TierClassification): string {
+    return tier === 'tier_1'
+      ? '#e8f5e9'
+      : tier === 'tier_2'
+        ? '#fff8e1'
+        : '#fce4ec';
+  }
+
+  /** S6: tier short label "1" | "2" | "3" */
+  tierShort(tier: TierClassification): string {
+    return tier.replace('tier_', '');
   }
 }

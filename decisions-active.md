@@ -484,3 +484,6 @@ These principles apply to every effort, not just this system.
 
 **D-186** — Decision Implementation Status. Every decision in decisions-active.md carries an impl_status field. Four values: unspecced (locked, no spec yet — default for all pre-existing decisions), specced (included in a spec document given to Claude Code — set by Claude Chat), built (Claude Code has implemented — set by Claude Code at completion), verified (Phil has confirmed acceptance criteria met). Format: | impl_status: [value] | on its own line after the decision record. Claude Code updates to built at implementation completion and does not set verified speculatively. Full principle in docs/design-principles.md Principle 16. | Source: Claude Chat | April 2026 |
 | impl_status: specced |
+
+**D-187** — Action Queue Name. "Action Queue" is the confirmed name for the user action surface. Gate approvals (Accountable) and Gate reviews (Consulted) are the first two action types. No rename as new action types are added unless a specific UX problem requires it. Capitalize in all user-facing text per Principle 14: labels, card headers, empty states, MCP error messages. "My Action Queue" on home screen card. "Items in your Action Queue" in notifications. | Source: Claude Chat | April 2026 |
+| impl_status: specced |

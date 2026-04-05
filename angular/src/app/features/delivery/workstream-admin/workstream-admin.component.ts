@@ -237,7 +237,8 @@ import { LoadingOverlayComponent } from '../../../shared/components/loading-over
               </span>
               <span style="display:flex;justify-content:flex-end;" (click)="$event.stopPropagation()">
                 <!-- D-178 Tier 2: spinner on toggle button -->
-                <button
+                <!-- Activate: immediate; Deactivate: inline confirmation per P13 / D-183 -->
+                <button *ngIf="!ws.active_status"
                   (click)="toggleActive(ws)"
                   [disabled]="togglingId === ws.workstream_id"
                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
@@ -246,8 +247,22 @@ import { LoadingOverlayComponent } from '../../../shared/components/loading-over
                   <ion-spinner *ngIf="togglingId === ws.workstream_id" name="crescent"
                                style="width:14px;height:14px;vertical-align:middle;">
                   </ion-spinner>
-                  {{ togglingId === ws.workstream_id ? '…' : (ws.active_status ? 'Deactivate' : 'Activate') }}
+                  {{ togglingId === ws.workstream_id ? '…' : 'Activate' }}
                 </button>
+                <!-- Deactivate: show confirmation trigger first -->
+                <button *ngIf="ws.active_status && confirmDeactivateWsId !== ws.workstream_id"
+                  (click)="startDeactivateConfirm(ws)"
+                  style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                         background:none;border:none;cursor:pointer;padding:0;">
+                  Deactivate
+                </button>
+                <span *ngIf="ws.active_status && confirmDeactivateWsId === ws.workstream_id"
+                      style="font-size:var(--triarq-text-small);">
+                  <button (click)="confirmDeactivateWsId = null"
+                          style="background:none;border:none;cursor:pointer;
+                                 color:var(--triarq-color-text-secondary);font-size:10px;
+                                 margin-right:4px;">Cancel</button>
+                </span>
               </span>
             </div>
 
@@ -266,7 +281,43 @@ import { LoadingOverlayComponent } from '../../../shared/components/loading-over
               </span>
             </div>
 
-            <!-- D-140: Deactivation warning — what changes and what the impact is -->
+            <!-- S5 / P13 / D-183: Inline deactivation confirmation — states exactly what changes -->
+            <!-- Principle 13: destructive confirmation inline, not modal; names the count of affected cycles -->
+            <div *ngIf="confirmDeactivateWsId === ws.workstream_id"
+                 style="background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
+                        padding:var(--triarq-space-sm) var(--triarq-space-md);
+                        font-size:var(--triarq-text-small);">
+              <div style="font-weight:500;margin-bottom:4px;">
+                Deactivate {{ ws.workstream_name }}?
+              </div>
+              <div style="color:var(--triarq-color-text-secondary);margin-bottom:var(--triarq-space-sm);">
+                Gate review will be blocked for
+                <strong>{{ ws.active_cycle_count ?? 0 }}
+                  Delivery Cycle{{ (ws.active_cycle_count ?? 0) === 1 ? '' : 's' }}</strong>
+                on this Workstream. They cannot advance past any gate until this Workstream is
+                reactivated. This action is reversible — use Activate to restore gate clearance.
+              </div>
+              <div style="display:flex;gap:var(--triarq-space-sm);align-items:center;">
+                <button (click)="toggleActive(ws)"
+                        [disabled]="togglingId === ws.workstream_id"
+                        class="oi-btn-primary"
+                        style="font-size:var(--triarq-text-small);padding:4px 14px;
+                               display:flex;align-items:center;gap:4px;
+                               background:var(--triarq-color-error);">
+                  <ion-spinner *ngIf="togglingId === ws.workstream_id" name="crescent"
+                               style="width:14px;height:14px;"></ion-spinner>
+                  {{ togglingId === ws.workstream_id ? 'Deactivating…' : 'Confirm Deactivate' }}
+                </button>
+                <button (click)="confirmDeactivateWsId = null"
+                        style="background:none;border:none;cursor:pointer;
+                               font-size:var(--triarq-text-small);
+                               color:var(--triarq-color-text-secondary);">
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+            <!-- D-140: Post-toggle warning — what changed and what to do to reverse -->
             <div *ngIf="toggleWarning && toggleWarningWsId === ws.workstream_id"
                  style="background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
                         padding:var(--triarq-space-sm) var(--triarq-space-md);
@@ -320,8 +371,22 @@ import { LoadingOverlayComponent } from '../../../shared/components/loading-over
               <div>{{ selectedWs.home_division_name ?? divisionName(selectedWs.home_division_id) }}</div>
             </div>
             <div>
-              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Workstream Lead</div>
-              <div>{{ selectedWs.lead_display_name ?? leadName(selectedWs.workstream_lead_user_id) }}</div>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:4px;">Workstream Lead</div>
+              <!-- D-181: Lead as tappable entity chip -->
+              <span class="oi-pill"
+                    style="font-size:11px;cursor:default;
+                           background:var(--triarq-color-fog,#f0f4f8);
+                           color:var(--triarq-color-text-primary);">
+                {{ selectedWs.lead_display_name ?? leadName(selectedWs.workstream_lead_user_id) }}
+              </span>
+            </div>
+            <!-- Members note: Division scopes visibility (D-170); no separate member table on workstream -->
+            <div>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Members</div>
+              <div style="font-size:10px;color:var(--triarq-color-text-secondary);font-style:italic;">
+                All members of {{ selectedWs.home_division_name ?? divisionName(selectedWs.home_division_id) }}
+                have access. Manage membership in Division Admin.
+              </div>
             </div>
             <div>
               <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Status</div>
@@ -398,6 +463,9 @@ export class WorkstreamAdminComponent implements OnInit {
   activeFilter: string               = 'active';
   selectedWs:   DeliveryWorkstream | null = null;
 
+  // S5 / P13 / D-183: inline deactivation confirmation
+  confirmDeactivateWsId: string | null = null;
+
   get filteredWorkstreams(): DeliveryWorkstream[] {
     if (this.activeFilter === 'active')   { return this.workstreams.filter(w => w.active_status); }
     if (this.activeFilter === 'inactive') { return this.workstreams.filter(w => !w.active_status); }
@@ -406,6 +474,16 @@ export class WorkstreamAdminComponent implements OnInit {
 
   selectWorkstream(ws: DeliveryWorkstream): void {
     this.selectedWs = this.selectedWs?.workstream_id === ws.workstream_id ? null : ws;
+    this.cdr.markForCheck();
+  }
+
+  /** P13 / D-183: open inline deactivation confirmation for a specific workstream */
+  startDeactivateConfirm(ws: DeliveryWorkstream): void {
+    this.confirmDeactivateWsId = ws.workstream_id;
+    this.toggleWarning         = '';
+    this.toggleWarningWsId     = null;
+    this.toggleError           = '';
+    this.toggleErrorWsId       = null;
     this.cdr.markForCheck();
   }
 
@@ -520,11 +598,12 @@ export class WorkstreamAdminComponent implements OnInit {
   }
 
   toggleActive(ws: DeliveryWorkstream): void {
-    this.togglingId        = ws.workstream_id;
-    this.toggleWarning     = '';
-    this.toggleWarningWsId = null;
-    this.toggleError       = '';
-    this.toggleErrorWsId   = null;
+    this.togglingId            = ws.workstream_id;
+    this.toggleWarning         = '';
+    this.toggleWarningWsId     = null;
+    this.toggleError           = '';
+    this.toggleErrorWsId       = null;
+    this.confirmDeactivateWsId = null;  // clear confirm state
     this.cdr.markForCheck();
 
     this.delivery.updateWorkstreamActiveStatus({

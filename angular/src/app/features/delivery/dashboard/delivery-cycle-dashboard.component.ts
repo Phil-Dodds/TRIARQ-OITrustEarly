@@ -25,8 +25,8 @@ import {
 } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { firstValueFrom, filter, take } from 'rxjs';
-import { CommonModule }           from '@angular/common';
-import { RouterModule, ActivatedRoute } from '@angular/router';
+import { CommonModule }                   from '@angular/common';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import {
   ReactiveFormsModule,
   FormBuilder,
@@ -45,11 +45,13 @@ import {
   DeliveryCycle,
   Division,
   DeliveryWorkstream,
+  DeliverySummary,
   TierClassification,
   LifecycleStage,
   GateName,
   GateStateMap
 } from '../../../core/types/database';
+import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -319,7 +321,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                 <ion-spinner *ngIf="creating" name="crescent"
                              style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
                 </ion-spinner>
-                {{ creating ? 'Creating…' : 'Create Cycle' }}
+                {{ creating ? 'Creating…' : 'Create Delivery Cycle' }}
               </button>
               <div *ngIf="createError"
                    style="font-size:var(--triarq-text-small);">
@@ -340,6 +342,134 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         [currentWorkstreamId]="createSelectedWorkstream?.workstream_id ?? null"
         (workstreamSelected)="onWorkstreamSelected($event)">
       </app-workstream-picker>
+
+      <!-- ── S7: Hub Summary Cards — 4 tap-target cards above cycle list ──── -->
+      <!-- Cards derive from loaded cycles and delivery summary. Each card taps to filter. -->
+      <!-- D-171: /delivery is purely navigational — these cards live on /delivery/cycles. -->
+      <div *ngIf="!loading"
+           style="display:grid;grid-template-columns:repeat(4,1fr);gap:var(--triarq-space-sm);
+                  margin-bottom:var(--triarq-space-md);">
+
+        <!-- Card 1: Active Cycles -->
+        <div class="oi-card"
+             style="cursor:pointer;transition:box-shadow 0.1s;"
+             (click)="clearFilters()"
+             (mouseenter)="$any($event.currentTarget).style.boxShadow='0 2px 8px rgba(0,0,0,0.12)'"
+             (mouseleave)="$any($event.currentTarget).style.boxShadow=''">
+          <div style="font-size:var(--triarq-text-small);font-weight:500;
+                      color:var(--triarq-color-text-secondary);margin-bottom:4px;">Active Cycles</div>
+          <div style="font-size:28px;font-weight:700;color:var(--triarq-color-primary);line-height:1;">
+            {{ activeCycleCount }}
+          </div>
+          <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:4px;">
+            {{ activeStageSummary }}
+          </div>
+        </div>
+
+        <!-- Card 2: Gates Awaiting Your Action -->
+        <div class="oi-card"
+             style="cursor:pointer;transition:box-shadow 0.1s;"
+             (click)="filterToAwaitingAction()"
+             (mouseenter)="$any($event.currentTarget).style.boxShadow='0 2px 8px rgba(0,0,0,0.12)'"
+             (mouseleave)="$any($event.currentTarget).style.boxShadow=''">
+          <div style="font-size:var(--triarq-text-small);font-weight:500;
+                      color:var(--triarq-color-text-secondary);margin-bottom:4px;">
+            Gates Awaiting Your Action
+          </div>
+          <div style="font-size:28px;font-weight:700;line-height:1;"
+               [style.color]="awaitingActionCount > 0 ? 'var(--triarq-color-primary)' : 'var(--triarq-color-text-secondary)'">
+            {{ awaitingActionCount }}
+          </div>
+          <div *ngIf="oldestAwaitingGateName"
+               style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:4px;">
+            Oldest: {{ GATE_LABELS[oldestAwaitingGateName] }} · {{ oldestAwaitingDays }} day{{ oldestAwaitingDays === 1 ? '' : 's' }}
+          </div>
+          <div *ngIf="!oldestAwaitingGateName && awaitingActionCount === 0"
+               style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:4px;">
+            No gates pending your review
+          </div>
+        </div>
+
+        <!-- Card 3: Overdue Gates — amber accent when >0 -->
+        <div class="oi-card"
+             style="cursor:pointer;transition:box-shadow 0.1s;"
+             [style.border-left]="overdueGateCount > 0 ? '4px solid var(--triarq-color-sunray,#f5a623)' : ''"
+             (click)="filterToOverdue()"
+             (mouseenter)="$any($event.currentTarget).style.boxShadow='0 2px 8px rgba(0,0,0,0.12)'"
+             (mouseleave)="$any($event.currentTarget).style.boxShadow=''">
+          <div style="font-size:var(--triarq-text-small);font-weight:500;
+                      color:var(--triarq-color-text-secondary);margin-bottom:4px;">Overdue Gates</div>
+          <div style="font-size:28px;font-weight:700;line-height:1;"
+               [style.color]="overdueGateCount > 0 ? 'var(--triarq-color-sunray,#f5a623)' : 'var(--triarq-color-text-secondary)'">
+            {{ overdueGateCount }}
+          </div>
+          <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:4px;">
+            Across {{ overdueCycleCount }} cycle{{ overdueCycleCount === 1 ? '' : 's' }}
+          </div>
+        </div>
+
+        <!-- Card 4: Active Workstreams -->
+        <div class="oi-card"
+             style="cursor:pointer;transition:box-shadow 0.1s;"
+             (click)="navigateToWorkstreams()"
+             (mouseenter)="$any($event.currentTarget).style.boxShadow='0 2px 8px rgba(0,0,0,0.12)'"
+             (mouseleave)="$any($event.currentTarget).style.boxShadow=''">
+          <div style="font-size:var(--triarq-text-small);font-weight:500;
+                      color:var(--triarq-color-text-secondary);margin-bottom:4px;">Active Workstreams</div>
+          <div style="font-size:28px;font-weight:700;color:var(--triarq-color-primary);line-height:1;">
+            {{ activeWorkstreamCount }}
+          </div>
+          <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:4px;">
+            {{ totalWorkstreamCycleCount }} active cycle{{ totalWorkstreamCycleCount === 1 ? '' : 's' }} total
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Item 5: Drill-down filter visual confirmation — Principle 3 ──── -->
+      <!-- When landing from a drill-down (query params set), show the applied filter clearly. -->
+      <!-- User can see what filter landed them here and remove it. -->
+      <div *ngIf="drillDownActive"
+           style="display:flex;align-items:center;gap:var(--triarq-space-sm);flex-wrap:wrap;
+                  margin-bottom:var(--triarq-space-sm);padding:var(--triarq-space-xs) var(--triarq-space-sm);
+                  background:#e3f2fd;border-radius:6px;font-size:var(--triarq-text-small);">
+        <span style="color:var(--triarq-color-primary);font-weight:500;">Filtered view:</span>
+        <span *ngIf="drillDownWorkstreamLabel"
+              style="display:inline-flex;align-items:center;gap:4px;
+                     padding:2px 8px;border-radius:999px;
+                     background:rgba(37,112,153,0.12);color:var(--triarq-color-primary);">
+          Workstream: {{ drillDownWorkstreamLabel }}
+          <button (click)="clearDrillDownWorkstream()"
+                  style="background:none;border:none;cursor:pointer;
+                         font-size:12px;color:var(--triarq-color-primary);
+                         padding:0;line-height:1;">✕</button>
+        </span>
+        <span *ngIf="drillDownGateLabel"
+              style="display:inline-flex;align-items:center;gap:4px;
+                     padding:2px 8px;border-radius:999px;
+                     background:rgba(37,112,153,0.12);color:var(--triarq-color-primary);">
+          Gate: {{ drillDownGateLabel }}
+          <button (click)="clearDrillDownGate()"
+                  style="background:none;border:none;cursor:pointer;
+                         font-size:12px;color:var(--triarq-color-primary);
+                         padding:0;line-height:1;">✕</button>
+        </span>
+        <span *ngIf="drillDownDivisionLabel"
+              style="display:inline-flex;align-items:center;gap:4px;
+                     padding:2px 8px;border-radius:999px;
+                     background:rgba(37,112,153,0.12);color:var(--triarq-color-primary);">
+          Division: {{ drillDownDivisionLabel }}
+          <button (click)="clearDrillDownDivision()"
+                  style="background:none;border:none;cursor:pointer;
+                         font-size:12px;color:var(--triarq-color-primary);
+                         padding:0;line-height:1;">✕</button>
+        </span>
+        <button (click)="clearDrillDown()"
+                style="margin-left:auto;font-size:var(--triarq-text-small);
+                       background:none;border:none;cursor:pointer;
+                       color:var(--triarq-color-text-secondary);text-decoration:underline;">
+          Remove all filters
+        </button>
+      </div>
 
       <!-- ── Filters + sort row ──────────────────────────────────────────── -->
       <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;
@@ -697,6 +827,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   filterDs:                 string  = '';
   filterCb:                 string  = '';
 
+  // S7: Hub summary card state — derived from loaded cycles + delivery summary
+  deliverySummary: DeliverySummary | null = null;
+
+  // Item 5: Drill-down visual confirmation — tracks which filters came from query params
+  drillDownFromQp = false;  // set true when query params were present on init
+
   // Sort state
   sortField: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' = 'cycle_title';
   sortDir:   'asc' | 'desc' = 'asc';
@@ -717,12 +853,14 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   readonly skeletonRows = [1, 2, 3, 4, 5];
 
   constructor(
-    private readonly delivery: DeliveryService,
-    private readonly mcp:      McpService,
-    private readonly profile:  UserProfileService,
-    private readonly fb:       FormBuilder,
-    private readonly route:    ActivatedRoute,
-    private readonly cdr:      ChangeDetectorRef
+    private readonly delivery:     DeliveryService,
+    private readonly mcp:          McpService,
+    private readonly profile:      UserProfileService,
+    private readonly fb:           FormBuilder,
+    private readonly route:        ActivatedRoute,
+    private readonly router:       Router,
+    private readonly screenState:  ScreenStateService,
+    private readonly cdr:          ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -743,14 +881,21 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       milestone_close_review:   ['']
     });
     // D-175: read query params from summary view drill-down and apply as initial filters.
+    // Item 5: set drillDownFromQp so the visual confirmation banner renders.
     const qp = this.route.snapshot.queryParams;
-    if (qp['workstream_id']) { this.filterWorkstream = qp['workstream_id'] as string; }
-    if (qp['next_gate'])     { this.filterNextGate   = qp['next_gate']     as string; }
-    if (qp['division_id'])   { this.filterDivision   = qp['division_id']   as string; }
+    if (qp['workstream_id']) { this.filterWorkstream = qp['workstream_id'] as string; this.drillDownFromQp = true; }
+    if (qp['next_gate'])     { this.filterNextGate   = qp['next_gate']     as string; this.drillDownFromQp = true; }
+    if (qp['division_id'])   { this.filterDivision   = qp['division_id']   as string; this.drillDownFromQp = true; }
+
+    // Item 4 (Part 3): Restore saved filter/sort state if no drill-down params present.
+    // D-175 drill-down takes priority; restoreScreenState() skips if drillDownFromQp is set.
+    // Principle 9: skeleton renders while cycles load — restored filters show on first paint.
+    this.restoreScreenState();
 
     this.loadWorkstreams();
     this.loadDivisions();
     this.loadCycles();
+    this.loadDeliverySummary();
 
     // Subscribe to profile — fires immediately if already loaded, or when it arrives.
     // canCreateCycle and checkUserDivisions() depend on system_role, which is only
@@ -761,7 +906,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       .subscribe(() => {
         const p    = this.profile.getCurrentProfile();
         const role = p?.system_role;
-        this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin' || role === 'cb' || role === 'ce';
+        // S8: CE is read-only — can view cycles but not create them (enforced at MCP layer too).
+        this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin' || role === 'cb';
 
         // CC-006: Pre-populate DS if caller is DS role.
         // Most cycles are created by their own DS — this eliminates a required picker call for the common case.
@@ -838,6 +984,180 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       return this.divisions;
     }
     return this.userDivisions;
+  }
+
+  // ── S7: Hub summary card computed getters ─────────────────────────────────
+
+  private readonly TERMINAL_STAGES: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
+
+  /** Card 1: count of non-terminal cycles across loaded result set */
+  get activeCycleCount(): number {
+    return this.cycles.filter(c => !this.TERMINAL_STAGES.includes(c.current_lifecycle_stage)).length;
+  }
+
+  /** Card 1: sub-stat — stage breakdown in priority order */
+  get activeStageSummary(): string {
+    const active = this.cycles.filter(c => !this.TERMINAL_STAGES.includes(c.current_lifecycle_stage));
+    const counts = new Map<string, number>();
+    for (const c of active) {
+      const label = STAGE_LABEL_MAP[c.current_lifecycle_stage] ?? c.current_lifecycle_stage;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    if (counts.size === 0) { return 'No active cycles'; }
+    return Array.from(counts.entries())
+      .map(([l, n]) => `${n} in ${l}`)
+      .join(' · ');
+  }
+
+  /** Card 2: count of gate records where caller can approve and gate is pending */
+  get awaitingActionCount(): number {
+    let count = 0;
+    for (const c of this.cycles) {
+      for (const g of c.gate_records ?? []) {
+        if (g.gate_status === 'pending' && g.current_user_gate_authority?.can_approve) { count++; }
+      }
+    }
+    return count;
+  }
+
+  /** Card 2: name of oldest awaiting gate */
+  get oldestAwaitingGateName(): GateName | null {
+    let oldest: { gate: GateName; date: string } | null = null;
+    for (const c of this.cycles) {
+      for (const g of c.gate_records ?? []) {
+        if (g.gate_status === 'pending' && g.current_user_gate_authority?.can_approve) {
+          if (!oldest || g.created_at < oldest.date) {
+            oldest = { gate: g.gate_name, date: g.created_at };
+          }
+        }
+      }
+    }
+    return oldest?.gate ?? null;
+  }
+
+  /** Card 2: days since oldest awaiting gate */
+  get oldestAwaitingDays(): number {
+    let oldest: string | null = null;
+    for (const c of this.cycles) {
+      for (const g of c.gate_records ?? []) {
+        if (g.gate_status === 'pending' && g.current_user_gate_authority?.can_approve) {
+          if (!oldest || g.created_at < oldest) { oldest = g.created_at; }
+        }
+      }
+    }
+    if (!oldest) { return 0; }
+    return Math.floor((Date.now() - new Date(oldest).getTime()) / 86_400_000);
+  }
+
+  /** Card 3: count of overdue gate records (target_date < today, no actual_date, not approved) */
+  get overdueGateCount(): number {
+    const today = new Date().toISOString().slice(0, 10);
+    let count = 0;
+    for (const c of this.cycles) {
+      for (const m of c.milestone_dates ?? []) {
+        if (m.target_date && !m.actual_date && m.target_date < today) {
+          const gateRecord = c.gate_records?.find(g => g.gate_name === m.gate_name);
+          if (gateRecord?.gate_status !== 'approved') { count++; }
+        }
+      }
+    }
+    return count;
+  }
+
+  /** Card 3: cycles with at least one overdue gate */
+  get overdueCycleCount(): number {
+    const today = new Date().toISOString().slice(0, 10);
+    return this.cycles.filter(c =>
+      (c.milestone_dates ?? []).some(m => {
+        if (!m.target_date || m.actual_date || m.target_date >= today) { return false; }
+        const gateRecord = c.gate_records?.find(g => g.gate_name === m.gate_name);
+        return gateRecord?.gate_status !== 'approved';
+      })
+    ).length;
+  }
+
+  /** Card 4: active workstream count from summary or loaded list */
+  get activeWorkstreamCount(): number {
+    if (this.deliverySummary) {
+      return this.deliverySummary.workstream_summaries.filter(w => w.active_status).length;
+    }
+    return this.activeWorkstreams.length;
+  }
+
+  /** Card 4: total active cycle count across all workstreams */
+  get totalWorkstreamCycleCount(): number {
+    if (this.deliverySummary) {
+      return this.deliverySummary.workstream_summaries
+        .filter(w => w.active_status)
+        .reduce((sum, w) => sum + w.total_active_cycles, 0);
+    }
+    return this.activeCycleCount;
+  }
+
+  // ── Item 5: Drill-down filter visual confirmation getters ──────────────────
+
+  get drillDownActive(): boolean {
+    return this.drillDownFromQp && !!(this.filterWorkstream || this.filterNextGate || this.filterDivision);
+  }
+
+  get drillDownWorkstreamLabel(): string | null {
+    if (!this.filterWorkstream || !this.drillDownFromQp) { return null; }
+    if (this.filterWorkstream === '__none__') { return 'No Workstream assigned'; }
+    return this.workstreams.find(w => w.workstream_id === this.filterWorkstream)?.workstream_name ?? this.filterWorkstream;
+  }
+
+  get drillDownGateLabel(): string | null {
+    if (!this.filterNextGate || !this.drillDownFromQp) { return null; }
+    return GATE_LABELS[this.filterNextGate as GateName] ?? this.filterNextGate;
+  }
+
+  get drillDownDivisionLabel(): string | null {
+    if (!this.filterDivision || !this.drillDownFromQp) { return null; }
+    return this.divisions.find(d => d.id === this.filterDivision)?.division_name ?? this.filterDivision;
+  }
+
+  clearDrillDownWorkstream(): void { this.filterWorkstream = ''; this.drillDownFromQp = !!this.filterNextGate || !!this.filterDivision; this.applyFilters(); }
+  clearDrillDownGate():       void { this.filterNextGate   = ''; this.drillDownFromQp = !!this.filterWorkstream || !!this.filterDivision; this.applyFilters(); }
+  clearDrillDownDivision():   void { this.filterDivision   = ''; this.drillDownFromQp = !!this.filterWorkstream || !!this.filterNextGate; this.onDivisionFilterChange(); }
+  clearDrillDown():           void { this.filterWorkstream = ''; this.filterNextGate = ''; this.filterDivision = ''; this.drillDownFromQp = false; this.onDivisionFilterChange(); }
+
+  /** Card 2 tap: filter to cycles where user has gates awaiting action */
+  filterToAwaitingAction(): void {
+    // Filter in-place: keep only cycles where can_approve + pending gate
+    this.filtered = this.cycles.filter(c =>
+      (c.gate_records ?? []).some(g => g.gate_status === 'pending' && g.current_user_gate_authority?.can_approve)
+    );
+    this.cdr.markForCheck();
+  }
+
+  /** Card 3 tap: filter to cycles with overdue gates */
+  filterToOverdue(): void {
+    const today = new Date().toISOString().slice(0, 10);
+    this.filtered = this.cycles.filter(c =>
+      (c.milestone_dates ?? []).some(m => {
+        if (!m.target_date || m.actual_date || m.target_date >= today) { return false; }
+        const gateRecord = c.gate_records?.find(g => g.gate_name === m.gate_name);
+        return gateRecord?.gate_status !== 'approved';
+      })
+    );
+    this.cdr.markForCheck();
+  }
+
+  /** Card 4 tap: navigate to workstream registry (Admin) */
+  navigateToWorkstreams(): void {
+    this.router.navigate(['/admin/workstreams']);
+  }
+
+  private loadDeliverySummary(): void {
+    this.delivery.getDeliverySummary().subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.deliverySummary = res.data;
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => {} // summary is supplemental — fail silently
+    });
   }
 
   private loadWorkstreams(): void {
@@ -938,7 +1258,55 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   // Called when division filter or include_child_divisions changes — reloads from server
   onDivisionFilterChange(): void {
+    this.saveScreenState();
     this.loadCycles();
+  }
+
+  // ── Item 4 (Part 3): Screen state save/restore ──────────────────────────────
+  // SCREEN_STATE_RECENCY_DAYS = 7. Search text is never persisted (Principle 4).
+  // Save: filter dropdowns + sort field + sort dir + division scope.
+  // Restore: only when no drill-down query params are active (D-175 takes priority).
+
+  private saveScreenState(): void {
+    const userId = this.profile.getCurrentProfile()?.id;
+    if (!userId) { return; }  // profile not yet loaded — skip
+    this.screenState.save(SCREEN_KEYS.DELIVERY_CYCLES, userId, {
+      filterStage:           this.filterStage,
+      filterTier:            this.filterTier,
+      filterWorkstream:      this.filterWorkstream,
+      filterDivision:        this.filterDivision,
+      includeChildDivisions: this.includeChildDivisions,
+      filterNextGate:        this.filterNextGate,
+      filterDs:              this.filterDs,
+      filterCb:              this.filterCb,
+      sortField:             this.sortField,
+      sortDir:               this.sortDir
+    });
+  }
+
+  private restoreScreenState(): void {
+    // D-175: drill-down query params take priority — do not overwrite with saved state
+    if (this.drillDownFromQp) { return; }
+    const userId = this.profile.getCurrentProfile()?.id;
+    if (!userId) { return; }
+    const saved = this.screenState.restore(SCREEN_KEYS.DELIVERY_CYCLES, userId);
+    if (!saved) { return; }
+    if (typeof saved['filterStage']      === 'string') { this.filterStage      = saved['filterStage']; }
+    if (typeof saved['filterTier']       === 'string') { this.filterTier       = saved['filterTier']; }
+    if (typeof saved['filterWorkstream'] === 'string') { this.filterWorkstream = saved['filterWorkstream']; }
+    if (typeof saved['filterDivision']   === 'string') { this.filterDivision   = saved['filterDivision']; }
+    if (typeof saved['filterNextGate']   === 'string') { this.filterNextGate   = saved['filterNextGate']; }
+    if (typeof saved['filterDs']         === 'string') { this.filterDs         = saved['filterDs']; }
+    if (typeof saved['filterCb']         === 'string') { this.filterCb         = saved['filterCb']; }
+    if (typeof saved['sortField']        === 'string') {
+      this.sortField = saved['sortField'] as 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification';
+    }
+    if (typeof saved['sortDir'] === 'string') {
+      this.sortDir = saved['sortDir'] as 'asc' | 'desc';
+    }
+    if (typeof saved['includeChildDivisions'] === 'boolean') {
+      this.includeChildDivisions = saved['includeChildDivisions'];
+    }
   }
 
   applyFilters(): void {
@@ -980,6 +1348,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     });
 
     this.filtered = result;
+    this.saveScreenState();
     this.cdr.markForCheck();
   }
 

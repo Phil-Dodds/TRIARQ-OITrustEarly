@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-187**
+**Next available: D-188**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -95,6 +95,7 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-184 | Entity Name Capitalization | Claude Chat | April 2026 | Active |
 | D-185 | Principle Citation in Specs | Claude Chat | April 2026 | Active |
 | D-186 | Decision Implementation Status | Claude Chat | April 2026 | Active |
+| D-187 | Action Queue Name confirmed | Claude Chat | April 2026 | Active |
 
 ---
 

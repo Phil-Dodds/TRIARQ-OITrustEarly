@@ -27,6 +27,7 @@ import { CommonModule }       from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import {
   ReactiveFormsModule,
+  FormsModule,
   FormBuilder,
   FormGroup,
   FormControl,
@@ -49,7 +50,8 @@ import {
   GateStatus,
   GateStateMap,
   TierClassification,
-  LifecycleStage
+  LifecycleStage,
+  DateStatus
 } from '../../../core/types/database';
 
 const GATE_LABELS: Record<GateName, string> = {
@@ -58,6 +60,19 @@ const GATE_LABELS: Record<GateName, string> = {
   go_to_deploy:   'Go to Deploy (Pilot Start)',
   go_to_release:  'Go to Release',
   close_review:   'Close Review'
+};
+
+// D-173: next gate derived from lifecycle stage — mirrors NEXT_GATE_BY_STAGE in lifecycle.js
+const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
+  BRIEF:    'brief_review',
+  DESIGN:   'go_to_build',
+  SPEC:     'go_to_build',
+  BUILD:    'go_to_deploy',
+  VALIDATE: 'go_to_deploy',
+  PILOT:    'go_to_release',
+  UAT:      'go_to_release',
+  RELEASE:  'close_review',
+  OUTCOME:  'close_review'
 };
 
 const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
@@ -70,7 +85,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent],
   template: `
     <!-- D-178 Tier 1: Skeleton screen for initial cycle load -->
     <div *ngIf="loading" style="max-width:1100px;margin:var(--triarq-space-xl) auto;
@@ -442,6 +457,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   margin-bottom:var(--triarq-space-md);">
 
         <!-- ── Milestone Dates ──────────────────────────────────────────── -->
+        <!-- Item 1 (Part 3): 4-column grid: Gate | Target Date | Actual Date | Status -->
+        <!-- Status column: editable dropdown for not_started/on_track/at_risk;          -->
+        <!--   Behind = muted system-set label; Complete = Unset Complete link.          -->
         <div class="oi-card">
           <div style="font-weight:500;margin-bottom:4px;">Milestone Dates</div>
           <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
@@ -450,7 +468,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           </div>
 
           <div *ngFor="let m of cycle.milestone_dates; trackBy: trackByMilestoneId"
-               style="display:grid;grid-template-columns:2fr 1fr 1fr;
+               style="display:grid;grid-template-columns:2fr 1fr 1fr 1.4fr;
                       gap:var(--triarq-space-sm);padding:var(--triarq-space-xs) 0;
                       border-bottom:1px solid var(--triarq-color-border);
                       font-size:var(--triarq-text-small);align-items:start;">
@@ -462,13 +480,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">
                 Target Date
               </div>
-              <span *ngIf="editingMilestoneGate !== m.gate_name"
+              <span *ngIf="editingMilestoneGate !== m.gate_name && m.target_date"
                     [style.color]="milestoneTargetColor(m)"
-                    [style.cursor]="'pointer'"
-                    style="text-decoration:underline dotted;"
+                    style="text-decoration:underline dotted;cursor:pointer;"
                     (click)="startMilestoneEdit(m)"
-                    title="Click to set target date">
-                {{ m.target_date ?? '' }}
+                    title="Click to edit target date">
+                {{ m.target_date }}
               </span>
               <span *ngIf="editingMilestoneGate !== m.gate_name && !m.target_date"
                     style="color:var(--triarq-color-primary);cursor:pointer;font-size:10px;"
@@ -509,199 +526,411 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                           ? 'var(--triarq-color-text-secondary)'
                           : 'var(--triarq-color-error)')
                       : 'var(--triarq-color-text-secondary)'">
-                {{ m.actual_date ?? '' }}
+                {{ m.actual_date ?? '—' }}
               </span>
             </div>
-          </div>
+
+            <!-- Status column — Item 1 (Part 3) -->
+            <div>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:4px;">
+                Status
+              </div>
+
+              <!-- Behind: system-set, not user-editable -->
+              <div *ngIf="m.date_status === 'behind'">
+                <span class="oi-pill"
+                      [style.background]="dateStatusBg('behind')"
+                      [style.color]="dateStatusColor('behind')"
+                      style="font-size:10px;">Behind</span>
+                <div style="font-size:10px;color:var(--triarq-color-text-secondary);
+                            font-style:italic;margin-top:3px;">
+                  System-set — change target date to re-plan
+                </div>
+              </div>
+
+              <!-- Complete: show pill + Unset Complete link -->
+              <div *ngIf="m.date_status === 'complete'">
+                <span class="oi-pill"
+                      [style.background]="dateStatusBg('complete')"
+                      [style.color]="dateStatusColor('complete')"
+                      style="font-size:10px;">Complete</span>
+                <!-- Inline Unset Complete confirmation (D-183 / Principle 13) -->
+                <div *ngIf="unsetCompleteGate !== m.gate_name">
+                  <button (click)="startUnsetComplete(m.gate_name)"
+                          style="font-size:10px;color:var(--triarq-color-text-secondary);
+                                 background:none;border:none;cursor:pointer;padding:0;
+                                 margin-top:3px;text-decoration:underline;">
+                    Unset Complete
+                  </button>
+                </div>
+                <!-- Confirmation form — requires reason ≥ 10 chars (D-183) -->
+                <div *ngIf="unsetCompleteGate === m.gate_name"
+                     style="margin-top:6px;padding:8px;background:var(--triarq-color-background-subtle);
+                            border-radius:5px;border:1px solid var(--triarq-color-border);">
+                  <div style="font-size:11px;font-weight:500;margin-bottom:4px;
+                               color:var(--triarq-color-text-primary);">
+                    Unset this gate's Complete status?
+                  </div>
+                  <div style="font-size:10px;color:var(--triarq-color-text-secondary);margin-bottom:6px;">
+                    This will return the milestone to On Track. The change is logged in the cycle event log.
+                  </div>
+                  <label style="display:block;font-size:10px;margin-bottom:2px;">
+                    Reason <span style="color:var(--triarq-color-error);">*</span>
+                    <span style="color:var(--triarq-color-text-secondary);font-weight:400;"> (min 10 chars)</span>
+                  </label>
+                  <textarea [formControl]="unsetCompleteReason"
+                            class="oi-input"
+                            rows="2"
+                            style="font-size:11px;width:100%;resize:vertical;"
+                            placeholder="Explain why this completion status is being removed…">
+                  </textarea>
+                  <div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
+                    <button class="oi-btn-primary"
+                            (click)="confirmUnsetComplete()"
+                            [disabled]="unsetCompleteReason.invalid || unsetCompleteSaving"
+                            style="font-size:10px;padding:2px 8px;
+                                   display:flex;align-items:center;gap:4px;">
+                      <ion-spinner *ngIf="unsetCompleteSaving" name="crescent"
+                                   style="width:12px;height:12px;"></ion-spinner>
+                      <span>{{ unsetCompleteSaving ? '…' : 'Confirm' }}</span>
+                    </button>
+                    <button (click)="cancelUnsetComplete()"
+                            style="background:none;border:none;cursor:pointer;
+                                   font-size:10px;color:var(--triarq-color-text-secondary);">
+                      Cancel
+                    </button>
+                  </div>
+                  <div *ngIf="unsetCompleteError"
+                       style="color:var(--triarq-color-error);font-size:10px;margin-top:4px;">
+                    {{ unsetCompleteError }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- User-editable statuses: not_started | on_track | at_risk -->
+              <div *ngIf="m.date_status !== 'behind' && m.date_status !== 'complete'">
+                <!-- Viewing mode: pill + edit link -->
+                <div *ngIf="editingMilestoneStatus !== m.gate_name"
+                     style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <span class="oi-pill"
+                        [style.background]="dateStatusBg(m.date_status)"
+                        [style.color]="dateStatusColor(m.date_status)"
+                        style="font-size:10px;">
+                    {{ dateStatusLabel(m.date_status) }}
+                  </span>
+                  <button (click)="startMilestoneStatusEdit(m)"
+                          style="font-size:10px;color:var(--triarq-color-primary);
+                                 background:none;border:none;cursor:pointer;padding:0;">
+                    Edit
+                  </button>
+                </div>
+                <!-- Inline edit dropdown -->
+                <div *ngIf="editingMilestoneStatus === m.gate_name"
+                     style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                  <select [(ngModel)]="milestoneStatusValue"
+                          class="oi-input"
+                          style="font-size:11px;padding:2px 4px;">
+                    <option *ngFor="let opt of milestoneStatusOptions(m.date_status)"
+                            [value]="opt.value">{{ opt.label }}</option>
+                  </select>
+                  <button class="oi-btn-primary"
+                          (click)="saveMilestoneStatus(m.gate_name)"
+                          [disabled]="savingMilestoneStatus"
+                          style="font-size:10px;padding:2px 6px;
+                                 display:flex;align-items:center;gap:4px;">
+                    <ion-spinner *ngIf="savingMilestoneStatus" name="crescent"
+                                 style="width:12px;height:12px;"></ion-spinner>
+                    <span>{{ savingMilestoneStatus ? '…' : 'Set' }}</span>
+                  </button>
+                  <button (click)="cancelMilestoneStatusEdit()"
+                          style="background:none;border:none;cursor:pointer;
+                                 font-size:10px;color:var(--triarq-color-text-secondary);">
+                    ✕
+                  </button>
+                  <div *ngIf="milestoneStatusError"
+                       style="color:var(--triarq-color-error);font-size:10px;margin-top:2px;">
+                    {{ milestoneStatusError }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- end *ngFor milestone rows -->
         </div>
 
-        <!-- ── Gate Record Panel ────────────────────────────────────────── -->
-        <!-- D-178 Tier 3: position:relative required for overlay -->
+        <!-- ── Gate Detail Sub-Panel ────────────────────────────────────── -->
+        <!-- S2 (Part 2 Supplement): Structured gate detail layout.         -->
+        <!-- Principle 10: right-panel, no route change, dismissible.       -->
+        <!-- D-178 Tier 3: position:relative required for loading overlay.  -->
         <div class="oi-card" style="position:relative;">
           <app-loading-overlay [visible]="gateActionBusy" message="Processing gate…"></app-loading-overlay>
-          <div style="font-weight:500;margin-bottom:var(--triarq-space-sm);">
-            Gate Record
-            <span *ngIf="selectedGate" style="font-weight:400;color:var(--triarq-color-text-secondary);">
-              — {{ GATE_LABELS[selectedGate] }}
-            </span>
+
+          <!-- Panel header: gate name + breadcrumb + close button -->
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;
+                      margin-bottom:var(--triarq-space-sm);">
+            <div>
+              <div style="font-weight:500;">
+                Gate Record
+                <span *ngIf="selectedGate" style="font-weight:400;color:var(--triarq-color-text-secondary);">
+                  — {{ GATE_LABELS[selectedGate] }}
+                </span>
+              </div>
+              <div *ngIf="cycle && selectedGate"
+                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                          margin-top:2px;">
+                {{ cycle.cycle_title }} · Tier {{ tierShortLabel(cycle.tier_classification) }}
+              </div>
+            </div>
+            <button *ngIf="selectedGate"
+                    (click)="closeGatePanel()"
+                    aria-label="Close Gate panel"
+                    style="background:none;border:none;cursor:pointer;
+                           color:var(--triarq-color-text-secondary);font-size:18px;
+                           line-height:1;padding:2px 4px;flex-shrink:0;">✕</button>
           </div>
 
-          <!-- Empty state — explain what gates are and how to interact -->
+          <!-- Empty state — no gate selected -->
           <div *ngIf="!selectedGate"
                style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
             <p style="margin:0 0 8px 0;">
-              Gates are formal checkpoints in the lifecycle. Each gate must be approved
-              before the cycle can advance past it.
+              Gates are formal checkpoints in the lifecycle. Each Gate must be approved
+              before the Delivery Cycle can advance past it.
             </p>
             <p style="margin:0;">
-              Click a gate diamond on the Lifecycle Track above to view the gate record,
+              Click a gate diamond on the Lifecycle Track above to view the Gate record,
               submit for approval, or record an Approve or Return decision.
             </p>
           </div>
 
-          <!-- Gate selected, no record yet -->
-          <div *ngIf="selectedGate && !selectedGateRecord"
-               style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-            <p style="margin:0 0 8px 0;">
-              <strong>{{ GATE_LABELS[selectedGate] }}</strong> has not been submitted yet.
-            </p>
+          <!-- Gate selected — structured layout (Principle 10 / S2 spec) -->
+          <ng-container *ngIf="selectedGate">
 
-            <!-- Not Yet Active: gate is premature for current cycle stage -->
-            <div *ngIf="isGateNotYetActive(selectedGate!)"
-                 style="background:#f5f5f5;border-radius:6px;padding:var(--triarq-space-xs);
-                        margin-bottom:var(--triarq-space-xs);">
-              <span style="font-weight:500;color:var(--triarq-color-text-secondary);">Not Yet Active</span>
-              <div style="margin-top:2px;color:var(--triarq-color-text-secondary);">
-                This gate becomes available as the cycle progresses through earlier stages.
-                Advance the cycle to enable this gate review.
+            <!-- ── GATE STATUS ─────────────────────────────────────────── -->
+            <div style="margin-bottom:var(--triarq-space-sm);">
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
+                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
+                          margin-bottom:4px;">Gate Status</div>
+              <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);flex-wrap:wrap;">
+                <span class="oi-pill"
+                      [style.background]="gateDetailStatusBg(selectedGate)"
+                      [style.color]="gateDetailStatusColor(selectedGate)"
+                      style="font-size:11px;">
+                  {{ gateDetailStatus(selectedGate) }}
+                </span>
+                <span *ngIf="gateDetailStatus(selectedGate) === 'Not Yet Active'"
+                      style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+                  Advance the Delivery Cycle through earlier stages to unlock this Gate.
+                </span>
+                <!-- D-140: blocked — what is blocked + how to resolve -->
+                <span *ngIf="selectedGateRecord?.workstream_active_at_clearance === false"
+                      style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);">
+                  Workstream was inactive at last clearance attempt.
+                  Reactivate the Workstream in Admin → Delivery Workstream Registry, then resubmit.
+                </span>
               </div>
             </div>
 
-            <p *ngIf="!isGateNotYetActive(selectedGate!)" style="margin:0;">
-              Use the "Submit for Approval" button below when the cycle is ready for this gate review.
-            </p>
-            <!-- Submit button: only shown when caller has submit authority and gate is reachable -->
-            <button *ngIf="callerCanSubmitGates && !isGateNotYetActive(selectedGate!)"
-                    class="oi-btn-primary"
-                    style="margin-top:var(--triarq-space-sm);font-size:var(--triarq-text-small);
-                           display:flex;align-items:center;gap:6px;"
-                    (click)="submitGate(selectedGate!)"
-                    [disabled]="gateActionBusy">
-              <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-              <span>Submit for Approval</span>
-            </button>
-            <!-- No submit authority — D-140: tell user what they need -->
-            <div *ngIf="!callerCanSubmitGates && !isGateNotYetActive(selectedGate!)"
-                 style="margin-top:var(--triarq-space-xs);color:var(--triarq-color-text-secondary);">
-              Only the assigned DS, CB, or Phil can submit this gate.
-              Contact the cycle owner or an Admin to submit for approval.
-            </div>
-            <div *ngIf="gateActionError"
-                 style="margin-top:var(--triarq-space-xs);font-size:var(--triarq-text-small);">
-              <span style="color:var(--triarq-color-error);font-weight:500;">{{ gateActionError }}</span>
-              <div style="color:var(--triarq-color-text-secondary);margin-top:4px;">
-                {{ gateActionHint }}
+            <!-- ── MILESTONE DATE ──────────────────────────────────────── -->
+            <div *ngIf="selectedGateMilestone" style="margin-bottom:var(--triarq-space-sm);">
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
+                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
+                          margin-bottom:4px;">Milestone Date</div>
+              <div style="display:flex;gap:var(--triarq-space-lg);font-size:var(--triarq-text-small);
+                          flex-wrap:wrap;align-items:center;">
+                <div>
+                  <span style="color:var(--triarq-color-text-secondary);">Target: </span>
+                  <span [style.color]="milestoneTargetColor(selectedGateMilestone)">
+                    {{ selectedGateMilestone.target_date ?? '—' }}
+                  </span>
+                </div>
+                <div>
+                  <span style="color:var(--triarq-color-text-secondary);">Actual: </span>
+                  <span>{{ selectedGateMilestone.actual_date ?? '—' }}</span>
+                </div>
+                <span class="oi-pill"
+                      [style.background]="dateStatusBg(selectedGateMilestone.date_status)"
+                      [style.color]="dateStatusColor(selectedGateMilestone.date_status)"
+                      style="font-size:10px;">
+                  {{ dateStatusLabel(selectedGateMilestone.date_status) }}
+                </span>
               </div>
             </div>
-          </div>
 
-          <!-- Gate record exists -->
-          <div *ngIf="selectedGate && selectedGateRecord">
-            <!-- Status pill -->
-            <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);
-                        margin-bottom:var(--triarq-space-sm);">
-              <span class="oi-pill"
-                    [style.background]="gateStatusBg(selectedGateRecord.gate_status)"
-                    [style.color]="gateStatusColor(selectedGateRecord.gate_status)"
-                    style="font-size:11px;">
-                {{ selectedGateRecord.gate_status.toUpperCase() }}
-              </span>
-              <!-- D-140: blocked explanation -->
-              <span *ngIf="selectedGateRecord.workstream_active_at_clearance === false"
-                    style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);">
-                Workstream was inactive at last clearance attempt.
-                Reactivate the Workstream in Admin → Workstreams, then resubmit.
-              </span>
+            <!-- ── APPROVAL ROUTING ───────────────────────────────────── -->
+            <div style="margin-bottom:var(--triarq-space-sm);">
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
+                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
+                          margin-bottom:6px;">Approval Routing</div>
+              <!-- Accountable (A badge) -->
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;
+                          font-size:var(--triarq-text-small);">
+                <span style="width:18px;height:18px;border-radius:50%;
+                             background:var(--triarq-color-primary);color:#fff;
+                             font-size:9px;font-weight:700;display:inline-flex;
+                             align-items:center;justify-content:center;flex-shrink:0;">A</span>
+                <span style="color:var(--triarq-color-text-secondary);min-width:72px;">Accountable</span>
+                <span *ngIf="selectedGateRecord?.approver_user_id"
+                      style="padding:2px 10px;border-radius:999px;
+                             background:rgba(37,112,153,0.09);font-size:11px;">
+                  {{ approverDisplayName(selectedGateRecord!.approver_user_id!) }}
+                </span>
+                <span *ngIf="!selectedGateRecord?.approver_user_id"
+                      style="color:var(--triarq-color-text-secondary);font-style:italic;font-size:11px;">
+                  Phil (escalation default — no Accountable configured)
+                </span>
+              </div>
+              <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                          font-style:italic;">
+                Consulted and Informed routing configured in Build D (RACI Management module).
+              </div>
             </div>
 
-            <!-- Approver Return Notes -->
-            <div *ngIf="selectedGateRecord.approver_notes"
-                 style="font-size:var(--triarq-text-small);margin-bottom:var(--triarq-space-sm);
-                        background:var(--triarq-color-background-subtle);
-                        border-radius:6px;padding:var(--triarq-space-xs);">
-              <span style="font-weight:500;">Approver Return Notes:</span>
-              {{ selectedGateRecord.approver_notes }}
+            <!-- ── GATE CHECKLIST ─────────────────────────────────────── -->
+            <div style="margin-bottom:var(--triarq-space-sm);">
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
+                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
+                          margin-bottom:6px;">Gate Checklist</div>
+              <div *ngFor="let item of gateChecklist(selectedGate)"
+                   style="display:flex;align-items:center;gap:6px;margin-bottom:3px;
+                          font-size:var(--triarq-text-small);">
+                <span style="flex-shrink:0;"
+                      [style.color]="item.met ? 'var(--triarq-color-success,#2e7d32)' : 'var(--triarq-color-sunray,#f5a623)'">
+                  {{ item.met ? '✓' : '⚠' }}
+                </span>
+                <span [style.color]="item.met ? 'var(--triarq-color-text-primary)' : 'var(--triarq-color-text-secondary)'">
+                  {{ item.label }}
+                </span>
+              </div>
+              <div *ngIf="gateChecklist(selectedGate).length === 0"
+                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+                No checklist items defined for this Gate.
+              </div>
             </div>
 
-            <!-- Submit action: only when caller has submit authority -->
-            <div *ngIf="(selectedGateRecord.gate_status === 'returned' || selectedGateRecord.gate_status === 'pending')
-                        && selectedGateRecord.current_user_gate_authority?.can_submit !== false"
+            <!-- ── REVIEW NOTES ───────────────────────────────────────── -->
+            <div *ngIf="selectedGateRecord?.approver_notes"
                  style="margin-bottom:var(--triarq-space-sm);">
-              <button class="oi-btn-primary"
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
+                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
+                          margin-bottom:4px;">Review Notes</div>
+              <div style="background:var(--triarq-color-background-subtle);border-radius:6px;
+                          padding:var(--triarq-space-xs);font-size:var(--triarq-text-small);">
+                {{ selectedGateRecord!.approver_notes }}
+              </div>
+            </div>
+
+            <!-- Divider above action buttons -->
+            <div style="border-top:1px solid var(--triarq-color-border);
+                        margin:var(--triarq-space-sm) 0;"></div>
+
+            <!-- ── ACTION AREA ────────────────────────────────────────── -->
+
+            <!-- Not yet active — explain advancement path -->
+            <div *ngIf="!selectedGateRecord && isGateNotYetActive(selectedGate)"
+                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+              Advance the Delivery Cycle through earlier stages to unlock this Gate.
+            </div>
+
+            <!-- No record yet, gate reachable -->
+            <div *ngIf="!selectedGateRecord && !isGateNotYetActive(selectedGate)"
+                 style="font-size:var(--triarq-text-small);">
+              <p style="margin:0 0 8px 0;color:var(--triarq-color-text-secondary);">
+                <strong>{{ GATE_LABELS[selectedGate] }}</strong> has not been submitted yet.
+                Use the button below when the Delivery Cycle is ready for Gate review.
+              </p>
+              <button *ngIf="callerCanSubmitGates"
+                      class="oi-btn-primary"
+                      style="font-size:var(--triarq-text-small);display:flex;align-items:center;gap:6px;"
                       (click)="submitGate(selectedGate!)"
-                      [disabled]="gateActionBusy"
-                      style="font-size:var(--triarq-text-small);
-                             display:flex;align-items:center;gap:6px;">
+                      [disabled]="gateActionBusy">
                 <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
                 <span>Submit for Approval</span>
               </button>
+              <div *ngIf="!callerCanSubmitGates"
+                   style="color:var(--triarq-color-text-secondary);">
+                Only the assigned Domain Strategist, Capability Builder, or Phil can submit this Gate.
+                Contact the cycle owner or an Admin to submit for approval.
+              </div>
             </div>
 
-            <!-- Approver decision form — only when caller has approve authority -->
-            <div *ngIf="selectedGateRecord.gate_status === 'pending'
-                        && selectedGateRecord.current_user_gate_authority?.can_approve"
-                 style="border-top:1px solid var(--triarq-color-border);
-                        padding-top:var(--triarq-space-sm);margin-top:var(--triarq-space-sm);">
-              <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;">
-                Record Decision
+            <!-- Gate record exists — action buttons -->
+            <div *ngIf="selectedGateRecord">
+
+              <!-- Submit / Resubmit -->
+              <div *ngIf="(selectedGateRecord.gate_status === 'returned' || selectedGateRecord.gate_status === 'pending')
+                          && selectedGateRecord.current_user_gate_authority?.can_submit !== false"
+                   style="margin-bottom:var(--triarq-space-sm);">
+                <button class="oi-btn-primary"
+                        (click)="submitGate(selectedGate!)"
+                        [disabled]="gateActionBusy"
+                        style="font-size:var(--triarq-text-small);display:flex;align-items:center;gap:6px;">
+                  <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                  <span>{{ selectedGateRecord.gate_status === 'returned' ? 'Resubmit for Approval' : 'Submit for Approval' }}</span>
+                </button>
               </div>
-              <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                          margin-bottom:var(--triarq-space-xs);">
-                Approver Return Notes are required when returning. Notes are optional for approval.
-              </div>
-              <form [formGroup]="gateDecisionForm" (ngSubmit)="recordDecision(selectedGate!)">
-                <textarea
-                  formControlName="approver_notes"
-                  class="oi-input"
-                  rows="2"
-                  placeholder="Approver Return Notes (required if returning)"
-                  style="width:100%;resize:none;font-size:var(--triarq-text-small);"
-                ></textarea>
-                <div style="display:flex;gap:var(--triarq-space-sm);margin-top:var(--triarq-space-xs);
-                            align-items:center;flex-wrap:wrap;">
-                  <!-- Approve: two-step confirmation -->
-                  <ng-container *ngIf="!approveConfirming">
-                    <button type="button" class="oi-btn-primary"
-                            (click)="approveConfirming = true"
-                            [disabled]="gateActionBusy"
-                            style="font-size:var(--triarq-text-small);
-                                   display:flex;align-items:center;gap:6px;">
-                      <span>✓ Approve</span>
-                    </button>
-                  </ng-container>
-                  <ng-container *ngIf="approveConfirming">
-                    <span style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-                      Approve this gate? This cannot be undone.
-                    </span>
-                    <button type="button" class="oi-btn-primary"
-                            (click)="recordDecisionWithValue(selectedGate!, 'approved')"
-                            [disabled]="gateActionBusy"
-                            style="font-size:var(--triarq-text-small);
-                                   display:flex;align-items:center;gap:6px;">
-                      <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-                      <span>Confirm Approve</span>
-                    </button>
-                    <button type="button" (click)="approveConfirming = false"
-                            style="font-size:var(--triarq-text-small);background:none;border:none;
-                                   cursor:pointer;color:var(--triarq-color-text-secondary);">
-                      Cancel
-                    </button>
-                  </ng-container>
-                  <button type="button"
-                          (click)="recordDecisionWithValue(selectedGate!, 'returned')"
-                          [disabled]="gateActionBusy"
-                          style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);
-                                 background:none;border:1px solid var(--triarq-color-error);
-                                 border-radius:5px;padding:6px 12px;cursor:pointer;
-                                 display:flex;align-items:center;gap:6px;">
-                    <ion-spinner *ngIf="gateActionBusy" name="crescent"
-                                 style="width:14px;height:14px;color:var(--triarq-color-error);"></ion-spinner>
-                    <span>✗ Return</span>
-                  </button>
+
+              <!-- Approver decision form — approve/return -->
+              <div *ngIf="selectedGateRecord.gate_status === 'pending'
+                          && selectedGateRecord.current_user_gate_authority?.can_approve">
+                <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;">
+                  Record Decision
                 </div>
-              </form>
+                <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                            margin-bottom:var(--triarq-space-xs);">
+                  Return notes are required when returning. Notes are optional for approval.
+                </div>
+                <form [formGroup]="gateDecisionForm" (ngSubmit)="recordDecision(selectedGate!)">
+                  <textarea formControlName="approver_notes" class="oi-input" rows="2"
+                            placeholder="Approver notes (required if returning)"
+                            style="width:100%;resize:none;font-size:var(--triarq-text-small);">
+                  </textarea>
+                  <div style="display:flex;gap:var(--triarq-space-sm);margin-top:var(--triarq-space-xs);
+                              align-items:center;flex-wrap:wrap;">
+                    <ng-container *ngIf="!approveConfirming">
+                      <button type="button" class="oi-btn-primary"
+                              (click)="approveConfirming = true"
+                              [disabled]="gateActionBusy"
+                              style="font-size:var(--triarq-text-small);">✓ Approve</button>
+                    </ng-container>
+                    <ng-container *ngIf="approveConfirming">
+                      <span style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+                        Approve this Gate? This cannot be undone.
+                      </span>
+                      <button type="button" class="oi-btn-primary"
+                              (click)="recordDecisionWithValue(selectedGate!, 'approved')"
+                              [disabled]="gateActionBusy"
+                              style="font-size:var(--triarq-text-small);display:flex;align-items:center;gap:6px;">
+                        <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                        <span>Confirm Approve</span>
+                      </button>
+                      <button type="button" (click)="approveConfirming = false"
+                              style="font-size:var(--triarq-text-small);background:none;border:none;
+                                     cursor:pointer;color:var(--triarq-color-text-secondary);">Cancel</button>
+                    </ng-container>
+                    <button type="button"
+                            (click)="recordDecisionWithValue(selectedGate!, 'returned')"
+                            [disabled]="gateActionBusy"
+                            style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);
+                                   background:none;border:1px solid var(--triarq-color-error);
+                                   border-radius:5px;padding:6px 12px;cursor:pointer;
+                                   display:flex;align-items:center;gap:6px;">
+                      <ion-spinner *ngIf="gateActionBusy" name="crescent"
+                                   style="width:14px;height:14px;color:var(--triarq-color-error);"></ion-spinner>
+                      <span>✗ Return</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- No approve authority — gate pending but caller can't approve — D-140 -->
+              <div *ngIf="selectedGateRecord.gate_status === 'pending'
+                          && !selectedGateRecord.current_user_gate_authority?.can_approve"
+                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+                This Gate is awaiting approval. Only the designated approver or Phil can record a decision.
+              </div>
             </div>
 
-            <!-- No approve authority — shown when gate is pending but caller can't approve -->
-            <div *ngIf="selectedGateRecord.gate_status === 'pending'
-                        && !selectedGateRecord.current_user_gate_authority?.can_approve"
-                 style="border-top:1px solid var(--triarq-color-border);
-                        padding-top:var(--triarq-space-sm);margin-top:var(--triarq-space-sm);
-                        font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-              This gate is awaiting approval. Only the designated approver or Phil can record a decision.
-            </div>
-
-            <!-- Gate action feedback — D-140 -->
+            <!-- Gate action error feedback — D-140 -->
             <div *ngIf="gateActionError"
                  style="margin-top:var(--triarq-space-xs);font-size:var(--triarq-text-small);">
               <span style="color:var(--triarq-color-error);font-weight:500;">{{ gateActionError }}</span>
@@ -710,21 +939,19 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 {{ gateActionHint }}
               </div>
             </div>
-          </div>
+          </ng-container>
         </div>
       </div>
 
       <!-- ── Artifact Slots ────────────────────────────────────────────── -->
+      <!-- Item 2 (Part 3): collapsible stage sections; Principle 5 (progressive disclosure). -->
+      <!-- Current+past stages expanded by default; future stages collapsed.                  -->
+      <!-- Inline attach form per stage group (no global form at top).                        -->
+      <!-- D-181: "Attached by [Name chip]" on filled slots.                                  -->
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
         <div style="display:flex;align-items:center;justify-content:space-between;
                     margin-bottom:var(--triarq-space-xs);">
           <span style="font-weight:500;">Cycle Artifacts</span>
-          <button *ngIf="!showAttachForm"
-                  (click)="openAttachForm('')"
-                  style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
-                         background:none;border:none;cursor:pointer;padding:0;">
-            + Attach ad hoc document
-          </button>
         </div>
         <p style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-small);
                   color:var(--triarq-color-text-secondary);">
@@ -732,48 +959,6 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           to fill a slot. Use "→ OI Library" to record the artifact in the OI Library
           (full submission completes in Build B).
         </p>
-
-        <!-- Attach form — D-178 Tier 3: position:relative for overlay -->
-        <div *ngIf="showAttachForm"
-             style="background:var(--triarq-color-background-subtle);
-                    border-radius:6px;padding:var(--triarq-space-sm);
-                    margin-bottom:var(--triarq-space-sm);position:relative;">
-          <app-loading-overlay [visible]="attaching" message="Attaching artifact…"></app-loading-overlay>
-          <form [formGroup]="attachForm" (ngSubmit)="submitAttach()">
-            <div style="display:grid;gap:var(--triarq-space-xs);grid-template-columns:2fr 3fr auto;">
-              <div>
-                <label style="display:block;font-size:10px;margin-bottom:2px;">Artifact Title *</label>
-                <input formControlName="display_name" class="oi-input"
-                       style="font-size:var(--triarq-text-small);"
-                       placeholder="e.g. Context Brief v2" />
-              </div>
-              <div>
-                <label style="display:block;font-size:10px;margin-bottom:2px;">External URL *</label>
-                <input formControlName="external_url" class="oi-input" type="url"
-                       placeholder="https://…"
-                       style="font-size:var(--triarq-text-small);" />
-              </div>
-              <div style="display:flex;align-items:flex-end;gap:4px;">
-                <button type="submit" class="oi-btn-primary"
-                        [disabled]="attachForm.invalid || attaching"
-                        style="font-size:var(--triarq-text-small);white-space:nowrap;
-                               display:flex;align-items:center;gap:6px;">
-                  <ion-spinner *ngIf="attaching" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-                  <span>{{ attaching ? 'Attaching…' : 'Attach' }}</span>
-                </button>
-                <button type="button" (click)="cancelAttach()"
-                        style="background:none;border:none;cursor:pointer;
-                               font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-                  ✕
-                </button>
-              </div>
-            </div>
-            <div *ngIf="attachError"
-                 style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
-              {{ attachError }}
-            </div>
-          </form>
-        </div>
 
         <!-- Promote stub message — inline, not alert -->
         <div *ngIf="promoteStubMessage"
@@ -783,63 +968,242 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           {{ promoteStubMessage }}
         </div>
 
-        <!-- Artifacts by lifecycle stage — Group C: future stage groups are dimmed -->
+        <!-- Stage groups — collapsible (Principle 5) -->
         <div *ngFor="let group of artifactsByStage"
-             [style.opacity]="group.isFuture ? '0.5' : '1'">
-          <div style="font-size:var(--triarq-text-small);font-weight:500;
-                      margin:var(--triarq-space-sm) 0 var(--triarq-space-xs) 0;
-                      display:flex;align-items:center;gap:var(--triarq-space-xs);"
-               [style.color]="group.isFuture ? 'var(--triarq-color-text-secondary)' : 'var(--triarq-color-primary)'">
-            {{ group.stage }}
-            <span *ngIf="group.isFuture"
-                  style="font-size:10px;font-weight:400;font-style:italic;">
-              — available when cycle reaches {{ group.stage }}
-            </span>
-          </div>
-          <div *ngFor="let slot of group.slots"
-               style="display:grid;grid-template-columns:2fr 3fr 110px;
-                      gap:var(--triarq-space-sm);padding:var(--triarq-space-xs) 0;
-                      border-bottom:1px solid var(--triarq-color-border);
-                      font-size:var(--triarq-text-small);align-items:center;">
-            <span style="color:var(--triarq-color-text-secondary);">{{ slot.artifact_type_name }}</span>
-            <span *ngIf="slot.external_url">
-              <a [href]="slot.external_url" target="_blank" rel="noopener noreferrer"
-                 style="color:var(--triarq-color-primary);word-break:break-all;">
-                {{ slot.display_name }}
-              </a>
-              <span *ngIf="slot.pointer_status === 'promoted'"
-                    style="margin-left:6px;font-size:10px;color:var(--triarq-color-primary);
-                           background:#e3f2fd;border-radius:4px;padding:1px 5px;">
-                OI Library
+             style="margin-bottom:var(--triarq-space-xs);">
+
+          <!-- Stage section header — ▼/▶ toggle + name + "N of M attached" count -->
+          <button (click)="toggleStageExpand(group.stage)"
+                  style="width:100%;background:none;border:none;cursor:pointer;
+                         display:flex;align-items:center;justify-content:space-between;
+                         padding:var(--triarq-space-xs) var(--triarq-space-xs);
+                         border-radius:5px;margin-bottom:2px;
+                         background:var(--triarq-color-background-subtle);"
+                  [style.opacity]="group.isFuture ? '0.65' : '1'">
+            <span style="display:flex;align-items:center;gap:var(--triarq-space-xs);">
+              <span style="font-size:11px;color:var(--triarq-color-text-secondary);
+                           transition:transform 0.15s;"
+                    [style.transform]="isStageExpanded(group.stage) ? 'rotate(0)' : 'rotate(-90deg)'">
+                ▼
+              </span>
+              <span style="font-weight:500;font-size:var(--triarq-text-small);"
+                    [style.color]="group.isFuture ? 'var(--triarq-color-text-secondary)' : 'var(--triarq-color-primary)'">
+                {{ group.stage }}
+              </span>
+              <span *ngIf="group.isFuture"
+                    style="font-size:10px;color:var(--triarq-color-text-secondary);font-style:italic;">
+                — future stage
               </span>
             </span>
-            <span *ngIf="!slot.external_url && !slot.oi_library_artifact_id"
-                  style="color:var(--triarq-color-text-secondary);font-style:italic;">
-              Not yet attached
+            <span style="font-size:10px;color:var(--triarq-color-text-secondary);">
+              {{ attachedCountInGroup(group.slots) }} of {{ group.slots.length }} attached
             </span>
-            <span style="text-align:right;">
-              <!-- Attach and OI Library actions hidden for future stage groups -->
-              <button *ngIf="!slot.external_url && !group.isFuture"
-                      (click)="openAttachForm(slot.artifact_type_id ?? '')"
-                      style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
+          </button>
+
+          <!-- Expanded body -->
+          <div *ngIf="isStageExpanded(group.stage)">
+
+            <!-- Slot rows -->
+            <div *ngFor="let slot of group.slots"
+                 style="padding:var(--triarq-space-xs) var(--triarq-space-xs);
+                        border-bottom:1px solid var(--triarq-color-border);
+                        font-size:var(--triarq-text-small);">
+
+              <!-- Slot type name + guidance text (Item 2 — guidance_text under name) -->
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;
+                          gap:var(--triarq-space-sm);flex-wrap:wrap;">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:500;color:var(--triarq-color-text-primary);">
+                    {{ slot.artifact_type_name ?? slot.display_name }}
+                  </div>
+                  <!-- guidance_text from cycle_artifact_types — shown below name (Item 2 / D-182) -->
+                  <div *ngIf="slot.guidance_text"
+                       style="font-size:10px;color:var(--triarq-color-text-secondary);
+                              margin-top:1px;font-style:italic;">
+                    {{ slot.guidance_text }}
+                  </div>
+
+                  <!-- Filled slot: link + "Attached by [chip] · timestamp" -->
+                  <div *ngIf="slot.external_url" style="margin-top:4px;">
+                    <a [href]="slot.external_url" target="_blank" rel="noopener noreferrer"
+                       style="color:var(--triarq-color-primary);word-break:break-all;">
+                      {{ slot.display_name }}
+                    </a>
+                    <span *ngIf="slot.pointer_status === 'promoted'"
+                          style="margin-left:6px;font-size:10px;color:var(--triarq-color-primary);
+                                 background:#e3f2fd;border-radius:4px;padding:1px 5px;">
+                      OI Library
+                    </span>
+                    <!-- D-181: "Attached by [Name chip]" -->
+                    <div style="margin-top:4px;display:flex;align-items:center;
+                                gap:4px;flex-wrap:wrap;">
+                      <span style="font-size:10px;color:var(--triarq-color-text-secondary);">
+                        Attached by
+                      </span>
+                      <span *ngIf="slot.attached_by_display_name"
+                            class="oi-pill"
+                            style="font-size:10px;cursor:default;
+                                   background:var(--triarq-color-fog, #f0f4f8);
+                                   color:var(--triarq-color-text-primary);">
+                        {{ slot.attached_by_display_name }}
+                      </span>
+                      <span *ngIf="!slot.attached_by_display_name"
+                            style="font-size:10px;color:var(--triarq-color-text-secondary);">
+                        Unknown
+                      </span>
+                      <span style="font-size:10px;color:var(--triarq-color-text-secondary);">
+                        · {{ slot.attached_at | date:'dd MMM yyyy' }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- Empty slot placeholder -->
+                  <div *ngIf="!slot.external_url && !slot.oi_library_artifact_id"
+                       style="margin-top:4px;font-size:10px;color:var(--triarq-color-text-secondary);
+                              font-style:italic;">
+                    Not yet attached
+                  </div>
+                </div>
+
+                <!-- Action column: Attach / Replace + → OI Library -->
+                <div *ngIf="!group.isFuture"
+                     style="display:flex;flex-direction:column;align-items:flex-end;
+                            gap:4px;flex-shrink:0;">
+                  <button *ngIf="!slot.external_url"
+                          (click)="openAttachForm(slot.artifact_type_id ?? '')"
+                          style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
+                                 background:none;border:none;cursor:pointer;padding:0;">
+                    Attach
+                  </button>
+                  <button *ngIf="slot.external_url"
+                          (click)="openAttachForm(slot.artifact_type_id ?? '')"
+                          style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                                 background:none;border:none;cursor:pointer;padding:0;">
+                    Replace
+                  </button>
+                  <button *ngIf="slot.external_url && slot.pointer_status === 'external_only'"
+                          (click)="promoteArtifact(slot)"
+                          style="font-size:10px;color:var(--triarq-color-text-secondary);
+                                 background:none;border:none;cursor:pointer;padding:0;"
+                          title="Record in OI Library (submission completes in Build B)">
+                    → OI Library
+                  </button>
+                </div>
+              </div>
+
+              <!-- Inline attach form — opened per slot or from stage ad hoc link -->
+              <div *ngIf="showAttachForm && attachingForTypeId === (slot.artifact_type_id ?? '')"
+                   style="margin-top:var(--triarq-space-xs);
+                          background:var(--triarq-color-background-subtle);
+                          border-radius:5px;padding:var(--triarq-space-xs);
+                          position:relative;">
+                <app-loading-overlay [visible]="attaching" message="Attaching artifact…"></app-loading-overlay>
+                <form [formGroup]="attachForm" (ngSubmit)="submitAttach()">
+                  <div style="display:grid;gap:var(--triarq-space-xs);
+                              grid-template-columns:2fr 3fr auto;align-items:end;">
+                    <div>
+                      <label style="display:block;font-size:10px;margin-bottom:2px;">
+                        Artifact Title <span style="color:var(--triarq-color-error);">*</span>
+                      </label>
+                      <input formControlName="display_name" class="oi-input"
+                             style="font-size:var(--triarq-text-small);"
+                             placeholder="e.g. Context Brief v2" />
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:10px;margin-bottom:2px;">
+                        External URL <span style="color:var(--triarq-color-error);">*</span>
+                      </label>
+                      <input formControlName="external_url" class="oi-input" type="url"
+                             placeholder="https://…"
+                             style="font-size:var(--triarq-text-small);" />
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                      <button type="submit" class="oi-btn-primary"
+                              [disabled]="attachForm.invalid || attaching"
+                              style="font-size:var(--triarq-text-small);white-space:nowrap;
+                                     display:flex;align-items:center;gap:6px;">
+                        <ion-spinner *ngIf="attaching" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                        <span>{{ attaching ? '…' : 'Attach' }}</span>
+                      </button>
+                      <button type="button" (click)="cancelAttach()"
+                              style="background:none;border:none;cursor:pointer;
+                                     font-size:var(--triarq-text-small);
+                                     color:var(--triarq-color-text-secondary);">✕</button>
+                    </div>
+                  </div>
+                  <div *ngIf="attachError"
+                       style="color:var(--triarq-color-error);font-size:10px;margin-top:4px;">
+                    {{ attachError }}
+                  </div>
+                </form>
+              </div>
+
+            </div><!-- end slot rows -->
+
+            <!-- Ad hoc attach link at bottom of each expanded stage (not future) -->
+            <div *ngIf="!group.isFuture"
+                 style="padding:var(--triarq-space-xs) var(--triarq-space-xs);">
+              <!-- Ad hoc form open for this stage -->
+              <div *ngIf="showAttachForm && attachingForTypeId === '__adhoc__' + group.stage"
+                   style="background:var(--triarq-color-background-subtle);
+                          border-radius:5px;padding:var(--triarq-space-xs);
+                          position:relative;">
+                <app-loading-overlay [visible]="attaching" message="Attaching artifact…"></app-loading-overlay>
+                <form [formGroup]="attachForm" (ngSubmit)="submitAttach()">
+                  <div style="display:grid;gap:var(--triarq-space-xs);
+                              grid-template-columns:2fr 3fr auto;align-items:end;">
+                    <div>
+                      <label style="display:block;font-size:10px;margin-bottom:2px;">
+                        Artifact Title <span style="color:var(--triarq-color-error);">*</span>
+                      </label>
+                      <input formControlName="display_name" class="oi-input"
+                             style="font-size:var(--triarq-text-small);"
+                             placeholder="e.g. Context Brief v2" />
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:10px;margin-bottom:2px;">
+                        External URL <span style="color:var(--triarq-color-error);">*</span>
+                      </label>
+                      <input formControlName="external_url" class="oi-input" type="url"
+                             placeholder="https://…"
+                             style="font-size:var(--triarq-text-small);" />
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                      <button type="submit" class="oi-btn-primary"
+                              [disabled]="attachForm.invalid || attaching"
+                              style="font-size:var(--triarq-text-small);white-space:nowrap;
+                                     display:flex;align-items:center;gap:6px;">
+                        <ion-spinner *ngIf="attaching" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                        <span>{{ attaching ? '…' : 'Attach' }}</span>
+                      </button>
+                      <button type="button" (click)="cancelAttach()"
+                              style="background:none;border:none;cursor:pointer;
+                                     font-size:var(--triarq-text-small);
+                                     color:var(--triarq-color-text-secondary);">✕</button>
+                    </div>
+                  </div>
+                  <div *ngIf="attachError"
+                       style="color:var(--triarq-color-error);font-size:10px;margin-top:4px;">
+                    {{ attachError }}
+                  </div>
+                </form>
+              </div>
+              <!-- Ad hoc link -->
+              <button *ngIf="!(showAttachForm && attachingForTypeId === '__adhoc__' + group.stage)"
+                      (click)="openAttachForm('__adhoc__' + group.stage)"
+                      style="font-size:10px;color:var(--triarq-color-primary);
                              background:none;border:none;cursor:pointer;padding:0;">
-                Attach
+                + Attach Document
               </button>
-              <button *ngIf="slot.external_url && slot.pointer_status === 'external_only' && !group.isFuture"
-                      (click)="promoteArtifact(slot)"
-                      style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                             background:none;border:none;cursor:pointer;padding:0;"
-                      title="Record in OI Library (submission completes in Build B)">
-                → OI Library
-              </button>
-            </span>
-          </div>
-        </div>
+            </div>
+
+          </div><!-- end expanded body -->
+
+        </div><!-- end stage group loop -->
 
         <div *ngIf="artifactsByStage.length === 0"
              style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-          No artifacts attached yet. Use "Attach ad hoc document" above or the Attach button
-          next to a specific slot once artifact types are seeded.
+          No artifact slots found. Artifact type seed data is required.
         </div>
       </div>
 
@@ -1026,7 +1390,7 @@ export class DeliveryCycleDetailComponent implements OnInit {
   showAttachForm    = false;
   attaching         = false;
   attachError       = '';
-  attachingTypeId   = '';
+  attachingForTypeId   = '';
   promoteStubMessage = '';
   attachForm!:      FormGroup;
 
@@ -1065,6 +1429,24 @@ export class DeliveryCycleDetailComponent implements OnInit {
   savingCb    = false;
   cbError     = '';
   cbControl   = new FormControl('');
+
+  // S2: Gate detail sub-panel — additional status edit state
+  // (selectedGate + selectedGateRecord already declared above)
+
+  // Item 1: Milestone status edit — status dropdown per row
+  editingMilestoneStatus:  GateName | null = null;
+  milestoneStatusValue:    string          = '';
+  savingMilestoneStatus    = false;
+  milestoneStatusError     = '';
+  // Item 1: Unset Complete inline confirmation — Principle 13
+  unsetCompleteGate:       GateName | null = null;
+  unsetCompleteReason      = new FormControl('', [Validators.required, Validators.minLength(10)]);
+  unsetCompleteSaving      = false;
+  unsetCompleteError       = '';
+
+  // Item 2: Artifact stage expand/collapse — Principle 5
+  // Populated on cycle load: current + past stages expanded by default; future collapsed
+  expandedStages = new Set<string>();
 
   // Expose constants to template
   readonly GATE_LABELS     = GATE_LABELS;
@@ -1109,6 +1491,7 @@ export class DeliveryCycleDetailComponent implements OnInit {
       next: (res) => {
         if (res.success && res.data) {
           this.cycle = res.data;
+          this.initExpandedStages(); // Item 2: expand current + past stages by default
           this.loadEvents(cycleId);
         } else {
           this.loadError = res.error ?? 'Could not load this cycle.';
@@ -1657,7 +2040,7 @@ export class DeliveryCycleDetailComponent implements OnInit {
   // ── Artifacts ──────────────────────────────────────────────────────────────
 
   openAttachForm(artifactTypeId: string): void {
-    this.attachingTypeId   = artifactTypeId;
+    this.attachingForTypeId   = artifactTypeId;
     this.showAttachForm    = true;
     this.attachError       = '';
     this.promoteStubMessage = '';
@@ -1679,7 +2062,7 @@ export class DeliveryCycleDetailComponent implements OnInit {
 
     this.delivery.attachArtifact({
       delivery_cycle_id: this.cycle.delivery_cycle_id,
-      artifact_type_id:  this.attachingTypeId || undefined,
+      artifact_type_id:  this.attachingForTypeId || undefined,
       display_name:      this.attachForm.value.display_name as string,
       external_url:      this.attachForm.value.external_url as string
     }).subscribe({
@@ -1819,5 +2202,302 @@ export class DeliveryCycleDetailComponent implements OnInit {
 
   trackByMilestoneId(_: number, m: CycleMilestoneDate): string {
     return m.milestone_id;
+  }
+
+  // ── S2: Gate detail sub-panel methods ─────────────────────────────────────
+
+  /** Close gate panel without navigating away — Principle 10 */
+  closeGatePanel(): void {
+    this.selectedGate       = null;
+    this.selectedGateRecord = null;
+    this.gateActionError    = '';
+    this.gateActionHint     = '';
+    this.approveConfirming  = false;
+    this.cdr.markForCheck();
+  }
+
+  /** Compute the display status label for the gate — Section 2.3 of Part 2 spec */
+  gateDetailStatus(gate: GateName): string {
+    const record = this.cycle?.gate_records?.find(g => g.gate_name === gate);
+    if (record?.gate_status === 'approved')  { return 'Approved'; }
+    if (record?.gate_status === 'blocked')   { return 'Blocked'; }
+    if (record?.gate_status === 'returned')  { return 'Returned'; }
+    if (record?.gate_status === 'pending')   { return 'Under Review'; }
+    if (this.isGateNotYetActive(gate))       { return 'Not Yet Active'; }
+    const nextGate = NEXT_GATE_BY_STAGE[this.cycle?.current_lifecycle_stage as LifecycleStage ?? 'BRIEF'];
+    if (nextGate === gate) { return 'Pending'; }
+    return 'Upcoming';
+  }
+
+  gateDetailStatusBg(gate: GateName): string {
+    const s = this.gateDetailStatus(gate);
+    if (s === 'Approved')       { return '#e8f5e9'; }
+    if (s === 'Blocked')        { return '#fdecea'; }
+    if (s === 'Returned')       { return '#fff8e1'; }
+    if (s === 'Under Review')   { return '#e3f2fd'; }
+    if (s === 'Pending')        { return 'var(--triarq-color-background-subtle)'; }
+    return '#f5f5f5';
+  }
+
+  gateDetailStatusColor(gate: GateName): string {
+    const s = this.gateDetailStatus(gate);
+    if (s === 'Approved')       { return '#2e7d32'; }
+    if (s === 'Blocked')        { return 'var(--triarq-color-error)'; }
+    if (s === 'Returned')       { return '#e65100'; }
+    if (s === 'Under Review')   { return 'var(--triarq-color-primary)'; }
+    return 'var(--triarq-color-text-secondary)';
+  }
+
+  /** Milestone row matching the selected gate — shown in gate sub-panel MILESTONE DATE section */
+  get selectedGateMilestone(): CycleMilestoneDate | null {
+    if (!this.selectedGate || !this.cycle) { return null; }
+    return this.cycle.milestone_dates?.find(m => m.gate_name === this.selectedGate) ?? null;
+  }
+
+  /** Gate checklist — computed from cycle state per gate name. Section 2.2, Part 2 spec. */
+  gateChecklist(gate: GateName): { label: string; met: boolean }[] {
+    if (!this.cycle) { return []; }
+    const c    = this.cycle;
+    const arts = c.artifacts ?? [];
+
+    const byStage = (stage: string) => arts.filter(a => a.lifecycle_stage === stage && a.external_url);
+    const briefArts   = byStage('BRIEF');
+    const specArts    = byStage('SPEC');
+    const buildArts   = byStage('BUILD');
+    const uatArts     = byStage('UAT');
+    const pilotArts   = byStage('PILOT');
+    const outcomeArts = byStage('OUTCOME');
+
+    const hasName = (list: CycleArtifact[], ...terms: string[]) =>
+      list.some(a => terms.some(t => (a.artifact_type_name ?? '').toLowerCase().includes(t)));
+
+    const isTier3 = c.tier_classification === 'tier_3';
+
+    switch (gate) {
+      case 'brief_review':
+        return [
+          { label: 'Context Package attached (at least one Brief Artifact)',      met: briefArts.length > 0 },
+          { label: 'Outcome Statement set',                                        met: !!c.outcome_statement },
+          { label: 'Tier classification set',                                      met: !!c.tier_classification },
+          { label: 'Assigned Domain Strategist set',                               met: !!c.assigned_ds_user_id },
+        ];
+      case 'go_to_build':
+        return [
+          { label: 'Context Package attached',                                     met: briefArts.length > 0 },
+          { label: 'Outcome Statement set',                                        met: !!c.outcome_statement },
+          { label: 'Technical Specification complete',                             met: hasName(specArts, 'technical spec') },
+          { label: 'Tier classification set',                                      met: !!c.tier_classification },
+          { label: 'Jira epic linked',                                             met: !!(c.jira_links?.[0]?.jira_epic_key) },
+          { label: 'MCP scope declared (Cursor Prompt or Agent Registry)',         met: hasName(specArts, 'cursor prompt', 'agent registry', 'mcp scope') },
+          { label: 'Assigned Capability Builder set',                              met: !!c.assigned_cb_user_id },
+        ];
+      case 'go_to_deploy':
+        return [
+          { label: 'Delivery Cycle Build Report attached',                         met: hasName(buildArts, 'build report') },
+          { label: 'UAT sign-off record attached',                                 met: hasName(uatArts, 'uat sign') },
+          ...(isTier3 ? [
+            { label: '7-step governance checklist attached (Tier 3)',              met: hasName(uatArts, '7-step', 'governance checklist') },
+            { label: 'HITRUST/GRICS checklist attached (Tier 3)',                  met: hasName(uatArts, 'hitrust', 'grics') },
+          ] : []),
+        ];
+      case 'go_to_release':
+        return [
+          { label: 'Pilot observations log attached',                              met: hasName(pilotArts, 'pilot observ') },
+          ...(isTier3 ? [
+            { label: 'AI Production Governance Board compliance check (Tier 3)',   met: false },
+          ] : []),
+        ];
+      case 'close_review':
+        return [
+          { label: 'Outcome measurement record attached',                          met: hasName(outcomeArts, 'outcome measurement') },
+          { label: 'Outcome Statement matches demonstrated result (confirm in notes)', met: !!this.selectedGateRecord?.approver_notes },
+          ...(isTier3 ? [
+            { label: 'Wiz continuous monitoring baseline attached (Tier 3)',       met: hasName(outcomeArts, 'wiz') },
+          ] : []),
+        ];
+      default:
+        return [];
+    }
+  }
+
+  /** Short tier label for gate sub-panel breadcrumb — "1", "2", or "3" */
+  tierShortLabel(tier: TierClassification): string {
+    return tier === 'tier_1' ? '1' : tier === 'tier_2' ? '2' : '3';
+  }
+
+  /** Resolve approver display name from allUsers list */
+  approverDisplayName(userId: string): string {
+    return this.allUsers.find(u => u.id === userId)?.display_name ?? userId;
+  }
+
+  // ── Date status helpers (used in gate sub-panel + milestone rows) ──────────
+
+  dateStatusLabel(s: DateStatus): string {
+    const labels: Record<DateStatus, string> = {
+      not_started: 'Not Started',
+      on_track:    'On Track',
+      at_risk:     'At Risk',
+      behind:      'Behind',
+      complete:    'Complete',
+    };
+    return labels[s] ?? s;
+  }
+
+  dateStatusBg(s: DateStatus): string {
+    if (s === 'on_track') { return '#e8f5e9'; }
+    if (s === 'at_risk')  { return '#fff8e1'; }
+    if (s === 'behind')   { return '#fdecea'; }
+    if (s === 'complete') { return '#e3f2fd'; }
+    return 'var(--triarq-color-background-subtle)';
+  }
+
+  dateStatusColor(s: DateStatus): string {
+    if (s === 'on_track') { return '#2e7d32'; }
+    if (s === 'at_risk')  { return '#e65100'; }
+    if (s === 'behind')   { return 'var(--triarq-color-error)'; }
+    if (s === 'complete') { return 'var(--triarq-color-primary)'; }
+    return 'var(--triarq-color-text-secondary)';
+  }
+
+  /** Options available to user for status dropdown based on current date_status */
+  milestoneStatusOptions(current: DateStatus): { value: DateStatus; label: string }[] {
+    const all: { value: DateStatus; label: string }[] = [
+      { value: 'not_started', label: 'Not Started' },
+      { value: 'on_track',    label: 'On Track' },
+      { value: 'at_risk',     label: 'At Risk' },
+    ];
+    // Behind and Complete are system-set — not in user-selectable options
+    return all.filter(o => o.value !== current);
+  }
+
+  // ── Item 1: Milestone status edit ─────────────────────────────────────────
+
+  startMilestoneStatusEdit(m: CycleMilestoneDate): void {
+    this.editingMilestoneStatus = m.gate_name;
+    this.milestoneStatusValue   = m.date_status;
+    this.milestoneStatusError   = '';
+    this.cdr.markForCheck();
+  }
+
+  cancelMilestoneStatusEdit(): void {
+    this.editingMilestoneStatus = null;
+    this.milestoneStatusError   = '';
+    this.cdr.markForCheck();
+  }
+
+  saveMilestoneStatus(gate: GateName): void {
+    if (!this.cycle || !this.milestoneStatusValue) { return; }
+    this.savingMilestoneStatus = true;
+    this.milestoneStatusError  = '';
+    this.cdr.markForCheck();
+
+    this.delivery.updateMilestoneStatus({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      gate_name:         gate,
+      date_status:       this.milestoneStatusValue as DateStatus,
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          const idx = this.cycle!.milestone_dates?.findIndex(m => m.gate_name === gate) ?? -1;
+          if (idx !== -1 && this.cycle!.milestone_dates) {
+            this.cycle!.milestone_dates[idx] = res.data;
+          }
+          this.editingMilestoneStatus = null;
+        } else {
+          this.milestoneStatusError = res.error ?? 'Save failed.';
+        }
+        this.savingMilestoneStatus = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.milestoneStatusError  = err.error ?? 'Save failed. Try again.';
+        this.savingMilestoneStatus = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // ── Item 1: Unset Complete inline confirmation — Principle 13 ──────────────
+
+  /** Begin the Unset Complete flow — show inline confirmation with impact statement. */
+  startUnsetComplete(gate: GateName): void {
+    this.unsetCompleteGate = gate;
+    this.unsetCompleteReason.reset();
+    this.unsetCompleteError = '';
+    this.cdr.markForCheck();
+  }
+
+  cancelUnsetComplete(): void {
+    this.unsetCompleteGate  = null;
+    this.unsetCompleteError = '';
+    this.cdr.markForCheck();
+  }
+
+  /** Save Unset Complete — requires reason ≥ 10 chars; logs to audit trail. */
+  confirmUnsetComplete(): void {
+    if (!this.cycle || !this.unsetCompleteGate || this.unsetCompleteReason.invalid) { return; }
+    this.unsetCompleteSaving = true;
+    this.unsetCompleteError  = '';
+    this.cdr.markForCheck();
+
+    this.delivery.updateMilestoneStatus({
+      delivery_cycle_id:       this.cycle.delivery_cycle_id,
+      gate_name:               this.unsetCompleteGate,
+      date_status:             'not_started',
+      status_override_reason:  this.unsetCompleteReason.value?.trim() ?? '',
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          const idx = this.cycle!.milestone_dates?.findIndex(m => m.gate_name === this.unsetCompleteGate) ?? -1;
+          if (idx !== -1 && this.cycle!.milestone_dates) {
+            this.cycle!.milestone_dates[idx] = res.data;
+          }
+          this.unsetCompleteGate = null;
+          this.loadEvents(this.cycle!.delivery_cycle_id);
+        } else {
+          this.unsetCompleteError = res.error ?? 'Save failed.';
+        }
+        this.unsetCompleteSaving = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.unsetCompleteError  = err.error ?? 'Save failed. Try again.';
+        this.unsetCompleteSaving = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // ── Item 2: Artifact stage expand/collapse ─────────────────────────────────
+
+  /** Initialise expandedStages: current + past stages expanded; future collapsed. */
+  private initExpandedStages(): void {
+    if (!this.cycle) { return; }
+    const STAGE_ORDER = [
+      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE'
+    ];
+    const currentIdx = STAGE_ORDER.indexOf(this.cycle.current_lifecycle_stage);
+    this.expandedStages = new Set(
+      STAGE_ORDER.filter((_, i) => i <= currentIdx)
+    );
+  }
+
+  /** Toggle a stage section open or closed. */
+  toggleStageExpand(stage: string): void {
+    if (this.expandedStages.has(stage)) {
+      this.expandedStages.delete(stage);
+    } else {
+      this.expandedStages.add(stage);
+    }
+    this.cdr.markForCheck();
+  }
+
+  isStageExpanded(stage: string): boolean {
+    return this.expandedStages.has(stage);
+  }
+
+  /** Count attached artifacts in a stage group */
+  attachedCountInGroup(slots: CycleArtifact[]): number {
+    return slots.filter(s => s.external_url || s.oi_library_artifact_id).length;
   }
 }
