@@ -1,5 +1,5 @@
 # Design Principles — Pathways OI Trust
-# Pathways OI Trust | April 2026 | CONFIDENTIAL
+# Pathways OI Trust | April 2026 | CONFIDENTIAL | v1.4
 # Authoritative source for UX and navigation design principles.
 # Referenced from CLAUDE.md. Feed to Claude Code and Claude Chat at session start.
 
@@ -295,6 +295,361 @@ Claude Code does not update `devStatus` without explicit confirmation. It does n
 
 ---
 
+---
+
+## Principle 10 — Right-Panel Entity Detail Pattern (D-180)
+
+**Statement:** Clicking any named entity anywhere in the system opens its detail in a right panel. The originating screen remains visible and navigable. No entity detail opens as a full-page replacement or modal unless a specific exception is locked by a design decision.
+
+### Architectural basis
+
+This principle exists for two reasons that are non-negotiable:
+
+1. **QPathways UX alignment.** OI Trust is a Native Federation remote that loads into the QPathways platform shell at port time. The right-panel detail pattern is the QPathways standard for entity detail. Deviating creates a UX discontinuity at the seam where OI Trust joins the platform.
+2. **Mobile compatibility.** OI Trust must function on a smartphone. The right-panel layout — list on left, detail on right — collapses naturally to a single-column stack on narrow viewports: list view first, detail view replaces it on tap, back button returns to list. A full-page replacement or modal does not collapse cleanly. Every detail surface built to this principle is mobile-ready without a separate implementation.
+
+### Rules
+
+**Rule 1 — List stays visible on wide viewports.**
+On tablet and desktop, the list occupies the left portion of the viewport when a right panel is open. The user can tap a different row without closing the panel — the panel updates to the new entity. On narrow (phone) viewports, the detail view replaces the list; the back button returns to the list.
+
+**Rule 2 — One panel slot, no stacking.**
+There is exactly one right panel slot. Opening a second entity's detail replaces the first. Panels do not stack. The user always knows where detail content lives.
+
+**Rule 3 — Entity references within a detail panel are tappable.**
+Any named entity reference rendered inside a detail panel — Division chip, Workstream chip, Assigned DS, Assigned CB, Approver name, Gate node — opens the referenced entity's detail in the same right panel slot, replacing the current detail. See Principle 11 (Tappable Entity Chips) for rendering requirements.
+
+**Rule 4 — Right panel does not change the main route.**
+The URL does not change when a right panel opens or closes. The panel is a UI layer, not a route. Deep-linking to a specific entity's detail panel is not supported in this pattern.
+
+**Rule 5 — Exceptions require a locked decision.**
+A full-page detail view or modal is only acceptable if a specific design decision names the exception and documents why. "We ran out of space" is not a valid exception.
+
+### Scope — applies to all entity types
+
+| Entity | Build | Panel Content |
+|---|---|---|
+| Delivery Cycle | C | Identity zone, Stage Track, gates, artifacts, activity |
+| Division | A (shell), D (full) | Hierarchy position, members, active cycle count |
+| User | A (shell), D (full) | Role, Division assignments, accomplishments |
+| Workstream | C | Members, lead, active cycles, WIP |
+| Gate | C | Gate status, checklist, approver routing, action buttons |
+| OI Library Artifact | B | Metadata, lifecycle state, Stage Track, review history |
+
+### What triggered this principle
+
+Session 2026-03-24 Decision I locked the right panel as the standard detail surface system-wide, originating from the Document Viewer side panel in D-153. Build C implemented Delivery Cycle detail correctly. Without a principle entry, future entity types default to modals or full-page replacements — both of which break mobile layout and the QPathways port contract.
+
+### Anti-patterns
+
+* Gate detail opens as a modal — use the right panel sub-section within the cycle detail panel
+* Workstream name in a cycle row is plain text — must be a tappable chip per Principle 11
+* Clicking a Division chip navigates to `/admin/divisions` — open the right panel instead
+
+---
+
+## Principle 11 — Tappable Entity Chips (D-181)
+
+**Statement:** Every named entity reference in a list row, detail panel, or form is rendered as a tappable chip. Plain text entity references are an anti-pattern.
+
+### What is an entity reference
+
+Any field value that names a specific record in the system: a Division name, a Workstream name, a user name (DS, CB, approver, actor), a Gate name, or an OI Library artifact title. If the value could open a detail panel for that entity, it is an entity reference and must be a chip.
+
+### Rules
+
+**Rule 1 — Visual treatment.**
+Entity chips use a pill shape (`border-radius: var(--radius-pill)`) with a muted background (`--triarq-color-fog` at low opacity) and the entity's initials avatar or a type icon on the left. Font: Roboto, same size as surrounding body text. On hover: background darkens slightly, cursor changes to pointer.
+
+**Rule 2 — Tap behavior.**
+Tapping a chip opens the referenced entity's detail in the right panel per Principle 10. The chip does not navigate away from the current screen.
+
+**Rule 3 — Inactive or inaccessible entities.**
+If the referenced entity is inactive or the current user lacks access to view it, the chip still renders but tapping it shows a read-only summary only — no action buttons. Never hide a chip because the entity is inactive.
+
+**Rule 4 — Multiple chips in a single field.**
+When a field contains multiple entity references (e.g., a list of Consulted reviewers), render each as a separate chip inline. Do not concatenate to plain text.
+
+**Rule 5 — Form field entity pickers produce chips.**
+After a user selects an entity via a picker or dropdown, the selected value renders as a chip (with a remove ✕ for editable fields), not as plain text in a text input.
+
+### Where chips are required in Build C
+
+* Assigned DS and Assigned CB on every Delivery Cycle row and detail
+* Delivery Workstream on every Delivery Cycle row and detail
+* Division on every Delivery Cycle row and detail
+* Approver names (Accountable, Consulted, Informed) in gate detail
+* Actor names in cycle activity log
+* Gate names in milestone date rows
+* "Attached by" user name on artifact slots
+
+### What triggered this principle
+
+Build C cycle dashboard rows initially rendered DS, CB, and Workstream names as plain text strings. Principle 10 requires entity references to be actionable — plain text cannot fulfill that requirement. Chips are the visual signal that a reference is tappable.
+
+### Anti-patterns
+
+* "Dave Chen" as plain text in the Assigned DS column — must be a chip
+* Workstream filter selection shown as selected text inside an `ion-select` — must become a chip after selection
+* "Practice Services Trust" as plain bold label in cycle detail — must be a chip
+
+---
+
+## Principle 12 — Entity Picker Pattern (D-182)
+
+**Statement:** When a form field requires the user to select a named entity that has meaningful attributes relevant to making the correct choice, use an entity picker — not a plain dropdown. A dropdown is only appropriate for short, flat lists of simple scalar values.
+
+### When to use a picker vs. a dropdown
+
+| Use a picker when | Use a dropdown when |
+|---|---|
+| The entity has attributes the user needs to evaluate (status, ownership, capacity) | The list is a flat set of scalar values (Tier 1/2/3, lifecycle stage) |
+| The list may be long enough to require search | The list is short (under ~8 items) and static |
+| Inactive or ineligible items exist and must be visible but blocked | All values in the list are valid selections |
+| The user must distinguish between entities with similar names | Values are unambiguous without additional context |
+
+### Picker structure
+
+Every picker follows this layout. Sections are only rendered when applicable (e.g., scope radio is omitted if only one scope exists).
+
+```
+┌─────────────────────────────────────────────┐
+│ Select [Entity Type]              [✕ Close] │
+├─────────────────────────────────────────────┤
+│ Scope:  ○ [Default scope — label]           │  ← only when multiple
+│         ○ [Wider scope — label]             │    scopes exist
+│         ○ [Widest scope — label]            │
+├─────────────────────────────────────────────┤
+│ 🔍  Search [entity type]s…                  │
+├─────────────────────────────────────────────┤
+│ [Entity row: avatar · name · attr · status] │
+│ [Entity row — inactive: dimmed, ⊘ badge,   │
+│  not selectable]                            │
+├─────────────────────────────────────────────┤
+│ Selected                                    │
+│ [Entity chip with key attributes]           │
+│ — or — None selected                        │
+├─────────────────────────────────────────────┤
+│                   [Cancel]  [Confirm]        │
+└─────────────────────────────────────────────┘
+```
+
+### Scope radio rules
+
+**Default is tightest relevant scope.**
+The picker opens showing only the entities most likely to be correct for the current context. The full system list is never the default.
+
+**Scope expansion is explicit and progressive.**
+Scope options are ordered from tightest to broadest. The user must deliberately choose a wider scope — the picker never auto-expands when no results are found. Correct pattern: show "No results in this Division" with scope radio visible so user can choose to expand.
+
+**Scope radio always visible when multiple scopes exist.**
+Not hidden behind an "expand" link.
+
+### Search field rules
+
+**Always present in a picker.**
+If the list were short enough to not need search, it would be a dropdown.
+
+**Client-side filtering when the scoped list is small.**
+When the default scope returns a manageable list (under ~100 records), load the full scoped list on picker open and filter client-side on each keystroke. No debounce, no per-keystroke query. Instant results.
+
+**Debounced server query when the scope is large.**
+When the selected scope could return a large number of records, do not load the full list on open. Fire a server query after the user pauses typing for `PICKER_SEARCH_DEBOUNCE_MS` with no new keystroke.
+
+```
+PICKER_SEARCH_DEBOUNCE_MS = 600
+```
+
+Defined once as a shared constant. Never hardcoded in individual components. 600ms is intentionally longer than standard web debounce (300ms) — healthcare context, deliberate typists, false queries more expensive than marginal lag.
+
+**Loading state during a debounced query.**
+Tier 1 skeleton rows (Principle 9) in the list area while query is in flight. Search field remains active — continued typing cancels in-flight query and restarts debounce. Never lock the search field.
+
+**Scope change triggers a fresh load.**
+List clears and reloads for the new scope. If new scope uses client-side filtering, load full scoped list immediately. If server queries, show: "Type to search [entity type]s in [scope label]."
+
+### Entity row content
+
+Each row: `[Avatar/initials]  [Primary name]  [Key attribute 1]  [Key attribute 2]  [Status badge]`
+
+Configurable per entity type. Structure fixed. Sorting: active items first alphabetically, inactive items at bottom dimmed with `⊘ Inactive` badge. Tapping an inactive row: blocked message inline below the row — picker stays open.
+
+### Echo section (Selected)
+
+Shows currently-selected entity as a chip with key attributes — not just the name. If a value is already set when picker opens, pre-selected in echo section. Tapping a row updates echo — does not close picker. Confirm closes and commits. Cancel closes and discards change.
+
+### DS/CB Picker — scope logic
+
+First production instance. Reference implementation for all future pickers.
+
+| Radio Label | Population |
+|---|---|
+| This Division (default) | Users with role DS (or CB) with membership in the cycle's assigned Division or any child Divisions |
+| [Trust Name] — shown only if cycle's Division is not a Trust-level Division | Users with role DS (or CB) with membership in any ancestor Division up to and including the Trust |
+| All Divisions | All users with role DS (or CB) in the system |
+
+Entity row content: Avatar initials · Full name · Primary Division · Active cycle count as DS or CB · Account status badge.
+
+### Implementation rule
+
+`EntityPickerComponent` is implemented once as a shared, configurable component. Never reimplemented per entity type. Configuration inputs: `entityType`, `defaultScope`, `scopeOptions`, `displayColumns`, `searchPlaceholder`. `WorkstreamPickerComponent` is the reference implementation — all future pickers configure the shared component.
+
+### Anti-patterns
+
+* Dropdown showing all 50 system users for DS selection — use picker with Division-scoped default
+* Picker that hides inactive Workstreams — show dimmed with blocked message on tap
+* Picker that auto-expands scope on no results — scope expansion is always a deliberate user action
+* `600` hardcoded in a component — reference `PICKER_SEARCH_DEBOUNCE_MS`
+* New entity picker as standalone component — configure `EntityPickerComponent`
+
+---
+
+## Principle 13 — Destructive and Irreversible Action Confirmation (D-183)
+
+**Statement:** Any action that cannot be automatically reversed — gate approval, stage regression, Workstream inactivation, artifact lifecycle transition — requires an explicit two-step confirmation that states what will change before the user commits.
+
+### Rules
+
+**Rule 1 — State what will change, not just "are you sure."**
+Examples:
+
+* Gate approval: "Approving this Gate will advance the Delivery Cycle to [NEXT STAGE]. This cannot be undone without a stage regression."
+* Stage regression: "Regressing to [STAGE] will reset the following Gates: [list]. Each Gate must be resubmitted and approved."
+* Workstream inactivation: "Inactivating this Workstream will block Gate advancement on [N] active Delivery Cycles. Each cycle must be reassigned before its next Gate can be approved."
+
+Generic "Are you sure?" confirmations are not acceptable.
+
+**Rule 2 — Two-call pattern for operations with computed downstream effects.**
+For operations where the impact set must be computed before confirming (stage regression, Workstream inactivation with active cycles): first MCP call returns a preview of what will change; second call with `confirmed: true` executes. UI renders the preview before showing the confirm button.
+
+**Rule 3 — Confirmation is inline, not a modal.**
+Confirmation renders inline within the current form or panel. Confirm and cancel buttons appear below the impact preview.
+
+**Rule 4 — Cancel is available until execution begins.**
+Cancel present and functional until Tier 3 loading overlay (Principle 9) takes over on the second MCP call.
+
+**Rule 5 — "Cannot be undone" means no automatic rollback, not impossibility.**
+"This cannot be undone without [correction path]" is accurate. Do not say "permanent" if the effect can be corrected manually.
+
+### Anti-patterns
+
+* "Confirm Gate approval? [OK] [Cancel]" — state what advances
+* Modal dialog for stage regression — inline per Rule 3
+* Stage regression that executes immediately — must preview Gate resets first
+
+---
+
+## Principle 14 — Entity Name Capitalization (D-184)
+
+**Statement:** Named system entities are capitalized in all user-facing text. General-purpose nouns describing the same concept are not.
+
+### The test
+
+If you could substitute the entity name as a UI label ("View all Delivery Cycles," "Assign a Workstream"), capitalize it. If it appears in a conceptual explanation where any instance could be substituted ("a delivery cycle is a unit of work"), use lowercase.
+
+### Capitalized entities
+
+Division, Workstream, Delivery Cycle, Gate, Artifact, OI Library, Delivery Workstream, Context Brief, Build Report, Action Queue, Stage Track, Trust, Milestone.
+
+### Applies to
+
+All Angular component templates, error messages, empty states, loading state labels, hub card descriptions, MCP error messages returned to the UI, form field labels, table column headers.
+
+### Does not apply to
+
+TypeScript variable names, database column names, MCP parameter names, schema identifiers.
+
+### Anti-patterns
+
+* "No delivery cycles found" — should be "No Delivery Cycles found"
+* "Delivery Cycle" in an explanatory sentence defining the concept — lowercase is correct there
+* "action queue" as a UI label — must be "Action Queue"
+* "gate approval" in a button label — must be "Gate Approval"
+
+---
+
+## Principle 15 — Principle Citation in Specs (D-185)
+
+**Statement:** Every spec document produced by Claude Chat cites the governing design principle number(s) for each section. Claude Code raises conflicts against the cited principle before building — not against the spec detail in isolation.
+
+### Format
+
+At each section header, immediately after Source:
+
+```
+**Governing principles:** Principle N (Name), Principle N (Name)
+```
+
+If a section has no applicable principle, omit the line — do not write "None."
+
+### Purpose
+
+Two-way benefit:
+
+* **For Claude Code:** When a spec instruction seems wrong, Claude Code debates against the principle, not against the spec author's intent. This surfaces the right level of conflict — "this spec instruction appears to violate Principle 10 because..." is more useful than "I think the UI should work differently."
+* **For Claude Chat:** Writing the principle citation forces the spec to be grounded. If a section cannot be cited to a principle, it may be an undocumented pattern that needs to become a new principle before the spec is issued.
+
+### Rules
+
+**Rule 1 — Citation is required on every section that governs UI or behavioral decisions.**
+Schema-only sections (migration lists, seed data) do not require citations. Every section that governs how the UI looks, behaves, or what the user can do requires at least one citation.
+
+**Rule 2 — Claude Code raises principle conflicts per Principle 6.**
+If a spec instruction appears to conflict with its cited principle, Claude Code raises it explicitly before building. "Spec Section 2.1 says X, but Principle 10 says Y — which governs?" is the correct escalation.
+
+**Rule 3 — Missing principle is a spec gap, not a silent assumption.**
+If Claude Code cannot identify a governing principle for a behavior it is implementing, it flags this to Phil. The behavior may need a new principle before it becomes a build pattern.
+
+### What triggered this principle
+
+Build C supplement was produced without principle citations. Claude Code implementing from that spec had no grounding for which behaviors were system-wide constraints vs. local decisions. This created unnecessary debates about spec details and missed several principle violations that would have been caught if the citation were present.
+
+---
+
+## Principle 16 — Decision Implementation Status (D-186)
+
+**Statement:** Every decision in decisions-active.md carries an `impl_status` field. Both Claude Chat and Claude Code maintain it. Neither tracks coverage through archaeology.
+
+### Four status values
+
+| Status | Meaning | Set by |
+|---|---|---|
+| `unspecced` | Decision locked, no spec document yet produced | Default for all existing decisions |
+| `specced` | Included in a spec document given to Claude Code | Claude Chat, when producing a spec |
+| `built` | Claude Code has implemented | Claude Code, at implementation completion |
+| `verified` | Phil has confirmed acceptance criteria met | Phil, or Claude Code reporting Phil confirmation |
+
+### Format in decisions-active.md
+
+Append to the end of each decision record, after the Source tag:
+
+```
+| impl_status: unspecced |
+| impl_status: specced |
+| impl_status: built |
+| impl_status: verified |
+```
+
+### Rules
+
+**Rule 1 — Claude Code updates to `built` at implementation.**
+When Claude Code completes implementation of a decision's acceptance criteria, it updates `impl_status` from `specced` to `built` in the same commit. If no `impl_status` field exists on the decision, Claude Code adds it.
+
+**Rule 2 — Claude Chat sets `specced` when producing a spec.**
+When a decision is included in a spec document, the spec document's D-Number Claims section states `impl_status: specced`. Claude Code applies this when committing the spec decisions.
+
+**Rule 3 — Default for all existing decisions is `unspecced`.**
+Claude Code applies `unspecced` as the default when first adding `impl_status` to existing decisions that have not been through this process. Do not attempt to infer status from code — set `unspecced` and let the status advance naturally.
+
+**Rule 4 — `verified` requires explicit Phil confirmation.**
+Claude Code does not set `verified` speculatively. Phil either confirms directly or Claude Code reports "acceptance criteria met" and Phil confirms in the next session.
+
+### What triggered this principle
+
+This session required archaeology to determine which decisions had been specced to Claude Code, which Claude Code had built, and which were floating. The Build C remaining spec document was produced by comparing three spec documents against the decisions list manually. With `impl_status`, that work is a query, not a review.
+
+---
+
 ## Version History
 
 | Version | Date | Change |
@@ -303,6 +658,7 @@ Claude Code does not update `devStatus` without explicit confirmation. It does n
 | v1.1 | April 2026 | Principle 6 (D-168) added: mandatory debate/question behavior for Claude Code sessions. |
 | v1.2 | April 2026 | Principle 7 (D-169) added: decision source tagging and registry protocol. |
 | v1.3 | April 2026 | Principle 8 added: feature stage advancement check at session close. |
+| v1.4 | April 2026 | Principles 10–16 added (D-180 through D-186): Right-Panel Entity Detail Pattern, Tappable Entity Chips, Entity Picker Pattern, Destructive Action Confirmation, Entity Name Capitalization, Principle Citation in Specs, Decision Implementation Status. Source: Claude Chat. |
 
 ---
 

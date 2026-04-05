@@ -8,12 +8,14 @@ Active = operative locked decisions + open decisions. Superseded decisions are i
 ## OPEN DECISIONS
 
 **D-162** — Performance Systems Builder hire — pending Mike and Milind response.
+| impl_status: unspecced |
 
 **D-156–161 terminology** — Analytics Capability terminology set pending Mike confirmation.
 
 **D-94-Granularity** — RACI template granularity — does artifact sub-type need separate templates (e.g. Engineering OI vs Policy OI)? Linked to artifact type registry.
 
 **D-18** — Performance measurement system scope — new UC section in OI Trust or separate system?
+| impl_status: unspecced |
 
 **D-55/56** — System name 'Pathways OI Trust' and OI definition extension — pending Mike review session. See locked Decisions 55 and 56 for full rationale.
 
@@ -32,12 +34,16 @@ Active = operative locked decisions + open decisions. Superseded decisions are i
 **D-Vertex-AI-Model** — Vertex AI model selection: which Gemini model for embedded chat; which embedding model for pgvector. Blocks embedded chat skill finalization and document_embeddings vector dimension. Source: Decision 148. (ARCH-19 open)
 
 **D-24** — Decision 119 text conflicts with Phil's recollection of intent. Pending Phil confirmation before amending.
+| impl_status: unspecced |
 
 **D-36** — Production approval checklist for AI-first delivery cycles — pending dedicated design session before engineering leads package is finalized.
+| impl_status: unspecced |
 
 **D-37** — Approval authority for engineering governance artifact types in OI Library — pending engineering leads session; engineering leads expected to be named approvers, not Phil per-item.
+| impl_status: unspecced |
 
 **D-38** | Decision Registry — new platform module. Pending dedicated design session. See deferred-items.md.
+| impl_status: unspecced |
 
 ---
 
@@ -46,10 +52,13 @@ Active = operative locked decisions + open decisions. Superseded decisions are i
 These principles apply to every effort, not just this system.
 
 **P1** — Self-Clarifying Labels. Every field, schema column, and UI label must include enough context to be unambiguous without relying on surrounding context. Add the clarifying adjective before the noun whenever the label would otherwise be ambiguous in isolation. Anti-pattern: date, status, type, name, id. Applied: org_tenant_id, submission_date, lifecycle_state, oi_type, artifact_display_name, detection_date, target_resolution_date. Applies to: database schema, API field names, UI labels, report column headers, all explanatory language produced in this project. Connects to: Design & Communication Principles (3.1 — No Bare Generic Nouns), D-159 (Fully Qualified Name Standard — analytics layer extension of this principle).
+| impl_status: unspecced |
 
 **P2** — Progressive Disclosure. Lead with the simplest, most essential concept. Allow complexity and detail to unfold only as needed and only for the audience that needs it. The full picture is always available — but it is never the starting point. Anti-pattern: email that opens with schema decisions, UI that surfaces every data field as equally important, explanation that starts with edge cases. Note: Phil engages with full complexity directly and will flag if this principle is over-applied. Connects to: Design & Communication Principles (2.1 — Lead With the Point).
+| impl_status: unspecced |
 
 **P3** — TRIARQ First Principles of System Design. The five-step methodology applied to every system, process, org change, agent design, and document before building: Context (full picture: domain, stakeholder, data, the why) → Question (challenge assumptions, ask why, assume it can be done differently) → Reduce (strip to essence, remove what does not need to exist) → Simplify (make what remains as clean as possible; outcome statement lives here) → Automate (only then, automation and AI on the simplified, essential process). Operationalized as TRIARQ's structured methodology. Apply as a review gate before locking the full plan. Connects to: Design & Communication Principles (1.1), D-119.
+| impl_status: unspecced |
 
 ---
 
@@ -58,38 +67,55 @@ These principles apply to every effort, not just this system.
 ### UX and Navigation Principles
 
 **D-163** — Workflow Entry Point Completeness. Every user-facing function must be reachable from exactly one declared entry point: sidebar nav item (user-initiated, persistent), home page card (role-relevant summary), or action queue / notification (system-triggered). A feature with no wired entry point is incomplete regardless of whether the route and component exist. Admin functions are never standalone sidebar links — they belong in the Admin hub (D-164). Entry point role arrays must include every permitted role. Full principle in docs/design-principles.md. Triggered by: Build C Delivery Cycle Tracking nav gap (sidebar restricted to ds/cb, excluding Phil; home card was non-functional stub). | Source: Claude Chat | April 2026 |
+| impl_status: unspecced |
 
 **D-164** — Admin Hub Consolidation. All administrative functions are grouped under a single Admin hub at `/admin`, accessible via one sidebar entry for `['phil','admin']` roles. The hub renders a card grid — one card per admin function. No admin sub-function appears as a direct sidebar link. Admin sub-routes (`/admin/workstreams`, `/admin/divisions`, `/admin/users`, etc.) remain stable as functions are added. Each hub card follows Principle 3 (Visible Context) — states what the function does and why. Full principle in docs/design-principles.md. | Source: Claude Chat | April 2026 |
+| impl_status: unspecced |
 
 **D-165** — Workstream Optional at Cycle Creation, Required at Brief Review Gate. `workstream_id` is recommended but not required when creating a Delivery Cycle. Rationale: at initial scoping (Brief stage), the owning workstream may not yet be known. By Brief Review — the first governance gate — the workstream must be assigned because it determines delivery team accountability and gate clearance eligibility. MCP enforcement: `create_delivery_cycle` accepts null workstream_id; `submit_gate_for_approval` blocks ALL gates when workstream_id is null, with D-140 message directing user to assign one. Schema: migration 024 makes `workstream_id` nullable. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-166** — Division Filter on Delivery Cycle Dashboard. The dashboard has a server-side Division filter showing the user's directly-assigned Divisions. An "Include child Divisions" checkbox expands the query to descendant Divisions when a specific Division is selected. Filter only rendered when user has more than one directly-assigned Division. MCP: `list_delivery_cycles` accepts `division_id` + `include_child_divisions` params; child resolution uses recursive descendant collection mirroring D-135. Known gap: the default unfiltered dashboard view uses direct `division_memberships` only and does not apply D-135 inheritance — fixing this globally is Build D scope. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-167** — Workstream Filter: No-Workstream and Inactive as Separate Options. The Workstream filter dropdown has three distinct groups: (1) "No workstream assigned" — cycles with null workstream_id; (2) Active workstreams; (3) Inactive workstreams, labelled "(inactive)". These are never merged. No workstream = expected early-scoping state. Inactive workstream = blocked gate condition. Merging them would hide blocked-gate visibility from users filtering for blank cycles. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-168** — Claude Code Mandatory Debate and Question Behavior. Before implementing any design change, architectural choice, or feature containing ambiguity, conflict with a locked decision, or a design choice Claude disagrees with, Claude Code must explicitly raise the issue, state its position, and present the conflict or question before writing any code. Silent resolution of conflicts is a hard build error equivalent. Applies to: (1) design choices Claude disagrees with — state the disagreement and rationale; (2) requirements that are unclear — ask before building, not after; (3) requests that conflict with locked decisions — surface the conflict explicitly; (4) implementation paths with multiple valid approaches that carry different trade-offs — present the options. This behavior is mandatory in all Claude Code sessions for this project. Full principle in docs/design-principles.md Principle 6. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-170** — Phil and Admin Have Implicit Access to All Divisions. Users with system_role of 'phil' or 'admin' are not required to have explicit Division membership assignments. They have read and governance access to all active Divisions in the system. Rationale: Phil governs the entire trust; Admin manages the system. Restricting their access to only assigned Divisions creates a bootstrapping problem (who assigns Phil?) and a coverage risk (a Division without a membership assignment becomes invisible). Implementation: (1) `get_user_divisions` MCP tool returns all active Divisions for phil/admin roles, tagged `access_type: 'privileged'`; (2) Angular home component skips the division membership check for phil/admin and sets `hasDivision = true` directly; (3) Dashboard `checkUserDivisions()` short-circuits for phil/admin; (4) Dashboard division filter uses `filterDivisionOptions` getter which returns all loaded divisions for phil/admin and directly-assigned divisions for other roles. `list_delivery_cycles` already handled this correctly (isPrivileged check). | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-169** — Decision Source Tagging and Registry Protocol. Every decision record in decisions-active.md includes a source tag: `| Source: Claude Code | [date] |` or `| Source: Claude Chat | [date] |` or `| Source: Design Session | [date] |`. The authoritative master list of all allocated decision numbers is `docs/decision-registry.md`. This file includes a "Next available" field at the top. Claude Code reads the registry before allocating any new D-number and updates the "Next available" field in the same commit. Claude Chat checks the registry file and states the number it is claiming; Phil asks Claude Code to commit and update in the next code session. If Claude Code finds a number collision, it claims the next available number, adds a COLLISION note in the registry, and surfaces the conflict to Phil. Purpose: distinguish Claude Code-originated vs Claude Chat-originated decisions to enable collision detection and reconciliation without archaeology. Full protocol in docs/decision-registry.md. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-171** — Delivery Cycle Tracking Hub Page. The `/delivery` route renders a hub page with four option cards. No data is loaded at the hub level — the hub is purely navigational. The four options are: Workstream Summary (`/delivery/workstreams`), Division Summary (`/delivery/divisions`), Upcoming Gate Summary (`/delivery/gates`), and All Delivery Cycles (`/delivery/cycles`). The hub page answers Principle 3 (Visible Context) for each view: what it shows, why it is useful, and how to get started. Users select the view that matches their current question before any data loads. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-172** — Delivery Module Sub-Routes. The Delivery feature module uses the following sub-routes under `/delivery`: (1) `/delivery` → DeliveryHubComponent (hub, no data); (2) `/delivery/workstreams` → WorkstreamSummaryComponent; (3) `/delivery/divisions` → DivisionSummaryComponent; (4) `/delivery/gates` → GatesSummaryComponent; (5) `/delivery/cycles` → DeliveryCycleDashboardComponent (the "big list" view, moved from the former root `/delivery` path to this sub-path); (6) `/delivery/:cycle_id` → DeliveryCycleDetailComponent. Named sub-routes are declared before the `:cycle_id` param route to avoid routing conflicts. The sidebar still links to `/delivery` (the hub). | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-173** — Next Gate Derived from Current Lifecycle Stage. The "next gate" a cycle must clear is determined by its current lifecycle stage, not by querying gate_records. Mapping: BRIEF → brief_review; DESIGN, SPEC → go_to_build; BUILD, VALIDATE → go_to_deploy; PILOT, UAT → go_to_release; RELEASE, OUTCOME → close_review; COMPLETE, CANCELLED, ON_HOLD → null (no next gate). This mapping is defined in `lifecycle.js` as `NEXT_GATE_BY_STAGE` and shared by the `get_delivery_summary` MCP tool and the Angular dashboard component. Used for: gate summary grouping, workstream gate counts, and the "Next Gate" filter on the cycles list. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-174** — WIP Categories and Limit. Work-in-progress (WIP) is measured per workstream in three categories: Prep (stages BRIEF, DESIGN, SPEC), Build (stages BUILD, VALIDATE), and Outcome (stages PILOT, UAT, RELEASE, OUTCOME). WIP limit per category per workstream is 4. COMPLETE and CANCELLED cycles are excluded from WIP counting entirely. ON_HOLD cycles are included in WIP counting (they occupy a slot even when paused — the constraint is intentional). WIP exceeded = category count > 4; displayed as an amber warning in the Workstream Summary view. WIP constants defined in `lifecycle.js` as `WIP_CATEGORY_BY_STAGE` and `WIP_LIMIT`. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-175** — Drill-Down from Summary Views to Cycle List. Clicking on a summary row or count in the Workstream Summary, Division Summary, or Gate Summary views navigates to `/delivery/cycles` with filters pre-applied as Angular Router query parameters. Supported params: `workstream_id` (string — pre-selects workstream filter), `division_id` (string — pre-selects division filter and triggers server reload), `next_gate` (GateName string — pre-selects next gate filter). The cycle list reads these params on init via `ActivatedRoute.queryParams` and applies them as initial filter values before loading. This satisfies D-163: every summary count is drillable with no dead ends. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-177** — Entity Name Capitalization in UI Text. In all user-facing text — labels, descriptions, empty states, error messages, button text, and tooltips — named entities in the system are capitalized: Division, Workstream, Delivery Cycle, Gate, Artifact, OI Library. General-purpose nouns that describe the same concepts are not capitalized (e.g., "a delivery cycle" in an explanatory sentence that is defining what a Delivery Cycle is). The principle: if you could substitute the entity name for a label in the product (e.g., "View all Delivery Cycles"), capitalize it. If it is a conceptual explanation ("a delivery cycle is a unit of work"), use lower case. Applies to: all Angular component templates, all error messages, all empty states, all loading states, all hub card descriptions, and all MCP error messages returned to the UI. Does not apply to: TypeScript variable names, database column names, MCP parameter names (those follow existing naming conventions). | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-178** — Processing State Standard: Three-Tier Loading Pattern. All MCP calls, queries, and transactions must display a loading indicator appropriate to the operation type. Lazy omission of a loading state is a build error, not a style preference. Three mandatory tiers: Tier 1 — Skeleton screen for data loads (tables, lists, cards). Rendered as `ion-skeleton-text` rows matching the expected content layout with animated shimmer. Replaces all "Loading…" text states. Appears immediately; replaced by content on arrival. Tier 2 — Button spinner for inline actions (save, toggle, submit individual field). `ion-spinner name="crescent"` replaces button label; button is `[disabled]="true"` during processing. No overlay. Rest of form remains operable. Tier 3 — Section overlay for CRUD operations (create, full form save, delete, gate action). Semi-transparent overlay covers the active form or panel via `LoadingOverlayComponent` (`position:absolute;inset:0;background:rgba(255,255,255,0.8)`). Centered spinner and one-line operation label visible within overlay. Sidebar and other panels remain interactive. Overlay lifts on success or error. Error appears within the form — overlay does not persist on error. Async card loading (dashboard, summary views) uses Tier 1 scoped to the card; other cards and sidebar remain interactive. Sidebar is never locked during any tier. Completion feedback: operations completing in <3 seconds receive in-form success/error feedback only. Operations exceeding 3 seconds where the user may have navigated away emit an `ion-toast` on completion (bottom of screen, auto-dismiss 4 seconds). Toast is not used for routine fast operations. Shared implementation: `LoadingOverlayComponent` (standalone, OnPush) at `/shared/components/loading-overlay/loading-overlay.component.ts` provides Tier 3. Tier 1 uses `ion-skeleton-text` directly in templates. Tier 2 uses `ion-spinner` inline in button templates. All three tiers applied at build time — not deferred as retrofits (Rule 8). | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-179** — Stage Regression Gate Reset Rule. When a Delivery Cycle stage is reversed to a prior stage, every gate that guards entry to a stage between the target stage and the current stage (target exclusive, current inclusive) is reset to status 'pending'. Fields cleared on reset: actual_date, approved_by, approver_notes, workstream_active_at_clearance. This allows the gate workflow to be re-run from the regressed position. The user receives a preview of the target stage and the list of gates that will be reset before confirming; the regression does not execute until the user confirms (two-call pattern: first call returns warning data, second call with confirmed=true executes). This pattern is universal — it applies to all gates, not just the immediately adjacent one. No gate record is hard-deleted during regression. The event log records which gates were reset and which user initiated the regression. Implementation: reverse_cycle_stage MCP tool in delivery-cycle-mcp; prevStage() and gatesResetOnRegressionTo() helpers in lifecycle.js. Cannot regress from BRIEF (no prior stage), CANCELLED, or ON_HOLD. Connects to: D-108, ARCH-12. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 **D-176** — Division Summary as Flat Indented List. The Division Summary view renders divisions as a flat indented list (not a collapsible tree). Indentation is determined by `division_level` (each additional level = 20px left padding relative to level 1). Divisions are displayed in tree order: parent before children, siblings sorted alphabetically. Rationale: collapsible trees add interaction cost with no scanning benefit for the current Division depth (typically 2–3 levels). A flat indented list is scannable without interaction. Each row shows: division name (indented), active cycle count, and a click target navigating to `/delivery/cycles?division_id=X`. | Source: Claude Code | April 2026 |
+| impl_status: unspecced |
 
 
 ### System Scope & Architecture Principles
@@ -287,58 +313,85 @@ These principles apply to every effort, not just this system.
 **154** — Five Named Gates: Brief Review, Go to Build, Go to Deploy, Go to Release, Close Review. Tier gate configuration is admin-configurable. [NOTE: Gate positions in stage sequence locked by Session 2026-03-18 Decision A. "Close" renamed to "Close Review" by Session 2026-03-18 Decision C. Fifth gate Go to Release added between PILOT and RELEASE by Session 2026-03-24-G.]
 
 **[Session 2026-03-18 — Decision A]** — Gate Position in Stage Sequence. The four named gates are positioned as follows in the 12-stage Delivery Cycle lifecycle: Brief Review gate exits BRIEF stage before DESIGN begins; Go to Build gate exits SPEC stage before BUILD begins; Go to Deploy gate exits UAT stage before PILOT begins; Close Review gate exits OUTCOME stage before COMPLETE. Locks the positional ambiguity introduced by D-154. D-49 gate content mapping remains operative. Brief Review accurately names its gate — it guards the Brief only, before DESIGN begins. Connects to: D-154, D-49, D-108, D-126, ARCH-12.
+| impl_status: unspecced |
 
 **[Session 2026-03-18 — Decision B]** — Delivery Cycle Date Commitment Purpose. Target dates in the Delivery Cycle are a team alignment and communication tool — not project management overhead and not a governance tracking mechanism. Four purposes: (1) Team commitment — a team that cannot name a date has not finished planning; the act of setting the date is itself valuable. (2) Planning and alignment forcing function — setting the date requires the team to reason through what reaching the next gate demands; gaps surface during planning, not after the miss. (3) Divergence as signal — materially different dates proposed by a Domain Strategist and Capability Builder indicate misaligned scope, competing commitments, or insufficient context; the negotiation reveals the real problem early. (4) Upward communication without upward management — Phil, Sabrina, and development leaders see where teams are pointed without having to ask; under-directed or under-resourced teams self-report through their dates or through the absence of them. This purpose statement constrains implementation: any date feature that adds overhead without serving one of these four purposes should not be built. Connects to: D-154, D-108, D-124.
+| impl_status: unspecced |
 
 **[Session 2026-03-18 — Decision C]** — Close Review Gate Name. The fourth named gate is renamed from "Close" to "Close Review." Close Review names the act of review at that passage point — the demonstrated outcome is reviewed before the cycle completes — consistent with Brief Review. The four confirmed gate names are: Brief Review, Go to Build, Go to Deploy, Close Review. Supersedes "Close" as the fourth gate name everywhere it appears in canonical documents. Connects to: D-154, D-108, Session 2026-03-18 Decision A.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision A]** — Delivery Cycle Dashboard Date Field State Model. Each date column on the Delivery Cycle dashboard row operates in one of three display modes determined by whether an actual date has been recorded. Commitment mode: actual_date is null — show target date with upcoming/overdue logic applied (overdue = today exceeds target date, displayed in Oravive; upcoming = 4 or fewer days remaining, displayed in Sunray). Achieved mode: actual_date is populated and actual_date ≤ target_date — show actual date, label as "Actual," neutral color treatment. Missed mode: actual_date is populated and actual_date > target_date — show actual date, label as "Actual," muted overdue color treatment. Urgency indicators (Sunray/Oravive) apply only in Commitment mode. Overdue state suppressed on cycles in COMPLETE or CANCELLED lifecycle stage. Connects to: ARCH-15, D-108, Session 2026-03-24-B, Session 2026-03-24-E.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision B]** — Delivery Cycle Dashboard Milestone Date Columns. The two persistent date columns on the Delivery Cycle dashboard row are Pilot Start Date and Production Release Date. Pilot Start Date corresponds to Go to Deploy gate clearance. Production Release Date corresponds to Go to Release gate clearance. Each column is always present at a fixed position on the dashboard row. When not yet set, the column is blank — no placeholder text. No rules govern when these dates must be set. Gate dates (all five) are visible on the cycle detail view, not the dashboard row. Connects to: D-108, D-154, ARCH-15, Session 2026-03-24-A, Session 2026-03-24-E, Session 2026-03-24-G.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision C]** — Dashboard Headline as Intelligent Summary Text. The Delivery Cycle dashboard row displays a headline text field — not a grid of date cells — that answers: what does someone need to know right now about where this cycle is going? Display logic: (1) Pre-pilot, no pilot target set: next gate name and target date. (2) Pre-pilot, pilot target set: next gate name and date plus pilot target date. (3) Gate pending approval: "Awaiting [Gate Name] approval · [target date if set]." (4) Gate overdue: "[Gate Name] approval overdue · X days." (5) Stage active, next gate future: current stage and next gate target. (6) Post-deploy: Pilot Start or Production Release as anchoring date. Overdue and upcoming logic from Decision A applies. Connects to: D-108, Session 2026-03-24-A, Session 2026-03-24-B.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision D]** — Current Stage Displayed on Dashboard and Detail View. Current lifecycle stage is displayed on both the Delivery Cycle dashboard row and the cycle detail view. Connects to: D-108.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision E]** — Five Milestone Dates as Planning Layer. Five tracked planning dates on a Delivery Cycle, each with a target date (team-set) and actual date (system-recorded when gate clears): (1) Brief Review Complete — Brief Review gate; (2) Build Start — Go to Build gate; (3) Pilot Start — Go to Deploy gate; (4) Release Start — Go to Release gate; (5) Close Review Complete — Close Review gate. Each operates under the date field state model in Decision A. Gate detail lives on the cycle detail view. Connects to: ARCH-15, D-108, D-154, Session 2026-03-24-A.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision F]** — Warning for Unset Actual Dates on Passed Stages. The system warns when actual dates are unset for stages the cycle has already moved through. Data quality signal — not a hard block. Warning surfaces on the cycle detail view. Connects to: ARCH-15, Session 2026-03-24-E.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision G]** — Fifth Gate: Go to Release. A fifth named gate, Go to Release, is added to the Delivery Cycle lifecycle. Positioned between PILOT and RELEASE stages — exits PILOT, before RELEASE begins. Gate configuration (approver identity, required or optional by tier) is admin-configurable per Division per tier per D-65/D-66. Tier 3 cycles with agent or Analytics Capability deployment trigger AI Production Governance Board review at this gate. The five confirmed gate names are: Brief Review, Go to Build, Go to Deploy, Go to Release, Close Review. Connects to: D-108, D-154, Session 2026-03-18 Decision A, D-65, D-66, D-163, ARCH-12.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision H]** — Gate Enforcement via Business Rules MCP. Stage advancement past any required gate is enforced by the business rules MCP. The UI calls the MCP before allowing any stage transition. A required unapproved gate returns a blocked state with reason stated. Users cannot manually set current stage. Blocked action UX follows D-140. Connects to: D-93, D-140, D-144, Session 2026-03-24-G.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision I]** — Right Panel as Standard Detail Surface. The right panel pattern established for the Document Viewer (D-153) is the standard detail surface across the system. Clicking any record in a list view opens its detail in a right panel. The list view remains visible and navigable on the left. No detail view opens as a full page replacement or modal unless a specific exception is locked. Connects to: D-153, Principle 4.2, UC-05, Build C detail view requirement.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision J]** — Cycle Detail View Required in Build C First Pass. The Delivery Cycle detail view is required in the first pass of Build C — not a later addition. Shows all five milestone dates (target and actual), current stage, all five gate statuses with required approvers, and other cycle details. Opens in right panel per Decision I. Connects to: D-108, Session 2026-03-24-E, Session 2026-03-24-I.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision K]** — Bootstrap File Design Principle: Entry Point Not Manifest. The repo-resident bootstrap file for coding agent session initialization contains only the MCP endpoint reference — not document IDs, version hashes, or governing document content. All governing documents are retrieved from the OI Library via MCP at session start. MCP response determines what to load and in what order; documents may chain further MCP calls. Failure behavior: hard pause — session does not proceed on absent or unverified governing constraints. Connects to: D-93, D-155, ARCH-22, D-52, D-39.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision L]** — Delivery Workstream Registry and Delivery Cycle Assignment. A Delivery Workstream is a named registry entry representing a team of Capability Builders with shared delivery accountability. Registry fields: workstream name, active/inactive status, home Division, member list (Capability Builders), named workstream lead. Every delivery cycle is linked to a Delivery Workstream at creation. Division is set explicitly on the delivery cycle — the workstream's home Division pre-populates the field but is overridable per cycle. A Delivery Workstream can work across multiple Divisions across different cycles without affecting Division governance accuracy on those cycles. The dashboard supports filtering and grouping by Delivery Workstream, enabling WIP visibility per workstream and a roadmap view. The OI Trust dashboard serves as the planning surface for Phil and Domain Leaders to see what each workstream is carrying. Connects to: D-108, D-80 (Registry primitive), UC-20, ARCH-15, ARCH-23, Session 2026-03-24-M, Session 2026-03-24-Q.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision M]** — Current Stage as System-Controlled Field with Automatic Advancement. Current lifecycle stage is a system-controlled field with a fixed list of values: the 12 named stages (BRIEF, DESIGN, SPEC, BUILD, VALIDATE, UAT, PILOT, RELEASE, OUTCOME, COMPLETE) plus CANCELLED and ON HOLD as terminal states. Users cannot manually set current stage. When a required gate is approved, the system automatically advances the stage to the next stage — no manual trigger required. Gate approval is the advancement event. Connects to: Session 2026-03-24-D, Session 2026-03-24-H, D-108.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision N]** — Milestone Date Status Model: Five States with Color. Each of the five milestone dates on a delivery cycle carries one of five statuses with fixed display colors: (1) Not Started (gray) — default state when a target date is set for a gate that is not yet the current or next gate, or before any date is set. (2) On Track (green) — human-set affirmation that the team expects to meet the target date. Not a system default. (3) At Risk (amber) — human-set signal that the date is in jeopardy regardless of arithmetic proximity. (4) Behind (red) — system-set automatically when today exceeds the target date and the gate is not yet cleared. Displays days-overdue count. System sets this regardless of what human had previously set. (5) Complete (blue) — system-set automatically when the gate is cleared, actual date is recorded, and stage advances. Human can unset Complete, but unsetting requires a logged reason captured in the cycle audit trail to preserve the compliance record of the gate approval and its reversal. Human can set On Track and At Risk, and can move status backward (e.g. On Track → Not Started, At Risk → On Track). System overrides human for Behind. When a human changes a target date on a Behind milestone, the status automatically resets to Not Started. Connects to: Session 2026-03-24-A, Session 2026-03-24-E, Session 2026-03-24-O, D-108.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision O]** — Default Status When Target Date Is Set. When a target date is set for the current or next gate, the default status is Not Started (gray) — the human must affirmatively set On Track. When a target date is set for any gate two or more positions ahead of the current stage, the status is Not Started (gray) and remains system-defaulted until the cycle reaches that gate. Connects to: Session 2026-03-24-N.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision P]** — Build Sequence Revised: A → C → B → D → E → F. The delivery cycle tracker (Build C) is pulled forward to position 2, ahead of OI Library Core (Build B). Rationale: the tracker delivers immediate visible value to Domain Strategists and Capability Builders, creates natural demand for the OI Library, and the only hard dependency (Division and user infrastructure) is satisfied by Build A. The Delivery Cycle Build Report submission to the OI Library at cycle close is implemented as a stub in Build C and wired fully when Build B ships. Revised build sequence: A (Foundation) → C (Delivery Cycle) → B (OI Library Core) → D (Notifications) → E (Performance & Standards) → F (Agent Governance). Connects to: D-133, Master Build Plan v1.0, D-89.
+| impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision Q]** — Delivery Workstream Active/Inactive Lifecycle and Gate Enforcement. Delivery Workstreams carry an active/inactive status. An inactive workstream cannot be assigned to new delivery cycles — the system blocks the assignment. When a workstream is inactivated, all active delivery cycles assigned to that workstream are immediately flagged with a warning: "Assigned Delivery Workstream is inactive — reassign before this cycle can advance past its current gate." The business rules MCP checks workstream active status as part of every gate clearance attempt. A cycle with an inactive workstream cannot advance past its current gate until a new active workstream is assigned. No grace period — reassignment is the resolution path and is not operationally complex. Connects to: Session 2026-03-24-L, Session 2026-03-24-H, D-80.
+| impl_status: unspecced |
 
 **Session 2026-03-25-A** | Outcome Statement as direct field on delivery_cycles | Three columns on delivery_cycles: outcome_statement (text, nullable), outcome_set_by_user_id (uuid FK → users), outcome_set_at (timestamptz). UI displays persistent amber warning when null. Never a gate block. Outcome Statement is not an artifact — it is a direct property of the cycle record. Connects to: ARCH-15, Session 2026-03-25-B.
+| impl_status: unspecced |
 
 **Session 2026-03-25-B** | Delivery Cycle artifact model | Two new tables: cycle_artifact_types (system-defined seed — artifact_type_id, artifact_type_name, lifecycle_stage, guidance_text, sort_order, gate_required [dormant], required_at_gate [dormant]) and cycle_artifacts (attachment records — cycle_artifact_id, delivery_cycle_id, artifact_type_id [nullable for ad hoc], display_name, external_url, oi_library_artifact_id, pointer_status [enum: external_only / promoted / oi_only], attached_by_user_id, attached_at). Slots organized by lifecycle stage. Empty slots render as placeholders in UI — guidance, not requirements. Connects to: Session 2026-03-25-A, C, D, E, F, G.
+| impl_status: unspecced |
 
 **Session 2026-03-25-C** | No platform enforcement on artifact slots at launch | gate_required and required_at_gate columns dormant at launch. All slots are guidance — visible, skippable, never blocking. Tier-specific enforcement available post-port via dormant columns. Connects to: Session 2026-03-25-B.
+| impl_status: unspecced |
 
 **Session 2026-03-25-D** | Delivery Cycle Build Report placed in BUILD stage | Named artifact slot in BUILD, not RELEASE. Guidance: "As-built record — what was built, how it works, deviations from spec. Complete before Go to Deploy. Input to Pilot, training, and OI Library submission." Consistent with existing Terminology Register definition (Go to Deploy gate). Connects to: Session 2026-03-25-B, D-50, terminology-register.md Section 13.
+| impl_status: unspecced |
 
 **Session 2026-03-25-E** | BRIEF stage artifact slots include Context Package artifacts | Four named slots in BRIEF: Context Brief; Scenario Journeys; True-life examples (plural); Stakeholder input record. Slots 2 and 3 represent the Context Package layer. Connects to: Session 2026-03-25-B, D-Context-Brief-2Layer.
+| impl_status: unspecced |
 
 **Session 2026-03-25-F** | Full cycle_artifact_types seed set locked | Complete slot set by stage: BRIEF (Context Brief; Scenario Journeys; True-life examples; Stakeholder input record). DESIGN (Design session output; UI/UX mockup; Process flow diagram). SPEC (Technical Specification; Cursor prompt; Architecture Decision Record; Agent Registry entry). BUILD (Governing document bootstrap log; Mend scan results; Code review sign-off; Delivery Cycle Build Report). VALIDATE (QA test results; OWASP ZAP scan; Wiz posture report). UAT (UAT sign-off record; 7-step governance checklist; HITRUST/GRICS checklist). PILOT (Pilot Plan; Pilot observations log). RELEASE/OUTCOME (Wiz continuous monitoring baseline; Outcome measurement record). ANY STAGE ad hoc (Reference document — artifact_type_id null, user provides display_name). All slots visible to all tiers. Connects to: Session 2026-03-25-B, C, D, E.
+| impl_status: unspecced |
 
 **Session 2026-03-25-G** | MSO365 to OI Library pointer transition model | On OI Library promotion: oi_library_artifact_id populated, pointer_status transitions from external_only to promoted, external_url preserved (not deleted). UI shows OI Library entry as live authoritative pointer, external URL as archived reference. Connects to: Session 2026-03-25-B.
+| impl_status: unspecced |
 
 **155** — On-Demand MCP Tool Loading Standard. Claude Code uses Tool Search to discover and load tools on demand rather than loading all tools at session start.
 
@@ -361,26 +414,37 @@ These principles apply to every effort, not just this system.
 **164** — Delivery Cycle Build Report name confirmed as final. LOCKED. "Delivery Cycle Build Report" is the final confirmed name. Closes D-59/74 and D-74. Connects to: D-73, D-74 (resolved), UC-01, UC-22.
 
 **Session 2026-03-29-A** | Embedded chat moved from Build A to Build B | Embedded chat removed from Build A scope. Home screen Chat card is a stub in Build A — present in UI per D-150, no chat skill or Vertex AI dependency wired. Fully implemented in Build B alongside OI Library approval workflow and translation layer. Removes ARCH-19 as Build A blocker; ARCH-19 now blocks Build B. Connects to: build-a-spec.md, master-build-plan.md, ARCH-19, D-150, D-153.
+| impl_status: unspecced |
 
 **Session 2026-03-29-B** | Division MCP rename | "Container MCP" (`container-mcp`) renamed to "Division MCP" (`division-mcp`) across all references. Tool names unchanged. Connects to: build-a-spec.md Section 5.2, architecture-notes.md, master-build-plan.md, D-134, D-144.
+| impl_status: unspecced |
 
 **Session 2026-03-29-C** | Unset-approver business rule | When no approver configured for an artifact type at a given Division: escalate to Division Owner; if no Division Owner set, escalate to Phil. Workflow never hard-fails on missing configuration. Build B spec must include approver configuration UI for admins. Connects to: D-65, D-66, D-94, UC-21, UC-02.
+| impl_status: unspecced |
 
 **Session 2026-03-29-D** | ARCH-19 moves to Build B blocker | Vertex AI model selection no longer blocks Build A. Blocks Build B finalization. Connects to: ARCH-19, Session 2026-03-29-A.
+| impl_status: unspecced |
 
 **Session 2026-03-29-E** | GCP account confirmed ready | Phil's personal GCP account ready. GCP setup removed from Build A blockers. Remaining Build A blocker: ionic.theme.map.scss designer confirmation. Connects to: build-a-spec.md Section 10.
+| impl_status: unspecced |
 
 **Session 2026-03-29-F** | Stage Track component contract locked | Full specification in design-communication-principles.md v1.2 Section 5.1. Stage nodes non-interactive. Gate nodes open gate record on click. StageTrackComponent is presentation-only Angular component. Two rendering modes: Full (detail views) and Condensed (dashboard rows). Build C: Full + Condensed for Delivery Cycle. Build B: applied to OI Library artifact detail. Connects to: ARCH-25, D-93, D-108, D-154.
+| impl_status: unspecced |
 
 **Session 2026-03-30-A** | RLS explicitly disabled | RLS (Row Level Security) is disabled in the Supabase project. JWT validation and Division-scoped access control live entirely in the MCP layer (D-93). Enabling RLS would add a second enforcement layer that conflicts with the MCP-only access rule and creates maintenance overhead with no security benefit in this architecture. This is not a deferral — it is an explicit architectural choice. Connects to: D-93, build-a-spec.md Section 2, CLAUDE.md.
+| impl_status: unspecced |
 
 **Session 2026-03-30-B** | Bulk Knowledge Seed supports multiple independent batches | The Bulk Knowledge Seed can be run as many times as needed — Batch A, then Batch B, then Batch C at any point in the future. Each batch creates independent artifact records with no dependencies on prior batches. The data model has no batch counter, no sequence dependency, and no carry-over state. Deduplication is a future consideration but not a current constraint. The ivfflat index on document_embeddings requires periodic maintenance as the table grows — operational note, not a build constraint. Connects to: build-a-spec.md Section 8, document_embeddings table.
+| impl_status: unspecced |
 
 **Session 2026-03-30-C** | CLAUDE.md produced; governing docs bootstrap mechanism deferred | CLAUDE.md authored for Build A and ready to commit to GitHub repo /docs/ folder. The ARCH-22 bootstrap mechanism cannot be implemented yet — OI Library does not exist. For Build A, CLAUDE.md points Claude Code directly at files in /docs/. Full ARCH-22 bootstrap mechanism wired when Build B ships the OI Library MCP. Four environment variable placeholders remain: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DOCUMENT_ACCESS_MCP_URL, DIVISION_MCP_URL — must be populated before Claude Code's first session. Connects to: ARCH-22, build-a-spec.md, CLAUDE.md.
+| impl_status: unspecced |
 
 **Session 2026-03-30-D** | MCP architecture stays in Build A; no deferral | A proposal to defer MCP servers to a later build was considered and rejected. The MCP-only architecture (D-93) is the portability guarantee. Retrofitting MCP after the fact means doing the migration work twice. The two MCP servers in Build A (document-access-mcp, division-mcp) are thin JWT-validating pass-through layers over straightforward queries. Build cost is low; retrofit cost is higher and introduces behavioral risk. Connects to: D-93, build-a-spec.md Section 5.
+| impl_status: unspecced |
 
 **Session 2026-03-30-E** | Engineering introduction: build sequence paused pending engineer onboarding | Build A infrastructure setup (GitHub repo, Supabase project, Render account) has not yet been created. Phil will introduce the engineer (Sandip managing, possible second engineer) on 2026-03-31. Build A does not start until after that session. Engineering introduction materials produced this session. Connects to: project-briefing.md Pending Actions, Build A blockers.
+| impl_status: unspecced |
 
 ---
 
@@ -397,3 +461,26 @@ These principles apply to every effort, not just this system.
 - D-L2/L3: Service Line Division (L2), Function Division (L3). Interim pending Mike.
 - D-59/74: Delivery Cycle Build Report name confirmed as final. Resolved 2026-03-13.
 - D-74: Delivery Cycle Build Report confirmed as final name (not a working placeholder). Resolved 2026-03-13.
+
+### Design Principles — D-180 through D-186 (April 2026)
+
+**D-180** — Right-Panel Entity Detail Pattern. Clicking any named entity anywhere in the system opens its detail in a right panel. The originating screen remains visible and navigable. No entity detail opens as a full-page replacement or modal unless a specific exception is locked by a design decision. Architectural basis: (1) QPathways UX alignment — right-panel is the QPathways standard for entity detail at port time; (2) Mobile compatibility — right-panel layout collapses to single-column on narrow viewports without a separate implementation. Rules: one right-panel slot (no stacking); list stays visible on wide viewports; entity references within a panel are tappable chips per D-181; URL does not change on panel open/close; exceptions require a locked decision. Applies to: Delivery Cycle (Build C), Division and User (Build A shell / Build D full), Workstream and Gate (Build C), OI Library Artifact (Build B). Full principle in docs/design-principles.md Principle 10. | Source: Claude Chat | April 2026 |
+| impl_status: specced |
+
+**D-181** — Tappable Entity Chips. Every named entity reference in a list row, detail panel, or form is rendered as a tappable chip. Plain text entity references are an anti-pattern. Visual treatment: pill shape (border-radius: var(--radius-pill)), muted background (--triarq-color-fog at low opacity), initials avatar or type icon on left, Roboto font. Tap behavior: opens referenced entity detail in right panel per D-180. Inactive or inaccessible entities: chip still renders, tap shows read-only summary — never hidden. Multiple chips: render each inline, never concatenated to plain text. Form pickers produce chips after selection (with remove x for editable fields). Required in Build C for: Assigned DS and CB on every cycle row and detail, Delivery Workstream on every cycle row and detail, Division on every cycle row and detail, approver names in gate detail, actor names in activity log, gate names in milestone rows, Attached by user on artifact slots. Full principle in docs/design-principles.md Principle 11. | Source: Claude Chat | April 2026 |
+| impl_status: specced |
+
+**D-182** — Entity Picker Pattern. When a form field requires selecting a named entity with meaningful attributes, use an entity picker — not a plain dropdown. A dropdown is only appropriate for short, flat lists of simple scalar values. Picker structure: scope radio (tightest scope default; explicit progression; always visible); search field (always present; client-side filtering under ~100 records; debounced server query for large scopes); entity rows (avatar, name, key attrs, status badge; inactive items dimmed at bottom; blocked message inline on inactive tap); echo section (selected entity as chip). Scope expansion is always deliberate — picker never auto-expands on no results. PICKER_SEARCH_DEBOUNCE_MS = 600 — defined once as a shared constant, never hardcoded. 600ms intentionally longer than web standard for healthcare context. EntityPickerComponent is implemented once, configurable per entity type — never reimplemented per type. DS/CB Picker is the reference implementation. Full principle in docs/design-principles.md Principle 12. | Source: Claude Chat | April 2026 |
+| impl_status: specced |
+
+**D-183** — Destructive and Irreversible Action Confirmation. Any action that cannot be automatically reversed requires an explicit two-step confirmation stating what will change before the user commits. Rules: (1) state what changes, not just "are you sure"; (2) two-call pattern for computed downstream effects — first MCP call returns preview, second call with confirmed: true executes; (3) confirmation is inline, not a modal; (4) cancel available until Tier 3 overlay takes over; (5) say "cannot be undone without [correction path]" not "permanent" if manually reversible. Connects to: D-140, D-179, Session 2026-03-24-N. Full principle in docs/design-principles.md Principle 13. | Source: Claude Chat | April 2026 |
+| impl_status: specced |
+
+**D-184** — Entity Name Capitalization. Named system entities are capitalized in all user-facing text. General-purpose nouns describing the same concept are not. Test: if you could substitute the entity name as a UI label, capitalize it; if it appears in a conceptual explanation, use lowercase. Capitalized entities: Division, Workstream, Delivery Cycle, Gate, Artifact, OI Library, Delivery Workstream, Context Brief, Build Report, Action Queue, Stage Track, Trust, Milestone. Applies to: all Angular component templates, error messages, empty states, loading state labels, hub card descriptions, MCP error messages returned to UI, form field labels, table column headers. Does not apply to: TypeScript variable names, database column names, MCP parameter names. Supersedes D-177. Full principle in docs/design-principles.md Principle 14. | Source: Claude Chat | April 2026 |
+| impl_status: specced |
+
+**D-185** — Principle Citation in Specs. Every spec document produced by Claude Chat cites the governing design principle number(s) for each section. Format immediately after Source: Governing principles: Principle N (Name). Omit the line when no principle applies — do not write "None." Citation required on every section governing UI or behavioral decisions; schema-only sections do not require it. When a spec instruction conflicts with its cited principle, Claude Code raises it explicitly per Principle 6 before building. Missing principle for a behavior is a spec gap — flag to Phil. Full principle in docs/design-principles.md Principle 15. | Source: Claude Chat | April 2026 |
+| impl_status: specced |
+
+**D-186** — Decision Implementation Status. Every decision in decisions-active.md carries an impl_status field. Four values: unspecced (locked, no spec yet — default for all pre-existing decisions), specced (included in a spec document given to Claude Code — set by Claude Chat), built (Claude Code has implemented — set by Claude Code at completion), verified (Phil has confirmed acceptance criteria met). Format: | impl_status: [value] | on its own line after the decision record. Claude Code updates to built at implementation completion and does not set verified speculatively. Full principle in docs/design-principles.md Principle 16. | Source: Claude Chat | April 2026 |
+| impl_status: specced |

@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-180**
+**Next available: D-187**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -88,6 +88,13 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-177 | Entity name capitalization in UI text (Division, Workstream, Delivery Cycle, Gate, etc.) | Claude Code | April 2026 | Active |
 | D-178 | Processing State Standard: Three-Tier Loading Pattern | Claude Code | April 2026 | Active |
 | D-179 | Stage Regression Gate Reset Rule — two-call confirm pattern, gatesResetOnRegressionTo() | Claude Code | April 2026 | Active |
+| D-180 | Right-Panel Entity Detail Pattern | Claude Chat | April 2026 | Active |
+| D-181 | Tappable Entity Chips | Claude Chat | April 2026 | Active |
+| D-182 | Entity Picker Pattern (incl. PICKER_SEARCH_DEBOUNCE_MS = 600) | Claude Chat | April 2026 | Active |
+| D-183 | Destructive and Irreversible Action Confirmation | Claude Chat | April 2026 | Active |
+| D-184 | Entity Name Capitalization | Claude Chat | April 2026 | Active |
+| D-185 | Principle Citation in Specs | Claude Chat | April 2026 | Active |
+| D-186 | Decision Implementation Status | Claude Chat | April 2026 | Active |
 
 ---
 
