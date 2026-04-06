@@ -66,6 +66,7 @@ export class DeliveryService {
     workstream_id?:           string;          // optional — D-165
     tier_classification:      TierClassification;
     assigned_ds_user_id?:     string;          // optional — CC-006: required before Brief Review gate
+    assigned_cb_user_id?:     string;          // optional — D-194: required before Go to Build gate
     outcome_statement?:       string;          // optional at creation
     jira_epic_key?:           string;          // optional
     milestone_target_dates?:  {               // optional gate target dates at creation
@@ -164,6 +165,14 @@ export class DeliveryService {
     target_date:       string;
   }): Observable<McpResponse<CycleMilestoneDate>> {
     return this.mcp.call<CycleMilestoneDate>('delivery', 'set_milestone_target_date', params as Record<string, unknown>);
+  }
+
+  setMilestoneActualDate(params: {
+    delivery_cycle_id: string;
+    gate_name:         GateName;
+    actual_date:       string;
+  }): Observable<McpResponse<CycleMilestoneDate>> {
+    return this.mcp.call<CycleMilestoneDate>('delivery', 'set_milestone_actual_date', params as Record<string, unknown>);
   }
 
   updateMilestoneStatus(params: {

@@ -487,3 +487,33 @@ These principles apply to every effort, not just this system.
 
 **D-187** — Action Queue Name. "Action Queue" is the confirmed name for the user action surface. Gate approvals (Accountable) and Gate reviews (Consulted) are the first two action types. No rename as new action types are added unless a specific UX problem requires it. Capitalize in all user-facing text per Principle 14: labels, card headers, empty states, MCP error messages. "My Action Queue" on home screen card. "Items in your Action Queue" in notifications. | Source: Claude Chat | April 2026 |
 | impl_status: specced |
+
+**D-188** — Primary Workflow Clarity. Every screen and panel is designed around its primary workflow. Primary workflow controls are the largest, most prominent elements. Secondary and tertiary controls are visually recessed: smaller text, reduced contrast, positioned below a visual separator or at screen edge, never inline with primary controls at equal weight. Anti-patterns: "Show inactive Workstreams" checkbox at equal weight to scope radios; an advanced filter rendered identically to a primary filter; an edge-case toggle positioned beside the main action path. Full principle in docs/design-principles.md Principle 17. | Source: Claude Chat | April 2026 |
+| impl_status: built |
+
+**D-189** — Sidebar-Only Navigation. OI Trust uses sidebar-only navigation. No top navigation bar. All navigation items live in the left sidebar. As items grow, apply section grouping with muted uppercase section headers when sidebar has 7+ items. Current grouping model (when triggered): (no header) Home/Action Queue/Notifications; OI LIBRARY — OI Library; DELIVERY — Delivery Cycle Tracking/Gates/Workstreams; ADMIN — Admin. Section headers are non-interactive labels. Full principle in docs/design-principles.md Principle 18. | Source: Claude Chat | April 2026 |
+| impl_status: built |
+
+**D-190** — UI Feedback Standard. Exactly three visual feedback patterns are used across all forms, panels, and screens. Pattern 1 — Field Guidance (gray sub-text, --triarq-color-stone, one size below label, no icon/background). Pattern 2 — Warning (amber left border 3px solid --triarq-color-sunray, 8% opacity background, standard body text, ⚠ icon). Pattern 3 — Error (2px solid error color field border, error message below field, ✕/⚠ icon). No fourth pattern is introduced without a locked design decision. Full principle in docs/design-principles.md UI Feedback Standard section. | Source: Claude Chat | April 2026 |
+| impl_status: built |
+
+**D-191** — Tier Classification as Dropdown with Descriptions. Tier Classification renders as a dropdown (not radio buttons). No default selection; placeholder "Select tier classification". Three options with inline descriptions: Tier 1 — Fast Lane: Workflow changes, config updates, no platform dependencies; Tier 2 — Structured: Platform changes, integrations, cross-domain dependencies; Tier 3 — Governed: Agent deployments, compliance scope changes, AI Governance Board required. Required before cycle creation; block with Pattern 3 error if unselected. | Source: Claude Chat | April 2026 |
+| impl_status: built |
+
+**D-192** — Full Gate Sequence for All Tiers (Rollout Phase). All three tiers run the full five-gate sequence during the current rollout phase. Implemented as gate configuration data — not a code change to the Tier model. Approvers by gate: Brief Review/Go to Build/Go to Deploy — Sabrina (Domain Lead) for Practice and Value Services Trusts; Go to Release/Close Review — Phil (EVP Governance). Other Trusts: escalate to Division Owner per Session 2026-03-29-C. | Source: Claude Chat | April 2026 |
+| impl_status: built |
+
+**D-193** — Workstream Filter as Tab Strip on Hub Screen. The Workstream filter on /delivery/cycles renders as a horizontal tab strip, not a dropdown. First tab: "All Workstreams" (default). Subsequent tabs: one per Workstream the authenticated user can access, ordered by name. Active tab: filled --triarq-color-primary, white text. Inactive tabs: outlined, muted text. Overflow: first N that fit, then "+ N more ▾" overflow tab — no second-row wrap. | Source: Claude Chat | April 2026 |
+| impl_status: built |
+
+**D-194** — Create Cycle Form Field Order. Field order on the New Delivery Cycle right panel: (1) Division, (2) Cycle Title, (3) Outcome Statement, (4) Delivery Workstream, (5) Tier Classification, (6) Assigned Domain Strategist, (7) Assigned Capability Builder, (8) Jira Epic Link. Outcome Statement moves to position 3 — immediately after Title — because it is the "why" of the cycle. | Source: Claude Chat | April 2026 |
+| impl_status: built |
+
+**D-195** — Workstream Picker: Suppress Trust Radio at Trust-Level Division; Inactive Toggle Treatment. Suppress the "Trust" scope radio when the cycle's selected Division is a Trust (hierarchy depth = 1). Default scope: "Cycle's Division". "Show inactive Workstreams" toggle is visually separated from scope radios (thin rule or 16px margin), text one step smaller than scope radio labels, color --triarq-color-stone. Toggle must not appear as a peer to scope radios. | Source: Claude Chat | April 2026 |
+| impl_status: built |
+
+**D-196** — Column Headers Always Rendered on Hub Screen. Column headers on /delivery/cycles always render — even when no rows exist. Header row: --triarq-color-navy background, white text. Column order: avatar (48px), Cycle Name (flex min 200px), Headline Status (flex), Lifecycle Stage (200px), Pilot Start Date (120px), Release Start Date (120px). Not sortable at this stage. | Source: Claude Chat | April 2026 |
+| impl_status: built |
+
+**D-197** — Tier Avatar Dot Column on Hub Screen Rows. Each cycle row on /delivery/cycles shows a colored circle in the avatar column (48px) indicating Tier. Colors: Tier 1 = green (#4CAF50), Tier 2 = amber (--triarq-color-sunray), Tier 3 = teal (--triarq-color-primary). No initials or icon — color alone carries the signal. Tier badge (pill, matching color, white text) renders below the cycle title in the Cycle Name column. | Source: Claude Chat | April 2026 |
+| impl_status: built |

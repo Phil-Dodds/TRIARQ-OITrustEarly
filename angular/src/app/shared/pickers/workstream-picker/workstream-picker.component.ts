@@ -43,18 +43,23 @@ type ScopeType = 'division_tree' | 'trust' | 'user_divisions' | 'all';
           <button class="ws-picker-close" (click)="cancel()" aria-label="Close picker">✕</button>
         </div>
 
-        <!-- Scope radio -->
+        <!-- Scope radio — D-195: suppress Trust option when division is Trust-level (depth=1) -->
         <div class="ws-scope-row">
           <span class="ws-scope-label">Scope:</span>
-          <label *ngFor="let opt of scopeOptions" class="ws-scope-option">
-            <input type="radio" [value]="opt.value" [formControl]="scopeCtrl" />
-            {{ opt.label }}
-          </label>
+          <ng-container *ngFor="let opt of scopeOptions">
+            <label *ngIf="!(opt.value === 'trust' && isTrustLevelDivision)" class="ws-scope-option">
+              <input type="radio" [value]="opt.value" [formControl]="scopeCtrl" />
+              {{ opt.label }}
+            </label>
+          </ng-container>
         </div>
 
-        <!-- Show inactive toggle -->
-        <div class="ws-inactive-toggle">
-          <label class="ws-toggle-label">
+        <!-- Show inactive toggle — D-195: visually separated, smaller text, muted color -->
+        <div class="ws-inactive-toggle"
+             style="border-top:1px solid var(--triarq-color-border,#e0e0e0);
+                    padding-top:8px;margin-top:4px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;
+                         font-size:12px;color:var(--triarq-color-stone,#8a9ba8);">
             <input type="checkbox" [formControl]="showInactiveCtrl" />
             Show inactive Workstreams
           </label>
@@ -282,6 +287,12 @@ type ScopeType = 'division_tree' | 'trust' | 'user_divisions' | 'all';
 export class WorkstreamPickerComponent implements OnInit, OnDestroy {
   /** Division ID of the cycle being created/edited. Used as default scope_division_id. */
   @Input() cycleDivisionId: string | null = null;
+
+  /**
+   * D-195: When true, the cycle's selected Division is a Trust (hierarchy depth = 1).
+   * The "Trust" scope radio is suppressed — it would be identical to "Cycle's Division".
+   */
+  @Input() isTrustLevelDivision = false;
 
   /** Currently assigned workstream ID — pre-selects this row on open. */
   @Input() currentWorkstreamId: string | null = null;
