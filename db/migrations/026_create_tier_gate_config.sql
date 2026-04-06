@@ -44,7 +44,7 @@ COMMENT ON TABLE public.tier_gate_requirements IS
 
 CREATE TABLE IF NOT EXISTS public.division_gate_approvers (
     approver_config_id  uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    division_id         uuid        NOT NULL REFERENCES public.divisions(division_id) ON DELETE RESTRICT,
+    division_id         uuid        NOT NULL REFERENCES public.divisions(id) ON DELETE RESTRICT,
     gate_name           text        NOT NULL
                                     CHECK (gate_name IN (
                                         'brief_review', 'go_to_build', 'go_to_deploy',
