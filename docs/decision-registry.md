@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-188**
+**Next available: D-198**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -96,6 +96,16 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-185 | Principle Citation in Specs | Claude Chat | April 2026 | Active |
 | D-186 | Decision Implementation Status | Claude Chat | April 2026 | Active |
 | D-187 | Action Queue Name confirmed | Claude Chat | April 2026 | Active |
+| D-188 | Primary Workflow Clarity — secondary controls visually recessed | Claude Chat | April 2026 | Active |
+| D-189 | Sidebar-Only Navigation — no top nav; section headers at 7+ items | Claude Chat | April 2026 | Active |
+| D-190 | UI Feedback Standard — three patterns only (Guidance/Warning/Error) | Claude Chat | April 2026 | Active |
+| D-191 | Tier Classification as dropdown with descriptions | Claude Chat | April 2026 | Active |
+| D-192 | Full gate sequence for all tiers — rollout phase config | Claude Chat | April 2026 | Active |
+| D-193 | Workstream filter as tab strip on hub screen | Claude Chat | April 2026 | Active |
+| D-194 | Create Cycle form field order (Outcome Statement at position 3) | Claude Chat | April 2026 | Active |
+| D-195 | Workstream Picker — suppress Trust radio; inactive toggle treatment | Claude Chat | April 2026 | Active |
+| D-196 | Column headers always rendered on hub screen | Claude Chat | April 2026 | Active |
+| D-197 | Tier avatar dot column on hub screen rows | Claude Chat | April 2026 | Active |
 
 ---
 

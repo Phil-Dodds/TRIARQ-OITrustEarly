@@ -650,6 +650,107 @@ This session required archaeology to determine which decisions had been specced 
 
 ---
 
+## Principle 17 — Primary Workflow Clarity (D-188)
+
+**Statement:** Every screen and panel is designed around its primary workflow — the action the user performs most often under normal operating conditions. Primary workflows are optimized for speed, clarity, and minimal visual noise. Secondary and tertiary capabilities are present but visually recessed.
+
+**Rules:**
+- Identify the primary workflow for every screen and panel before designing layout. If it cannot be stated in one sentence, the screen has too many responsibilities.
+- Primary workflow controls are the largest, most prominent elements on the surface. They are never visually equal to secondary controls.
+- Secondary options use muted visual treatment: smaller text, reduced contrast, positioned below a visual separator or at screen edge, never inline with primary controls at equal weight.
+- A secondary capability that appears as prominent as the primary workflow is a layout violation — not a preference.
+- Applies to: every form, panel, picker, modal, and dashboard screen in the system.
+
+**Anti-patterns:**
+- A "Show inactive Workstreams" checkbox appearing inline with scope radios at equal visual weight.
+- An advanced filter option rendered identically to a primary filter control.
+- An edge-case toggle positioned above or beside the main action path.
+
+**Application to pickers:** In any entity picker, the scope radios are the primary control. Secondary options (show inactive, advanced filters) must be visually separated — placed below a thin rule or with increased margin — and use smaller, muted text. They must not appear as a peer row to the scope radios.
+
+**Source:** Session 2026-04-06 | D-188 | impl_status: built
+
+---
+
+## Principle 18 — Sidebar-Only Navigation (D-189)
+
+**Statement:** OI Trust uses sidebar-only navigation. There is no top navigation bar. The sidebar is the single navigation authority for the application.
+
+**Rules:**
+- All navigation lives in the left sidebar. No secondary navigation bar at the top of the content area.
+- As the number of sidebar items grows across builds, items are grouped under section headers (not moved to a top bar). Section headers use muted uppercase label styling and do not carry navigation targets themselves.
+- Implement section headers when the sidebar has 7 or more items. Defer grouping below that threshold.
+- Current grouping model (evolves as builds add surfaces):
+  - *(no header)* — Home, Action Queue, Notifications
+  - **OI Library** — OI Library
+  - **Delivery** — Delivery Cycle Tracking, Gates, Workstreams
+  - **Admin** — User Management, System Health, Admin
+- The "+ New Cycle" button and equivalent primary actions live in the content area header — never in the sidebar.
+- At port time into AI.TRIARQPathways.com, the host shell provides the outer chrome. OI Trust loads as a Native Federation remote. Sidebar navigation is internal to the OI Trust remote and does not conflict with host-level navigation.
+
+**Source:** Session 2026-04-06 | D-189 | impl_status: built
+
+---
+
+## UI Feedback Standard — Field Guidance, Warnings, and Errors (D-190)
+
+Every form, panel, and screen uses exactly three visual feedback patterns. These are the only three. No new patterns are introduced without a locked design decision.
+
+### Pattern 1 — Field Guidance (gray sub-text)
+
+Used for: helpful context that tells the user when or why a field matters. Not a warning. Not an error. Informational only.
+
+Visual treatment:
+- Text color: `--triarq-color-stone` (gray, muted)
+- Font size: one step below the field label (e.g., 12px if label is 14px)
+- Position: directly below the input field, above the next field
+- No icon, no background, no border
+
+Examples:
+- "Required before Brief Review Gate."
+- "Required before Go to Build Gate."
+- "Outcome Statement should be set before Brief Review. You can add it now or after creation."
+
+**The Outcome Statement nudge on the Create Cycle form is Field Guidance — not a warning. It must use this pattern, not the amber banner pattern.**
+
+### Pattern 2 — Warning (amber)
+
+Used for: a condition that requires attention but does not block the current action.
+
+Visual treatment:
+- Left border: 3px solid `--triarq-color-sunray` (amber)
+- Background: `--triarq-color-sunray` at 8% opacity
+- Text color: standard body color (not amber)
+- Icon: ⚠ amber, left-aligned
+- Position: inline where the condition exists (below a field, within a panel section, or as a banner within a right panel — never a floating overlay)
+
+Examples:
+- Amber dot on Outcome Statement column when null in dashboard row
+- "Assigned Delivery Workstream is inactive — reassign before this cycle can advance past its current gate."
+
+### Pattern 3 — Error (red)
+
+Used for: a validation failure that blocks the current action.
+
+Visual treatment:
+- Field border: 2px solid system error color
+- Error message: system error color, below the field
+- Icon: ✕ or ⚠ in error color
+- Position: adjacent to the field that failed validation
+
+Examples:
+- Required field left blank on form submit
+- Invalid date format
+- Gate blocked — missing required artifact
+
+### Enforcement Rule
+
+Before adding any new feedback element to a form or panel, identify which of the three patterns applies. If none fits, surface it as a new design decision — do not invent a fourth pattern inline.
+
+**Source:** Session 2026-04-06 | D-190 | impl_status: built
+
+---
+
 ## Version History
 
 | Version | Date | Change |
@@ -659,6 +760,7 @@ This session required archaeology to determine which decisions had been specced 
 | v1.2 | April 2026 | Principle 7 (D-169) added: decision source tagging and registry protocol. |
 | v1.3 | April 2026 | Principle 8 added: feature stage advancement check at session close. |
 | v1.4 | April 2026 | Principles 10–16 added (D-180 through D-186): Right-Panel Entity Detail Pattern, Tappable Entity Chips, Entity Picker Pattern, Destructive Action Confirmation, Entity Name Capitalization, Principle Citation in Specs, Decision Implementation Status. Source: Claude Chat. |
+| v1.5 | April 2026 | Principles 17–18 + UI Feedback Standard added (D-188 through D-190): Primary Workflow Clarity, Sidebar-Only Navigation, three-pattern UI Feedback Standard. Source: Claude Chat. |
 
 ---
 
