@@ -26,7 +26,12 @@ import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
+import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 import { GateSummaryItem, GateName, Division } from '../../../core/types/database';
+
+// Item 4 (Part 3): screen key declared at top of file — Principle 4 (self-clarifying names)
+const SCREEN_KEY = SCREEN_KEYS.DELIVERY_GATES;
+type GateSortCol = 'gate_name' | 'total_pending_count' | 'upcoming_count' | 'overdue_count';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -99,21 +104,39 @@ const GATE_LABELS: Record<GateName, string> = {
       <!-- Table -->
       <div *ngIf="!loading && !loadError">
 
-        <!-- Header -->
+        <!-- Gate type filter + sort controls (Item 4) -->
+        <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;
+                    margin-bottom:var(--triarq-space-sm);align-items:center;">
+          <select [(ngModel)]="filterGateType" (ngModelChange)="saveState()"
+                  class="oi-input" style="font-size:var(--triarq-text-small);max-width:200px;">
+            <option value="">All Gate Types</option>
+            <option *ngFor="let g of allGateNames" [value]="g">{{ gateLabel(g) }}</option>
+          </select>
+        </div>
+
+        <!-- Header (sortable columns) -->
         <div style="display:grid;grid-template-columns:2fr 120px 140px 120px;
                     gap:var(--triarq-space-sm);
                     padding:var(--triarq-space-xs) var(--triarq-space-sm);
                     font-size:var(--triarq-text-small);font-weight:500;
                     color:var(--triarq-color-text-secondary);
                     border-bottom:2px solid var(--triarq-color-border);">
-          <span>Gate</span>
-          <span style="text-align:center;">Total Pending</span>
-          <span style="text-align:center;">Upcoming (≤7 days)</span>
-          <span style="text-align:center;">Overdue</span>
+          <span (click)="setSort('gate_name')" style="cursor:pointer;user-select:none;">
+            Gate {{ sortIndicator('gate_name') }}
+          </span>
+          <span (click)="setSort('total_pending_count')" style="text-align:center;cursor:pointer;user-select:none;">
+            Total Pending {{ sortIndicator('total_pending_count') }}
+          </span>
+          <span (click)="setSort('upcoming_count')" style="text-align:center;cursor:pointer;user-select:none;">
+            Upcoming (≤7 days) {{ sortIndicator('upcoming_count') }}
+          </span>
+          <span (click)="setSort('overdue_count')" style="text-align:center;cursor:pointer;user-select:none;">
+            Overdue {{ sortIndicator('overdue_count') }}
+          </span>
         </div>
 
         <!-- Rows -->
-        <div *ngFor="let gate of gateSummaries"
+        <div *ngFor="let gate of sortedGateSummaries"
              style="display:grid;grid-template-columns:2fr 120px 140px 120px;
                     gap:var(--triarq-space-sm);
                     padding:var(--triarq-space-sm);
@@ -183,17 +206,28 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
   userDivisionIds:   string[] = [];
   gateSummaries:     GateSummaryItem[] = [];
 
+  // Item 4 (Part 3): filter + sort state persisted via ScreenStateService
+  filterGateType: string      = '';
+  sortCol:        GateSortCol = 'gate_name';
+  sortDir:        'asc' | 'desc' = 'asc';
+
+  readonly allGateNames: GateName[] = [
+    'brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'
+  ];
+
   // D-178 Tier 1: skeleton rows for loading state
   readonly skeletonRows = [1, 2, 3, 4, 5];
 
+  private currentUserId = '';
   private readonly profileSub = new Subscription();
 
   constructor(
-    private readonly delivery: DeliveryService,
-    private readonly mcp:      McpService,
-    private readonly profile:  UserProfileService,
-    private readonly router:   Router,
-    private readonly cdr:      ChangeDetectorRef
+    private readonly delivery:     DeliveryService,
+    private readonly mcp:          McpService,
+    private readonly profile:      UserProfileService,
+    private readonly screenState:  ScreenStateService,
+    private readonly router:       Router,
+    private readonly cdr:          ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -203,10 +237,18 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
         filter((p): p is NonNullable<typeof p> => p !== null),
         take(1)
       ).subscribe(profile => {
+        this.currentUserId = profile.id ?? '';
+        // Item 4: restore saved filter/sort state before loading (Principle 9: skeleton shows during restore)
+        const saved = this.screenState.restore(SCREEN_KEY, this.currentUserId);
+        if (saved) {
+          if (typeof saved['filterGateType'] === 'string') { this.filterGateType = saved['filterGateType']; }
+          if (typeof saved['sortCol']         === 'string') { this.sortCol = saved['sortCol'] as GateSortCol; }
+          if (saved['sortDir'] === 'asc' || saved['sortDir'] === 'desc') { this.sortDir = saved['sortDir']; }
+        }
         const role        = profile.system_role;
         this.isPrivileged = role === 'phil' || role === 'admin';
         if (!this.isPrivileged) {
-          this.loadUserDivisions(profile.id ?? '');
+          this.loadUserDivisions(this.currentUserId);
         } else {
           this.loadSummary();
         }
@@ -275,6 +317,46 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
 
   onToggleChange(): void {
     this.loadSummary();
+  }
+
+  // Item 4: sort controls
+  setSort(col: GateSortCol): void {
+    if (this.sortCol === col) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortCol = col;
+      this.sortDir = col === 'gate_name' ? 'asc' : 'desc'; // counts default descending
+    }
+    this.saveState();
+    this.cdr.markForCheck();
+  }
+
+  sortIndicator(col: GateSortCol): string {
+    if (this.sortCol !== col) { return ''; }
+    return this.sortDir === 'asc' ? '↑' : '↓';
+  }
+
+  saveState(): void {
+    if (!this.currentUserId) { return; }
+    this.screenState.save(SCREEN_KEY, this.currentUserId, {
+      filterGateType: this.filterGateType,
+      sortCol:        this.sortCol,
+      sortDir:        this.sortDir,
+    });
+  }
+
+  get sortedGateSummaries(): GateSummaryItem[] {
+    let rows = this.filterGateType
+      ? this.gateSummaries.filter(g => g.gate_name === this.filterGateType)
+      : [...this.gateSummaries];
+    rows = rows.slice().sort((a, b) => {
+      const dir = this.sortDir === 'asc' ? 1 : -1;
+      if (this.sortCol === 'gate_name') {
+        return dir * a.gate_name.localeCompare(b.gate_name);
+      }
+      return dir * ((a[this.sortCol] as number) - (b[this.sortCol] as number));
+    });
+    return rows;
   }
 
   drillDown(gate: GateName): void {

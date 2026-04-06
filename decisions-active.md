@@ -346,7 +346,7 @@ These principles apply to every effort, not just this system.
 | impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision F]** — Warning for Unset Actual Dates on Passed Stages. The system warns when actual dates are unset for stages the cycle has already moved through. Data quality signal — not a hard block. Warning surfaces on the cycle detail view. Connects to: ARCH-15, Session 2026-03-24-E.
-| impl_status: unspecced |
+| impl_status: built |
 
 **[Session 2026-03-24 — Decision G]** — Fifth Gate: Go to Release. A fifth named gate, Go to Release, is added to the Delivery Cycle lifecycle. Positioned between PILOT and RELEASE stages — exits PILOT, before RELEASE begins. Gate configuration (approver identity, required or optional by tier) is admin-configurable per Division per tier per D-65/D-66. Tier 3 cycles with agent or Analytics Capability deployment trigger AI Production Governance Board review at this gate. The five confirmed gate names are: Brief Review, Go to Build, Go to Deploy, Go to Release, Close Review. Connects to: D-108, D-154, Session 2026-03-18 Decision A, D-65, D-66, D-163, ARCH-12.
 | impl_status: unspecced |
@@ -373,7 +373,7 @@ These principles apply to every effort, not just this system.
 | impl_status: unspecced |
 
 **[Session 2026-03-24 — Decision O]** — Default Status When Target Date Is Set. When a target date is set for the current or next gate, the default status is Not Started (gray) — the human must affirmatively set On Track. When a target date is set for any gate two or more positions ahead of the current stage, the status is Not Started (gray) and remains system-defaulted until the cycle reaches that gate. Connects to: Session 2026-03-24-N.
-| impl_status: unspecced |
+| impl_status: built |
 
 **[Session 2026-03-24 — Decision P]** — Build Sequence Revised: A → C → B → D → E → F. The delivery cycle tracker (Build C) is pulled forward to position 2, ahead of OI Library Core (Build B). Rationale: the tracker delivers immediate visible value to Domain Strategists and Capability Builders, creates natural demand for the OI Library, and the only hard dependency (Division and user infrastructure) is satisfied by Build A. The Delivery Cycle Build Report submission to the OI Library at cycle close is implemented as a stub in Build C and wired fully when Build B ships. Revised build sequence: A (Foundation) → C (Delivery Cycle) → B (OI Library Core) → D (Notifications) → E (Performance & Standards) → F (Agent Governance). Connects to: D-133, Master Build Plan v1.0, D-89.
 | impl_status: unspecced |
@@ -400,7 +400,7 @@ These principles apply to every effort, not just this system.
 | impl_status: unspecced |
 
 **Session 2026-03-25-G** | MSO365 to OI Library pointer transition model | On OI Library promotion: oi_library_artifact_id populated, pointer_status transitions from external_only to promoted, external_url preserved (not deleted). UI shows OI Library entry as live authoritative pointer, external URL as archived reference. Connects to: Session 2026-03-25-B.
-| impl_status: unspecced |
+| impl_status: built |
 
 **155** — On-Demand MCP Tool Loading Standard. Claude Code uses Tool Search to discover and load tools on demand rather than loading all tools at session start.
 
@@ -495,4 +495,4 @@ These principles apply to every effort, not just this system.
 | impl_status: specced |
 
 **D-187** — Action Queue Name. "Action Queue" is the confirmed name for the user action surface. Gate approvals (Accountable) and Gate reviews (Consulted) are the first two action types. No rename as new action types are added unless a specific UX problem requires it. Capitalize in all user-facing text per Principle 14: labels, card headers, empty states, MCP error messages. "My Action Queue" on home screen card. "Items in your Action Queue" in notifications. | Source: Claude Chat | April 2026 |
-| impl_status: specced |
+| impl_status: built |

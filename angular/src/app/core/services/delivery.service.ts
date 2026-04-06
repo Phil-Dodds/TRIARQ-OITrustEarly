@@ -176,6 +176,16 @@ export class DeliveryService {
     return this.mcp.call<CycleMilestoneDate>('delivery', 'update_milestone_status', params as Record<string, unknown>);
   }
 
+  // Session 2026-03-24-F: manual actual date entry for data quality path
+  setMilestoneActualDate(params: {
+    delivery_cycle_id: string;
+    gate_name:         GateName;
+    actual_date:       string;
+    manually_entered:  boolean;
+  }): Observable<McpResponse<CycleMilestoneDate>> {
+    return this.mcp.call<CycleMilestoneDate>('delivery', 'set_milestone_actual_date', params as Record<string, unknown>);
+  }
+
   // ── Artifact tools ─────────────────────────────────────────────────────────
 
   attachArtifact(params: {
