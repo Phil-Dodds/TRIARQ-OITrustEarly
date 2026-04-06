@@ -36,7 +36,7 @@ import {
 
 // Item 4 (Part 3): screen key declared at top of file — Principle 4 (self-clarifying names)
 const SCREEN_KEY = SCREEN_KEYS.DELIVERY_WORKSTREAMS;
-type WorkstreamSortCol = 'workstream_name' | 'total_active';
+type WorkstreamSortCol = 'workstream_name' | 'total_active_cycles';
 
 // D-189: gate labels for column headers
 const GATE_LABELS: Record<GateName, string> = {
@@ -387,7 +387,7 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
       this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
     } else {
       this.sortCol = col;
-      this.sortDir = col === 'workstream_name' ? 'asc' : 'desc';
+      this.sortDir = col === 'workstream_name' ? 'asc' : 'desc'; // total_active_cycles defaults desc
     }
     this.saveState();
     this.cdr.markForCheck();
@@ -431,7 +431,7 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
           if (this.sortCol === 'workstream_name') {
             return dir * a.workstream_name.localeCompare(b.workstream_name);
           }
-          return dir * (a.total_active - b.total_active);
+          return dir * (a.total_active_cycles - b.total_active_cycles);
         })
       }))
       .sort((a, b) => a.divisionName.localeCompare(b.divisionName));
