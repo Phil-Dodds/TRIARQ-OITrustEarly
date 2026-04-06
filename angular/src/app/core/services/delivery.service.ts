@@ -206,8 +206,8 @@ export class DeliveryService {
   /**
    * Returns pre-aggregated summary data for all three hub sub-views.
    * Optionally filtered to specific division IDs (pass empty/omit for all accessible).
-   * D-173: NEXT_GATE_BY_STAGE computed server-side.
-   * D-174: WIP category counts and exceeded flags computed server-side.
+   * D-189: NEXT_GATE_BY_STAGE computed server-side.
+   * D-190: WIP category counts and exceeded flags computed server-side.
    */
   getDeliverySummary(params: {
     division_ids?: string[];

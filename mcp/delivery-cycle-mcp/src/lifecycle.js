@@ -94,7 +94,7 @@ function gatesResetOnRegressionTo(target_stage, current_stage) {
   return gates;
 }
 
-// Next gate that must be cleared from each current stage (D-173).
+// Next gate that must be cleared from each current stage (D-189).
 // Used for summary views and filter labelling.
 // Returns null for terminal/pause stages.
 const NEXT_GATE_BY_STAGE = {
@@ -112,7 +112,7 @@ const NEXT_GATE_BY_STAGE = {
   ON_HOLD:   null
 };
 
-// WIP category for each lifecycle stage (D-174).
+// WIP category for each lifecycle stage (D-190).
 // Prep = BRIEF/DESIGN/SPEC. Build = BUILD/VALIDATE. Outcome = PILOT/UAT/RELEASE/OUTCOME.
 // COMPLETE, CANCELLED, ON_HOLD are excluded from WIP counting (null).
 const WIP_CATEGORY_BY_STAGE = {
@@ -130,7 +130,7 @@ const WIP_CATEGORY_BY_STAGE = {
   ON_HOLD:   null
 };
 
-// WIP limit per category per workstream (D-174).
+// WIP limit per category per workstream (D-190).
 const WIP_LIMIT = 4;
 
 module.exports = {

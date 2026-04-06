@@ -32,7 +32,7 @@ const GATE_LABEL: Record<GateName, string> = {
   close_review:  'Close Review'
 };
 
-// D-173: next gate derived from stage — mirrors NEXT_GATE_BY_STAGE in delivery-cycle-detail
+// D-189: next gate derived from stage — mirrors NEXT_GATE_BY_STAGE in delivery-cycle-detail
 const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
   BRIEF:    'brief_review',
   DESIGN:   'go_to_build',

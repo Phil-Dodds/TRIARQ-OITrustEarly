@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "mode": "allow",
     "allow": [
       "Bash(git *)",
       "Bash (git:*)",
@@ -45,12 +44,25 @@
       "WebFetch(domain:phil-dodds.github.io)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:render.com)",
-      "mcp__Claude_in_Chrome__tabs_context_mcp"
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app/features/delivery\")",
+      "Read(//c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app/features/delivery/dashboard/$BASE/**)",
+      "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app\")",
+      "Read(//c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app/features/delivery/dashboard/$BASE/features/delivery/dashboard/**)",
+      "Read(//c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app/features/delivery/dashboard/$BASE/features/**)",
+      "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app/features/home/components\")",
+      "Read(//c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app/features/delivery/dashboard/**)",
+      "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app/core/services\")",
+      "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/mcp\" ls \"$BASE/\" ls \"$BASE/delivery-cycle-mcp/src/tools/\")",
+      "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/mcp\")",
+      "Read(//c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app/features/delivery/dashboard/$BASE/delivery-cycle-mcp/**)",
+      "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/mcp/delivery-cycle-mcp/src\")"
     ],
     "deny": [
       "Bash(git reset --hard *)",
       "Bash(git push --force *)",
       "Bash(sudo *)"
-    ]
+    ],
+    "mode": "allow"
   }
 }

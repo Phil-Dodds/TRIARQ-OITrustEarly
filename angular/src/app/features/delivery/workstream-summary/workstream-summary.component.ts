@@ -1,9 +1,9 @@
 // workstream-summary.component.ts — WorkstreamSummaryComponent
-// Route: /delivery/workstreams  (D-172)
+// Route: /delivery/workstreams  (D-188)
 //
 // Shows WIP counts per workstream grouped by home Division.
-// Prep/Build/Outcome WIP with exceeded-limit indicator (D-174).
-// Gate count columns per D-173 NEXT_GATE_BY_STAGE mapping.
+// Prep/Build/Outcome WIP with exceeded-limit indicator (D-190).
+// Gate count columns per D-189 NEXT_GATE_BY_STAGE mapping.
 // Click a count → drill down to /delivery/cycles with query params (D-175).
 // Toggle: "Display only my Divisions" — hidden for phil/admin (D-170).
 //
@@ -33,7 +33,7 @@ import {
   Division
 } from '../../../core/types/database';
 
-// D-173: gate labels for column headers
+// D-189: gate labels for column headers
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
   go_to_build:   'Go to Build',

@@ -1,5 +1,5 @@
 // delivery-cycle-dashboard.component.ts — DeliveryCycleDashboardComponent
-// Route: /delivery/cycles  (moved from /delivery — D-172)
+// Route: /delivery/cycles  (moved from /delivery — D-188)
 // Spec: build-c-spec Section 5.2
 //
 // Displays all Delivery Cycles visible to the current user.
@@ -61,7 +61,7 @@ const GATE_LABELS: Record<GateName, string> = {
   close_review:  'Close Review'
 };
 
-// D-173: next gate derived from lifecycle stage (mirrors lifecycle.js NEXT_GATE_BY_STAGE)
+// D-189: next gate derived from lifecycle stage (mirrors lifecycle.js NEXT_GATE_BY_STAGE)
 const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
   BRIEF:    'brief_review',
   DESIGN:   'go_to_build',
@@ -92,7 +92,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
   template: `
     <div style="max-width:1200px;margin:var(--triarq-space-2xl) auto;padding:0 var(--triarq-space-md);">
 
-      <!-- ── Back link (D-172) ───────────────────────────────────────────── -->
+      <!-- ── Back link (D-188) ───────────────────────────────────────────── -->
       <div style="margin-bottom:var(--triarq-space-sm);">
         <a routerLink="/delivery"
            style="font-size:var(--triarq-text-small);
@@ -532,7 +532,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           </optgroup>
         </select>
 
-        <!-- D-173: Next Gate filter — computed from lifecycle stage client-side -->
+        <!-- D-189: Next Gate filter — computed from lifecycle stage client-side -->
         <select [(ngModel)]="filterNextGate" (ngModelChange)="applyFilters()" class="oi-input"
                 style="max-width:180px;font-size:var(--triarq-text-small);">
           <option value="">All Next Gates</option>
@@ -541,7 +541,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           </option>
         </select>
 
-        <!-- D-172: Assigned DS filter — only shown when there are multiple DS in the loaded result set -->
+        <!-- D-188: Assigned DS filter — only shown when there are multiple DS in the loaded result set -->
         <select *ngIf="dsFilterOptions.length > 1"
                 [(ngModel)]="filterDs" (ngModelChange)="applyFilters()" class="oi-input"
                 style="max-width:180px;font-size:var(--triarq-text-small);">
@@ -549,7 +549,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           <option *ngFor="let ds of dsFilterOptions" [value]="ds.user_id">{{ ds.display_name }}</option>
         </select>
 
-        <!-- D-172: Assigned CB filter — only shown when there are multiple CB in the loaded result set -->
+        <!-- D-188: Assigned CB filter — only shown when there are multiple CB in the loaded result set -->
         <select *ngIf="cbFilterOptions.length > 1"
                 [(ngModel)]="filterCb" (ngModelChange)="applyFilters()" class="oi-input"
                 style="max-width:180px;font-size:var(--triarq-text-small);">
@@ -821,9 +821,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // D-166: division filter — server-side reload when changed
   filterDivision:           string  = '';
   includeChildDivisions:    boolean = false;
-  // D-173/D-175: next gate filter — computed client-side from lifecycle stage
+  // D-189/D-175: next gate filter — computed client-side from lifecycle stage
   filterNextGate:           string  = '';
-  // D-172: Assigned DS and Assigned CB filters — client-side, derived from loaded cycles
+  // D-188: Assigned DS and Assigned CB filters — client-side, derived from loaded cycles
   filterDs:                 string  = '';
   filterCb:                 string  = '';
 
@@ -1180,7 +1180,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return this.workstreams.filter(w => !w.active_status);
   }
 
-  // D-172: Unique DS options derived from loaded cycles — only show people who appear in current result set.
+  // D-188: Unique DS options derived from loaded cycles — only show people who appear in current result set.
   get dsFilterOptions(): { user_id: string; display_name: string }[] {
     const seen = new Map<string, string>();
     for (const c of this.cycles) {
@@ -1193,7 +1193,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       .sort((a, b) => a.display_name.localeCompare(b.display_name));
   }
 
-  // D-172: Unique CB options derived from loaded cycles.
+  // D-188: Unique CB options derived from loaded cycles.
   get cbFilterOptions(): { user_id: string; display_name: string }[] {
     const seen = new Map<string, string>();
     for (const c of this.cycles) {
@@ -1321,16 +1321,16 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         if (c.workstream_id !== this.filterWorkstream) { return false; }
       }
 
-      // D-173/D-175: next gate filter — computed from lifecycle stage
+      // D-189/D-175: next gate filter — computed from lifecycle stage
       if (this.filterNextGate) {
         const nextGate = NEXT_GATE_BY_STAGE[c.current_lifecycle_stage] ?? null;
         if (nextGate !== this.filterNextGate) { return false; }
       }
 
-      // D-172: Assigned DS filter
+      // D-188: Assigned DS filter
       if (this.filterDs && c.assigned_ds_user_id !== this.filterDs) { return false; }
 
-      // D-172: Assigned CB filter
+      // D-188: Assigned CB filter
       if (this.filterCb && c.assigned_cb_user_id !== this.filterCb) { return false; }
 
       return true;

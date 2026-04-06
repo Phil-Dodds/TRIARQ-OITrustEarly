@@ -1,7 +1,7 @@
 // gates-summary.component.ts — GatesSummaryComponent
-// Route: /delivery/gates  (D-172)
+// Route: /delivery/gates  (D-188)
 //
-// Shows upcoming and overdue gate counts per gate type (D-173).
+// Shows upcoming and overdue gate counts per gate type (D-189).
 // "Upcoming" = next gate target date within 7 days and not yet passed.
 // "Overdue"  = next gate target date is in the past, no actual date set.
 // Click a row → drill down to /delivery/cycles?next_gate=X (D-175).

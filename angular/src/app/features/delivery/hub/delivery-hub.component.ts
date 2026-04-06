@@ -1,5 +1,5 @@
 // delivery-hub.component.ts — DeliveryHubComponent
-// Route: /delivery  (D-171, D-172)
+// Route: /delivery  (D-171, D-188)
 //
 // Hub page for Delivery Cycle Tracking. Shows four option cards.
 // No data is loaded at hub level — the hub is purely navigational.

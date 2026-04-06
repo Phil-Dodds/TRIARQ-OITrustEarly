@@ -323,7 +323,7 @@ export type GateStateMap = Record<GateName, GateDisplayState>;
 // ── Build C — Dashboard summary types (D-171–D-176) ──────────────────────────
 
 /** WIP category counts per workstream. Prep = BRIEF/DESIGN/SPEC; Build = BUILD/VALIDATE;
- *  Outcome = PILOT/UAT/RELEASE/OUTCOME. Limit = 4 each (D-174). */
+ *  Outcome = PILOT/UAT/RELEASE/OUTCOME. Limit = 4 each (D-190). */
 export interface WorkstreamSummaryItem {
   workstream_id:          string | null;  // null = cycles with no workstream assigned
   workstream_name:        string;

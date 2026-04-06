@@ -1,5 +1,5 @@
 // division-summary.component.ts — DivisionSummaryComponent
-// Route: /delivery/divisions  (D-172)
+// Route: /delivery/divisions  (D-188)
 //
 // Active cycle count per Division in flat indented list order (D-176).
 // Tree order: parent before children, siblings alphabetical.
