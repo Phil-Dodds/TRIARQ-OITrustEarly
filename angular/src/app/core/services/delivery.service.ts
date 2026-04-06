@@ -168,9 +168,10 @@ export class DeliveryService {
   }
 
   setMilestoneActualDate(params: {
-    delivery_cycle_id: string;
-    gate_name:         GateName;
-    actual_date:       string;
+    delivery_cycle_id:  string;
+    gate_name:          GateName;
+    actual_date:        string;
+    manually_entered?:  boolean;
   }): Observable<McpResponse<CycleMilestoneDate>> {
     return this.mcp.call<CycleMilestoneDate>('delivery', 'set_milestone_actual_date', params as Record<string, unknown>);
   }
