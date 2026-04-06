@@ -11,8 +11,9 @@
 // CC-006 (Session 2026-04-04): cycle_owner_user_id removed — same person as assigned_ds_user_id.
 // assigned_ds_user_id is nullable at creation; required before Brief Review gate (enforced in submit_gate_for_approval).
 // assigned_cb_user_id is nullable at creation; required before Go to Build gate.
+// D-194 (Session 2026-04-06): assigned_cb_user_id added to create params — single-call creation (Option B).
 //
-// Source: D-83, D-108, D-124, D-125, D-165, CC-006, build-c-spec Section 4.1
+// Source: D-83, D-108, D-124, D-125, D-165, CC-006, D-194, build-c-spec Section 4.1
 
 'use strict';
 
@@ -27,6 +28,7 @@ const { GATE_MILESTONE_LABELS, ALL_GATES } = require('../lifecycle');
  * @param {string}  [params.workstream_id]         — Optional at creation (D-165)
  * @param {string}  params.tier_classification     — 'tier_1' | 'tier_2' | 'tier_3'
  * @param {string}  [params.assigned_ds_user_id]   — Optional at creation (CC-006); required before Brief Review gate
+ * @param {string}  [params.assigned_cb_user_id]   — Optional at creation (D-194); required before Go to Build gate
  * @param {string}  [params.outcome_statement]      — Optional; can be set at creation or later
  * @param {string}  [params.jira_epic_key]          — Optional Jira Epic Key
  * @param {object}  [params.milestone_target_dates] — Optional gate target dates at creation
@@ -45,6 +47,7 @@ async function create_delivery_cycle(params, caller_user_id) {
     workstream_id,
     tier_classification,
     assigned_ds_user_id,
+    assigned_cb_user_id,
     outcome_statement,
     jira_epic_key,
     milestone_target_dates
@@ -66,7 +69,8 @@ async function create_delivery_cycle(params, caller_user_id) {
     return { success: false, error: 'tier_classification must be one of: tier_1, tier_2, tier_3.' };
   }
   // assigned_ds_user_id is optional at creation (CC-006) — required before Brief Review gate.
-  // No required check here — gate enforcement is in submit_gate_for_approval.
+  // assigned_cb_user_id is optional at creation (D-194) — required before Go to Build gate.
+  // No required checks here — gate enforcement is in submit_gate_for_approval.
 
   // ── Caller role check ─────────────────────────────────────────────────────
   const { data: caller, error: callerErr } = await supabase
@@ -133,6 +137,20 @@ async function create_delivery_cycle(params, caller_user_id) {
     }
   }
 
+  // ── Verify assigned CB exists (if provided) ───────────────────────────────
+  if (assigned_cb_user_id) {
+    const { data: cb, error: cbErr } = await supabase
+      .from('users')
+      .select('id, is_active')
+      .eq('id', assigned_cb_user_id)
+      .is('deleted_at', null)
+      .single();
+
+    if (cbErr || !cb) {
+      return { success: false, error: 'assigned_cb_user_id not found or has been deleted.' };
+    }
+  }
+
   // ── Insert cycle ──────────────────────────────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
@@ -144,6 +162,7 @@ async function create_delivery_cycle(params, caller_user_id) {
       tier_classification,
       current_lifecycle_stage: 'BRIEF',
       assigned_ds_user_id:     assigned_ds_user_id || null,  // CC-006: nullable at creation
+      assigned_cb_user_id:     assigned_cb_user_id || null,  // D-194: nullable at creation
       outcome_statement:       outcome_statement   || null,
       jira_epic_key:           jira_epic_key       || null
     })
@@ -199,19 +218,24 @@ async function create_delivery_cycle(params, caller_user_id) {
     ? ` DS assigned at creation.`
     : ` No DS assigned yet (required before Brief Review gate).`;
 
+  const cbDesc = assigned_cb_user_id
+    ? ` CB assigned at creation.`
+    : '';
+
   await supabase
     .from('cycle_event_log')
     .insert({
       delivery_cycle_id: cycle_id,
       event_type:        'cycle_created',
-      event_description: `Delivery Cycle "${cycle.cycle_title}" created at ${tier_classification} ${workstreamDesc}.${dsDesc}`,
+      event_description: `Delivery Cycle "${cycle.cycle_title}" created at ${tier_classification} ${workstreamDesc}.${dsDesc}${cbDesc}`,
       actor_user_id:     caller_user_id,
       event_metadata: {
         tier_classification,
         workstream_id:       workstream_id       || null,
         workstream_name:     workstream?.workstream_name || null,
         division_id,
-        assigned_ds_user_id: assigned_ds_user_id || null
+        assigned_ds_user_id: assigned_ds_user_id || null,
+        assigned_cb_user_id: assigned_cb_user_id || null
       }
     });
 

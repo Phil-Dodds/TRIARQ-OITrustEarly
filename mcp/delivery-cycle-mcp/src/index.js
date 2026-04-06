@@ -35,6 +35,7 @@ const { submit_gate_for_approval }       = require('./tools/submit_gate_for_appr
 const { record_gate_decision }           = require('./tools/record_gate_decision');
 
 const { set_milestone_target_date }      = require('./tools/set_milestone_target_date');
+const { set_milestone_actual_date }      = require('./tools/set_milestone_actual_date');
 const { update_milestone_status }        = require('./tools/update_milestone_status');
 
 const { attach_cycle_artifact }          = require('./tools/attach_cycle_artifact');
@@ -71,6 +72,7 @@ const TOOLS = {
 
   // Milestone date management
   set_milestone_target_date,
+  set_milestone_actual_date,
   update_milestone_status,
 
   // Artifact tracking
