@@ -163,4 +163,18 @@ No feature stage changes this session. Work was UX corrections to existing built
 
 ---
 
+## Post-Session Fixes (after initial close)
+
+**Migration 026 fix:** `division_gate_approvers` FK referenced `divisions(division_id)` — should be `divisions(id)`. Fixed and reapplied in Supabase.
+
+**Seed 003 fix:** Two `SELECT division_id INTO` queries — should be `SELECT id INTO`. Fixed and reapplied in Supabase.
+
+**Sabrina user row:** Phil added Sabrina Dobbins (`sdobbins@triarqhealth.com`, role DS) via Admin UI. Seed 003 re-run — Sabrina's gate approver rows for Practice Services Trust and Value Services Trust now seeded successfully.
+
+**CLAUDE.md:** Worktree and Scripting Rules section added — governing docs are master-only, npm install on new worktrees, python3 alias broken on Windows (use awk/sed/grep).
+
+**Final master commit:** `6481381`
+
+---
+
 *Session 2026-04-06-B | Claude Code | Worktree: claude/peaceful-driscoll | CONFIDENTIAL*
