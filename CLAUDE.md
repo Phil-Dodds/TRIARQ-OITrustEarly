@@ -197,6 +197,16 @@ Never return error codes or silent failures. Source: D-140.
 
 ---
 
+## Worktree and Scripting Rules
+
+**Governing documents are master-only.** Never modify `decisions-active.md`, `docs/decision-registry.md`, or `docs/design-principles.md` inside a worktree. Make all governing doc changes directly on master (before or after the worktree merge). This prevents merge conflicts on files that both branches would otherwise touch.
+
+**npm install on new worktrees.** Any worktree that has no `node_modules/` requires `npm install --legacy-peer-deps` in the `angular/` folder before `ng build` will work. Do this automatically at the start of any worktree session — do not wait for `ng build` to fail first.
+
+**File manipulation scripting.** Use `awk`, `sed`, and `grep` for text/file processing. Do not use `python3` — the Windows alias opens Microsoft Store instead of running Python. Node.js (`node -e`) is available as a fallback but requires care with path arguments: pass file paths via `process.argv` or environment variables, never interpolated directly into the `-e` string (bash `/c/` paths become `C:\c\` in Node's Windows resolver).
+
+---
+
 ## Code Generation Rules
 
 - Generate tests alongside every code file — CB reviews coverage before QA
