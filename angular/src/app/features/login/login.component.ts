@@ -14,12 +14,27 @@ type LoginState = 'idle' | 'signing-in' | 'error';
   selector:        'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="oi-login-shell">
-      <div class="oi-login-card oi-card">
+    <div class="login-wrapper">
 
-        <div class="oi-login-brand">
-          <h3>Pathways OI Trust</h3>
-          <p class="oi-login-subtitle">Organizational Intelligence Platform</p>
+      <!-- LEFT PANEL -->
+      <div class="login-left">
+
+        <!-- Logo block -->
+        <div class="logo-block">
+          <img
+            src="assets/images/TRIARQ_Logo_rgb.svg"
+            alt="TRIARQ Health"
+            style="width: 180px; height: auto; display: block;"
+          />
+          <p class="logo-sub">Pathways Operating System</p>
+        </div>
+
+        <!-- Product name + purpose -->
+        <div class="product-block">
+          <h1 class="product-name">Pathways OI Trust</h1>
+          <p class="product-description">
+            TRIARQ's platform for delivery workflows, organizational intelligence, and governance.
+          </p>
         </div>
 
         <!-- Callback error notice — shown when redirected back from a failed magic link -->
@@ -34,8 +49,9 @@ type LoginState = 'idle' | 'signing-in' | 'error';
               novalidate>
 
           <div class="oi-field">
-            <label for="email">Work email</label>
+            <label class="field-label" for="email">Work Email</label>
             <input id="email"
+                   class="email-input"
                    type="email"
                    formControlName="email"
                    autocomplete="email"
@@ -52,88 +68,289 @@ type LoginState = 'idle' | 'signing-in' | 'error';
           </app-blocked-action>
 
           <button type="submit"
-                  class="oi-btn-primary"
+                  class="signin-button"
                   [disabled]="state === 'signing-in'">
             {{ state === 'signing-in' ? 'Signing in…' : 'Sign in' }}
           </button>
 
         </form>
 
+        <!-- Tagline footer -->
+        <div class="tagline-footer">
+          <p class="tagline-text">Empower · Optimize · Partner</p>
+        </div>
+
       </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="login-right">
+
+        <h2 class="rp-headline">Delivery Cycle management<br/>is in UAT.</h2>
+
+        <div class="feature-list">
+
+          <!-- Bullet 1: AI-First (no subtext) -->
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <polyline points="2,7 5,10 11,3"
+                  stroke="#E96127" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <p class="feature-label">Developed 100% "AI-First" using Claude Code</p>
+            </div>
+          </div>
+
+          <!-- Bullet 2: Delivery Cycle Tracking -->
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <polyline points="2,7 5,10 11,3"
+                  stroke="#E96127" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <p class="feature-label">Delivery Cycle Tracking</p>
+              <p class="feature-description">Create and track delivery cycles from Context Brief through production release — with named gates, milestone dates, and role-based visibility for DSs and CBs.</p>
+            </div>
+          </div>
+
+          <!-- Bullet 3: MCP architecture -->
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <polyline points="2,7 5,10 11,3"
+                  stroke="#E96127" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <p class="feature-label">100% MCP architecture</p>
+              <p class="feature-description">Every data operation runs through a governed MCP layer — fully portable to the production AI.TRIARQPathways environment at launch.</p>
+            </div>
+          </div>
+
+          <!-- Bullet 4: Angular 19 platform foundation -->
+          <div class="feature-item">
+            <div class="feature-icon">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <polyline points="2,7 5,10 11,3"
+                  stroke="#E96127" stroke-width="1.8"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <p class="feature-label">Angular 19 platform foundation</p>
+              <p class="feature-description">Built on the same design tokens and component architecture that will power the full Pathways OS — not a prototype, a production foundation.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Coming soon footer -->
+        <div class="coming-soon">
+          <p class="coming-soon-label">Coming soon</p>
+          <p class="coming-soon-items">
+            OI Library · Embedded AI chat · Analytics capability · Engineering governance
+          </p>
+        </div>
+
+      </div>
+
     </div>
   `,
   styles: [`
-    .oi-login-shell {
-      min-height: 100vh;
+    /* ── Wrapper ── */
+    .login-wrapper {
       display: flex;
-      align-items: center;
+      min-height: 100vh;
+      width: 100%;
+      font-family: Arial, sans-serif;
+    }
+
+    /* ── Left panel ── */
+    .login-left {
+      flex: 1;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
       justify-content: center;
-      background: var(--triarq-color-background);
+      padding: 3rem 3.5rem;
     }
-    .oi-login-card {
-      width: 100%;
-      max-width: 400px;
-      padding: var(--triarq-space-2xl);
-    }
-    .oi-login-brand { text-align: center; margin-bottom: var(--triarq-space-xl); }
-    .oi-login-brand h3 { color: var(--triarq-color-primary); margin: 0 0 var(--triarq-space-xs) 0; }
-    .oi-login-subtitle { color: var(--triarq-color-text-secondary); font-size: var(--triarq-text-small); margin: 0; }
 
-    .oi-field { margin-bottom: var(--triarq-space-md); }
-    label { display: block; font-size: var(--triarq-text-small); font-weight: var(--triarq-font-weight-medium); margin-bottom: var(--triarq-space-xs); }
-    input[type="email"] {
+    /* ── Right panel ── */
+    .login-right {
+      flex: 1;
+      background: #12274A;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 3rem 3rem;
+    }
+
+    /* ── Logo block ── */
+    .logo-block { margin-bottom: 2.5rem; }
+    .logo-sub {
+      font-size: 10px;
+      color: #5A5A5A;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      margin-top: 6px;
+      margin-bottom: 0;
+    }
+
+    /* ── Product block ── */
+    .product-block { margin-bottom: 2rem; }
+    .product-name {
+      font-size: 26px;
+      font-weight: 700;
+      color: #12274A;
+      line-height: 1.2;
+      margin: 0 0 10px 0;
+    }
+    .product-description {
+      font-size: 14px;
+      color: #5A5A5A;
+      line-height: 1.6;
+      max-width: 320px;
+      margin: 0;
+    }
+
+    /* ── Email field ── */
+    .oi-field { margin-bottom: 0; }
+    .field-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #12274A;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .email-input {
       width: 100%;
-      padding: var(--triarq-space-sm) var(--triarq-space-md);
-      border: 1px solid var(--triarq-color-border);
-      border-radius: var(--triarq-radius-input);
-      font-family: var(--triarq-font-family);
-      font-size: var(--triarq-text-body);
       box-sizing: border-box;
+      padding: 12px 14px;
+      border: 1.5px solid #d0d4da;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #12274A;
+      background: #fafafa;
+      outline: none;
+      margin-bottom: 1.5rem;
     }
-    input[type="email"]:focus { outline: 2px solid var(--triarq-color-primary); border-color: transparent; }
-    .oi-input-error { border-color: var(--triarq-color-error); }
-    .oi-field-error { color: var(--triarq-color-error); font-size: var(--triarq-text-caption); margin: var(--triarq-space-xs) 0 0 0; }
+    .email-input:focus { border-color: #0071AF; }
+    .oi-input-error { border-color: var(--triarq-color-error) !important; }
+    .oi-field-error { color: var(--triarq-color-error); font-size: 12px; margin: -1rem 0 1rem 0; }
 
-    .oi-btn-primary {
+    /* ── Sign in button ── */
+    .signin-button {
       width: 100%;
-      padding: var(--triarq-space-sm) var(--triarq-space-md);
-      background: var(--triarq-color-primary);
-      color: #fff;
+      padding: 13px;
+      background: #E96127;
+      color: #ffffff;
       border: none;
-      border-radius: var(--triarq-radius-button);
-      font-family: var(--triarq-font-family);
-      font-size: var(--triarq-text-body);
-      font-weight: var(--triarq-font-weight-medium);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
       cursor: pointer;
-      margin-top: var(--triarq-space-md);
     }
-    .oi-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-    .oi-btn-primary:hover:not(:disabled) { background: var(--triarq-color-primary-dark); }
+    .signin-button:hover:not(:disabled) { background: #c94f1e; }
+    .signin-button:disabled { opacity: 0.6; cursor: not-allowed; }
 
+    /* ── Tagline footer ── */
+    .tagline-footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 0.5px solid #e8eaed;
+    }
+    .tagline-text {
+      font-size: 11px;
+      color: #A6A6A6;
+      letter-spacing: 0.3px;
+      margin: 0;
+    }
+
+    /* ── Callback error notice ── */
     .oi-callback-notice {
       background: #fff8e1;
       border: 1px solid #ffe082;
-      border-radius: var(--triarq-radius-card);
-      padding: var(--triarq-space-sm) var(--triarq-space-md);
-      margin-bottom: var(--triarq-space-md);
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 1rem;
     }
-    .oi-notice-primary { font-size: var(--triarq-text-small); font-weight: var(--triarq-font-weight-medium); margin: 0 0 var(--triarq-space-xs) 0; color: var(--triarq-color-text-primary); }
-    .oi-notice-secondary { font-size: var(--triarq-text-caption); color: var(--triarq-color-text-secondary); margin: 0; }
+    .oi-notice-primary { font-size: 13px; font-weight: 600; margin: 0 0 4px 0; color: #12274A; }
+    .oi-notice-secondary { font-size: 12px; color: #5A5A5A; margin: 0; }
 
-    .oi-login-sent { text-align: center; }
-    .oi-sent-primary { font-size: var(--triarq-text-h4); font-weight: var(--triarq-font-weight-medium); margin-bottom: var(--triarq-space-sm); }
-    .oi-sent-secondary { font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); line-height: 1.6; margin-bottom: var(--triarq-space-xs); }
-    .oi-sent-expiry { font-size: var(--triarq-text-caption); color: var(--triarq-color-text-secondary); margin: 0 0 var(--triarq-space-sm) 0; }
-    .oi-sent-browser-note {
-      font-size: var(--triarq-text-caption);
-      color: var(--triarq-color-text-secondary);
-      background: var(--triarq-color-surface);
-      border-radius: var(--triarq-radius-card);
-      padding: var(--triarq-space-xs) var(--triarq-space-sm);
-      margin: var(--triarq-space-sm) 0;
-      line-height: 1.5;
+    /* ── Right panel: headline ── */
+    .rp-headline {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.3;
+      margin: 0 0 1.75rem 0;
     }
-    .oi-btn-ghost { background: none; border: none; color: var(--triarq-color-primary); cursor: pointer; font-size: var(--triarq-text-small); margin-top: var(--triarq-space-md); text-decoration: underline; }
+
+    /* ── Feature bullets ── */
+    .feature-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .feature-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .feature-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(233, 97, 39, 0.2);
+      border: 1px solid #E96127;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .feature-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+      margin: 0 0 2px 0;
+    }
+    .feature-description {
+      font-size: 12px;
+      color: #A6A6A6;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    /* ── Coming soon footer ── */
+    .coming-soon {
+      border-top: 0.5px solid rgba(255, 255, 255, 0.12);
+      padding-top: 1.25rem;
+    }
+    .coming-soon-label {
+      font-size: 11px;
+      color: #F2A620;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin: 0 0 6px 0;
+    }
+    .coming-soon-items {
+      font-size: 12px;
+      color: #A6A6A6;
+      line-height: 1.6;
+      margin: 0;
+    }
   `]
 })
 export class LoginComponent implements OnInit {
