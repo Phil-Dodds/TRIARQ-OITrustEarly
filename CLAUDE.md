@@ -203,6 +203,8 @@ Never return error codes or silent failures. Source: D-140.
 
 **npm install on new worktrees.** Any worktree that has no `node_modules/` requires `npm install --legacy-peer-deps` in the `angular/` folder before `ng build` will work. Do this automatically at the start of any worktree session — do not wait for `ng build` to fail first.
 
+**tsconfig.federation.json is build-critical — never commit mutations from npm install.** Running `npm install` causes `@angular-architects/native-federation` to rewrite `tsconfig.federation.json` with hardcoded `node_modules\\` paths for every shared package. This mutated file must NEVER be staged or committed. After every `npm install` in a worktree, immediately run `git checkout -- angular/tsconfig.federation.json` to restore the clean version before doing anything else. Committing the mutated version causes the next `ng build` to hang indefinitely as the TypeScript compiler tries to process `.mjs` files directly.
+
 **File manipulation scripting.** Use `awk`, `sed`, and `grep` for text/file processing. Do not use `python3` — the Windows alias opens Microsoft Store instead of running Python. Node.js (`node -e`) is available as a fallback but requires care with path arguments: pass file paths via `process.argv` or environment variables, never interpolated directly into the `-e` string (bash `/c/` paths become `C:\c\` in Node's Windows resolver).
 
 ---
