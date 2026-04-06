@@ -2,8 +2,8 @@
 // Delivery Cycle Tracking hub summary tool (D-171–D-176).
 //
 // Returns pre-aggregated summary data for three dashboard views:
-//   workstream_summaries — WIP counts, exceeded flags, gate counts per workstream (D-174)
-//   gate_summaries       — upcoming/overdue counts per gate type (D-173)
+//   workstream_summaries — WIP counts, exceeded flags, gate counts per workstream (D-190)
+//   gate_summaries       — upcoming/overdue counts per gate type (D-189)
 //   division_summaries   — active cycle counts per division (D-176)
 //
 // Optional param: division_ids (string[]) — filter to specific divisions.
@@ -68,7 +68,7 @@ async function get_delivery_summary(params, caller_id) {
   }
 
   // ── Load active delivery cycles ─────────────────────────────────────────────
-  // Active = not COMPLETE, not CANCELLED, not soft-deleted (D-174: ON_HOLD is included)
+  // Active = not COMPLETE, not CANCELLED, not soft-deleted (D-190: ON_HOLD is included)
   let cycleQuery = supabase
     .from('delivery_cycles')
     .select(`
@@ -211,7 +211,7 @@ async function get_delivery_summary(params, caller_id) {
     a.workstream_name.localeCompare(b.workstream_name)
   );
 
-  // ── Build gate summary (D-173) ────────────────────────────────────────────
+  // ── Build gate summary (D-189) ────────────────────────────────────────────
   const gateSummaryMap = {};
   for (const gate of ALL_GATES) {
     gateSummaryMap[gate] = {

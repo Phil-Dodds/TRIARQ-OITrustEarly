@@ -71,10 +71,10 @@ export class HomeComponent implements OnInit {
   get showSystemHealth():    boolean { return this.isPhil; }
   get showDivisions():       boolean { return this.isPhil || this.isAdmin; }
   get showUserManagement():  boolean { return this.isAdmin; }
-  // All roles see Delivery Cycle Tracking (D-163). Users without Division
-  // assignments see a contextual empty state on the dashboard explaining why
-  // no cycles appear and what needs to change.
-  get showDeliveryCycles():  boolean { return true; }
+  // My Delivery Cycles card — DS and CB only (build-c-supplement-spec Section 6, D-150).
+  // Phil and Admin use the full dashboard. CE is read-only and not in a create/DS/CB role.
+  // assigned_to_current_user scopes data server-side; role check here hides card for non-DS/CB.
+  get showDeliveryCycles():  boolean { return this.isDS || this.isCB; }
 
   // Phil and Admin always see the main cards — they need the Divisions card to
   // bootstrap the hierarchy before they can have a division assignment themselves.

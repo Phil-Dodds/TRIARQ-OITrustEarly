@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-198**
+**Next available: D-201**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -80,12 +80,12 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-169 | Decision source tagging and registry protocol | Claude Code | April 2026 | Active |
 | D-170 | Phil and Admin have implicit access to all Divisions | Claude Code | April 2026 | Active |
 | D-171 | Delivery hub page at /delivery — four option cards, no data on load | Claude Code | April 2026 | Active |
-| D-172 | Delivery module sub-routes — hub, workstreams, divisions, gates, cycles, :cycle_id | Claude Code | April 2026 | Active |
-| D-173 | Next gate derived from current lifecycle stage (NEXT_GATE_BY_STAGE map) | Claude Code | April 2026 | Active |
-| D-174 | WIP categories: Prep/Build/Outcome, limit=4, ON_HOLD counted, COMPLETE/CANCELLED excluded | Claude Code | April 2026 | Active |
+| D-172 | Dashboard Column Set — 11 columns, 4 always visible | Claude Chat | April 2026 | Active |
+| D-173 | assigned_ds_user_id as sole DS field; cycle_owner dropped (Migration 025) | Claude Chat | April 2026 | Active |
+| D-174 | DS and CB nullable at creation; gate enforcement in MCP only | Claude Chat | April 2026 | Active |
 | D-175 | Drill-down from summary views to /delivery/cycles via query params | Claude Code | April 2026 | Active |
 | D-176 | Division summary as flat indented list (not collapsible tree) | Claude Code | April 2026 | Active |
-| D-177 | Entity name capitalization in UI text (Division, Workstream, Delivery Cycle, Gate, etc.) | Claude Code | April 2026 | Active |
+| D-177 | Entity name capitalization in UI text — SUPERSEDED by D-184 | Claude Code | April 2026 | Superseded |
 | D-178 | Processing State Standard: Three-Tier Loading Pattern | Claude Code | April 2026 | Active |
 | D-179 | Stage Regression Gate Reset Rule — two-call confirm pattern, gatesResetOnRegressionTo() | Claude Code | April 2026 | Active |
 | D-180 | Right-Panel Entity Detail Pattern | Claude Chat | April 2026 | Active |
@@ -96,9 +96,9 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-185 | Principle Citation in Specs | Claude Chat | April 2026 | Active |
 | D-186 | Decision Implementation Status | Claude Chat | April 2026 | Active |
 | D-187 | Action Queue Name confirmed | Claude Chat | April 2026 | Active |
-| D-188 | Primary Workflow Clarity — secondary controls visually recessed | Claude Chat | April 2026 | Active |
-| D-189 | Sidebar-Only Navigation — no top nav; section headers at 7+ items | Claude Chat | April 2026 | Active |
-| D-190 | UI Feedback Standard — three patterns only (Guidance/Warning/Error) | Claude Chat | April 2026 | Active |
+| D-188 | Delivery module sub-routes (renumbered from D-172 — collision) | Claude Code | April 2026 | Active |
+| D-189 | Next gate derived from lifecycle stage / NEXT_GATE_BY_STAGE (renumbered from D-173) | Claude Code | April 2026 | Active |
+| D-190 | WIP categories Prep/Build/Outcome, limit=4 (renumbered from D-174) | Claude Code | April 2026 | Active |
 | D-191 | Tier Classification as dropdown with descriptions | Claude Chat | April 2026 | Active |
 | D-192 | Full gate sequence for all tiers — rollout phase config | Claude Chat | April 2026 | Active |
 | D-193 | Workstream filter as tab strip on hub screen | Claude Chat | April 2026 | Active |
@@ -106,6 +106,9 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-195 | Workstream Picker — suppress Trust radio; inactive toggle treatment | Claude Chat | April 2026 | Active |
 | D-196 | Column headers always rendered on hub screen | Claude Chat | April 2026 | Active |
 | D-197 | Tier avatar dot column on hub screen rows | Claude Chat | April 2026 | Active |
+| D-198 | Primary Workflow Clarity — secondary controls visually recessed | Claude Chat | April 2026 | Active |
+| D-199 | Sidebar-Only Navigation — no top nav; section headers at 7+ items | Claude Chat | April 2026 | Active |
+| D-200 | UI Feedback Standard — three patterns only (Guidance/Warning/Error) | Claude Chat | April 2026 | Active |
 
 ---
 

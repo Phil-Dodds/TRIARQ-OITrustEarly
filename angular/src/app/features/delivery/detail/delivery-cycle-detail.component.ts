@@ -62,7 +62,7 @@ const GATE_LABELS: Record<GateName, string> = {
   close_review:   'Close Review'
 };
 
-// D-173: next gate derived from lifecycle stage — mirrors NEXT_GATE_BY_STAGE in lifecycle.js
+// D-189: next gate derived from lifecycle stage — mirrors NEXT_GATE_BY_STAGE in lifecycle.js
 const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
   BRIEF:    'brief_review',
   DESIGN:   'go_to_build',
@@ -437,18 +437,16 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       </div>
 
       <!-- ── Session 2026-03-24-F: missing actual date warning ───────────── -->
-      <div *ngIf="missingActualDateWarnings.length > 0"
+      <!-- Spec: "[N] Milestone(s) are missing actual dates for Gates this Delivery Cycle has already passed." -->
+      <div *ngIf="missingActualDateGateNames.length > 0"
            style="margin-bottom:var(--triarq-space-md);
                   background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
                   border-radius:0 6px 6px 0;padding:var(--triarq-space-sm) var(--triarq-space-md);">
         <div style="font-weight:500;font-size:var(--triarq-text-small);margin-bottom:4px;">
-          ⚠ Actual date not recorded for cleared gate{{ missingActualDateWarnings.length > 1 ? 's' : '' }}
+          ⚠ {{ missingActualDateGateNames.length }} Milestone{{ missingActualDateGateNames.length > 1 ? 's are' : ' is' }} missing actual dates for Gates this Delivery Cycle has already passed.
         </div>
         <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-          {{ missingActualDateWarnings.join(', ') }} —
-          gate{{ missingActualDateWarnings.length > 1 ? 's were' : ' was' }} cleared but the actual
-          date was not recorded. Set the Actual Date in the Milestone Dates panel to preserve
-          accurate milestone history.
+          Actual dates are recorded automatically on Gate approval — if missing, the Gate may have been approved before date tracking was active. Add them manually to maintain a complete audit record.
         </div>
       </div>
 
@@ -521,13 +519,53 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">
                 Actual Date
               </div>
-              <span [style.color]="m.actual_date
-                      ? (m.actual_date <= (m.target_date ?? m.actual_date)
-                          ? 'var(--triarq-color-text-secondary)'
-                          : 'var(--triarq-color-error)')
-                      : 'var(--triarq-color-text-secondary)'">
-                {{ m.actual_date ?? '—' }}
-              </span>
+              <!-- Normal display: actual date present and not manually editing -->
+              <div *ngIf="!isMissingActualDate(m.gate_name) || editingActualDateGate === m.gate_name; else missingActualBlock">
+                <span *ngIf="editingActualDateGate !== m.gate_name"
+                      [style.color]="m.actual_date
+                        ? (m.actual_date <= (m.target_date ?? m.actual_date)
+                            ? 'var(--triarq-color-text-secondary)'
+                            : 'var(--triarq-color-error)')
+                        : 'var(--triarq-color-text-secondary)'">
+                  {{ m.actual_date ?? '—' }}
+                </span>
+                <!-- Inline actual date edit (manual entry for data quality path) -->
+                <div *ngIf="editingActualDateGate === m.gate_name"
+                     style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                  <input [formControl]="actualDateControl" type="date"
+                         class="oi-input" style="font-size:11px;padding:2px 4px;" />
+                  <button class="oi-btn-primary"
+                          (click)="saveActualDate(m.gate_name)"
+                          [disabled]="savingActualDate"
+                          style="font-size:10px;padding:2px 6px;white-space:nowrap;
+                                 display:flex;align-items:center;gap:4px;">
+                    <ion-spinner *ngIf="savingActualDate" name="crescent" style="width:12px;height:12px;"></ion-spinner>
+                    <span>{{ savingActualDate ? '…' : 'Set' }}</span>
+                  </button>
+                  <button (click)="cancelActualDateEdit()"
+                          style="background:none;border:none;cursor:pointer;
+                                 font-size:10px;color:var(--triarq-color-text-secondary);">
+                    ✕
+                  </button>
+                  <div *ngIf="actualDateError"
+                       style="color:var(--triarq-color-error);font-size:10px;margin-top:2px;width:100%;">
+                    {{ actualDateError }}
+                  </div>
+                </div>
+              </div>
+              <!-- ⚠ row-level warning: gate approved, actual_date missing (data quality path) -->
+              <ng-template #missingActualBlock>
+                <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+                  <span style="color:var(--triarq-color-sunray,#f5a623);font-size:12px;"
+                        title="Actual date missing for an approved Gate">⚠</span>
+                  <span style="color:var(--triarq-color-text-secondary);font-size:10px;">—</span>
+                  <button (click)="startActualDateEdit(m.gate_name)"
+                          style="font-size:10px;color:var(--triarq-color-primary);
+                                 background:none;border:none;cursor:pointer;padding:0;">
+                    Add
+                  </button>
+                </div>
+              </ng-template>
             </div>
 
             <!-- Status column — Item 1 (Part 3) -->
@@ -569,10 +607,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                             border-radius:5px;border:1px solid var(--triarq-color-border);">
                   <div style="font-size:11px;font-weight:500;margin-bottom:4px;
                                color:var(--triarq-color-text-primary);">
-                    Unset this gate's Complete status?
+                    Unsetting Complete will remove the recorded Gate clearance date and return this Milestone to Not Started. This cannot be undone without reapproving the Gate.
                   </div>
                   <div style="font-size:10px;color:var(--triarq-color-text-secondary);margin-bottom:6px;">
-                    This will return the milestone to On Track. The change is logged in the cycle event log.
+                    The change is logged in the cycle event log.
                   </div>
                   <label style="display:block;font-size:10px;margin-bottom:2px;">
                     Reason <span style="color:var(--triarq-color-error);">*</span>
@@ -582,7 +620,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                             class="oi-input"
                             rows="2"
                             style="font-size:11px;width:100%;resize:vertical;"
-                            placeholder="Explain why this completion status is being removed…">
+                            placeholder="Required for audit trail — describe why this Gate clearance is being reversed.">
                   </textarea>
                   <div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
                     <button class="oi-btn-primary"
@@ -992,7 +1030,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               </span>
               <span *ngIf="group.isFuture"
                     style="font-size:10px;color:var(--triarq-color-text-secondary);font-style:italic;">
-                — future stage
+                — Available when cycle reaches {{ group.stage }}
               </span>
             </span>
             <span style="font-size:10px;color:var(--triarq-color-text-secondary);">
@@ -1023,17 +1061,13 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     {{ slot.guidance_text }}
                   </div>
 
-                  <!-- Filled slot: link + "Attached by [chip] · timestamp" -->
-                  <div *ngIf="slot.external_url" style="margin-top:4px;">
+                  <!-- Filled slot — external_only: link + "Attached by [chip]" -->
+                  <div *ngIf="slot.external_url && slot.pointer_status !== 'promoted'"
+                       style="margin-top:4px;">
                     <a [href]="slot.external_url" target="_blank" rel="noopener noreferrer"
                        style="color:var(--triarq-color-primary);word-break:break-all;">
                       {{ slot.display_name }}
                     </a>
-                    <span *ngIf="slot.pointer_status === 'promoted'"
-                          style="margin-left:6px;font-size:10px;color:var(--triarq-color-primary);
-                                 background:#e3f2fd;border-radius:4px;padding:1px 5px;">
-                      OI Library
-                    </span>
                     <!-- D-181: "Attached by [Name chip]" -->
                     <div style="margin-top:4px;display:flex;align-items:center;
                                 gap:4px;flex-wrap:wrap;">
@@ -1054,6 +1088,27 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                       <span style="font-size:10px;color:var(--triarq-color-text-secondary);">
                         · {{ slot.attached_at | date:'dd MMM yyyy' }}
                       </span>
+                    </div>
+                  </div>
+
+                  <!-- Filled slot — promoted: OI Library chip as primary, external URL as archived reference -->
+                  <!-- Spec: pointer_status = promoted → OI Library artifact is primary tappable chip; external URL plain text -->
+                  <div *ngIf="slot.pointer_status === 'promoted'" style="margin-top:4px;">
+                    <!-- Primary: OI Library chip -->
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                      <span style="font-size:11px;color:var(--triarq-color-text-secondary);">OI Library:</span>
+                      <span class="oi-pill"
+                            style="font-size:10px;background:#e3f2fd;
+                                   color:var(--triarq-color-primary);cursor:pointer;"
+                            title="View in OI Library (full integration in Build B)">
+                        {{ slot.display_name }}
+                      </span>
+                    </div>
+                    <!-- Secondary: external URL as plain archived reference -->
+                    <div *ngIf="slot.external_url"
+                         style="font-size:10px;color:var(--triarq-color-text-secondary);
+                                word-break:break-all;">
+                      External: {{ slot.external_url }} · <em>Archived reference</em>
                     </div>
                   </div>
 
@@ -1443,6 +1498,11 @@ export class DeliveryCycleDetailComponent implements OnInit {
   unsetCompleteReason      = new FormControl('', [Validators.required, Validators.minLength(10)]);
   unsetCompleteSaving      = false;
   unsetCompleteError       = '';
+  // Session 2026-03-24-F: manual actual date entry for data quality path
+  editingActualDateGate:   GateName | null = null;
+  actualDateControl        = new FormControl('');
+  savingActualDate         = false;
+  actualDateError          = '';
 
   // Item 2: Artifact stage expand/collapse — Principle 5
   // Populated on cycle load: current + past stages expanded by default; future collapsed
@@ -1595,9 +1655,9 @@ export class DeliveryCycleDetailComponent implements OnInit {
   /**
    * Session 2026-03-24-F: gates where gate_status = 'approved' but
    * the corresponding milestone has no actual_date.
-   * Returns gate labels for display in the warning panel.
+   * Returns GateName[] for row-level checks and count in the warning banner.
    */
-  get missingActualDateWarnings(): string[] {
+  get missingActualDateGateNames(): GateName[] {
     if (!this.cycle) { return []; }
     const approvedGates = this.cycle.gate_records?.filter(g => g.gate_status === 'approved') ?? [];
     return approvedGates
@@ -1605,7 +1665,11 @@ export class DeliveryCycleDetailComponent implements OnInit {
         const milestone = this.cycle!.milestone_dates?.find(m => m.gate_name === g.gate_name);
         return milestone && !milestone.actual_date;
       })
-      .map(g => GATE_LABELS[g.gate_name]);
+      .map(g => g.gate_name);
+  }
+
+  isMissingActualDate(gate: GateName): boolean {
+    return this.missingActualDateGateNames.includes(gate);
   }
 
   /** Group cycle artifacts by lifecycle_stage for the artifacts panel.
@@ -2011,6 +2075,10 @@ export class DeliveryCycleDetailComponent implements OnInit {
     this.milestoneError  = '';
     this.cdr.markForCheck();
 
+    // Capture pre-save status — if Behind, changing target date resets to Not Started (spec Item 1)
+    const preSaveIdx = this.cycle.milestone_dates?.findIndex(m => m.gate_name === gate) ?? -1;
+    const wasBehind  = preSaveIdx !== -1 && this.cycle.milestone_dates![preSaveIdx].date_status === 'behind';
+
     this.delivery.setMilestoneTargetDate({
       delivery_cycle_id: this.cycle.delivery_cycle_id,
       gate_name:         gate,
@@ -2020,7 +2088,12 @@ export class DeliveryCycleDetailComponent implements OnInit {
         if (res.success && res.data) {
           const idx = this.cycle!.milestone_dates?.findIndex(m => m.gate_name === gate) ?? -1;
           if (idx !== -1 && this.cycle!.milestone_dates) {
-            this.cycle!.milestone_dates[idx] = res.data;
+            const updated = res.data;
+            // If milestone was Behind and target date changed, reset status to Not Started
+            if (wasBehind && updated.date_status === 'behind') {
+              updated.date_status = 'not_started';
+            }
+            this.cycle!.milestone_dates[idx] = updated;
           }
           this.editingMilestoneGate = null;
         } else {
@@ -2463,6 +2536,55 @@ export class DeliveryCycleDetailComponent implements OnInit {
       error: (err: { error?: string }) => {
         this.unsetCompleteError  = err.error ?? 'Save failed. Try again.';
         this.unsetCompleteSaving = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // ── Session 2026-03-24-F: manual actual date entry (data quality path) ────────
+
+  startActualDateEdit(gate: GateName): void {
+    this.editingActualDateGate = gate;
+    this.actualDateControl.setValue('');
+    this.actualDateError = '';
+    this.cdr.markForCheck();
+  }
+
+  cancelActualDateEdit(): void {
+    this.editingActualDateGate = null;
+    this.actualDateError       = '';
+    this.cdr.markForCheck();
+  }
+
+  saveActualDate(gate: GateName): void {
+    if (!this.cycle || !this.actualDateControl.value) { return; }
+    this.savingActualDate = true;
+    this.actualDateError  = '';
+    this.cdr.markForCheck();
+
+    this.delivery.setMilestoneActualDate({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      gate_name:         gate,
+      actual_date:       this.actualDateControl.value,
+      manually_entered:  true
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          const idx = this.cycle!.milestone_dates?.findIndex(m => m.gate_name === gate) ?? -1;
+          if (idx !== -1 && this.cycle!.milestone_dates) {
+            this.cycle!.milestone_dates[idx] = res.data;
+          }
+          this.editingActualDateGate = null;
+          this.loadEvents(this.cycle!.delivery_cycle_id);
+        } else {
+          this.actualDateError = res.error ?? 'Save failed.';
+        }
+        this.savingActualDate = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.actualDateError  = err.error ?? 'Save failed. Try again.';
+        this.savingActualDate = false;
         this.cdr.markForCheck();
       }
     });

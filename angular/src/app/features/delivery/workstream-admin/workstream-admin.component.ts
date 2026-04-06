@@ -44,7 +44,7 @@ import { LoadingOverlayComponent } from '../../../shared/components/loading-over
       <div style="display:flex;align-items:flex-start;justify-content:space-between;
                   margin-bottom:var(--triarq-space-md);gap:var(--triarq-space-md);">
         <div>
-          <h3 style="margin:0 0 4px 0;">Delivery Workstreams</h3>
+          <h3 style="margin:0 0 4px 0;">Delivery Workstream Registry</h3>
           <p style="margin:0;font-size:var(--triarq-text-small);
                     color:var(--triarq-color-text-secondary);max-width:560px;">
             A Workstream is a persistent delivery team or domain — the organising unit that
@@ -189,11 +189,12 @@ import { LoadingOverlayComponent } from '../../../shared/components/loading-over
 
         <!-- List panel -->
         <div style="flex:1;min-width:0;">
-          <div style="display:grid;grid-template-columns:3fr 2fr 2fr 80px 1fr 100px;
+          <div style="display:grid;grid-template-columns:32px 3fr 2fr 2fr 80px 1fr 100px;
                       gap:var(--triarq-space-sm);padding:var(--triarq-space-xs) var(--triarq-space-sm);
                       font-size:var(--triarq-text-small);font-weight:500;
                       color:var(--triarq-color-text-secondary);
                       border-bottom:2px solid var(--triarq-color-border);">
+            <span></span>
             <span>Workstream Name</span>
             <span>Home Division</span>
             <span>Workstream Lead</span>
@@ -205,13 +206,20 @@ import { LoadingOverlayComponent } from '../../../shared/components/loading-over
           <div *ngFor="let ws of filteredWorkstreams">
             <!-- Row — click to open detail panel -->
             <div (click)="selectWorkstream(ws)"
-                 style="display:grid;grid-template-columns:3fr 2fr 2fr 80px 1fr 100px;
+                 style="display:grid;grid-template-columns:32px 3fr 2fr 2fr 80px 1fr 100px;
                         gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
                         border-bottom:1px solid var(--triarq-color-border);
                         font-size:var(--triarq-text-small);align-items:center;cursor:pointer;"
                  [style.background]="selectedWs?.workstream_id === ws.workstream_id
                    ? 'var(--triarq-color-background-subtle)'
                    : ws.active_status ? 'transparent' : '#fff8f8'">
+              <!-- Avatar: initials circle from workstream name (D-181 Entity Chip) -->
+              <span style="display:flex;align-items:center;justify-content:center;
+                            width:28px;height:28px;border-radius:50%;
+                            background:var(--triarq-color-primary,#257099);
+                            color:#fff;font-size:10px;font-weight:600;flex-shrink:0;">
+                {{ wsInitials(ws.workstream_name) }}
+              </span>
               <span style="font-weight:500;color:var(--triarq-color-text-primary);">
                 {{ ws.workstream_name }}
               </span>
@@ -639,5 +647,13 @@ export class WorkstreamAdminComponent implements OnInit {
 
   leadName(userId: string): string {
     return this.users.find(u => u.id === userId)?.display_name ?? userId;
+  }
+
+  /** D-181: initials avatar from workstream name — first letter of first two words */
+  wsInitials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    return parts.length >= 2
+      ? (parts[0][0] + parts[1][0]).toUpperCase()
+      : name.slice(0, 2).toUpperCase();
   }
 }

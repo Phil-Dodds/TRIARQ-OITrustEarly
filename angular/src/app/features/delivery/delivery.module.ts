@@ -1,7 +1,7 @@
 // delivery.module.ts — DeliveryModule (lazy-loaded, D-143)
 // Build C + dashboard redesign: hub, summary views, cycle list, cycle detail.
 //
-// Sub-routes (D-172):
+// Sub-routes (D-188):
 //   /delivery               → DeliveryHubComponent       (hub — no data, 4 option cards)
 //   /delivery/workstreams   → WorkstreamSummaryComponent (WIP counts per workstream)
 //   /delivery/divisions     → DivisionSummaryComponent   (cycle counts per division)
@@ -47,7 +47,7 @@ import { IonicModule }  from '@ionic/angular';
           import('./gates-summary/gates-summary.component')
             .then(c => c.GatesSummaryComponent)
       },
-      // ── Full cycle list (moved from '' to 'cycles' — D-172) ───────────────
+      // ── Full cycle list (moved from '' to 'cycles' — D-188) ───────────────
       {
         path: 'cycles',
         loadComponent: () =>

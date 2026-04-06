@@ -1,5 +1,5 @@
 // division-summary.component.ts — DivisionSummaryComponent
-// Route: /delivery/divisions  (D-172)
+// Route: /delivery/divisions  (D-188)
 //
 // Active cycle count per Division in flat indented list order (D-176).
 // Tree order: parent before children, siblings alphabetical.
@@ -26,7 +26,12 @@ import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
+import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 import { DivisionSummaryItem, Division } from '../../../core/types/database';
+
+// Item 4 (Part 3): screen key declared at top of file — Principle 4 (self-clarifying names)
+const SCREEN_KEY = SCREEN_KEYS.DELIVERY_DIVISIONS;
+type DivisionSortCol = 'division_name' | 'active_cycle_count';
 
 @Component({
   selector:        'app-division-summary',
@@ -86,7 +91,7 @@ import { DivisionSummaryItem, Division } from '../../../core/types/database';
         </div>
       </div>
 
-      <!-- Column header -->
+      <!-- Column header (sortable — Item 4) -->
       <div *ngIf="!loading && !loadError && sortedDivisions.length > 0"
            style="display:grid;grid-template-columns:1fr 120px;
                   gap:var(--triarq-space-sm);
@@ -94,8 +99,13 @@ import { DivisionSummaryItem, Division } from '../../../core/types/database';
                   font-size:var(--triarq-text-small);font-weight:500;
                   color:var(--triarq-color-text-secondary);
                   border-bottom:2px solid var(--triarq-color-border);">
-        <span>Division</span>
-        <span style="text-align:right;">Active Cycles</span>
+        <span (click)="setSort('division_name')" style="cursor:pointer;user-select:none;">
+          Division {{ sortIndicator('division_name') }}
+        </span>
+        <span (click)="setSort('active_cycle_count')"
+              style="text-align:right;cursor:pointer;user-select:none;">
+          Active Cycles {{ sortIndicator('active_cycle_count') }}
+        </span>
       </div>
 
       <!-- Division rows — flat indented list (D-176) -->
@@ -170,17 +180,23 @@ export class DivisionSummaryComponent implements OnInit, OnDestroy {
   userDivisionIds:   string[] = [];
   divisionSummaries: DivisionSummaryItem[] = [];
 
+  // Item 4 (Part 3): sort state persisted via ScreenStateService (sibling sort within hierarchy)
+  sortCol: DivisionSortCol = 'division_name';
+  sortDir: 'asc' | 'desc'  = 'asc';
+
   // D-178 Tier 1: skeleton rows for loading state
   readonly skeletonRows = [1, 2, 3, 4, 5];
 
+  private currentUserId    = '';
   private readonly profileSub = new Subscription();
 
   constructor(
-    private readonly delivery: DeliveryService,
-    private readonly mcp:      McpService,
-    private readonly profile:  UserProfileService,
-    private readonly router:   Router,
-    private readonly cdr:      ChangeDetectorRef
+    private readonly delivery:    DeliveryService,
+    private readonly mcp:         McpService,
+    private readonly profile:     UserProfileService,
+    private readonly screenState: ScreenStateService,
+    private readonly router:      Router,
+    private readonly cdr:         ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -190,10 +206,17 @@ export class DivisionSummaryComponent implements OnInit, OnDestroy {
         filter((p): p is NonNullable<typeof p> => p !== null),
         take(1)
       ).subscribe(profile => {
+        this.currentUserId = profile.id ?? '';
+        // Item 4: restore saved sort state (Principle 9: skeleton shows during restore load)
+        const saved = this.screenState.restore(SCREEN_KEY, this.currentUserId);
+        if (saved) {
+          if (typeof saved['sortCol'] === 'string') { this.sortCol = saved['sortCol'] as DivisionSortCol; }
+          if (saved['sortDir'] === 'asc' || saved['sortDir'] === 'desc') { this.sortDir = saved['sortDir']; }
+        }
         const role        = profile.system_role;
         this.isPrivileged = role === 'phil' || role === 'admin';
         if (!this.isPrivileged) {
-          this.loadUserDivisions(profile.id ?? '');
+          this.loadUserDivisions(this.currentUserId);
         } else {
           this.loadSummary();
         }
@@ -264,6 +287,31 @@ export class DivisionSummaryComponent implements OnInit, OnDestroy {
     this.loadSummary();
   }
 
+  // Item 4: sort controls (siblings within hierarchy — preserves parent-before-children order)
+  setSort(col: DivisionSortCol): void {
+    if (this.sortCol === col) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortCol = col;
+      this.sortDir = col === 'division_name' ? 'asc' : 'desc';
+    }
+    this.saveState();
+    this.cdr.markForCheck();
+  }
+
+  sortIndicator(col: DivisionSortCol): string {
+    if (this.sortCol !== col) { return ''; }
+    return this.sortDir === 'asc' ? '↑' : '↓';
+  }
+
+  saveState(): void {
+    if (!this.currentUserId) { return; }
+    this.screenState.save(SCREEN_KEY, this.currentUserId, {
+      sortCol: this.sortCol,
+      sortDir: this.sortDir,
+    });
+  }
+
   drillDown(divisionId: string): void {
     this.router.navigate(['/delivery/cycles'], { queryParams: { division_id: divisionId } });
   }
@@ -279,10 +327,17 @@ export class DivisionSummaryComponent implements OnInit, OnDestroy {
 
     const result: DivisionSummaryItem[] = [];
 
+    const dir = this.sortDir === 'asc' ? 1 : -1;
     const visit = (parentId: string | null) => {
+      // Item 4: siblings sorted by sortCol/sortDir (preserves parent-before-children per D-176)
       const children = (byParent.get(parentId) ?? [])
         .slice()
-        .sort((a, b) => a.division_name.localeCompare(b.division_name));
+        .sort((a, b) => {
+          if (this.sortCol === 'active_cycle_count') {
+            return dir * (a.active_cycle_count - b.active_cycle_count);
+          }
+          return dir * a.division_name.localeCompare(b.division_name);
+        });
       for (const child of children) {
         result.push(child);
         visit(child.division_id);

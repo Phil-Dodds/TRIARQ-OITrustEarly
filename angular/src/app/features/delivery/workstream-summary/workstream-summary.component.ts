@@ -1,9 +1,9 @@
 // workstream-summary.component.ts — WorkstreamSummaryComponent
-// Route: /delivery/workstreams  (D-172)
+// Route: /delivery/workstreams  (D-188)
 //
 // Shows WIP counts per workstream grouped by home Division.
-// Prep/Build/Outcome WIP with exceeded-limit indicator (D-174).
-// Gate count columns per D-173 NEXT_GATE_BY_STAGE mapping.
+// Prep/Build/Outcome WIP with exceeded-limit indicator (D-190).
+// Gate count columns per D-189 NEXT_GATE_BY_STAGE mapping.
 // Click a count → drill down to /delivery/cycles with query params (D-175).
 // Toggle: "Display only my Divisions" — hidden for phil/admin (D-170).
 //
@@ -27,13 +27,18 @@ import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
+import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 import {
   WorkstreamSummaryItem,
   GateName,
   Division
 } from '../../../core/types/database';
 
-// D-173: gate labels for column headers
+// Item 4 (Part 3): screen key declared at top of file — Principle 4 (self-clarifying names)
+const SCREEN_KEY = SCREEN_KEYS.DELIVERY_WORKSTREAMS;
+type WorkstreamSortCol = 'workstream_name' | 'total_active_cycles';
+
+// D-189: gate labels for column headers
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
   go_to_build:   'Go to Build',
@@ -258,20 +263,26 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
 
   workstreamSummaries: WorkstreamSummaryItem[] = [];
 
+  // Item 4 (Part 3): sort state persisted via ScreenStateService
+  sortCol: WorkstreamSortCol  = 'workstream_name';
+  sortDir: 'asc' | 'desc'    = 'asc';
+
   readonly gates    = ALL_GATES;
   readonly wipLimit = 4;
 
   // D-178 Tier 1: skeleton rows for loading state
   readonly skeletonRows = [1, 2, 3, 4];
 
+  private currentUserId    = '';
   private readonly profileSub = new Subscription();
 
   constructor(
-    private readonly delivery: DeliveryService,
-    private readonly mcp:      McpService,
-    private readonly profile:  UserProfileService,
-    private readonly router:   Router,
-    private readonly cdr:      ChangeDetectorRef
+    private readonly delivery:    DeliveryService,
+    private readonly mcp:         McpService,
+    private readonly profile:     UserProfileService,
+    private readonly screenState: ScreenStateService,
+    private readonly router:      Router,
+    private readonly cdr:         ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -282,10 +293,17 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
         filter((p): p is NonNullable<typeof p> => p !== null),
         take(1)
       ).subscribe(profile => {
+        this.currentUserId = profile.id ?? '';
+        // Item 4: restore saved sort state (Principle 9: skeleton shows during restore load)
+        const saved = this.screenState.restore(SCREEN_KEY, this.currentUserId);
+        if (saved) {
+          if (typeof saved['sortCol'] === 'string') { this.sortCol = saved['sortCol'] as WorkstreamSortCol; }
+          if (saved['sortDir'] === 'asc' || saved['sortDir'] === 'desc') { this.sortDir = saved['sortDir']; }
+        }
         const role        = profile.system_role;
         this.isPrivileged = role === 'phil' || role === 'admin';
         if (!this.isPrivileged) {
-          this.loadUserDivisions(profile.id ?? '');
+          this.loadUserDivisions(this.currentUserId);
         } else {
           this.loadSummary();
         }
@@ -363,6 +381,31 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
     this.loadSummary();
   }
 
+  // Item 4: sort controls (within each Division group)
+  setSort(col: WorkstreamSortCol): void {
+    if (this.sortCol === col) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortCol = col;
+      this.sortDir = col === 'workstream_name' ? 'asc' : 'desc'; // total_active_cycles defaults desc
+    }
+    this.saveState();
+    this.cdr.markForCheck();
+  }
+
+  sortIndicator(col: WorkstreamSortCol): string {
+    if (this.sortCol !== col) { return ''; }
+    return this.sortDir === 'asc' ? '↑' : '↓';
+  }
+
+  saveState(): void {
+    if (!this.currentUserId) { return; }
+    this.screenState.save(SCREEN_KEY, this.currentUserId, {
+      sortCol: this.sortCol,
+      sortDir: this.sortDir,
+    });
+  }
+
   drillDown(params: { workstream_id?: string | null; next_gate?: GateName }): void {
     const queryParams: Record<string, string> = {};
     if (params.workstream_id) { queryParams['workstream_id'] = params.workstream_id; }
@@ -379,8 +422,18 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
       if (!map.has(key)) { map.set(key, []); }
       map.get(key)!.push(ws);
     }
+    const dir = this.sortDir === 'asc' ? 1 : -1;
     return Array.from(map.entries())
-      .map(([divisionName, workstreams]) => ({ divisionName, workstreams }))
+      .map(([divisionName, workstreams]) => ({
+        divisionName,
+        // Item 4: sort workstreams within each Division group per sortCol/sortDir
+        workstreams: workstreams.slice().sort((a, b) => {
+          if (this.sortCol === 'workstream_name') {
+            return dir * a.workstream_name.localeCompare(b.workstream_name);
+          }
+          return dir * (a.total_active_cycles - b.total_active_cycles);
+        })
+      }))
       .sort((a, b) => a.divisionName.localeCompare(b.divisionName));
   }
 

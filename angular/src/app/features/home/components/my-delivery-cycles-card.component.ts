@@ -32,7 +32,7 @@ const GATE_LABEL: Record<GateName, string> = {
   close_review:  'Close Review'
 };
 
-// D-173: next gate derived from stage — mirrors NEXT_GATE_BY_STAGE in delivery-cycle-detail
+// D-189: next gate derived from stage — mirrors NEXT_GATE_BY_STAGE in delivery-cycle-detail
 const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
   BRIEF:    'brief_review',
   DESIGN:   'go_to_build',
@@ -84,7 +84,7 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
              style="padding:var(--triarq-space-xs) 0;
                     border-bottom:1px solid var(--triarq-color-border);">
 
-          <!-- Row 1: cycle title + tier badge + attention indicator -->
+          <!-- Row 1: cycle title + stage badge + tier badge + attention indicator -->
           <div style="display:flex;align-items:center;gap:var(--triarq-space-xs);
                       margin-bottom:2px;flex-wrap:wrap;">
             <a [routerLink]="['/delivery', cycle.delivery_cycle_id]"
@@ -95,6 +95,12 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
                [title]="cycle.cycle_title">
               {{ cycle.cycle_title }}
             </a>
+            <!-- Stage badge — S6 -->
+            <span class="oi-pill"
+                  style="font-size:9px;flex-shrink:0;
+                         background:var(--triarq-color-background-subtle);">
+              {{ STAGE_LABEL[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
+            </span>
             <!-- Tier badge — S6 -->
             <span class="oi-pill"
                   [style.background]="tierPillBg(cycle.tier_classification)"
@@ -133,6 +139,11 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
       <div *ngIf="!loading && activeCycles.length === 0"
            style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
         No active cycles assigned to you.
+        <a routerLink="/delivery/cycles"
+           style="display:block;margin-top:var(--triarq-space-xs);
+                  color:var(--triarq-color-primary);text-decoration:none;">
+          + Start a Delivery Cycle
+        </a>
       </div>
 
       <!-- Footer: "View all [N] cycles →" (S6) -->
@@ -156,7 +167,7 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
   totalActive  = 0;
 
   readonly STAGE_LABEL = STAGE_LABEL;
-  private readonly MAX_SHOWN = 5;
+  private readonly MAX_SHOWN = 3;
   private readonly TODAY = new Date().toISOString().slice(0, 10);
 
   constructor(

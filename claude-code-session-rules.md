@@ -1,5 +1,5 @@
 # Claude Code — Session Active Rules
-Pathways OI Trust | v1.0 | April 2026 | CONFIDENTIAL
+Pathways OI Trust | v1.2 | April 2026 | CONFIDENTIAL
 Owner: Phil Sappington, EVP Performance & Governance
 
 These rules are active from the start of every Claude Code session with Phil.
@@ -117,5 +117,92 @@ point forward for the remainder of the session.
 
 ---
 
+---
+
+## Rule 11 — Confirm Spec Before Implementing Any Component or Screen (Rule A)
+
+Before implementing any new component, screen, or form, confirm the governing
+spec document is available and re-read it immediately before writing code. Do
+not infer field sets, field order, interaction patterns, or layout from partial
+context, prior session memory, or the component's name alone.
+
+If the governing spec document is not present in the session materials:
+1. Stop before implementing that component.
+2. Surface a warning: "Spec document for [component name] not found in session
+   materials. Cannot implement without the spec — proceeding risks building
+   against the wrong requirements."
+3. Continue with other work. Do not attempt to infer the spec.
+
+Spec documents contain locked decisions not fully recoverable from session-brief
+decision summaries alone. A component built without its spec requires a full
+correction pass, not a patch.
+
+---
+
+## Rule 12 — Record Every Deviation from Spec as a CC-Decision (Rule B)
+
+Any time implementation differs from the spec — including improvements that go
+beyond what the spec describes — record it as a CC-decision before session
+close. Do not reserve CC-decisions for architectural choices only.
+
+The test: if a reviewer reading the spec would expect to see something different
+from what was built, that difference is a CC-decision regardless of whether the
+built version is better.
+
+CC-decisions that are not recorded are indistinguishable from spec violations.
+An unrecorded improvement will be treated as a mistake in the next correction
+pass and overwritten. Recording it protects it.
+
+Format: follow the existing CC-decision format in the session close output.
+Include what was built, what the spec said, and why the deviation is an
+improvement.
+
+---
+
+## Rule 13 — Conflict Check Before Implementing Any Correction or New Spec (Rule C)
+
+Before implementing any correction spec or new spec that touches an existing
+surface, run a conflict check. Do not begin implementation until the check is
+complete.
+
+The conflict check looks in two places:
+
+1. CC-decisions in the current session's CodeClose output — improvements
+   recorded this session that touch the same surface. These are protected.
+   Do not overwrite them without surfacing the conflict.
+
+2. Relevant D-numbers in the session-brief — decisions already assigned
+   D-numbers from prior sessions. These are locked. Do not overwrite them.
+
+What to do with a conflict:
+
+- If the incoming spec contradicts a CC-decision or D-number: surface the
+  conflict before implementing. Format: "Conflict found — [spec section]
+  contradicts [CC-decision / D-number]. Spec says [X]. Existing implementation
+  says [Y]. Which takes precedence?" Do not resolve unilaterally.
+- If the incoming spec covers a surface where the existing implementation
+  differs but there is no CC-decision or D-number protecting it: treat the
+  difference as a spec violation. Implement the spec.
+
+What is not a conflict: Intentional improvements from Design Session
+instructions — prototype fidelity targets, design token requirements, principle
+citations — are not conflicts. The conflict check protects Code's deliberate
+decisions, not its mistakes.
+
+---
+
+## Session Initialization Checklist
+
+At the start of every Claude Code session, read these documents in order before
+writing any code or calling any tool:
+
+1. `CLAUDE.md` — architectural rules and non-negotiables
+2. `claude-code-session-rules.md` — this file
+3. `docs/design-principles.md` — UX and navigation constraints
+4. `docs/decision-registry.md` — current next-available D-number
+5. Current build specification (e.g. `docs/build-c-spec.md`)
+
+---
+
 *Pathways OI Trust · Empower | Optimize | Partner*
-*CONFIDENTIAL | April 2026 | v1.0*
+*CONFIDENTIAL | April 2026 | v1.2*

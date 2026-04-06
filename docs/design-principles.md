@@ -650,7 +650,7 @@ This session required archaeology to determine which decisions had been specced 
 
 ---
 
-## Principle 17 — Primary Workflow Clarity (D-188)
+## Principle 17 — Primary Workflow Clarity (D-198)
 
 **Statement:** Every screen and panel is designed around its primary workflow — the action the user performs most often under normal operating conditions. Primary workflows are optimized for speed, clarity, and minimal visual noise. Secondary and tertiary capabilities are present but visually recessed.
 
@@ -668,11 +668,11 @@ This session required archaeology to determine which decisions had been specced 
 
 **Application to pickers:** In any entity picker, the scope radios are the primary control. Secondary options (show inactive, advanced filters) must be visually separated — placed below a thin rule or with increased margin — and use smaller, muted text. They must not appear as a peer row to the scope radios.
 
-**Source:** Session 2026-04-06 | D-188 | impl_status: built
+**Source:** Session 2026-04-06 | D-198 | impl_status: built
 
 ---
 
-## Principle 18 — Sidebar-Only Navigation (D-189)
+## Principle 18 — Sidebar-Only Navigation (D-199)
 
 **Statement:** OI Trust uses sidebar-only navigation. There is no top navigation bar. The sidebar is the single navigation authority for the application.
 
@@ -688,11 +688,11 @@ This session required archaeology to determine which decisions had been specced 
 - The "+ New Cycle" button and equivalent primary actions live in the content area header — never in the sidebar.
 - At port time into AI.TRIARQPathways.com, the host shell provides the outer chrome. OI Trust loads as a Native Federation remote. Sidebar navigation is internal to the OI Trust remote and does not conflict with host-level navigation.
 
-**Source:** Session 2026-04-06 | D-189 | impl_status: built
+**Source:** Session 2026-04-06 | D-199 | impl_status: built
 
 ---
 
-## UI Feedback Standard — Field Guidance, Warnings, and Errors (D-190)
+## UI Feedback Standard — Field Guidance, Warnings, and Errors (D-200)
 
 Every form, panel, and screen uses exactly three visual feedback patterns. These are the only three. No new patterns are introduced without a locked design decision.
 
@@ -747,7 +747,7 @@ Examples:
 
 Before adding any new feedback element to a form or panel, identify which of the three patterns applies. If none fits, surface it as a new design decision — do not invent a fourth pattern inline.
 
-**Source:** Session 2026-04-06 | D-190 | impl_status: built
+**Source:** Session 2026-04-06 | D-200 | impl_status: built
 
 ---
 
@@ -760,7 +760,7 @@ Before adding any new feedback element to a form or panel, identify which of the
 | v1.2 | April 2026 | Principle 7 (D-169) added: decision source tagging and registry protocol. |
 | v1.3 | April 2026 | Principle 8 added: feature stage advancement check at session close. |
 | v1.4 | April 2026 | Principles 10–16 added (D-180 through D-186): Right-Panel Entity Detail Pattern, Tappable Entity Chips, Entity Picker Pattern, Destructive Action Confirmation, Entity Name Capitalization, Principle Citation in Specs, Decision Implementation Status. Source: Claude Chat. |
-| v1.5 | April 2026 | Principles 17–18 + UI Feedback Standard added (D-188 through D-190): Primary Workflow Clarity, Sidebar-Only Navigation, three-pattern UI Feedback Standard. Source: Claude Chat. |
+| v1.5 | April 2026 | Principles 17–18 + UI Feedback Standard added (D-198 through D-200): Primary Workflow Clarity, Sidebar-Only Navigation, three-pattern UI Feedback Standard. Source: Claude Chat. |
 
 ---
 
