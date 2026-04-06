@@ -8,7 +8,7 @@
 --      Run: SELECT id, display_name FROM public.users WHERE display_name ILIKE '%Sabrina%';
 --      If her row is missing, invite her via Supabase Auth, then seed her user row first.
 --   3. Confirm division names. Run:
---      SELECT division_id, division_name FROM public.divisions WHERE deleted_at IS NULL;
+--      SELECT id, division_name FROM public.divisions WHERE deleted_at IS NULL;
 --      Update the ILIKE patterns below if division names differ from expected.
 --
 -- Source: Section 4 (build-c-ux-correction-spec-2026-04-06), D-65, D-66, Session 2026-03-29-C
@@ -72,8 +72,8 @@ BEGIN
                       'Create her user record and re-run this script.';
     END IF;
 
-    -- ── Resolve Practice Services Trust division_id ────────────────────────
-    SELECT division_id INTO practice_div_id
+    -- ── Resolve Practice Services Trust division id ────────────────────────
+    SELECT id INTO practice_div_id
     FROM public.divisions
     WHERE division_name ILIKE '%Practice Services%'
       AND deleted_at IS NULL
@@ -84,8 +84,8 @@ BEGIN
                       'Check division_name and update ILIKE pattern if needed.';
     END IF;
 
-    -- ── Resolve Value Services Trust division_id ───────────────────────────
-    SELECT division_id INTO value_svc_div_id
+    -- ── Resolve Value Services Trust division id ───────────────────────────
+    SELECT id INTO value_svc_div_id
     FROM public.divisions
     WHERE division_name ILIKE '%Value Services%'
       AND deleted_at IS NULL
