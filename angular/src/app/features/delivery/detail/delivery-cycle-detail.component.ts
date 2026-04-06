@@ -992,7 +992,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               </span>
               <span *ngIf="group.isFuture"
                     style="font-size:10px;color:var(--triarq-color-text-secondary);font-style:italic;">
-                — future stage
+                — Available when cycle reaches {{ group.stage }}
               </span>
             </span>
             <span style="font-size:10px;color:var(--triarq-color-text-secondary);">

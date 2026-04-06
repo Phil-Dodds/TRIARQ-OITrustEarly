@@ -65,7 +65,8 @@ export class DeliveryService {
     division_id:              string;
     workstream_id?:           string;          // optional — D-165
     tier_classification:      TierClassification;
-    assigned_ds_user_id?:     string;          // optional — CC-006: required before Brief Review gate
+    assigned_ds_user_id?:     string;          // optional — D-174: required before Brief Review gate
+    assigned_cb_user_id?:     string;          // optional — D-174: required before Go to Build gate
     outcome_statement?:       string;          // optional at creation
     jira_epic_key?:           string;          // optional
     milestone_target_dates?:  {               // optional gate target dates at creation
