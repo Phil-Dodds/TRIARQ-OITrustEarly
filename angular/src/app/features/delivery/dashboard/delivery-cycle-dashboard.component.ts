@@ -90,6 +90,19 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent, WorkstreamPickerComponent],
   template: `
+    <!-- D-172 responsive: DS/CB columns collapse to avatar-only on narrow viewports -->
+    <style>
+      @media (max-width: 1200px) {
+        .oi-col-ds span, .oi-col-cb span {
+          max-width: 26px !important; overflow: hidden !important;
+          white-space: nowrap !important; text-overflow: clip !important;
+          padding: 2px 4px !important;
+        }
+      }
+      @media (max-width: 960px) {
+        .oi-col-ds, .oi-col-cb { display: none !important; }
+      }
+    </style>
     <div style="max-width:1200px;margin:var(--triarq-space-2xl) auto;padding:0 var(--triarq-space-md);">
 
       <!-- ── Back link (D-172) ───────────────────────────────────────────── -->
@@ -860,95 +873,98 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       </div>
 
       <!-- ── Column header row — D-196: always rendered, even when no rows ─── -->
-      <!-- D-196: Navy background, white text. Not sortable at this stage. -->
+      <!-- D-172: 11 columns. D-196: Deep Navy background (#12274A), white text. Not sortable at this stage. -->
+      <!-- Columns: Tier dot | Division | Cycle Name | Outcome | Stage Track | Headline | DS | CB | Pilot Start | Release Start | Workstream -->
       <div *ngIf="!loading"
            style="display:grid;
-                  grid-template-columns:48px 1fr 1fr 200px 120px 120px;
+                  grid-template-columns:36px 100px 1fr 120px 155px 1fr 100px 100px 85px 85px 120px;
                   gap:var(--triarq-space-sm);padding:8px var(--triarq-space-sm);
                   font-size:var(--triarq-text-small);font-weight:500;color:#fff;
-                  background:var(--triarq-color-navy,#1a3a4f);border-radius:6px 6px 0 0;">
+                  background:var(--triarq-color-navy,#12274A);border-radius:6px 6px 0 0;">
         <span></span>
+        <span>Division</span>
         <span>Cycle Name</span>
+        <span>Outcome</span>
+        <span>Stage Track</span>
         <span>Headline Status</span>
-        <span>Lifecycle Stage</span>
+        <span class="oi-col-ds">DS</span>
+        <span class="oi-col-cb">CB</span>
         <span>Pilot Start</span>
         <span>Release Start</span>
+        <span>Workstream</span>
       </div>
 
-      <!-- ── Cycle rows — D-196/D-197: new column structure ───────────────── -->
-      <!-- Columns: avatar(48px) | Cycle Name(flex) | Headline Status(flex) | Lifecycle Stage(200px) | Pilot Start(120px) | Release Start(120px) -->
+      <!-- ── Cycle rows — D-172: 11-column structure ───────────────────────── -->
+      <!-- Col order: Tier dot | Division | Cycle Name | Outcome | Stage Track | Headline | DS | CB | Pilot Start | Release Start | Workstream -->
+      <!-- D-197: Tier dot avatar in col 1. D-172: DS/CB collapse to avatar on narrow viewports (.oi-col-ds/.oi-col-cb). -->
       <div *ngFor="let cycle of filtered">
         <div
           [routerLink]="['/delivery', cycle.delivery_cycle_id]"
           style="display:grid;
-                 grid-template-columns:48px 1fr 1fr 200px 120px 120px;
+                 grid-template-columns:36px 100px 1fr 120px 155px 1fr 100px 100px 85px 85px 120px;
                  gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
                  border-bottom:1px solid var(--triarq-color-border);
                  font-size:var(--triarq-text-small);align-items:start;
-                 cursor:pointer;transition:background 0.1s;min-height:72px;"
+                 cursor:pointer;transition:background 0.1s;min-height:64px;"
           (mouseenter)="$any($event.currentTarget).style.background='var(--triarq-color-background-subtle)'"
           (mouseleave)="$any($event.currentTarget).style.background=''"
         >
-          <!-- Avatar column — D-197: colored Tier dot, no initials -->
+          <!-- Col 1: Tier dot — D-197: colored circle, no initials -->
           <div style="display:flex;align-items:flex-start;justify-content:center;padding-top:6px;">
             <div [style.background]="tierDotColor(cycle.tier_classification)"
-                 style="width:20px;height:20px;border-radius:50%;flex-shrink:0;">
+                 style="width:18px;height:18px;border-radius:50%;flex-shrink:0;">
             </div>
           </div>
 
-          <!-- Cycle Name column: title + tier badge + DS chip + CB chip + outcome warning -->
+          <!-- Col 2: Division — tappable chip (detail panel TBD) -->
+          <div style="padding-top:4px;" (click)="$event.stopPropagation()">
+            <span *ngIf="cycle.division_name"
+                  style="display:inline-block;padding:2px 7px;border-radius:999px;
+                         font-size:10px;background:rgba(37,112,153,0.08);
+                         color:var(--triarq-color-primary);white-space:nowrap;
+                         overflow:hidden;text-overflow:ellipsis;max-width:96px;"
+                  [title]="cycle.division_name">
+              {{ cycle.division_name }}
+            </span>
+            <span *ngIf="!cycle.division_name"
+                  style="color:var(--triarq-color-text-secondary);font-size:10px;">—</span>
+          </div>
+
+          <!-- Col 3: Cycle Name — title (tappable → detail) + Tier badge pill only -->
           <div>
-            <div style="font-weight:500;color:var(--triarq-color-text-primary);margin-bottom:4px;">
+            <div style="font-weight:500;color:var(--triarq-color-text-primary);
+                        margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
               {{ cycle.cycle_title }}
             </div>
-            <!-- D-197: Tier badge pill below title -->
-            <span style="display:inline-block;padding:2px 8px;border-radius:999px;
-                         font-size:10px;color:#fff;margin-bottom:4px;"
+            <!-- D-197: Tier badge pill below title only — DS/CB chips moved to cols 7/8 -->
+            <span style="display:inline-block;padding:2px 7px;border-radius:999px;
+                         font-size:10px;color:#fff;"
                   [style.background]="tierPillColor(cycle.tier_classification)">
-              {{ tierLabel(cycle.tier_classification) === 'T1' ? 'Tier 1' : tierLabel(cycle.tier_classification) === 'T2' ? 'Tier 2' : 'Tier 3' }}
+              {{ tierLabel(cycle.tier_classification) === 'T1' ? 'Tier 1' :
+                 tierLabel(cycle.tier_classification) === 'T2' ? 'Tier 2' : 'Tier 3' }}
             </span>
-            <!-- DS chip (D-181) -->
-            <span *ngIf="cycle.assigned_ds_display_name"
-                  style="display:inline-flex;align-items:center;gap:4px;
-                         padding:2px 8px;border-radius:999px;margin-left:4px;margin-bottom:4px;
-                         background:rgba(37,112,153,0.08);font-size:10px;
-                         color:var(--triarq-color-text-secondary);">
-              DS: {{ cycle.assigned_ds_display_name }}
+          </div>
+
+          <!-- Col 4: Outcome Statement — one-line truncation, amber dot when null -->
+          <div style="padding-top:4px;display:flex;align-items:center;gap:5px;">
+            <span *ngIf="cycle.outcome_statement"
+                  style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+                         color:var(--triarq-color-text-primary);font-size:var(--triarq-text-small);"
+                  [title]="cycle.outcome_statement">
+              {{ cycle.outcome_statement }}
             </span>
-            <span *ngIf="!cycle.assigned_ds_display_name"
-                  style="display:inline-flex;align-items:center;gap:4px;
-                         padding:2px 8px;border-radius:999px;margin-left:4px;margin-bottom:4px;
-                         background:rgba(245,166,35,0.1);font-size:10px;
-                         color:var(--triarq-color-sunray,#f5a623);">
-              ⚠ DS unassigned
-            </span>
-            <!-- CB chip (D-181) -->
-            <span *ngIf="cycle.assigned_cb_display_name"
-                  style="display:inline-flex;align-items:center;gap:4px;
-                         padding:2px 8px;border-radius:999px;margin-left:4px;margin-bottom:4px;
-                         background:rgba(37,112,153,0.08);font-size:10px;
-                         color:var(--triarq-color-text-secondary);">
-              CB: {{ cycle.assigned_cb_display_name }}
-            </span>
-            <!-- Outcome warning (D-190 Pattern 2: amber dot) -->
             <span *ngIf="!cycle.outcome_statement"
                   style="display:inline-block;width:8px;height:8px;border-radius:50%;
-                         background:var(--triarq-color-sunray,#f5a623);
-                         margin-left:4px;margin-bottom:2px;vertical-align:middle;"
+                         background:var(--triarq-color-sunray,#f5a623);flex-shrink:0;"
                   title="Outcome Statement not set">
             </span>
-          </div>
-
-          <!-- Headline Status column -->
-          <div style="padding-top:2px;">
-            <span [style.color]="headlineColor(cycle)"
-                  style="white-space:normal;display:-webkit-box;-webkit-line-clamp:2;
-                         -webkit-box-orient:vertical;overflow:hidden;">
-              {{ headline(cycle) }}
+            <span *ngIf="!cycle.outcome_statement"
+                  style="color:var(--triarq-color-text-secondary);font-size:10px;font-style:italic;">
+              Not set
             </span>
           </div>
 
-          <!-- Lifecycle Stage column: condensed track + stage label -->
+          <!-- Col 5: Stage Track (condensed) + stage label -->
           <div (click)="$event.stopPropagation()" style="padding-top:2px;">
             <div style="font-size:10px;color:var(--triarq-color-text-secondary);
                         margin-bottom:4px;text-transform:uppercase;letter-spacing:0.3px;">
@@ -961,16 +977,76 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
             ></app-stage-track>
           </div>
 
-          <!-- Pilot Start Date (go_to_deploy milestone) — em dash when not set -->
+          <!-- Col 6: Headline Status -->
+          <div style="padding-top:2px;">
+            <span [style.color]="headlineColor(cycle)"
+                  style="white-space:normal;display:-webkit-box;-webkit-line-clamp:2;
+                         -webkit-box-orient:vertical;overflow:hidden;">
+              {{ headline(cycle) }}
+            </span>
+          </div>
+
+          <!-- Col 7: Assigned DS — standalone chip, tappable (detail panel TBD) -->
+          <div class="oi-col-ds" style="padding-top:4px;" (click)="$event.stopPropagation()">
+            <span *ngIf="cycle.assigned_ds_display_name"
+                  style="display:inline-flex;align-items:center;gap:3px;
+                         padding:2px 7px;border-radius:999px;
+                         background:rgba(37,112,153,0.08);font-size:10px;
+                         color:var(--triarq-color-text-secondary);
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:96px;"
+                  [title]="cycle.assigned_ds_display_name">
+              {{ cycle.assigned_ds_display_name }}
+            </span>
+            <span *ngIf="!cycle.assigned_ds_display_name"
+                  style="display:inline-block;width:20px;height:20px;border-radius:50%;
+                         background:rgba(245,166,35,0.15);
+                         line-height:20px;text-align:center;font-size:10px;
+                         color:var(--triarq-color-sunray,#f5a623);"
+                  title="DS unassigned">!</span>
+          </div>
+
+          <!-- Col 8: Assigned CB — standalone chip, tappable (detail panel TBD) -->
+          <div class="oi-col-cb" style="padding-top:4px;" (click)="$event.stopPropagation()">
+            <span *ngIf="cycle.assigned_cb_display_name"
+                  style="display:inline-flex;align-items:center;gap:3px;
+                         padding:2px 7px;border-radius:999px;
+                         background:rgba(37,112,153,0.08);font-size:10px;
+                         color:var(--triarq-color-text-secondary);
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:96px;"
+                  [title]="cycle.assigned_cb_display_name">
+              {{ cycle.assigned_cb_display_name }}
+            </span>
+            <span *ngIf="!cycle.assigned_cb_display_name"
+                  style="color:var(--triarq-color-text-secondary);font-size:10px;">—</span>
+          </div>
+
+          <!-- Col 9: Pilot Start Date (go_to_deploy milestone) -->
           <div style="padding-top:2px;"
                [style.color]="dateColor(cycle, 'go_to_deploy')">
             {{ dateDisplay(cycle, 'go_to_deploy') || '—' }}
           </div>
 
-          <!-- Release Start Date (go_to_release milestone) — em dash when not set -->
+          <!-- Col 10: Production Release Date (go_to_release milestone) -->
           <div style="padding-top:2px;"
                [style.color]="dateColor(cycle, 'go_to_release')">
             {{ dateDisplay(cycle, 'go_to_release') || '—' }}
+          </div>
+
+          <!-- Col 11: Delivery Workstream — chip, muted when inactive (active_status=false) -->
+          <div style="padding-top:4px;" (click)="$event.stopPropagation()">
+            <span *ngIf="cycle.workstream"
+                  style="display:inline-block;padding:2px 7px;border-radius:999px;
+                         font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:116px;"
+                  [style.background]="cycle.workstream.active_status ? 'rgba(37,112,153,0.08)' : 'rgba(0,0,0,0.05)'"
+                  [style.color]="cycle.workstream.active_status ? 'var(--triarq-color-primary)' : 'var(--triarq-color-text-secondary)'"
+                  [style.opacity]="cycle.workstream.active_status ? '1' : '0.6'"
+                  [title]="cycle.workstream.workstream_name + (cycle.workstream.active_status ? '' : ' (inactive)')">
+              {{ cycle.workstream.workstream_name }}
+            </span>
+            <span *ngIf="!cycle.workstream"
+                  style="color:var(--triarq-color-text-secondary);font-size:10px;font-style:italic;">
+              None
+            </span>
           </div>
         </div>
       </div>
@@ -979,7 +1055,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <!-- Column headers always render above this. Empty state row spans all columns. -->
       <div *ngIf="!loading && !loadError && filtered.length === 0"
            style="display:grid;
-                  grid-template-columns:48px 1fr 1fr 200px 120px 120px;
+                  grid-template-columns:36px 100px 1fr 120px 155px 1fr 100px 100px 85px 85px 120px;
                   border-bottom:1px solid var(--triarq-color-border);">
         <div style="grid-column:1/-1;min-height:200px;
                     display:flex;flex-direction:column;align-items:center;justify-content:center;

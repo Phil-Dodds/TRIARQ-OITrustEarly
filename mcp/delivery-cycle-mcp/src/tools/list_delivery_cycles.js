@@ -157,10 +157,46 @@ async function list_delivery_cycles(params, caller_user_id) {
     }
   }
 
+  // ── Resolve division names (D-172 col 2) ──────────────────────────────────
+  const divisionIdSet = new Set(cycles.map(c => c.division_id).filter(Boolean));
+  let divisionMap = {};
+  if (divisionIdSet.size > 0) {
+    const { data: divisionRows } = await supabase
+      .from('divisions')
+      .select('id, division_name')
+      .in('id', Array.from(divisionIdSet))
+      .is('deleted_at', null);
+    if (divisionRows) {
+      divisionRows.forEach(d => { divisionMap[d.id] = d.division_name; });
+    }
+  }
+
+  // ── Resolve workstream names + active_status (D-172 col 11) ───────────────
+  const workstreamIdSet = new Set(cycles.map(c => c.workstream_id).filter(Boolean));
+  let workstreamMap = {};
+  if (workstreamIdSet.size > 0) {
+    const { data: workstreamRows } = await supabase
+      .from('delivery_workstreams')
+      .select('workstream_id, workstream_name, active_status')
+      .in('workstream_id', Array.from(workstreamIdSet))
+      .is('deleted_at', null);
+    if (workstreamRows) {
+      workstreamRows.forEach(w => {
+        workstreamMap[w.workstream_id] = {
+          workstream_id:   w.workstream_id,
+          workstream_name: w.workstream_name,
+          active_status:   w.active_status
+        };
+      });
+    }
+  }
+
   const enriched = cycles.map(c => ({
     ...c,
     assigned_ds_display_name: c.assigned_ds_user_id ? (userMap[c.assigned_ds_user_id] ?? null) : null,
-    assigned_cb_display_name: c.assigned_cb_user_id ? (userMap[c.assigned_cb_user_id] ?? null) : null
+    assigned_cb_display_name: c.assigned_cb_user_id ? (userMap[c.assigned_cb_user_id] ?? null) : null,
+    division_name:            divisionMap[c.division_id] ?? null,
+    workstream:               c.workstream_id ? (workstreamMap[c.workstream_id] ?? null) : null
   }));
 
   return { success: true, data: enriched };
