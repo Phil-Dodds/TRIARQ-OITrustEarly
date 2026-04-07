@@ -8,7 +8,10 @@
 
 ## Next Available Decision Number
 
-**Next available: D-201**
+**Next available: D-203**
+
+> NOTE: D-201 and D-202 were allocated by Claude Chat in Design Session 2026-04-06-E.
+> Details to be backfilled by Design Chat. See START-HERE.md from that session zip.
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -109,6 +112,8 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-198 | Primary Workflow Clarity — secondary controls visually recessed | Claude Chat | April 2026 | Active |
 | D-199 | Sidebar-Only Navigation — no top nav; section headers at 7+ items | Claude Chat | April 2026 | Active |
 | D-200 | UI Feedback Standard — three patterns only (Guidance/Warning/Error) | Claude Chat | April 2026 | Active |
+| D-201 | Allocated by Claude Chat in Design Session 2026-04-06-E — details TBD | Claude Chat | April 2026 | Pending backfill |
+| D-202 | Allocated by Claude Chat in Design Session 2026-04-06-E — details TBD | Claude Chat | April 2026 | Pending backfill |
 
 ---
 

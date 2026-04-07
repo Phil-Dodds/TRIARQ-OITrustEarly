@@ -456,34 +456,6 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         </div>
       </div>
 
-      <!-- ── Workstream Tab Strip — D-193 ───────────────────────────────────── -->
-      <!-- Replaces workstream dropdown. Tabs: All Workstreams + one per accessible Workstream. -->
-      <div style="display:flex;gap:6px;flex-wrap:nowrap;overflow:hidden;
-                  margin-bottom:var(--triarq-space-sm);align-items:center;">
-        <!-- All Workstreams tab — always first -->
-        <button type="button"
-                (click)="selectWorkstreamTab('')"
-                [style.background]="activeWorkstreamTab === '' ? 'var(--triarq-color-primary,#257099)' : '#fff'"
-                [style.color]="activeWorkstreamTab === '' ? '#fff' : 'var(--triarq-color-text-secondary)'"
-                style="border:1px solid var(--triarq-color-border,#ddd);border-radius:4px;
-                       padding:5px 14px;font-size:var(--triarq-text-small);cursor:pointer;
-                       white-space:nowrap;flex-shrink:0;font-family:inherit;">
-          All Workstreams
-        </button>
-        <!-- Per-Workstream tabs -->
-        <ng-container *ngFor="let ws of activeWorkstreams">
-          <button type="button"
-                  (click)="selectWorkstreamTab(ws.workstream_id)"
-                  [style.background]="activeWorkstreamTab === ws.workstream_id ? 'var(--triarq-color-primary,#257099)' : '#fff'"
-                  [style.color]="activeWorkstreamTab === ws.workstream_id ? '#fff' : 'var(--triarq-color-text-secondary)'"
-                  style="border:1px solid var(--triarq-color-border,#ddd);border-radius:4px;
-                         padding:5px 14px;font-size:var(--triarq-text-small);cursor:pointer;
-                         white-space:nowrap;flex-shrink:0;font-family:inherit;">
-            {{ ws.workstream_name }}
-          </button>
-        </ng-container>
-      </div>
-
       <!-- ── Item 5: Drill-down filter visual confirmation — Principle 3 ──── -->
       <!-- When landing from a drill-down (query params set), show the applied filter clearly. -->
       <!-- User can see what filter landed them here and remove it. -->
@@ -530,95 +502,331 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         </button>
       </div>
 
-      <!-- ── Filters + sort row ──────────────────────────────────────────── -->
-      <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;
-                  margin-bottom:var(--triarq-space-md);align-items:center;">
+      <!-- ── Header counts — hidden when any filter active (D-HubCounts-2026-04-06) ── -->
+      <div *ngIf="!anyFilterActive"
+           style="display:flex;align-items:center;gap:var(--triarq-space-lg, 24px);
+                  margin-bottom:var(--triarq-space-sm);
+                  font-size:var(--triarq-text-small);">
+        <!-- Active cycles — always shown, not tappable -->
+        <div>
+          <span style="font-size:20px;font-weight:700;color:var(--triarq-color-primary, #257099);">
+            {{ activeCycleCount }}
+          </span>
+          <span style="color:var(--triarq-color-text-secondary, #5A5A5A);margin-left:4px;">
+            Active cycles
+          </span>
+        </div>
+        <!-- My Cycles — hidden when count is zero; tappable sets assigned filter -->
+        <div *ngIf="myCycleCount > 0"
+             style="cursor:pointer;"
+             (click)="setAssignedToMeFilter()">
+          <span style="font-size:20px;font-weight:700;color:var(--triarq-color-deep-navy, #0D2240);">
+            {{ myCycleCount }}
+          </span>
+          <span style="color:var(--triarq-color-primary, #257099);margin-left:4px;text-decoration:underline;">
+            My cycles
+          </span>
+        </div>
+        <!-- Overdue gates — hidden when zero; tappable sets overdue filter -->
+        <div *ngIf="overdueGateCount > 0"
+             style="cursor:pointer;"
+             (click)="setOverdueGateFilter()">
+          <span style="font-size:20px;font-weight:700;color:var(--triarq-color-sunray, #D4960A);">
+            {{ overdueGateCount }}
+          </span>
+          <span style="color:var(--triarq-color-sunray, #D4960A);margin-left:4px;text-decoration:underline;">
+            Overdue gate{{ overdueGateCount === 1 ? '' : 's' }}
+          </span>
+        </div>
+      </div>
 
-        <!-- D-166/D-170: Division filter — server-side reload.
-             Phil/Admin see all divisions; others see their directly-assigned divisions.
-             Only shown when there is more than one option to choose from. -->
-        <select *ngIf="filterDivisionOptions.length > 1"
-                [(ngModel)]="filterDivision"
-                (ngModelChange)="onDivisionFilterChange()"
-                class="oi-input"
-                style="max-width:200px;font-size:var(--triarq-text-small);">
-          <option value="">All Divisions</option>
-          <option *ngFor="let d of filterDivisionOptions" [value]="d.id">{{ d.division_name }}</option>
-        </select>
+      <!-- ── Filter bar: "Filters" button + active filter chips ─────────── -->
+      <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);flex-wrap:wrap;
+                  margin-bottom:var(--triarq-space-sm);">
 
-        <!-- D-166: Include child divisions — only visible when a division is selected -->
-        <label *ngIf="filterDivision"
-               style="display:flex;align-items:center;gap:6px;
-                      font-size:var(--triarq-text-small);
-                      color:var(--triarq-color-text-secondary);
-                      cursor:pointer;white-space:nowrap;">
-          <input type="checkbox"
-                 [(ngModel)]="includeChildDivisions"
-                 (ngModelChange)="onDivisionFilterChange()" />
-          Include child Divisions
-        </label>
-
-        <!-- Stage filter -->
-        <select [(ngModel)]="filterStage" (ngModelChange)="applyFilters()" class="oi-input"
-                style="max-width:160px;font-size:var(--triarq-text-small);">
-          <option value="">All Stages</option>
-          <option *ngFor="let s of stages" [value]="s">{{ STAGE_LABEL_MAP[s] ?? s }}</option>
-        </select>
-
-        <!-- Tier filter -->
-        <select [(ngModel)]="filterTier" (ngModelChange)="applyFilters()" class="oi-input"
-                style="max-width:130px;font-size:var(--triarq-text-small);">
-          <option value="">All Tiers</option>
-          <option value="tier_1">Tier 1</option>
-          <option value="tier_2">Tier 2</option>
-          <option value="tier_3">Tier 3</option>
-        </select>
-
-        <!-- D-193: Workstream filter moved to tab strip above — removed from filter row -->
-
-        <!-- D-167: No Workstream filter — show cycles with no workstream assigned -->
-        <button *ngIf="activeWorkstreamTab === ''"
-                type="button"
-                [style.background]="filterWorkstream === '__none__' ? 'var(--triarq-color-primary)' : 'transparent'"
-                [style.color]="filterWorkstream === '__none__' ? '#fff' : 'var(--triarq-color-text-secondary)'"
-                (click)="filterWorkstream = filterWorkstream === '__none__' ? '' : '__none__'; applyFilters()"
-                style="border:1px solid var(--triarq-color-border,#ddd);border-radius:4px;
-                       padding:4px 10px;font-size:var(--triarq-text-small);cursor:pointer;
-                       white-space:nowrap;font-family:inherit;">
-          No Workstream
+        <!-- Filters button -->
+        <button type="button"
+                (click)="filterPanelOpen = true"
+                style="display:flex;align-items:center;gap:6px;
+                       border:1px solid var(--triarq-color-border, #E0E0E0);
+                       border-radius:5px;padding:6px 14px;cursor:pointer;
+                       background:#fff;font-family:inherit;
+                       font-size:var(--triarq-text-small);">
+          <span>Filters</span>
+          <span *ngIf="activeFilterCount > 0"
+                style="display:inline-flex;align-items:center;justify-content:center;
+                       min-width:18px;height:18px;border-radius:999px;
+                       background:var(--triarq-color-primary, #257099);color:#fff;
+                       font-size:11px;padding:0 4px;">
+            {{ activeFilterCount }}
+          </span>
         </button>
 
-        <!-- D-173: Next Gate filter — computed from lifecycle stage client-side -->
-        <select [(ngModel)]="filterNextGate" (ngModelChange)="applyFilters()" class="oi-input"
-                style="max-width:180px;font-size:var(--triarq-text-small);">
-          <option value="">All Next Gates</option>
-          <option *ngFor="let gate of gateNames" [value]="gate">
-            {{ GATE_LABELS[gate] }}
-          </option>
-        </select>
+        <!-- Active filter chips — one per active filter -->
+        <ng-container *ngFor="let chip of activeFilterChips">
+          <span style="display:inline-flex;align-items:center;gap:4px;
+                       padding:3px 10px;border-radius:999px;
+                       background:rgba(37,112,153,0.1);
+                       color:var(--triarq-color-primary, #257099);
+                       font-size:var(--triarq-text-small);">
+            {{ chip.label }}
+            <button type="button"
+                    (click)="removeFilter(chip.key)"
+                    style="background:none;border:none;cursor:pointer;
+                           color:var(--triarq-color-primary, #257099);
+                           padding:0;line-height:1;font-size:13px;">✕</button>
+          </span>
+        </ng-container>
 
-        <!-- D-172: Assigned DS filter — only shown when there are multiple DS in the loaded result set -->
-        <select *ngIf="dsFilterOptions.length > 1"
-                [(ngModel)]="filterDs" (ngModelChange)="applyFilters()" class="oi-input"
-                style="max-width:180px;font-size:var(--triarq-text-small);">
-          <option value="">All Domain Strategists</option>
-          <option *ngFor="let ds of dsFilterOptions" [value]="ds.user_id">{{ ds.display_name }}</option>
-        </select>
-
-        <!-- D-172: Assigned CB filter — only shown when there are multiple CB in the loaded result set -->
-        <select *ngIf="cbFilterOptions.length > 1"
-                [(ngModel)]="filterCb" (ngModelChange)="applyFilters()" class="oi-input"
-                style="max-width:180px;font-size:var(--triarq-text-small);">
-          <option value="">All Capability Builders</option>
-          <option *ngFor="let cb of cbFilterOptions" [value]="cb.user_id">{{ cb.display_name }}</option>
-        </select>
-
-        <span *ngIf="filterStage || filterTier || filterWorkstream || filterNextGate || filterDs || filterCb"
-              (click)="clearFilters()"
-              style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
-                     cursor:pointer;text-decoration:underline;">
-          Clear filters
+        <!-- Clear all link — shown when any filter active -->
+        <span *ngIf="anyFilterActive"
+              (click)="clearAllFiltersPanel()"
+              style="font-size:var(--triarq-text-small);
+                     color:var(--triarq-color-text-secondary, #5A5A5A);
+                     cursor:pointer;text-decoration:underline;margin-left:4px;">
+          Clear all
         </span>
+
+        <!-- Filtered view count — shown when any filter active -->
+        <span *ngIf="anyFilterActive"
+              style="margin-left:auto;font-size:var(--triarq-text-small);
+                     color:var(--triarq-color-text-secondary, #5A5A5A);">
+          {{ filtered.length }} of {{ cycles.length }} cycles — filtered view
+        </span>
+      </div>
+
+      <!-- ── Filter panel — slide-in from right ─────────────────────────── -->
+      <!-- Backdrop -->
+      <div *ngIf="filterPanelOpen"
+           (click)="filterPanelOpen = false"
+           style="position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:1000;">
+      </div>
+      <!-- Panel -->
+      <div *ngIf="filterPanelOpen"
+           style="position:fixed;top:0;right:0;bottom:0;width:360px;
+                  background:#fff;z-index:1001;overflow-y:auto;
+                  box-shadow:-4px 0 16px rgba(0,0,0,0.12);
+                  display:flex;flex-direction:column;">
+        <!-- Panel header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    padding:var(--triarq-space-md);
+                    border-bottom:1px solid var(--triarq-color-border, #E0E0E0);
+                    position:sticky;top:0;background:#fff;z-index:1;">
+          <span style="font-weight:600;font-size:var(--triarq-text-body);">Filters</span>
+          <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);">
+            <span *ngIf="activeFilterCount > 0"
+                  (click)="clearAllFiltersPanel()"
+                  style="font-size:var(--triarq-text-small);cursor:pointer;
+                         color:var(--triarq-color-primary, #257099);text-decoration:underline;">
+              Clear all
+            </span>
+            <button type="button"
+                    (click)="filterPanelOpen = false"
+                    style="background:none;border:none;cursor:pointer;
+                           font-size:20px;line-height:1;padding:0 4px;
+                           color:var(--triarq-color-text-secondary, #5A5A5A);">×</button>
+          </div>
+        </div>
+
+        <div style="padding:var(--triarq-space-md);flex:1;">
+
+          <!-- 1. Division filter -->
+          <div style="margin-bottom:var(--triarq-space-lg);">
+            <button type="button"
+                    (click)="panelSections.division = !panelSections.division"
+                    style="display:flex;align-items:center;justify-content:space-between;
+                           width:100%;background:none;border:none;cursor:pointer;
+                           padding:0;font-family:inherit;">
+              <span style="font-weight:600;font-size:var(--triarq-text-small);">Division</span>
+              <span>{{ panelSections.division ? '▲' : '▼' }}</span>
+            </button>
+            <div *ngIf="panelSections.division" style="margin-top:var(--triarq-space-sm);">
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="divScope" value="my" [(ngModel)]="divisionScope"
+                       (ngModelChange)="onPanelDivisionScopeChange()" />
+                My Divisions
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="divScope" value="all" [(ngModel)]="divisionScope"
+                       (ngModelChange)="onPanelDivisionScopeChange()" />
+                All Divisions
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="divScope" value="single" [(ngModel)]="divisionScope"
+                       (ngModelChange)="onPanelDivisionScopeChange()" />
+                Select Division
+              </label>
+              <select *ngIf="divisionScope === 'single'"
+                      [(ngModel)]="filterDivision"
+                      (ngModelChange)="onDivisionFilterChange()"
+                      class="oi-input"
+                      style="margin-top:4px;width:100%;font-size:var(--triarq-text-small);">
+                <option value="">— Select —</option>
+                <option *ngFor="let d of filterDivisionOptions" [value]="d.id">{{ d.division_name }}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 2. Assigned Person filter -->
+          <div style="margin-bottom:var(--triarq-space-lg);">
+            <button type="button"
+                    (click)="panelSections.person = !panelSections.person"
+                    style="display:flex;align-items:center;justify-content:space-between;
+                           width:100%;background:none;border:none;cursor:pointer;
+                           padding:0;font-family:inherit;">
+              <span style="font-weight:600;font-size:var(--triarq-text-small);">Assigned Person</span>
+              <span>{{ panelSections.person ? '▲' : '▼' }}</span>
+            </button>
+            <div *ngIf="panelSections.person" style="margin-top:var(--triarq-space-sm);">
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="personMode" value="anyone" [(ngModel)]="assignedPersonMode"
+                       (ngModelChange)="applyFilters()" />
+                Anyone
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="personMode" value="my_cycles" [(ngModel)]="assignedPersonMode"
+                       (ngModelChange)="applyFilters()" />
+                My cycles
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="personMode" value="unassigned_ds" [(ngModel)]="assignedPersonMode"
+                       (ngModelChange)="applyFilters()" />
+                Unassigned DS
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="personMode" value="unassigned_cb" [(ngModel)]="assignedPersonMode"
+                       (ngModelChange)="applyFilters()" />
+                Unassigned CB
+              </label>
+            </div>
+          </div>
+
+          <!-- 3. Lifecycle Stage filter (multi-select) -->
+          <div style="margin-bottom:var(--triarq-space-lg);">
+            <button type="button"
+                    (click)="panelSections.stage = !panelSections.stage"
+                    style="display:flex;align-items:center;justify-content:space-between;
+                           width:100%;background:none;border:none;cursor:pointer;
+                           padding:0;font-family:inherit;">
+              <span style="font-weight:600;font-size:var(--triarq-text-small);">Lifecycle Stage</span>
+              <span>{{ panelSections.stage ? '▲' : '▼' }}</span>
+            </button>
+            <div *ngIf="panelSections.stage" style="margin-top:var(--triarq-space-sm);">
+              <label *ngFor="let s of stages"
+                     style="display:flex;align-items:center;gap:8px;margin-bottom:4px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="checkbox"
+                       [checked]="stageFilterSet.has(s)"
+                       (change)="toggleStageFilter(s)" />
+                {{ STAGE_LABEL_MAP[s] ?? s }}
+              </label>
+            </div>
+          </div>
+
+          <!-- 4. Gate Status filter -->
+          <div style="margin-bottom:var(--triarq-space-lg);">
+            <button type="button"
+                    (click)="panelSections.gateStatus = !panelSections.gateStatus"
+                    style="display:flex;align-items:center;justify-content:space-between;
+                           width:100%;background:none;border:none;cursor:pointer;
+                           padding:0;font-family:inherit;">
+              <span style="font-weight:600;font-size:var(--triarq-text-small);">Gate Status</span>
+              <span>{{ panelSections.gateStatus ? '▲' : '▼' }}</span>
+            </button>
+            <div *ngIf="panelSections.gateStatus" style="margin-top:var(--triarq-space-sm);">
+              <label *ngFor="let gs of gateStatusOptions"
+                     style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="gateStatus" [value]="gs.value" [(ngModel)]="gateStatusFilter"
+                       (ngModelChange)="applyFilters()" />
+                {{ gs.label }}
+              </label>
+            </div>
+          </div>
+
+          <!-- 5. Tier filter -->
+          <div style="margin-bottom:var(--triarq-space-lg);">
+            <button type="button"
+                    (click)="panelSections.tier = !panelSections.tier"
+                    style="display:flex;align-items:center;justify-content:space-between;
+                           width:100%;background:none;border:none;cursor:pointer;
+                           padding:0;font-family:inherit;">
+              <span style="font-weight:600;font-size:var(--triarq-text-small);">Tier</span>
+              <span>{{ panelSections.tier ? '▲' : '▼' }}</span>
+            </button>
+            <div *ngIf="panelSections.tier" style="margin-top:var(--triarq-space-sm);">
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="tier" value="" [(ngModel)]="filterTier"
+                       (ngModelChange)="applyFilters()" />
+                All Tiers
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="tier" value="tier_1" [(ngModel)]="filterTier"
+                       (ngModelChange)="applyFilters()" />
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;
+                              background:#4CAF50;margin-right:2px;"></span>
+                Tier 1 — Fast Lane
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="tier" value="tier_2" [(ngModel)]="filterTier"
+                       (ngModelChange)="applyFilters()" />
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;
+                              background:var(--triarq-color-sunray,#f5a623);margin-right:2px;"></span>
+                Tier 2 — Structured
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;
+                             cursor:pointer;font-size:var(--triarq-text-small);">
+                <input type="radio" name="tier" value="tier_3" [(ngModel)]="filterTier"
+                       (ngModelChange)="applyFilters()" />
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;
+                              background:var(--triarq-color-primary,#257099);margin-right:2px;"></span>
+                Tier 3 — Governed
+              </label>
+            </div>
+          </div>
+
+          <!-- 6. Workstream filter (D-167: 3 groups — all / none / active / inactive) -->
+          <div style="margin-bottom:var(--triarq-space-lg);">
+            <button type="button"
+                    (click)="panelSections.workstream = !panelSections.workstream"
+                    style="display:flex;align-items:center;justify-content:space-between;
+                           width:100%;background:none;border:none;cursor:pointer;
+                           padding:0;font-family:inherit;">
+              <span style="font-weight:600;font-size:var(--triarq-text-small);">Workstream</span>
+              <span>{{ panelSections.workstream ? '▲' : '▼' }}</span>
+            </button>
+            <div *ngIf="panelSections.workstream" style="margin-top:var(--triarq-space-sm);">
+              <select [(ngModel)]="filterWorkstream"
+                      (ngModelChange)="applyFilters()"
+                      class="oi-input"
+                      style="width:100%;font-size:var(--triarq-text-small);">
+                <option value="">All Workstreams</option>
+                <option value="__none__">No workstream assigned</option>
+                <optgroup label="Active">
+                  <option *ngFor="let ws of activeWorkstreams" [value]="ws.workstream_id">
+                    {{ ws.workstream_name }}
+                  </option>
+                </optgroup>
+                <optgroup *ngIf="inactiveWorkstreams.length > 0" label="Inactive">
+                  <option *ngFor="let ws of inactiveWorkstreams" [value]="ws.workstream_id">
+                    {{ ws.workstream_name }} (inactive)
+                  </option>
+                </optgroup>
+              </select>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
@@ -859,8 +1067,37 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   autoAssignedCbUserId:       string | null = null;
   autoAssignedCbDisplayName:  string | null = null;
 
-  // D-193: Workstream tab strip — tracks the active tab ('__all__' = All Workstreams)
-  activeWorkstreamTab = '';
+  // Block 3: Filter panel state
+  filterPanelOpen = false;
+
+  // Block 3: Panel section expand/collapse state
+  panelSections = {
+    division:   true,   // Division expanded by default
+    person:     false,
+    stage:      false,
+    gateStatus: false,
+    tier:       false,
+    workstream: false
+  };
+
+  // Block 3: Division scope (panel radio) — 'my' | 'all' | 'single'
+  divisionScope: 'my' | 'all' | 'single' = 'my';
+
+  // Block 3: Assigned person mode (panel radio)
+  assignedPersonMode: 'anyone' | 'my_cycles' | 'unassigned_ds' | 'unassigned_cb' = 'anyone';
+
+  // Block 3: Stage multi-select — empty Set = all stages selected (no filter)
+  stageFilterSet: Set<string> = new Set();
+
+  // Block 3: Gate status filter
+  gateStatusFilter: 'all' | 'overdue' | 'pending' | 'approved' = 'all';
+
+  readonly gateStatusOptions = [
+    { value: 'all',      label: 'All' },
+    { value: 'overdue',  label: 'Overdue' },
+    { value: 'pending',  label: 'Pending' },
+    { value: 'approved', label: 'Approved' }
+  ];
 
   // Filter state (ngModel bindings — not reactive form controls)
   filterStage:              string  = '';
@@ -878,6 +1115,10 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   // S7: Hub summary card state — derived from loaded cycles + delivery summary
   deliverySummary: DeliverySummary | null = null;
+
+  // Block 3: Header counts — computed from loaded cycles
+  activeCycleCount = 0;
+  myCycleCount     = 0;
 
   // Item 5: Drill-down visual confirmation — tracks which filters came from query params
   drillDownFromQp = false;  // set true when query params were present on init
@@ -1043,11 +1284,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // ── S7: Hub summary card computed getters ─────────────────────────────────
 
   private readonly TERMINAL_STAGES: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
-
-  /** Card 1: count of non-terminal cycles across loaded result set */
-  get activeCycleCount(): number {
-    return this.cycles.filter(c => !this.TERMINAL_STAGES.includes(c.current_lifecycle_stage)).length;
-  }
 
   /** Card 1: sub-stat — stage breakdown in priority order */
   get activeStageSummary(): string {
@@ -1295,6 +1531,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         if (res.success && res.data) {
           this.cycles    = Array.isArray(res.data) ? res.data : [];
           this.loadError = '';
+          this.computeHeaderCounts();
           this.applyFilters();
         } else {
           this.loadError = res.error ?? 'Delivery Cycles could not be loaded.';
@@ -1387,6 +1624,17 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       // D-172: Assigned CB filter
       if (this.filterCb && c.assigned_cb_user_id !== this.filterCb) { return false; }
 
+      // Block 3: Stage multi-select (stageFilterSet overrides filterStage when non-empty)
+      if (this.stageFilterSet.size > 0 && !this.stageFilterSet.has(c.current_lifecycle_stage)) { return false; }
+
+      // Block 3: Assigned person mode
+      if (this.assignedPersonMode === 'my_cycles') {
+        const uid = this.profile.getCurrentProfile()?.id ?? '';
+        if (c.assigned_ds_user_id !== uid && c.assigned_cb_user_id !== uid) { return false; }
+      }
+      if (this.assignedPersonMode === 'unassigned_ds' && c.assigned_ds_user_id)  { return false; }
+      if (this.assignedPersonMode === 'unassigned_cb' && c.assigned_cb_user_id)  { return false; }
+
       return true;
     });
 
@@ -1406,36 +1654,35 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  // D-193: Workstream tab strip — select a tab; '' = All Workstreams
-  selectWorkstreamTab(wsId: string): void {
-    this.activeWorkstreamTab = wsId;
-    this.filterWorkstream    = wsId;
+  clearFilters(): void {
+    this.filterStage       = '';
+    this.filterTier        = '';
+    this.filterWorkstream  = '';
+    this.filterNextGate    = '';
+    this.filterDs          = '';
+    this.filterCb          = '';
     this.applyFilters();
   }
 
-  clearFilters(): void {
-    this.filterStage           = '';
-    this.filterTier            = '';
-    this.filterWorkstream      = '';
-    this.activeWorkstreamTab   = '';
-    this.filterNextGate        = '';
-    this.filterDs              = '';
-    this.filterCb              = '';
-    // Division filter requires server reload — not cleared here.
-    // Division is intentionally NOT cleared by "Clear filters" (it's a scope selection).
+  clearAllFiltersPanel(): void {
+    this.filterStage          = '';
+    this.filterTier           = '';
+    this.filterWorkstream     = '';
+    this.filterNextGate       = '';
+    this.filterDs             = '';
+    this.filterCb             = '';
+    this.filterDivision       = '';
+    this.divisionScope        = 'my';
+    this.assignedPersonMode   = 'anyone';
+    this.stageFilterSet       = new Set();
+    this.gateStatusFilter     = 'all';
+    this.includeChildDivisions = false;
     this.applyFilters();
+    this.loadCycles();
   }
 
   clearAllFilters(): void {
-    this.filterStage           = '';
-    this.filterTier            = '';
-    this.filterWorkstream      = '';
-    this.filterNextGate        = '';
-    this.filterDs              = '';
-    this.filterCb              = '';
-    this.filterDivision        = '';
-    this.includeChildDivisions = false;
-    this.loadCycles();
+    this.clearAllFiltersPanel();
   }
 
   setSort(field: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification'): void {
@@ -1720,5 +1967,143 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.profileSub?.unsubscribe();
+  }
+
+  // ── Block 3: Filter panel methods ─────────────────────────────────────────
+
+  get anyFilterActive(): boolean {
+    return !!(
+      this.filterStage      ||
+      this.filterTier       ||
+      this.filterWorkstream ||
+      this.filterNextGate   ||
+      this.filterDs         ||
+      this.filterCb         ||
+      this.assignedPersonMode !== 'anyone' ||
+      this.stageFilterSet.size > 0 ||
+      this.gateStatusFilter !== 'all' ||
+      (this.divisionScope !== 'my')
+    );
+  }
+
+  get activeFilterCount(): number {
+    let count = 0;
+    if (this.filterTier)                        { count++; }
+    if (this.filterWorkstream)                  { count++; }
+    if (this.filterNextGate)                    { count++; }
+    if (this.filterDs || this.filterCb)         { count++; }
+    if (this.assignedPersonMode !== 'anyone')   { count++; }
+    if (this.stageFilterSet.size > 0)           { count++; }
+    if (this.gateStatusFilter !== 'all')        { count++; }
+    if (this.divisionScope !== 'my')            { count++; }
+    return count;
+  }
+
+  get activeFilterChips(): Array<{ key: string; label: string }> {
+    const chips: Array<{ key: string; label: string }> = [];
+    if (this.divisionScope === 'all') {
+      chips.push({ key: 'divisionScope', label: 'All Divisions' });
+    } else if (this.divisionScope === 'single' && this.filterDivision) {
+      const div = this.filterDivisionOptions.find(d => d.id === this.filterDivision);
+      chips.push({ key: 'divisionScope', label: 'Division: ' + (div?.division_name ?? this.filterDivision) });
+    }
+    if (this.assignedPersonMode === 'my_cycles')    { chips.push({ key: 'person', label: 'My cycles' }); }
+    if (this.assignedPersonMode === 'unassigned_ds') { chips.push({ key: 'person', label: 'Unassigned DS' }); }
+    if (this.assignedPersonMode === 'unassigned_cb') { chips.push({ key: 'person', label: 'Unassigned CB' }); }
+    if (this.stageFilterSet.size > 0) {
+      chips.push({ key: 'stage', label: this.stageFilterSet.size + ' stage' + (this.stageFilterSet.size > 1 ? 's' : '') });
+    }
+    if (this.gateStatusFilter !== 'all') {
+      chips.push({ key: 'gateStatus', label: 'Gate: ' + this.gateStatusFilter });
+    }
+    if (this.filterTier) {
+      const tLabel = this.filterTier === 'tier_1' ? 'Tier 1' : this.filterTier === 'tier_2' ? 'Tier 2' : 'Tier 3';
+      chips.push({ key: 'tier', label: tLabel });
+    }
+    if (this.filterWorkstream === '__none__') {
+      chips.push({ key: 'workstream', label: 'No workstream' });
+    } else if (this.filterWorkstream) {
+      const ws = this.workstreams.find(w => w.workstream_id === this.filterWorkstream);
+      chips.push({ key: 'workstream', label: 'WS: ' + (ws?.workstream_name ?? this.filterWorkstream) });
+    }
+    if (this.filterNextGate) {
+      chips.push({ key: 'nextGate', label: 'Gate: ' + (GATE_LABELS[this.filterNextGate as GateName] ?? this.filterNextGate) });
+    }
+    return chips;
+  }
+
+  removeFilter(key: string): void {
+    switch (key) {
+      case 'divisionScope':
+        this.divisionScope  = 'my';
+        this.filterDivision = '';
+        this.onDivisionFilterChange();
+        break;
+      case 'person':
+        this.assignedPersonMode = 'anyone';
+        this.filterDs = '';
+        this.filterCb = '';
+        this.applyFilters();
+        break;
+      case 'stage':
+        this.stageFilterSet = new Set();
+        this.filterStage    = '';
+        this.applyFilters();
+        break;
+      case 'gateStatus':
+        this.gateStatusFilter = 'all';
+        this.applyFilters();
+        break;
+      case 'tier':
+        this.filterTier = '';
+        this.applyFilters();
+        break;
+      case 'workstream':
+        this.filterWorkstream = '';
+        this.applyFilters();
+        break;
+      case 'nextGate':
+        this.filterNextGate = '';
+        this.applyFilters();
+        break;
+    }
+  }
+
+  toggleStageFilter(stage: string): void {
+    if (this.stageFilterSet.has(stage)) {
+      this.stageFilterSet.delete(stage);
+    } else {
+      this.stageFilterSet.add(stage);
+    }
+    // Sync filterStage for applyFilters compat — single-value fallback
+    this.filterStage = this.stageFilterSet.size === 1 ? [...this.stageFilterSet][0] : '';
+    this.applyFilters();
+  }
+
+  setAssignedToMeFilter(): void {
+    this.assignedPersonMode = 'my_cycles';
+    this.applyFilters();
+    // Count tap does NOT write to filter memory (D-HubCounts-2026-04-06)
+  }
+
+  setOverdueGateFilter(): void {
+    this.gateStatusFilter = 'overdue';
+    this.applyFilters();
+    // Count tap does NOT write to filter memory
+  }
+
+  onPanelDivisionScopeChange(): void {
+    if (this.divisionScope === 'my')  { this.filterDivision = ''; this.onDivisionFilterChange(); }
+    if (this.divisionScope === 'all') { this.filterDivision = ''; this.onDivisionFilterChange(); }
+    // 'single': wait for user to pick from dropdown
+  }
+
+  private computeHeaderCounts(): void {
+    const currentUserId = this.profile.getCurrentProfile()?.id ?? '';
+    const inactiveFinal: LifecycleStage[] = ['COMPLETE', 'CANCELLED', 'ON_HOLD'];
+    this.activeCycleCount = this.cycles.filter(c => !inactiveFinal.includes(c.current_lifecycle_stage as LifecycleStage)).length;
+    this.myCycleCount     = this.cycles.filter(c =>
+      c.assigned_ds_user_id === currentUserId || c.assigned_cb_user_id === currentUserId
+    ).length;
   }
 }

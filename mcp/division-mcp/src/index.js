@@ -26,6 +26,8 @@ const { get_user_divisions }       = require('./tools/get_user_divisions');
 const { create_user }              = require('./tools/create_user');
 const { update_user }              = require('./tools/update_user');
 const { list_users }               = require('./tools/list_users');
+const { get_maintenance_mode }     = require('./tools/get_maintenance_mode');
+const { set_maintenance_mode }     = require('./tools/set_maintenance_mode');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -63,7 +65,8 @@ app.post('/tools/:toolName', async (req, res) => {
     get_user_divisions,
     create_user,
     update_user,
-    list_users
+    list_users,
+    set_maintenance_mode
   };
 
   if (!tools[toolName]) {
@@ -105,6 +108,14 @@ app.post('/tools/:toolName', async (req, res) => {
   }
 });
 
+// ── Maintenance mode public read (no JWT required) ────────────────────────────
+// Angular bootstrap reads system_config directly from Supabase (D-MaintenanceMode).
+// This endpoint is a secondary path for deployment scripts and health monitors.
+app.get('/maintenance-mode', async (req, res) => {
+  const result = await get_maintenance_mode();
+  return res.status(result.success ? 200 : 500).json(result);
+});
+
 // ── Health check (no JWT required) ───────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'division-mcp', version: '1.0.0' });
@@ -125,7 +136,9 @@ app.get('/tools', (req, res) => {
       { name: 'get_user_divisions',       method: 'POST', path: '/tools/get_user_divisions' },
       { name: 'create_user',              method: 'POST', path: '/tools/create_user' },
       { name: 'update_user',              method: 'POST', path: '/tools/update_user' },
-      { name: 'list_users',               method: 'POST', path: '/tools/list_users' }
+      { name: 'list_users',               method: 'POST', path: '/tools/list_users' },
+      { name: 'set_maintenance_mode',     method: 'POST', path: '/tools/set_maintenance_mode', note: 'Admin JWT required' },
+      { name: 'get_maintenance_mode',     method: 'GET',  path: '/maintenance-mode',           note: 'No JWT required — public endpoint' }
     ]
   });
 });

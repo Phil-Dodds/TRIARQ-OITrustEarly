@@ -13,7 +13,8 @@ import { AppComponent }         from './app.component';
 import { LoginComponent }        from './features/login/login.component';
 import { AuthCallbackComponent } from './features/login/auth-callback.component';
 import { SidebarComponent }      from './shared/components/sidebar/sidebar.component';
-import { BlockedActionComponent } from './shared/components/blocked-action/blocked-action.component';
+import { BlockedActionComponent }    from './shared/components/blocked-action/blocked-action.component';
+import { MaintenanceScreenComponent } from './features/maintenance/maintenance-screen.component';
 
 @NgModule({
   declarations: [
@@ -28,7 +29,8 @@ import { BlockedActionComponent } from './shared/components/blocked-action/block
     ReactiveFormsModule,
     IonicModule.forRoot(),
     AppRoutingModule,
-    BlockedActionComponent      // standalone — imported, not declared
+    BlockedActionComponent,       // standalone — imported, not declared
+    MaintenanceScreenComponent    // standalone — D-MaintenanceMode
   ],
   bootstrap: [AppComponent]
 })
