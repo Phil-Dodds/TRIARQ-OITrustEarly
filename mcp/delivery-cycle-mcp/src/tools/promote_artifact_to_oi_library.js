@@ -85,8 +85,7 @@ async function promote_artifact_to_oi_library(params, caller_user_id) {
   return {
     success: true,
     data: updated,
-    stub_message:
-      'OI Library submission recorded. Full submission workflow (ingestion, indexing, visibility) completes in Build B.'
+    stub_message: 'OI Library submission will be available in Build B.'
   };
 }
 

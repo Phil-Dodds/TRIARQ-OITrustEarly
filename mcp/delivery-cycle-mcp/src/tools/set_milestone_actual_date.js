@@ -85,11 +85,14 @@ async function set_milestone_actual_date(params, caller_user_id) {
     new_date_status = 'overdue';
   }
 
+  // manually_entered: true — this tool is called directly by a user (correction path).
+  // Gate approval path calls update directly, not through this tool.
   const { data: updated, error: updateErr } = await supabase
     .from('cycle_milestone_dates')
     .update({
       actual_date,
-      date_status: new_date_status
+      date_status:      new_date_status,
+      manually_entered: true
     })
     .eq('milestone_id', milestone.milestone_id)
     .select()
@@ -98,6 +101,22 @@ async function set_milestone_actual_date(params, caller_user_id) {
   if (updateErr) {
     return { success: false, error: `Failed to set actual date: ${updateErr.message}` };
   }
+
+  // Append event log — manual entry flagged for audit trail
+  await supabase
+    .from('cycle_event_log')
+    .insert({
+      delivery_cycle_id:  delivery_cycle_id,
+      event_type:         'milestone_actual_date_set_manually',
+      event_description:  `Actual date for gate '${gate_name}' set manually to ${actual_date} (status: ${new_date_status}).`,
+      actor_user_id:      caller_user_id,
+      event_metadata: {
+        gate_name,
+        actual_date,
+        date_status:      new_date_status,
+        manually_entered: true
+      }
+    });
 
   return { success: true, data: updated };
 }

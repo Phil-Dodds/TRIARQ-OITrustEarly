@@ -643,8 +643,8 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
 
         <div style="padding:var(--triarq-space-md);flex:1;">
 
-          <!-- 1. Division filter -->
-          <div style="margin-bottom:var(--triarq-space-lg);">
+          <!-- 1. Division filter — hidden for single-Division users (Fix 3, D-166) -->
+          <div *ngIf="filterDivisionOptions.length > 1" style="margin-bottom:var(--triarq-space-lg);">
             <button type="button"
                     (click)="panelSections.division = !panelSections.division"
                     style="display:flex;align-items:center;justify-content:space-between;
