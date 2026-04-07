@@ -15,7 +15,7 @@ import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@
 import { Router, NavigationEnd } from '@angular/router';
 import { AuthService }           from './core/services/auth.service';
 import { UserProfileService }    from './core/services/user-profile.service';
-import { filter, map }           from 'rxjs/operators';
+import { filter, map, startWith } from 'rxjs/operators';
 import { Observable }            from 'rxjs';
 import { environment }           from '../environments/environment';
 
@@ -59,10 +59,15 @@ export class AppComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    // startWith seeds the initial value for when maintenanceChecked flips true
+    // and the async pipe subscribes after NavigationEnd has already fired.
     this.showSidebar$ = this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
       map(e =>
         this.auth.isAuthenticated() && !e.urlAfterRedirects.startsWith('/login')
+      ),
+      startWith(
+        this.auth.isAuthenticated() && !this.router.url.startsWith('/login')
       )
     );
 
