@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-201**
+**Next available: D-208**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
