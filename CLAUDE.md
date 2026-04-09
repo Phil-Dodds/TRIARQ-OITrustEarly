@@ -307,3 +307,40 @@ Decisions are locked in `decisions-active.md`. Do not re-litigate locked decisio
 | D-167 | Workstream filter: no-workstream and inactive shown as separate options |
 | D-168 | Claude Code must debate/question before building — silent conflict resolution is a build error |
 | D-169 | Decision source tagging + registry protocol — read docs/decision-registry.md before allocating any D-number |
+
+---
+
+## Naming Standard (D-223)
+
+All files, methods, and exports in this codebase follow these five rules. All rules are binary — a file either complies or it does not.
+
+**Rule 1 — File naming:** Files follow `feature-name.type.ts` Angular pattern. The feature name must contain at least one domain noun and one function noun. Example: `delivery-cycle-lifecycle.service.ts` (domain: delivery-cycle, function: lifecycle). `delivery.service.ts` violates this rule — function is missing.
+
+**Rule 2 — No generic feature names:** The following words are banned in file names: `shared`, `common`, `util`, `helper`, `misc`, `data`, `base`. These signal unclear responsibility. Split or rename before committing.
+
+**Rule 3 — Method naming:** Method names follow verb-noun pattern declaring intent. Examples: `approveMilestoneGate()` not `handleMilestone()`. `buildFilterQuery()` not `processData()`. `loadWorkstreamsByScope()` not `getData()`.
+
+**Rule 4 — One export per file:** Each file has one export by default. Two exports signals two responsibilities — split the file. If co-location is genuinely justified, add a comment explaining why before committing.
+
+**Rule 5 — Decision citations:** When a piece of logic implements a specific locked decision, add a comment in this format: `// [plain-language summary of the rule]. Source: D-NNN`. Example: `// User controls milestone status freely — system alerts on divergence but never restricts. Source: D-205`. The plain-language summary is required — the D-number alone is not sufficient.
+
+---
+
+## Responsibility Declaration (D-226)
+
+Before creating any new service or component file, add a one-line responsibility declaration as the first comment in the file. The declaration must contain two parts:
+
+1. What this file is responsible for
+2. What it is NOT responsible for, and where that logic lives instead
+
+Example:
+```
+// Manages milestone date status updates only.
+// Does not handle gate approval logic or cycle stage advancement — those live in delivery-cycle-lifecycle.service.ts.
+```
+
+A declaration that only states what the file DOES is incomplete — the NOT statement is required. Rewrite before committing.
+
+Also include the declaration in the CodeClose output under "New Files Created" so Design has a record of all new file boundaries.
+
+Future sessions treat this declaration as the boundary for the file. If a new piece of logic violates the stated boundary, record it as a CC-decision rather than silently adding it.

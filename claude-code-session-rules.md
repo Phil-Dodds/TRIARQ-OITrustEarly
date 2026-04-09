@@ -191,6 +191,65 @@ decisions, not its mistakes.
 
 ---
 
+## Rule 14 — Pre-Build Component Verification (D-219)
+
+Before modifying any existing component or service file, verify it appears in
+at least one active import or route declaration. A commented-out import does
+not qualify. If a file fails this check, it is a dead file. Do not modify,
+refactor, or delete it. Record it as a CC-decision in this format:
+`CC-NNN: Dead file found — [filename]. Not wired to any active import or route.
+Awaiting Design instruction.` Surface it in the CodeClose file under a
+dedicated "Dead Files Found" section. Phil routes the decision in the next
+Design session.
+
+---
+
+## Rule 15 — Dependency Sequencing (D-222)
+
+Before proposing implementation order on any multi-section spec, identify
+inter-section dependencies and sequence dependent sections as a unit. Dependent
+sections are not independently shippable — they ship together. If Section A
+calls Section B's output, they are one implementation unit regardless of their
+label in the spec. State the dependency reasoning in the implementation plan
+before beginning work.
+
+---
+
+## Rule 16 — Behavior Protection During Code Changes (D-224)
+
+Triggered when modifying a file that contains confirmed working behavior from a
+prior session — including consolidations, extractions, and relocations of
+existing logic. New files and new functions are exempt.
+
+Two tiers:
+- Pure structural (logic unchanged, location only): write tests if none exist,
+  proceed if confident the change is mechanical, note coverage status in
+  CodeClose.
+- Logic-touching (logic changes during restructure): confirmed test baseline
+  required before starting; same tests must pass after the change; no
+  exceptions.
+
+Declare which tier applies in the session output before beginning. Phil can
+declare the type in the session instruction. If type is unclear and Phil has
+not declared it, ask Phil one question before proceeding: "Is this pure
+structural or will logic change?" Phil can override the test requirement
+entirely by stating "no test baseline needed" in the session instruction.
+
+---
+
+## Rule 17 — Triggered Structural Read (D-225)
+
+When a spec instructs you to modify a file not yet touched in the current
+session, before writing any code: read the file and record (1) current line
+count, (2) stated responsibility from the top comment or inferred from content,
+(3) whether it exceeds 300 lines (component threshold) or 400 lines (service
+threshold). Report findings in CodeClose under a "Structural Health" section.
+Do not surface mid-session. Do not block implementation. If a file exceeds the
+threshold, note it and continue — Phil routes oversized files to a dedicated
+refactor session via Design.
+
+---
+
 ## Session Initialization Checklist
 
 At the start of every Claude Code session, read these documents in order before
