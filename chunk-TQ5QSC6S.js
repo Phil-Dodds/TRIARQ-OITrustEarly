@@ -1,0 +1,12 @@
+import{c as o,f as r}from"./chunk-PLB6R2HW.js";import"@angular/core";import{CommonModule as c}from"@angular/common";import*as e from"@angular/core";import*as a from"@angular/common";function m(t,s){if(t&1&&(e.\u0275\u0275elementStart(0,"div",4),e.\u0275\u0275text(1),e.\u0275\u0275elementEnd()),t&2){let n=e.\u0275\u0275nextContext(2);e.\u0275\u0275advance(),e.\u0275\u0275textInterpolate1(" ",n.message," ")}}function p(t,s){if(t&1&&(e.\u0275\u0275elementStart(0,"div",1),e.\u0275\u0275element(1,"ion-spinner",2),e.\u0275\u0275template(2,m,2,1,"div",3),e.\u0275\u0275elementEnd()),t&2){let n=e.\u0275\u0275nextContext();e.\u0275\u0275advance(2),e.\u0275\u0275property("ngIf",n.message)}}var b=(()=>{class t{constructor(){this.visible=!1,this.message=""}static{this.\u0275fac=function(i){return new(i||t)}}static{this.\u0275cmp=e.\u0275\u0275defineComponent({type:t,selectors:[["app-loading-overlay"]],inputs:{visible:"visible",message:"message"},standalone:!0,features:[e.\u0275\u0275StandaloneFeature],decls:1,vars:1,consts:[["style",`position:absolute;
+                inset:0;
+                background:rgba(255,255,255,0.82);
+                z-index:20;
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                justify-content:center;
+                border-radius:10px;`,4,"ngIf"],[2,"position","absolute","inset","0","background","rgba(255,255,255,0.82)","z-index","20","display","flex","flex-direction","column","align-items","center","justify-content","center","border-radius","10px"],["name","crescent",2,"color","var(--triarq-color-primary)","width","32px","height","32px"],["style",`margin-top:var(--triarq-space-sm);
+                  font-size:var(--triarq-text-small);
+                  color:var(--triarq-color-text-secondary);
+                  text-align:center;`,4,"ngIf"],[2,"margin-top","var(--triarq-space-sm)","font-size","var(--triarq-text-small)","color","var(--triarq-color-text-secondary)","text-align","center"]],template:function(i,l){i&1&&e.\u0275\u0275template(0,p,3,1,"div",0),i&2&&e.\u0275\u0275property("ngIf",l.visible)},dependencies:[c,a.NgIf,r,o],encapsulation:2,changeDetection:0})}}return t})();export{b as a};
