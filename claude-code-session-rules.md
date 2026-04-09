@@ -250,6 +250,20 @@ refactor session via Design.
 
 ---
 
+## Rule 18 — Required File Verification at Session Start (D-227)
+
+At session start, after reading START-HERE.md and the session brief, identify
+every file the brief instructs you to read or modify. Verify each exists at the
+expected path before beginning any work. If any required file is missing: record
+a CC-decision (`CC-NNN: Required file missing — [filename]. Expected at [path].
+Cannot proceed with [task].`), skip that task, complete any tasks that don't
+depend on the missing file, and open the CodeClose file with a prominent header:
+`⚠ PARTIAL SESSION — [task name] skipped: [filename] not found at [path].` Do
+not create a substitute from scratch unless the session brief explicitly
+authorizes it.
+
+---
+
 ## Session Initialization Checklist
 
 At the start of every Claude Code session, read these documents in order before
