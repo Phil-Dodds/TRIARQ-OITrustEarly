@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-208**
+**Next available: D-231**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -109,6 +109,16 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-198 | Primary Workflow Clarity — secondary controls visually recessed | Claude Chat | April 2026 | Active |
 | D-199 | Sidebar-Only Navigation — no top nav; section headers at 7+ items | Claude Chat | April 2026 | Active |
 | D-200 | UI Feedback Standard — three patterns only (Guidance/Warning/Error) | Claude Chat | April 2026 | Active |
+| D-219 | Pre-Build Component Verification — read before creating any new component | Claude Chat | April 2026 | Active |
+| D-222 | Dependency Sequencing — schema → MCP → service → component order | Claude Chat | April 2026 | Active |
+| D-223 | Naming Standard — five binary-testable rules for files, methods, exports | Claude Chat | April 2026 | Active |
+| D-224 | Behavior Protection During Code Changes | Claude Chat | April 2026 | Active |
+| D-225 | Triggered Structural Read — structural files read before editing | Claude Chat | April 2026 | Active |
+| D-226 | Responsibility Declaration — required first-comment in all new files | Claude Chat | April 2026 | Active |
+| D-227 | Required File Verification at Session Start | Claude Chat | April 2026 | Active |
+| D-228 | Tier Classification Edit Behavior on Existing Cycles — amber non-blocking warning | Claude Chat | April 2026 | Active |
+| D-229 | Delivery Cycle Field Edit Audit Log — structured event log entry on every update_delivery_cycle call | Claude Chat | April 2026 | Active |
+| D-230 | Cancelled Item Visibility Philosophy — hidden by default, explicit reveal control, no persist (S-009 operative) | Claude Chat | April 2026 | Active |
 
 ---
 
@@ -134,6 +144,8 @@ D-145 through D-147: Pre-existing decisions not yet entered in this registry.
 D-149 through D-150: Pre-existing decisions not yet entered in this registry.
 D-152 through D-153: Pre-existing decisions not yet entered in this registry.
 D-156 through D-162: Pre-existing or open decisions not yet entered in this registry.
+D-201 through D-218: Allocated by Claude Chat / Claude Code in worktree sessions April 2026 — content exists in session outputs and worktree code but not yet backfilled to this registry table.
+D-220 through D-221: Allocated by Claude Chat April 2026 — content not yet backfilled.
 
 These gaps are not available for allocation — the numbers exist in decisions-active.md or
 decisions-archive.md. They are listed here to prevent accidental reuse. A future session
