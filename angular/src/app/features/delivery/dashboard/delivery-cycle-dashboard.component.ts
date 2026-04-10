@@ -503,7 +503,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                      border:1.5px solid var(--triarq-color-primary,#257099);
                      color:var(--triarq-color-primary,#257099);border-radius:999px;
                      padding:4px 12px;font-size:13px;">
-          {{ STAGE_LABEL_MAP[filterStage] ?? filterStage }}
+          {{ stageLabelFor(filterStage) }}
           <button (click)="filterStage='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">x</button>
         </span>
         <span *ngIf="filterTier"
@@ -511,7 +511,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                      border:1.5px solid var(--triarq-color-primary,#257099);
                      color:var(--triarq-color-primary,#257099);border-radius:999px;
                      padding:4px 12px;font-size:13px;">
-          Tier {{ tierLabel(filterTier) }}
+          Tier {{ tierLabel($any(filterTier)) }}
           <button (click)="filterTier='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">x</button>
         </span>
         <span *ngIf="filterWorkstream"
@@ -519,7 +519,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                      border:1.5px solid var(--triarq-color-primary,#257099);
                      color:var(--triarq-color-primary,#257099);border-radius:999px;
                      padding:4px 12px;font-size:13px;">
-          {{ filterWorkstream === '__none__' ? 'No Workstream' : (workstreamName(filterWorkstream) ?? filterWorkstream) }}
+          {{ filterWorkstream === '__none__' ? 'No Workstream' : workstreamName(filterWorkstream) }}
           <button (click)="filterWorkstream='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">x</button>
         </span>
         <span *ngIf="filterGateStatus"
@@ -1735,6 +1735,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   tierLabel(tier: TierClassification): string {
     return tier === 'tier_1' ? '1' : tier === 'tier_2' ? '2' : '3';
+  }
+
+  /** Safe stage label lookup — accepts plain string for filter chip display. */
+  stageLabelFor(stage: string): string {
+    return STAGE_LABEL_MAP[stage as LifecycleStage] ?? stage;
   }
 
   tierPillBg(tier: TierClassification): string {
