@@ -59,6 +59,18 @@ async function get_delivery_cycle(params, caller_user_id) {
     .is('deleted_at', null)
     .single();
 
+  // ── Resolve workstream home division name (Section 2.5 — Division field inheritance) ──
+  let home_division_name = null;
+  if (workstream?.home_division_id) {
+    const { data: divRow } = await supabase
+      .from('divisions')
+      .select('division_name')
+      .eq('division_id', workstream.home_division_id)
+      .is('deleted_at', null)
+      .single();
+    if (divRow) { home_division_name = divRow.division_name; }
+  }
+
   // ── Fetch Jira links ──────────────────────────────────────────────────────
   const { data: jira_links } = await supabase
     .from('jira_links')
@@ -124,7 +136,7 @@ async function get_delivery_cycle(params, caller_user_id) {
       assigned_cb_display_name: cycle.assigned_cb_user_id ? (userMap[cycle.assigned_cb_user_id] ?? null) : null,
       milestone_dates:  milestone_dates       || [],
       gate_records:     enrichedGateRecords,
-      workstream:       workstream            || null,
+      workstream:       workstream ? { ...workstream, home_division_name } : null,
       jira_links:       jira_links            || [],
       artifacts:        artifacts             || []
     }

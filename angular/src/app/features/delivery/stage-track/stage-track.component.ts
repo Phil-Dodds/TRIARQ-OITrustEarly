@@ -52,24 +52,27 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
   imports: [CommonModule],
   template: `
     <!-- ── Full mode ──────────────────────────────────────────────────────── -->
-    <div *ngIf="displayMode === 'full'" style="overflow-x:auto;padding:var(--triarq-space-sm) 0;">
-      <div style="display:flex;align-items:center;min-width:700px;gap:0;">
+    <!-- 20px horizontal padding each side. No overflow scroll — track compresses
+         to fit panel width. Source: build-c-view-correction-spec-2026-04-09 Section 2.2 -->
+    <div *ngIf="displayMode === 'full'"
+         style="padding:var(--triarq-space-sm) 20px;height:80px;overflow:hidden;">
+      <div style="display:flex;align-items:center;width:100%;gap:0;height:100%;">
 
         <ng-container *ngFor="let node of fullTrack; let i = index">
 
-          <!-- Connector line -->
+          <!-- Connector line — no min-width so track compresses to fit panel -->
           <div
             *ngIf="i > 0"
-            [style.background]="connectorFilled(i) ? 'var(--triarq-color-primary)' : 'var(--triarq-color-fog, #e0e0e0)'"
-            style="height:2px;flex:1;min-width:10px;"
+            [style.background]="connectorFilled(i) ? 'var(--triarq-color-primary)' : '#D0D0D0'"
+            style="height:2px;flex:1;"
           ></div>
 
           <!-- Stage node -->
           <div *ngIf="node.type === 'stage'"
-               style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+               style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;">
             <div
               [style.background]="stageCircleBg(node.id)"
-              [style.outline]="isCurrent(node.id) ? '2px solid var(--triarq-color-primary)' : 'none'"
+              [style.outline]="isCurrent(node.id) ? '2px solid #fff' : 'none'"
               [style.outline-offset]="'2px'"
               style="width:28px;height:28px;border-radius:50%;
                      display:flex;align-items:center;justify-content:center;
@@ -80,29 +83,26 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
               <span *ngIf="isCurrent(node.id) && !isComplete(node.id)"
                     style="color:#fff;font-size:10px;font-weight:700;">●</span>
             </div>
-            <span style="font-size:10px;white-space:nowrap;
-                         color:var(--triarq-color-text-secondary);text-align:center;
-                         max-width:52px;overflow:hidden;text-overflow:ellipsis;">
+            <span style="font-size:10px;color:#5A5A5A;text-align:center;
+                         max-width:40px;line-height:1.1;word-break:break-word;">
               {{ node.label }}
             </span>
           </div>
 
-          <!-- Gate node — diamond shape, interactive -->
+          <!-- Gate node — diamond, label above, interactive -->
           <div *ngIf="node.type === 'gate'"
-               style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+               style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;">
+            <span style="font-size:10px;color:#5A5A5A;text-align:center;
+                         max-width:44px;line-height:1.1;word-break:break-word;margin-bottom:2px;">
+              {{ node.label }}
+            </span>
             <div
               [style.background]="gateColor(node.id)"
               [title]="gateTitle(node.id)"
               (click)="onGateClick(node.id)"
-              style="width:22px;height:22px;border-radius:4px;transform:rotate(45deg);
-                     cursor:pointer;display:flex;align-items:center;justify-content:center;
-                     transition:opacity 0.15s;"
+              style="width:24px;height:24px;border-radius:4px;transform:rotate(45deg);
+                     cursor:pointer;transition:opacity 0.15s;"
             ></div>
-            <span style="font-size:9px;white-space:nowrap;max-width:52px;
-                          overflow:hidden;text-overflow:ellipsis;
-                          color:var(--triarq-color-text-secondary);text-align:center;">
-              {{ node.label }}
-            </span>
           </div>
 
         </ng-container>
