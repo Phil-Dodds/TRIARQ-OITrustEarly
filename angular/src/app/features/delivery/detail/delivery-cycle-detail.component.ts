@@ -129,22 +129,29 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <div>
             <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);flex-wrap:wrap;
                         margin-bottom:var(--triarq-space-xs);">
-              <span class="oi-pill"
-                    [style.background]="stagePillBg(cycle.current_lifecycle_stage)"
-                    style="font-size:11px;">
+              <!-- Stage badge — Visual Layout Standards 1.7/3.1: 4px radius, not pill -->
+              <span style="background:var(--triarq-color-primary,#257099);color:#fff;
+                           font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
+                           border-radius:4px;padding:3px 8px;text-transform:uppercase;
+                           letter-spacing:0.5px;">
                 {{ STAGE_LABEL_MAP[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
               </span>
-              <span class="oi-pill"
-                    [style.background]="tierPillBg(cycle.tier_classification)"
-                    style="font-size:11px;">
-                {{ cycle.tier_classification.replace('_',' ').toUpperCase() }}
+              <!-- Tier badge — Visual Layout Standards 1.7/3.1: tier colors, 4px radius -->
+              <span [style.background]="tierBadgeBg(cycle.tier_classification)"
+                    [style.color]="tierBadgeColor(cycle.tier_classification)"
+                    style="font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
+                           border-radius:4px;padding:3px 8px;">
+                Tier {{ tierLabel(cycle.tier_classification) }}
               </span>
             </div>
             <h3 style="margin:0 0 4px 0;">{{ cycle.cycle_title }}</h3>
             <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
               {{ cycle.workstream?.workstream_name ?? cycle.workstream_id }}
               &nbsp;·&nbsp;
-              {{ cycle.division_name ?? cycle.division_id }}
+              <!-- Division inherited from workstream. Source: build-c-view-correction-spec-2026-04-09 Section 2.5 -->
+              <span *ngIf="cycle.workstream?.home_division_name">{{ cycle.workstream!.home_division_name }}</span>
+              <span *ngIf="!cycle.workstream?.home_division_name"
+                    style="color:#9E9E9E;font-style:italic;">Not set</span>
             </div>
 
             <!-- DS / CB assignment row -->
@@ -382,17 +389,23 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           </button>
         </div>
 
-        <!-- Amber warning when not set -->
-        <div *ngIf="!cycle.outcome_statement && !editingOutcome"
-             style="color:var(--triarq-color-sunray,#f5a623);font-size:var(--triarq-text-small);
-                    font-weight:500;margin-bottom:var(--triarq-space-xs);">
-          ⚠ Outcome statement not yet set. Use "Add" to describe what this cycle is expected to deliver.
-        </div>
-
-        <div *ngIf="cycle.outcome_statement && !editingOutcome"
-             style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-primary);
-                    white-space:pre-wrap;">
-          {{ cycle.outcome_statement }}
+        <!-- Outcome Statement display — amber bordered box per Visual Layout Standards 3.3 -->
+        <!-- Box shows for both populated and null; warning text only when null. -->
+        <div *ngIf="!editingOutcome"
+             style="border:1.5px solid var(--triarq-color-sunray,#F2A620);background:#FFFBF0;
+                    border-radius:6px;padding:12px;">
+          <!-- Null state: nudge message -->
+          <div *ngIf="!cycle.outcome_statement"
+               style="color:var(--triarq-color-sunray,#F2A620);font-size:14px;
+                      font-style:italic;font-family:Roboto,sans-serif;">
+            No Outcome Statement set. Required before Brief Review gate.
+          </div>
+          <!-- Populated state: display text -->
+          <div *ngIf="cycle.outcome_statement"
+               style="font-size:14px;font-style:italic;font-family:Roboto,sans-serif;
+                      color:#262626;white-space:pre-wrap;">
+            {{ cycle.outcome_statement }}
+          </div>
         </div>
 
         <!-- Inline edit -->
@@ -492,8 +505,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               </span>
               <div *ngIf="editingMilestoneGate === m.gate_name"
                    style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                <!-- Styled date input per Visual Layout Standards 6.1 -->
                 <input [formControl]="milestoneDateControl" type="date"
-                       class="oi-input" style="font-size:11px;padding:2px 4px;" />
+                       style="background:#fff;border:1.5px solid #D0D0D0;border-radius:5px;
+                              padding:10px;font-size:14px;font-family:Roboto,sans-serif;
+                              outline:none;" />
                 <button class="oi-btn-primary"
                         (click)="saveMilestoneDate(m.gate_name)"
                         [disabled]="savingMilestone"
@@ -532,8 +548,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 <!-- Inline actual date edit (manual entry for data quality path) -->
                 <div *ngIf="editingActualDateGate === m.gate_name"
                      style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                  <!-- Styled date input per Visual Layout Standards 6.1 -->
                   <input [formControl]="actualDateControl" type="date"
-                         class="oi-input" style="font-size:11px;padding:2px 4px;" />
+                         style="background:#fff;border:1.5px solid #D0D0D0;border-radius:5px;
+                                padding:10px;font-size:14px;font-family:Roboto,sans-serif;
+                                outline:none;" />
                   <button class="oi-btn-primary"
                           (click)="saveActualDate(m.gate_name)"
                           [disabled]="savingActualDate"
@@ -645,51 +664,15 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 </div>
               </div>
 
-              <!-- User-editable statuses: not_started | on_track | at_risk -->
+              <!-- Gate status: display-only colored text per Visual Layout Standards 1.7 -->
+              <!-- D-205: status is system-derived from date state model — not user-editable. -->
+              <!-- Source: build-c-view-correction-spec-2026-04-09 Section 2.4 -->
               <div *ngIf="m.date_status !== 'behind' && m.date_status !== 'complete'">
-                <!-- Viewing mode: pill + edit link -->
-                <div *ngIf="editingMilestoneStatus !== m.gate_name"
-                     style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                  <span class="oi-pill"
-                        [style.background]="dateStatusBg(m.date_status)"
-                        [style.color]="dateStatusColor(m.date_status)"
-                        style="font-size:10px;">
-                    {{ dateStatusLabel(m.date_status) }}
-                  </span>
-                  <button (click)="startMilestoneStatusEdit(m)"
-                          style="font-size:10px;color:var(--triarq-color-primary);
-                                 background:none;border:none;cursor:pointer;padding:0;">
-                    Edit
-                  </button>
-                </div>
-                <!-- Inline edit dropdown -->
-                <div *ngIf="editingMilestoneStatus === m.gate_name"
-                     style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
-                  <select [(ngModel)]="milestoneStatusValue"
-                          class="oi-input"
-                          style="font-size:11px;padding:2px 4px;">
-                    <option *ngFor="let opt of milestoneStatusOptions(m.date_status)"
-                            [value]="opt.value">{{ opt.label }}</option>
-                  </select>
-                  <button class="oi-btn-primary"
-                          (click)="saveMilestoneStatus(m.gate_name)"
-                          [disabled]="savingMilestoneStatus"
-                          style="font-size:10px;padding:2px 6px;
-                                 display:flex;align-items:center;gap:4px;">
-                    <ion-spinner *ngIf="savingMilestoneStatus" name="crescent"
-                                 style="width:12px;height:12px;"></ion-spinner>
-                    <span>{{ savingMilestoneStatus ? '…' : 'Set' }}</span>
-                  </button>
-                  <button (click)="cancelMilestoneStatusEdit()"
-                          style="background:none;border:none;cursor:pointer;
-                                 font-size:10px;color:var(--triarq-color-text-secondary);">
-                    ✕
-                  </button>
-                  <div *ngIf="milestoneStatusError"
-                       style="color:var(--triarq-color-error);font-size:10px;margin-top:2px;">
-                    {{ milestoneStatusError }}
-                  </div>
-                </div>
+                <span [style.color]="gateStatusTextColor(m.date_status)"
+                      [style.font-weight]="gateStatusFontWeight(m.date_status)"
+                      style="font-size:13px;">
+                  {{ gateStatusDisplayLabel(m.date_status) }}
+                </span>
               </div>
             </div>
 
@@ -1256,9 +1239,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
         </div><!-- end stage group loop -->
 
+        <!-- Empty state per build-c-view-correction-spec-2026-04-09 Section 2.6 -->
         <div *ngIf="artifactsByStage.length === 0"
-             style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-          No artifact slots found. Artifact type seed data is required.
+             style="font-size:14px;font-style:italic;font-family:Roboto,sans-serif;
+                    color:#9E9E9E;padding:16px;">
+          No artifacts attached yet. Artifact slots become available as the cycle advances through stages.
         </div>
       </div>
 
@@ -2246,6 +2231,50 @@ export class DeliveryCycleDetailComponent implements OnInit {
 
   tierPillBg(tier: TierClassification): string {
     return tier === 'tier_1' ? '#e3f2fd' : tier === 'tier_2' ? '#f3e5f5' : '#e8f5e9';
+  }
+
+  // ── Badge helpers (Visual Layout Standards 1.7/3.1 — 4px radius, not pill) ──
+
+  tierBadgeBg(tier: TierClassification): string {
+    if (tier === 'tier_1') { return '#E3F2FD'; }
+    if (tier === 'tier_2') { return '#E0F2F1'; }
+    return '#FFF3E0'; // tier_3
+  }
+
+  tierBadgeColor(tier: TierClassification): string {
+    if (tier === 'tier_1') { return '#1565C0'; }
+    if (tier === 'tier_2') { return '#00695C'; }
+    return '#E65100'; // tier_3
+  }
+
+  tierLabel(tier: TierClassification): string {
+    if (tier === 'tier_1') { return '1'; }
+    if (tier === 'tier_2') { return '2'; }
+    return '3';
+  }
+
+  // ── Gate status text display (Section 2.4 — display-only per date state model) ──
+
+  /** Gate status text color per Visual Layout Standards 1.7 */
+  gateStatusTextColor(dateStatus: DateStatus): string {
+    if (dateStatus === 'on_track')   { return 'var(--triarq-color-sunray,#F2A620)'; }
+    if (dateStatus === 'at_risk')    { return '#E96127'; }
+    return '#9E9E9E'; // not_started
+  }
+
+  /** Gate status font weight per Visual Layout Standards 1.7 */
+  gateStatusFontWeight(dateStatus: DateStatus): string {
+    return dateStatus === 'not_started' ? '400' : '600';
+  }
+
+  /** Gate status display label (pending/awaiting = Sunray label) */
+  gateStatusDisplayLabel(dateStatus: DateStatus): string {
+    const labels: Record<string, string> = {
+      not_started: 'Not Started',
+      on_track:    'Awaiting Approval',
+      at_risk:     'At Risk'
+    };
+    return labels[dateStatus] ?? dateStatus;
   }
 
   gateStatusBg(status: GateStatus): string {
