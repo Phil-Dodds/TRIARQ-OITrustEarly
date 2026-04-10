@@ -134,3 +134,18 @@ Neither field uses a DB NOT NULL constraint — enforcement lives entirely in th
 Same pattern as workstream assignment (D-165, ARCH-23).
 
 **Phil must run migration 025 in Supabase SQL editor before MCP changes go live.**
+
+---
+
+## CC-007 — Service Worker Disabled (D-237)
+**Date:** 2026-04-10
+**Source:** Claude Code (Session 2026-04-09-D) — required by D-237 for build config change
+**Status:** Active
+
+Service worker registration is disabled for this project. Root cause: service worker caching requires incognito mode to see fresh deployments in UAT environments. No cache invalidation strategy exists.
+
+**Change:** Added `"serviceWorker": false` to the `_build` options in `angular.json`. This applies to all build configurations (production and development). No `ngsw-config.json` was present.
+
+**CLAUDE.md:** Rule 6 added prohibiting service worker re-enablement without an explicit design session decision covering cache invalidation strategy.
+
+**Governing decision:** D-237 (build config changes require CC-decision before committing).
