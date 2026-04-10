@@ -65,7 +65,7 @@ async function get_delivery_cycle(params, caller_user_id) {
     const { data: divRow } = await supabase
       .from('divisions')
       .select('division_name')
-      .eq('division_id', workstream.home_division_id)
+      .eq('id', workstream.home_division_id)
       .is('deleted_at', null)
       .single();
     if (divRow) { home_division_name = divRow.division_name; }
