@@ -1,6 +1,6 @@
 # CLAUDE.md
 Pathways OI Trust | Build C — Delivery Cycle Tracker | April 2026 | CONFIDENTIAL
-Owner: Phil Sappington, EVP Performance & Governance
+Owner: Phil Dodds, EVP Performance & Governance
 
 ---
 
@@ -35,6 +35,70 @@ After `get_session_context` returns:
 2. Read the Master Build Plan
 3. Read the Build C Specification (`build-c-spec.md`)
 4. Begin work
+
+---
+
+## Active Standards — Mandatory Read (D-232)
+
+Read `docs/standards-summary.md` before writing any component code.
+
+Active Standards carry the same force as Non-Negotiable Architectural Rules above.
+A spec element that conflicts with an Active Standard is not valid without a named
+exception decision carrying a D-number.
+
+`docs/standards-summary.md` contains the operative Rule and Conformance test for each
+Active Standard. Full rationale for each Standard lives in `standards.md` (canonical
+document — available via session zip).
+
+When a spec cites a Standard (e.g. "Governing standards: S-006"), find that Standard
+in `docs/standards-summary.md` and confirm the implementation will pass its Conformance
+test before writing code. If it will not pass, raise per Rule 4.
+
+---
+
+## Permanent Reference Documents (D-234)
+
+After reading this file, verify every document in this list exists in the repo at the
+specified path. If any document is missing: **stop immediately and report which
+document is missing before writing any code.**
+
+Required documents:
+- `docs/standards-summary.md` — Active Standards reference (D-232)
+- `docs/build-c-visual-layout-standards.md` — Visual layout and token rules
+
+This list is maintained by Design sessions. When a new permanent reference document
+is added, a CLAUDE.md update instruction adds it to this list.
+
+---
+
+## Session Type and Reading Order (D-235, D-236, D-238)
+
+Every session brief includes a SESSION TYPE declaration. Read it before opening
+any files.
+
+**NEW BUILD session:**
+1. Read session brief completely
+2. Read permanent reference documents (docs/standards-summary.md,
+   docs/build-c-visual-layout-standards.md)
+3. Read the target state spec
+4. Build from spec
+
+**MODIFICATION session:**
+1. Read session brief completely — including the delta instruction section
+2. Read permanent reference documents
+3. Read the target state spec
+4. **Only then** open existing component files — and only to extract:
+   - CC-decision comments
+   - Auth/guard logic
+   - Error handling patterns
+   Discard all other existing patterns. Build from the delta instruction.
+
+Opening existing component files before completing steps 1–3 in a MODIFICATION
+session is a Rule 4 violation. The existing implementation is not a design reference
+for redesigned surfaces.
+
+If a session brief flags a surface as MODIFICATION but provides no delta instruction
+for that surface: stop and raise per Rule 4 before proceeding.
 
 ---
 
@@ -105,6 +169,18 @@ If Claude Code finds a collision (number taken by a different decision), it take
 Claude Chat-originated decisions are tagged `| Source: Claude Chat |`. When Phil asks Claude Code to commit a chat-originated decision, Claude Code follows the same allocation protocol and notes the chat origin in the source tag.
 
 This rule exists to prevent silent collision of D-numbers between Claude Code and Claude Chat sessions. Full protocol in `docs/decision-registry.md`. Decision D-169.
+
+**Rule 6 — No Service Worker.**
+Service worker registration is disabled for this project. `angular.json` must have
+`"serviceWorker": false` for all build configurations. Do not enable it in any build
+configuration without an explicit design session decision covering cache invalidation
+strategy. If `ngsw-config.json` exists, remove it.
+
+**Rule 7 — Build Configuration Changes Require CC-Decision (D-237).**
+Any change to `angular.json`, `package.json` (new dependencies), or any other build
+configuration file requires a CC-decision recorded before committing. No silent build
+configuration changes. Binary-testable: did the commit that changed `angular.json` or
+`package.json` include a corresponding CC-decision entry? Yes = compliant. No = violation.
 
 ---
 
