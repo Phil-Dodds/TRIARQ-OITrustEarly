@@ -2,11 +2,10 @@
 // Route: /delivery/cycles  (moved from /delivery — D-172)
 // Spec: build-c-spec Section 5.2
 //
-// Displays all Delivery Cycles visible to the current user.
-// Row columns: cycle title + headline, lifecycle stage, workstream, tier,
-//              condensed track, Pilot Start Date, Production Release Date.
-// Filters: stage, tier, workstream. Sorting: title, stage, tier.
-// Create button for DS, Phil, and Admin roles.
+// 5-column grid (Contract 1, 2026-04-10): Tier dot | Division | Cycle Name | Outcome | Stage | Team
+// Row tap opens right panel (S-005/S-006) — no full-page navigation.
+// Filters: stage, tier, workstream, gate status, assigned person, division.
+// Create button for DS, Phil, Admin, and CB roles.
 //
 // D-93: DeliveryService only — no Supabase.
 // D-140: Blocked action UX.
@@ -15,6 +14,11 @@
 // Session 2026-03-24-C: headline 6-rule priority logic.
 // Design Principle 4.2: every screen states What/Why/How for empty states.
 // D-178: Three-tier loading standard applied — Tier 1 skeleton, Tier 2 button spinner, Tier 3 overlay.
+// CC-Decision-2026-04-10-A: Division chip uses division_name from MCP response. display_name_short gap
+//   to be resolved when ARCH-29 propagation reaches list query.
+// CC-Decision-2026-04-10-B: filterGateStatus 'overdue' value confirmed present — no addition needed.
+// CC-Decision-2026-04-10-C: Team cell lift-up per Phil direction — CB / Workstream / DS; if all null
+//   render single muted "Unassigned" label.
 
 import {
   Component,
@@ -41,6 +45,7 @@ import { UserProfileService }   from '../../../core/services/user-profile.servic
 import { StageTrackComponent }  from '../stage-track/stage-track.component';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { WorkstreamPickerComponent } from '../../../shared/pickers/workstream-picker/workstream-picker.component';
+import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 import {
   DeliveryCycle,
   Division,
@@ -88,9 +93,13 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
   selector: 'app-delivery-cycle-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent, WorkstreamPickerComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent, WorkstreamPickerComponent, DeliveryCycleDetailComponent],
   template: `
-    <div style="max-width:1200px;margin:var(--triarq-space-2xl) auto;padding:0 var(--triarq-space-md);">
+    <!-- S-006: flex container — grid left, detail panel right when cycle selected -->
+    <div style="display:flex;align-items:flex-start;min-height:100%;">
+
+    <!-- ── Left: grid content ─────────────────────────────────────────────── -->
+    <div style="flex:1;min-width:0;max-width:1200px;padding:var(--triarq-space-2xl) var(--triarq-space-md);">
 
       <!-- ── Back link (D-172) ───────────────────────────────────────────── -->
       <div style="margin-bottom:var(--triarq-space-sm);">
@@ -639,23 +648,18 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         </div>
       </div>
 
-            <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
+            <!-- ── Loading skeleton (D-178 Tier 1) — 5-column ────────────────── -->
       <div *ngIf="loading">
         <div *ngFor="let _ of skeletonRows"
-             style="display:grid;grid-template-columns:48px 90px minmax(150px,1.5fr) minmax(100px,1fr) 150px minmax(120px,1.2fr) 80px 80px 90px 100px 110px;
-                    gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
+             style="display:grid;grid-template-columns:48px 88px 180px 1fr 118px 128px;
+                    gap:8px;padding:16px;
                     border-bottom:1px solid var(--triarq-color-border);align-items:center;">
-          <ion-skeleton-text animated style="height:20px;border-radius:999px;width:40px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:20px;border-radius:999px;width:60px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:40px;border-radius:50%;width:40px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:20px;border-radius:4px;width:70px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:14px;border-radius:4px;width:60px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:14px;border-radius:4px;width:60px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:14px;border-radius:4px;width:70px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:14px;border-radius:4px;width:70px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:16px;border-radius:4px;width:16px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:40px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:40px;border-radius:4px;"></ion-skeleton-text>
         </div>
       </div>
 
@@ -670,11 +674,12 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         </div>
       </div>
 
-      <!-- ── Column header row — D-196/D-172: 11 columns, always rendered ──────────── -->
-      <!-- D-172 column set locked. D-196: headers always shown even when no rows.        -->
+      <!-- ── Column header row — D-196: 5 columns, always rendered ─────────────── -->
+      <!-- Contract 1 2026-04-10: 5-column design supersedes D-172 11-column for this view. -->
+      <!-- D-196: headers always shown even when no rows.                                   -->
       <div *ngIf="!loading"
            style="display:grid;
-                  grid-template-columns:48px 90px minmax(150px,1.5fr) minmax(100px,1fr) 150px minmax(120px,1.2fr) 80px 80px 90px 100px 110px;
+                  grid-template-columns:48px 88px 180px 1fr 118px 128px;
                   gap:8px;padding:8px 16px;
                   font-size:13px;font-weight:500;color:#fff;text-transform:uppercase;
                   background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;">
@@ -682,46 +687,49 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         <span>Division</span>
         <span>Cycle Name</span>
         <span>Outcome</span>
-        <span>Stage Track</span>
-        <span>Headline</span>
-        <span>DS</span>
-        <span>CB</span>
-        <span>Pilot Start</span>
-        <span>Prod Release</span>
-        <span>Workstream</span>
+        <span>Stage</span>
+        <span>Team</span>
       </div>
 
-      <!-- ── Cycle rows — D-172: 11-column format ─────────────────────────────────── -->
-      <!-- Col order: tier-dot | division | cycle-title+tier-badge | outcome |            -->
-      <!-- stage-track | headline | ds | cb | pilot-start | prod-release | workstream    -->
+      <!-- ── Cycle rows — 5-column (Contract 1 2026-04-10) ───────────────────────── -->
+      <!-- Col order: tier-dot | division | cycle-name+tier-badge | outcome | stage(3-line) | team -->
+      <!-- S-005: full-row tap opens right panel (not routerLink navigation). Source: Contract 1.  -->
       <div *ngFor="let cycle of filtered">
         <div
-          [routerLink]="['/delivery', cycle.delivery_cycle_id]"
+          (click)="openCyclePanel(cycle.delivery_cycle_id)"
+          [style.background]="selectedCycleId === cycle.delivery_cycle_id ? '#E8F0FE' : ''"
+          [style.border-left]="selectedCycleId === cycle.delivery_cycle_id ? '3px solid var(--triarq-color-primary,#257099)' : '3px solid transparent'"
           style="display:grid;
-                 grid-template-columns:48px 90px minmax(150px,1.5fr) minmax(100px,1fr) 150px minmax(120px,1.2fr) 80px 80px 90px 100px 110px;
+                 grid-template-columns:48px 88px 180px 1fr 118px 128px;
                  gap:8px;padding:16px;
                  border-bottom:1px solid #E8E8E8;
-                 align-items:center;cursor:pointer;min-height:88px;"
-          (mouseenter)="$any($event.currentTarget).style.background='#F0F4F8'"
-          (mouseleave)="$any($event.currentTarget).style.background=''">
+                 align-items:start;cursor:pointer;min-height:88px;"
+          (mouseenter)="$any($event.currentTarget).style.background = selectedCycleId === cycle.delivery_cycle_id ? '#E8F0FE' : '#F0F4F8'"
+          (mouseleave)="$any($event.currentTarget).style.background = selectedCycleId === cycle.delivery_cycle_id ? '#E8F0FE' : ''">
 
-          <!-- Col 1: Tier dot (D-197) -->
-          <div style="display:flex;justify-content:center;align-items:center;">
+          <!-- Col 1: Tier dot — 48px contained circle (D-197) -->
+          <div style="display:flex;justify-content:center;align-items:flex-start;padding-top:4px;">
             <div [style.background]="tierDotColor(cycle.tier_classification)"
-                 style="width:40px;height:40px;border-radius:50%;flex-shrink:0;"></div>
+                 style="width:48px;height:48px;border-radius:50%;flex-shrink:0;"></div>
           </div>
 
-          <!-- Col 2: Division -->
-          <div style="font-size:13px;color:var(--triarq-color-primary,#257099);
-                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
-               title="{{ cycle.division_name ?? '' }}">
-            {{ cycle.division_name ?? '&#8212;' }}
+          <!-- Col 2: Division chip — D-203: always chip, empty chip if null -->
+          <!-- CC-Decision-2026-04-10-A: using division_name from MCP; display_name_short pending ARCH-29 -->
+          <div style="overflow:hidden;padding-top:6px;">
+            <span style="display:inline-block;padding:2px 6px;border-radius:4px;
+                         background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:11px;
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                         max-width:80px;cursor:pointer;"
+                  title="{{ cycle.division_name ?? '' }}">
+              {{ cycle.division_name ?? '' }}
+            </span>
           </div>
 
-          <!-- Col 3: Cycle Title + Tier badge (per spec 1.7: radius 4px not pill) -->
+          <!-- Col 3: Cycle Name (2-line clamp) + Tier badge below -->
           <div>
             <div style="font-size:14px;font-weight:600;color:#1E1E1E;margin-bottom:4px;
-                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                        display:-webkit-box;-webkit-line-clamp:2;
+                        -webkit-box-orient:vertical;overflow:hidden;"
                  title="{{ cycle.cycle_title }}">
               {{ cycle.cycle_title }}
             </div>
@@ -733,10 +741,10 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
             </span>
           </div>
 
-          <!-- Col 4: Outcome Statement (1-line truncation, amber dot when null) -->
-          <div style="display:flex;align-items:center;gap:4px;overflow:hidden;">
+          <!-- Col 4: Outcome — 1-line truncation, amber dot when null -->
+          <div style="display:flex;align-items:flex-start;gap:4px;overflow:hidden;padding-top:2px;">
             <span *ngIf="!cycle.outcome_statement"
-                  style="display:inline-block;width:8px;height:8px;flex-shrink:0;
+                  style="display:inline-block;width:8px;height:8px;flex-shrink:0;margin-top:4px;
                          border-radius:50%;background:var(--triarq-color-sunray,#F2A620);"
                   title="Outcome Statement not set"></span>
             <span style="font-size:13px;color:#5A5A5A;
@@ -745,9 +753,10 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
             </span>
           </div>
 
-          <!-- Col 5: Stage Track Condensed (5 gate diamonds, stage name above) -->
-          <div (click)="$event.stopPropagation()">
-            <div style="font-size:12px;color:#5A5A5A;margin-bottom:4px;
+          <!-- Col 5: Stage — 3-line structure per Contract 1 spec -->
+          <!-- Line 1: stage label | Line 2: condensed track | Line 3: headline text -->
+          <div style="overflow:hidden;" (click)="$event.stopPropagation(); openCyclePanel(cycle.delivery_cycle_id)">
+            <div style="font-size:13px;color:#5A5A5A;margin-bottom:2px;
                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
               {{ STAGE_LABEL_MAP[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
             </div>
@@ -756,65 +765,34 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
               [gateStateMap]="buildGateStateMap(cycle)"
               displayMode="condensed"
             ></app-stage-track>
+            <div style="font-size:11px;margin-top:2px;
+                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+                 [style.color]="headlineColor(cycle)">
+              {{ headline(cycle) }}
+            </div>
           </div>
 
-          <!-- Col 6: Headline text -->
-          <div style="font-size:14px;
-                      display:-webkit-box;-webkit-line-clamp:2;
-                      -webkit-box-orient:vertical;overflow:hidden;"
-               [style.color]="headlineColor(cycle)">
-            {{ headline(cycle) }}
-          </div>
-
-          <!-- Col 7: Assigned DS chip (D-181) -->
-          <div>
-            <span *ngIf="cycle.assigned_ds_display_name"
-                  style="display:inline-block;padding:2px 6px;border-radius:999px;
-                         background:rgba(37,112,153,0.08);color:#5A5A5A;
-                         font-size:11px;white-space:nowrap;overflow:hidden;
-                         text-overflow:ellipsis;max-width:100%;">
-              {{ cycle.assigned_ds_display_name }}
-            </span>
-            <span *ngIf="!cycle.assigned_ds_display_name"
-                  style="font-size:12px;color:var(--triarq-color-sunray,#F2A620);">&#8212;</span>
-          </div>
-
-          <!-- Col 8: Assigned CB chip (D-181) -->
-          <div>
-            <span *ngIf="cycle.assigned_cb_display_name"
-                  style="display:inline-block;padding:2px 6px;border-radius:999px;
-                         background:rgba(37,112,153,0.08);color:#5A5A5A;
-                         font-size:11px;white-space:nowrap;overflow:hidden;
-                         text-overflow:ellipsis;max-width:100%;">
-              {{ cycle.assigned_cb_display_name }}
-            </span>
-            <span *ngIf="!cycle.assigned_cb_display_name"
-                  style="font-size:12px;color:#9E9E9E;">&#8212;</span>
-          </div>
-
-          <!-- Col 9: Pilot Start Date (go_to_deploy milestone) -->
-          <div style="font-size:13px;"
-               [style.color]="dateColor(cycle, 'go_to_deploy')">
-            {{ dateDisplay(cycle, 'go_to_deploy') || '&#8212;' }}
-          </div>
-
-          <!-- Col 10: Production Release Date (go_to_release milestone) -->
-          <div style="font-size:13px;"
-               [style.color]="dateColor(cycle, 'go_to_release')">
-            {{ dateDisplay(cycle, 'go_to_release') || '&#8212;' }}
-          </div>
-
-          <!-- Col 11: Delivery Workstream chip (D-181) -->
-          <div>
-            <span *ngIf="cycle.workstream"
-                  style="display:inline-block;padding:2px 6px;border-radius:999px;
-                         background:rgba(37,112,153,0.08);color:var(--triarq-color-primary,#257099);
-                         font-size:11px;white-space:nowrap;overflow:hidden;
-                         text-overflow:ellipsis;max-width:100%;"
-                  title="{{ cycle.workstream.workstream_name }}">
-              {{ cycle.workstream.workstream_name }}
-            </span>
-            <span *ngIf="!cycle.workstream" style="font-size:12px;color:#9E9E9E;">&#8212;</span>
+          <!-- Col 6: Team — CB / Workstream / DS, lift-up when null (CC-Decision-2026-04-10-C) -->
+          <div style="font-size:12px;overflow:hidden;">
+            <ng-container *ngIf="cycle.assigned_cb_display_name || cycle.workstream || cycle.assigned_ds_display_name; else unassignedTeamCell">
+              <div *ngIf="cycle.assigned_cb_display_name"
+                   style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                          color:#1E1E1E;margin-bottom:1px;">
+                {{ cycle.assigned_cb_display_name }}
+              </div>
+              <div *ngIf="cycle.workstream"
+                   style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#5A5A5A;">
+                {{ cycle.workstream.workstream_name }}
+              </div>
+              <div *ngIf="cycle.assigned_ds_display_name"
+                   style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                          color:#5A5A5A;margin-top:1px;">
+                {{ cycle.assigned_ds_display_name }}
+              </div>
+            </ng-container>
+            <ng-template #unassignedTeamCell>
+              <span style="color:#9E9E9E;font-style:italic;font-size:11px;">Unassigned</span>
+            </ng-template>
           </div>
 
         </div>
@@ -824,7 +802,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <!-- Column headers always render above this. Empty state row spans all columns. -->
       <div *ngIf="!loading && !loadError && filtered.length === 0"
            style="display:grid;
-                  grid-template-columns:48px 90px minmax(150px,1.5fr) minmax(100px,1fr) 150px minmax(120px,1.2fr) 80px 80px 90px 100px 110px;
+                  grid-template-columns:48px 88px 180px 1fr 118px 128px;
                   border-bottom:1px solid #E8E8E8;">
         <div style="grid-column:1/-1;min-height:200px;
                     display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -877,11 +855,26 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         cycle{{ cycles.length === 1 ? '' : 's' }}
         <span *ngIf="sortField"> · sorted by {{ sortLabel() }}</span>
       </div>
+    </div><!-- /left panel -->
+
+    <!-- ── Right: Detail Panel — S-005/S-006 right panel on row tap ──────── -->
+    <div *ngIf="selectedCycleId"
+         style="width:60%;border-left:1px solid #E0E0E0;background:#fff;
+                position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;">
+      <app-delivery-cycle-detail
+        [cycleId]="selectedCycleId"
+        (close)="closePanel()">
+      </app-delivery-cycle-detail>
     </div>
+
+    </div><!-- /flex container -->
   `
 })
 export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   private profileSub?: Subscription;
+
+  // S-005/S-006: right panel — selected cycle drives detail panel visibility
+  selectedCycleId: string | null = null;
 
   cycles:            DeliveryCycle[]       = [];
   filtered:          DeliveryCycle[]       = [];
@@ -1884,6 +1877,21 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (diff < 0)  { return 'var(--triarq-color-error, #d32f2f)'; }   // overdue
     if (diff <= 4) { return 'var(--triarq-color-sunray, #f5a623)'; }  // within 4 days
     return 'var(--triarq-color-text-secondary)';
+  }
+
+  // ── Right panel — S-005/S-006 push/pop navigation ──────────────────────────
+
+  /** Open the detail right panel for the given cycle. S-008: parent re-queries on close. */
+  openCyclePanel(cycleId: string): void {
+    this.selectedCycleId = cycleId;
+    this.cdr.markForCheck();
+  }
+
+  /** Close the detail right panel. S-008: unconditionally re-query cycles on close. */
+  closePanel(): void {
+    this.selectedCycleId = null;
+    this.loadCycles(); // S-008: parent always re-queries on stack pop
+    this.cdr.markForCheck();
   }
 
   ngOnDestroy(): void {

@@ -1,17 +1,16 @@
 // delivery-cycle-detail.component.ts — DeliveryCycleDetailComponent
-// Route: /delivery/:cycle_id
-// Spec: build-c-spec Section 5.3
+// Route: /delivery/:cycle_id  (also used as embedded right panel via @Input cycleId)
+// Spec: build-c-spec Section 5.3 | Contract 1 2026-04-10
 //
-// Sections:
-//  - Cycle header (title, owner, division, workstream, tier, stage)
-//  - Outcome Statement (inline edit, amber warning when null)
-//  - StageTrackComponent Full mode — gate nodes open gate record panel
-//  - Session 2026-03-24-F: amber warning when gate cleared but actual_date not recorded
-//  - Milestone dates panel (5 rows, target date editable, actual date displayed)
-//  - Gate record panel (opens on gate node click, explains what gates are when empty)
-//  - Artifact slots panel (by stage, with placeholders + attach button)
-//  - Jira sync panel
-//  - Event log (append-only, chronological, bottom)
+// Contract 1 changes: S-005/S-006 View surface — display-only fields, action zone.
+//   - @Input() cycleId: accepts id from dashboard panel (route fallback for direct URL)
+//   - @Output() close: emits when panel close is triggered (dashboard handles S-008 re-query)
+//   - Panel mode: no full-page wrapper; route mode: max-width:860px per approved plan
+//   - Inline field editing removed. Action zone added (5 actions per contract).
+//   - Gate rows: Milestone Status 5-color dot + Gate Approval Status narrative (D-244/D-245).
+//   - Gate sub-panel preserved (workflow actions, not field editing).
+//   - All content sections preserved: Stage Track, Outcome display, Milestones display,
+//     Gate sub-panel, Artifacts, Jira sync, Event log.
 //
 // D-93: DeliveryService only — no Supabase.
 // D-140: All blocked actions state what is blocked AND what would need to change.
@@ -21,7 +20,12 @@ import {
   Component,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
-  OnInit
+  OnInit,
+  OnChanges,
+  SimpleChanges,
+  Input,
+  Output,
+  EventEmitter
 } from '@angular/core';
 import { CommonModule }       from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
@@ -119,8 +123,21 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       </div>
     </div>
 
-    <div *ngIf="!loading && cycle" style="max-width:1100px;margin:var(--triarq-space-xl) auto;
-                                          padding:0 var(--triarq-space-md);">
+    <!-- Panel-aware wrapper: no max-width in panel mode; 860px max in route mode. Source: approved plan 2026-04-10 -->
+    <div *ngIf="!loading && cycle"
+         [ngStyle]="panelMode
+           ? {padding: 'var(--triarq-space-md)'}
+           : {'max-width': '860px', margin: 'var(--triarq-space-xl) auto', padding: '0 var(--triarq-space-md)'}">
+
+      <!-- Panel close button — only in panel mode (S-006) -->
+      <div *ngIf="panelMode"
+           style="display:flex;justify-content:flex-end;margin-bottom:var(--triarq-space-sm);">
+        <button (click)="close.emit()"
+                style="background:none;border:none;cursor:pointer;
+                       color:var(--triarq-color-text-secondary);font-size:20px;
+                       line-height:1;padding:4px 8px;"
+                title="Close panel">✕</button>
+      </div>
 
       <!-- ── Cycle Header ───────────────────────────────────────────────── -->
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
@@ -154,174 +171,86 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     style="color:#9E9E9E;font-style:italic;">Not set</span>
             </div>
 
-            <!-- DS / CB assignment row -->
+            <!-- DS / CB display row — display only in View. Edit available via Edit Cycle action (Contract 2). -->
             <div style="display:flex;gap:var(--triarq-space-lg);margin-top:var(--triarq-space-sm);
                         flex-wrap:wrap;">
-
-              <!-- Delivery Specialist -->
               <div style="font-size:var(--triarq-text-small);">
                 <span style="color:var(--triarq-color-text-secondary);">DS: </span>
-                <span *ngIf="!editingDs">
-                  <span *ngIf="cycle.assigned_ds_user_id" style="font-weight:500;">
-                    {{ cycle.assigned_ds_display_name ?? cycle.assigned_ds_user_id }}
-                  </span>
-                  <span *ngIf="!cycle.assigned_ds_user_id"
-                        style="color:var(--triarq-color-text-secondary);font-style:italic;">
-                    Unassigned
-                  </span>
-                  <button (click)="startDsEdit()"
-                          style="margin-left:6px;font-size:10px;color:var(--triarq-color-primary);
-                                 background:none;border:none;cursor:pointer;padding:0;">
-                    {{ cycle.assigned_ds_user_id ? 'Change' : 'Assign' }}
-                  </button>
+                <span *ngIf="cycle.assigned_ds_user_id" style="font-weight:500;">
+                  {{ cycle.assigned_ds_display_name ?? cycle.assigned_ds_user_id }}
                 </span>
-                <span *ngIf="editingDs" style="display:inline-flex;align-items:center;gap:4px;">
-                  <select [formControl]="dsControl" class="oi-input"
-                          style="font-size:11px;padding:2px 4px;">
-                    <option value="">— Unassign —</option>
-                    <option *ngFor="let u of allUsers" [value]="u.id">{{ u.display_name }}</option>
-                  </select>
-                  <button class="oi-btn-primary" (click)="saveDs()"
-                          [disabled]="savingDs"
-                          style="font-size:10px;padding:2px 8px;
-                                 display:flex;align-items:center;gap:4px;">
-                    <ion-spinner *ngIf="savingDs" name="crescent" style="width:12px;height:12px;"></ion-spinner>
-                    <span>Set</span>
-                  </button>
-                  <button (click)="cancelDsEdit()"
-                          style="background:none;border:none;cursor:pointer;
-                                 color:var(--triarq-color-text-secondary);font-size:12px;">✕</button>
-                </span>
-                <span *ngIf="dsError"
-                      style="color:var(--triarq-color-error);font-size:10px;margin-left:4px;">
-                  {{ dsError }}
-                </span>
+                <span *ngIf="!cycle.assigned_ds_user_id"
+                      style="color:var(--triarq-color-text-secondary);font-style:italic;">Unassigned</span>
               </div>
-
-              <!-- Capability Builder -->
               <div style="font-size:var(--triarq-text-small);">
                 <span style="color:var(--triarq-color-text-secondary);">CB: </span>
-                <span *ngIf="!editingCb">
-                  <span *ngIf="cycle.assigned_cb_user_id" style="font-weight:500;">
-                    {{ cycle.assigned_cb_display_name ?? cycle.assigned_cb_user_id }}
-                  </span>
-                  <span *ngIf="!cycle.assigned_cb_user_id"
-                        style="color:var(--triarq-color-text-secondary);font-style:italic;">
-                    Unassigned
-                  </span>
-                  <button (click)="startCbEdit()"
-                          style="margin-left:6px;font-size:10px;color:var(--triarq-color-primary);
-                                 background:none;border:none;cursor:pointer;padding:0;">
-                    {{ cycle.assigned_cb_user_id ? 'Change' : 'Assign' }}
-                  </button>
+                <span *ngIf="cycle.assigned_cb_user_id" style="font-weight:500;">
+                  {{ cycle.assigned_cb_display_name ?? cycle.assigned_cb_user_id }}
                 </span>
-                <span *ngIf="editingCb" style="display:inline-flex;align-items:center;gap:4px;">
-                  <select [formControl]="cbControl" class="oi-input"
-                          style="font-size:11px;padding:2px 4px;">
-                    <option value="">— Unassign —</option>
-                    <option *ngFor="let u of allUsers" [value]="u.id">{{ u.display_name }}</option>
-                  </select>
-                  <button class="oi-btn-primary" (click)="saveCb()"
-                          [disabled]="savingCb"
-                          style="font-size:10px;padding:2px 8px;
-                                 display:flex;align-items:center;gap:4px;">
-                    <ion-spinner *ngIf="savingCb" name="crescent" style="width:12px;height:12px;"></ion-spinner>
-                    <span>Set</span>
-                  </button>
-                  <button (click)="cancelCbEdit()"
-                          style="background:none;border:none;cursor:pointer;
-                                 color:var(--triarq-color-text-secondary);font-size:12px;">✕</button>
-                </span>
-                <span *ngIf="cbError"
-                      style="color:var(--triarq-color-error);font-size:10px;margin-left:4px;">
-                  {{ cbError }}
-                </span>
+                <span *ngIf="!cycle.assigned_cb_user_id"
+                      style="color:var(--triarq-color-text-secondary);font-style:italic;">Unassigned</span>
               </div>
-
             </div>
           </div>
-          <!-- Action button group: Advance | Regress | On Hold / Resume -->
-          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
-            <button
-              *ngIf="canAdvance"
-              class="oi-btn-primary"
-              (click)="advanceStage()"
-              [disabled]="advancing || holdBusy || regressBusy"
-              style="white-space:nowrap;font-size:var(--triarq-text-small);
-                     display:flex;align-items:center;gap:6px;">
-              <ion-spinner *ngIf="advancing" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-              <span>{{ advancing ? 'Advancing…' : 'Advance Stage' }}</span>
+          <!-- ── Action Zone (5 actions per Contract 1 2026-04-10) ──────────── -->
+          <!-- Actions: Edit Cycle | Submit Gate | Regress Stage | Cancel | Un-cancel -->
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;">
+
+            <!-- 1. Edit Cycle — always shown; stub navigates to edit route (Contract 2) -->
+            <button (click)="editCycleStub()"
+                    class="oi-btn-primary"
+                    style="white-space:nowrap;font-size:var(--triarq-text-small);">
+              ✎ Edit Cycle
             </button>
 
-            <!-- Secondary actions row -->
-            <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-
-              <!-- Regress Stage — D-179 two-call pattern -->
-              <button *ngIf="canRegress && !regressConfirming"
-                      (click)="initiateRegress()"
-                      [disabled]="regressBusy || holdBusy || advancing"
-                      style="font-size:11px;color:var(--triarq-color-text-secondary);
-                             background:none;border:1px solid var(--triarq-color-border);
-                             border-radius:5px;padding:3px 8px;cursor:pointer;">
-                <ion-spinner *ngIf="regressBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
-                ↩ Regress Stage
-              </button>
-
-              <!-- Resume from Hold — only when ON_HOLD -->
-              <button *ngIf="cycle.current_lifecycle_stage === 'ON_HOLD'"
-                      (click)="resumeFromHold()"
-                      [disabled]="holdBusy"
-                      style="font-size:11px;color:var(--triarq-color-primary);
-                             background:none;border:1px solid var(--triarq-color-primary);
-                             border-radius:5px;padding:3px 8px;cursor:pointer;
-                             display:flex;align-items:center;gap:4px;">
-                <ion-spinner *ngIf="holdBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
-                ▶ Resume from Hold
-              </button>
-
-              <!-- Place on Hold — only when NOT on hold and NOT terminal -->
-              <button *ngIf="canPlaceOnHold && !showHoldReason"
-                      (click)="showHoldReason = true"
-                      style="font-size:11px;color:var(--triarq-color-text-secondary);
-                             background:none;border:1px solid var(--triarq-color-border);
-                             border-radius:5px;padding:3px 8px;cursor:pointer;">
-                ⏸ Place on Hold
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Hold reason inline form ─────────────────────────────────────── -->
-        <div *ngIf="showHoldReason"
-             style="margin-top:var(--triarq-space-xs);padding:var(--triarq-space-xs);
-                    border:1px solid var(--triarq-color-border);border-radius:5px;
-                    background:var(--triarq-color-background-subtle);">
-          <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;">
-            Place cycle on hold
-          </div>
-          <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:6px;">
-            The current stage will be preserved and restored when the cycle resumes.
-          </div>
-          <input [formControl]="holdReasonCtrl" class="oi-input"
-                 placeholder="Hold reason (optional)"
-                 style="font-size:var(--triarq-text-small);margin-bottom:6px;width:100%;" />
-          <div style="display:flex;gap:6px;">
-            <button class="oi-btn-primary"
-                    (click)="placeOnHold()"
-                    [disabled]="holdBusy"
-                    style="font-size:11px;padding:3px 10px;display:flex;align-items:center;gap:4px;">
-              <ion-spinner *ngIf="holdBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
-              {{ holdBusy ? 'Placing…' : 'Confirm Hold' }}
+            <!-- 2. Submit Gate for Approval — when pending gate exists and caller can submit -->
+            <button *ngIf="pendingGateForSubmit && callerCanSubmitGates && !gateActionBusy"
+                    (click)="submitGate(pendingGateForSubmit)"
+                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
+                           background:none;border:1px solid var(--triarq-color-primary);
+                           border-radius:5px;padding:3px 8px;cursor:pointer;">
+              ↑ Submit Gate for Approval
             </button>
-            <button (click)="showHoldReason = false; holdReasonCtrl.reset(); holdError = ''"
-                    style="font-size:11px;background:none;border:none;cursor:pointer;
-                           color:var(--triarq-color-text-secondary);">
-              Cancel
+            <button *ngIf="pendingGateForSubmit && callerCanSubmitGates && gateActionBusy"
+                    disabled
+                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
+                           background:none;border:1px solid var(--triarq-color-primary);
+                           border-radius:5px;padding:3px 8px;
+                           display:flex;align-items:center;gap:4px;">
+              <ion-spinner name="crescent" style="width:10px;height:10px;"></ion-spinner>
+              Submitting…
             </button>
-          </div>
-          <div *ngIf="holdError"
-               style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
-            {{ holdError }}
+
+            <!-- 3. Regress Stage — canRegress, D-179 two-call pattern preserved -->
+            <button *ngIf="canRegress && !regressConfirming"
+                    (click)="initiateRegress()"
+                    [disabled]="regressBusy"
+                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-text-secondary);
+                           background:none;border:1px solid var(--triarq-color-border);
+                           border-radius:5px;padding:3px 8px;cursor:pointer;
+                           display:flex;align-items:center;gap:4px;">
+              <ion-spinner *ngIf="regressBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
+              ↩ Regress Stage
+            </button>
+
+            <!-- 4. Cancel Cycle — not terminal, D-183 two-step inline confirm -->
+            <button *ngIf="canCancelCycle && !cancelConfirming"
+                    (click)="cancelConfirming = true"
+                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-error);
+                           background:none;border:1px solid var(--triarq-color-error);
+                           border-radius:5px;padding:3px 8px;cursor:pointer;">
+              ✕ Cancel Cycle
+            </button>
+
+            <!-- 5. Un-cancel Cycle — CANCELLED stage only -->
+            <button *ngIf="cycle.current_lifecycle_stage === 'CANCELLED' && !uncancelConfirming"
+                    (click)="uncancelConfirming = true"
+                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
+                           background:none;border:1px solid var(--triarq-color-primary);
+                           border-radius:5px;padding:3px 8px;cursor:pointer;">
+              ↺ Un-cancel Cycle
+            </button>
+
           </div>
         </div>
 
@@ -365,71 +294,89 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           </div>
         </div>
 
-        <!-- Advance error — D-140 -->
-        <div *ngIf="advanceError"
-             style="margin-top:var(--triarq-space-xs);font-size:var(--triarq-text-small);">
-          <span style="color:var(--triarq-color-error);font-weight:500;">{{ advanceError }}</span>
-          <span style="color:var(--triarq-color-text-secondary);margin-left:6px;">
-            Clear the required gate before advancing. If the gate shows as blocked,
-            reactivate the Workstream first.
-          </span>
+        <!-- ── Cancel Cycle confirm panel — D-183 two-step ───────────────── -->
+        <div *ngIf="cancelConfirming"
+             style="margin-top:var(--triarq-space-xs);padding:var(--triarq-space-xs);
+                    border:1px solid var(--triarq-color-error);border-radius:5px;
+                    background:#FFF5F5;">
+          <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;
+                      color:var(--triarq-color-error);">
+            Cancel this cycle?
+          </div>
+          <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:6px;">
+            The cycle will be marked CANCELLED. You can un-cancel it later from this panel.
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="oi-btn-primary"
+                    (click)="cancelCycleAction()"
+                    [disabled]="cancelBusy"
+                    style="font-size:11px;padding:3px 10px;background:var(--triarq-color-error);
+                           display:flex;align-items:center;gap:4px;">
+              <ion-spinner *ngIf="cancelBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
+              {{ cancelBusy ? 'Cancelling…' : 'Confirm Cancel' }}
+            </button>
+            <button (click)="cancelConfirming = false; cancelError = ''"
+                    style="font-size:11px;background:none;border:none;cursor:pointer;
+                           color:var(--triarq-color-text-secondary);">
+              Keep Active
+            </button>
+          </div>
+          <div *ngIf="cancelError"
+               style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
+            {{ cancelError }}
+          </div>
         </div>
+
+        <!-- ── Un-cancel Cycle confirm panel — D-183 two-step ────────────── -->
+        <div *ngIf="uncancelConfirming"
+             style="margin-top:var(--triarq-space-xs);padding:var(--triarq-space-xs);
+                    border:1px solid var(--triarq-color-primary);border-radius:5px;
+                    background:#F0F7FF;">
+          <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;">
+            Restore this cycle?
+          </div>
+          <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:6px;">
+            The cycle will be returned to BRIEF stage and can resume the delivery workflow.
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="oi-btn-primary"
+                    (click)="uncancelCycleAction()"
+                    [disabled]="uncancelBusy"
+                    style="font-size:11px;padding:3px 10px;display:flex;align-items:center;gap:4px;">
+              <ion-spinner *ngIf="uncancelBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
+              {{ uncancelBusy ? 'Restoring…' : 'Confirm Restore' }}
+            </button>
+            <button (click)="uncancelConfirming = false; uncancelError = ''"
+                    style="font-size:11px;background:none;border:none;cursor:pointer;
+                           color:var(--triarq-color-text-secondary);">
+              Cancel
+            </button>
+          </div>
+          <div *ngIf="uncancelError"
+               style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
+            {{ uncancelError }}
+          </div>
+        </div>
+
       </div>
 
-      <!-- ── Outcome Statement ──────────────────────────────────────────── -->
+      <!-- ── Outcome Statement — display only in View (S-005). Edit via Edit Cycle. ── -->
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
-        <div style="display:flex;align-items:center;justify-content:space-between;
-                    margin-bottom:var(--triarq-space-xs);">
-          <span style="font-weight:500;font-size:var(--triarq-text-body);">Outcome Statement</span>
-          <button *ngIf="!editingOutcome"
-                  (click)="startOutcomeEdit()"
-                  style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
-                         background:none;border:none;cursor:pointer;padding:0;">
-            {{ cycle.outcome_statement ? 'Edit' : 'Add' }}
-          </button>
+        <div style="font-weight:500;font-size:var(--triarq-text-body);margin-bottom:var(--triarq-space-xs);">
+          Outcome Statement
         </div>
-
-        <!-- Outcome Statement display — amber bordered box per Visual Layout Standards 3.3 -->
-        <!-- Box shows for both populated and null; warning text only when null. -->
-        <div *ngIf="!editingOutcome"
-             style="border:1.5px solid var(--triarq-color-sunray,#F2A620);background:#FFFBF0;
+        <!-- Amber bordered box per Visual Layout Standards 3.3. Warning text when null. -->
+        <div style="border:1.5px solid var(--triarq-color-sunray,#F2A620);background:#FFFBF0;
                     border-radius:6px;padding:12px;">
-          <!-- Null state: nudge message -->
           <div *ngIf="!cycle.outcome_statement"
                style="color:var(--triarq-color-sunray,#F2A620);font-size:14px;
                       font-style:italic;font-family:Roboto,sans-serif;">
             No Outcome Statement set. Required before Brief Review gate.
           </div>
-          <!-- Populated state: display text -->
           <div *ngIf="cycle.outcome_statement"
                style="font-size:14px;font-style:italic;font-family:Roboto,sans-serif;
                       color:#262626;white-space:pre-wrap;">
             {{ cycle.outcome_statement }}
-          </div>
-        </div>
-
-        <!-- Inline edit -->
-        <div *ngIf="editingOutcome">
-          <textarea
-            [formControl]="outcomeControl"
-            class="oi-input"
-            rows="3"
-            placeholder="Describe the outcome this cycle is expected to deliver…"
-            style="width:100%;resize:vertical;"
-          ></textarea>
-          <div style="margin-top:var(--triarq-space-xs);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-            <button class="oi-btn-primary" (click)="saveOutcome()" [disabled]="savingOutcome"
-                    style="display:flex;align-items:center;gap:6px;">
-              <ion-spinner *ngIf="savingOutcome" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-              <span>{{ savingOutcome ? 'Saving…' : 'Save' }}</span>
-            </button>
-            <button (click)="cancelOutcomeEdit()"
-                    style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
-                           background:none;border:none;cursor:pointer;">Cancel</button>
-            <span *ngIf="outcomeError"
-                  style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);">
-              {{ outcomeError }}
-            </span>
           </div>
         </div>
       </div>
@@ -468,212 +415,69 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   margin-bottom:var(--triarq-space-md);">
 
         <!-- ── Milestone Dates ──────────────────────────────────────────── -->
-        <!-- Item 1 (Part 3): 4-column grid: Gate | Target Date | Actual Date | Status -->
-        <!-- Status column: editable dropdown for not_started/on_track/at_risk;          -->
-        <!--   Behind = muted system-set label; Complete = Unset Complete link.          -->
+        <!-- D-244: Milestone Status shown as 5-color dot indicator per gate row.    -->
+        <!-- D-245: Gate Approval Status as contextual narrative text.               -->
+        <!-- Display-only in View (S-005). Target/Actual date editing in Edit Cycle. -->
         <div class="oi-card">
           <div style="font-weight:500;margin-bottom:4px;">Milestone Dates</div>
           <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
                       margin-bottom:var(--triarq-space-sm);">
-            Click a Target Date to edit it. Actual Date is set automatically when a gate is cleared.
+            Actual date is set automatically when a gate is cleared.
+            Target dates and milestone status are editable via Edit Cycle.
           </div>
 
+          <!-- Gate row: Gate + Approval Status narrative | Target Date | Actual Date | Milestone Status dot -->
+          <!-- D-244: 5-color dot for Milestone Status. D-245: Approval Status as narrative text.         -->
+          <!-- Display-only in View (S-005). Target date editing and status override in Edit Cycle.        -->
           <div *ngFor="let m of cycle.milestone_dates; trackBy: trackByMilestoneId"
-               style="display:grid;grid-template-columns:2fr 1fr 1fr 1.4fr;
-                      gap:var(--triarq-space-sm);padding:var(--triarq-space-xs) 0;
+               style="display:grid;grid-template-columns:2fr 1fr 1fr 100px;
+                      gap:var(--triarq-space-sm);padding:12px 0;
                       border-bottom:1px solid var(--triarq-color-border);
                       font-size:var(--triarq-text-small);align-items:start;">
 
-            <span style="font-weight:500;padding-top:2px;">{{ GATE_LABELS[m.gate_name] }}</span>
-
-            <!-- Target Date cell with inline edit -->
+            <!-- Col 1: Gate name + Gate Approval Status narrative (D-245) -->
             <div>
-              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">
-                Target Date
-              </div>
-              <span *ngIf="editingMilestoneGate !== m.gate_name && m.target_date"
-                    [style.color]="milestoneTargetColor(m)"
-                    style="text-decoration:underline dotted;cursor:pointer;"
-                    (click)="startMilestoneEdit(m)"
-                    title="Click to edit target date">
-                {{ m.target_date }}
-              </span>
-              <span *ngIf="editingMilestoneGate !== m.gate_name && !m.target_date"
-                    style="color:var(--triarq-color-primary);cursor:pointer;font-size:10px;"
-                    (click)="startMilestoneEdit(m)">
-                Set date
-              </span>
-              <div *ngIf="editingMilestoneGate === m.gate_name"
-                   style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
-                <!-- Styled date input per Visual Layout Standards 6.1 -->
-                <input [formControl]="milestoneDateControl" type="date"
-                       style="background:#fff;border:1.5px solid #D0D0D0;border-radius:5px;
-                              padding:10px;font-size:14px;font-family:Roboto,sans-serif;
-                              outline:none;" />
-                <button class="oi-btn-primary"
-                        (click)="saveMilestoneDate(m.gate_name)"
-                        [disabled]="savingMilestone"
-                        style="font-size:10px;padding:2px 6px;white-space:nowrap;
-                               display:flex;align-items:center;gap:4px;">
-                  <ion-spinner *ngIf="savingMilestone" name="crescent" style="width:12px;height:12px;"></ion-spinner>
-                  <span>{{ savingMilestone ? '…' : 'Set' }}</span>
-                </button>
-                <button (click)="cancelMilestoneEdit()"
-                        style="background:none;border:none;cursor:pointer;
-                               font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-                  ✕
-                </button>
-              </div>
-              <div *ngIf="milestoneError && editingMilestoneGate === m.gate_name"
-                   style="color:var(--triarq-color-error);font-size:10px;margin-top:2px;">
-                {{ milestoneError }}
+              <span style="font-weight:500;font-size:14px;">{{ GATE_LABELS[m.gate_name] }}</span>
+              <div *ngIf="gateApprovalNarrative(m.gate_name)"
+                   [style.color]="gateApprovalNarrativeColor(m.gate_name)"
+                   style="font-size:11px;margin-top:3px;">
+                {{ gateApprovalNarrative(m.gate_name) }}
               </div>
             </div>
 
-            <!-- Actual Date column -->
+            <!-- Col 2: Target Date — display only -->
             <div>
-              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">
-                Actual Date
-              </div>
-              <!-- Normal display: actual date present and not manually editing -->
-              <div *ngIf="!isMissingActualDate(m.gate_name) || editingActualDateGate === m.gate_name; else missingActualBlock">
-                <span *ngIf="editingActualDateGate !== m.gate_name"
-                      [style.color]="m.actual_date
-                        ? (m.actual_date <= (m.target_date ?? m.actual_date)
-                            ? 'var(--triarq-color-text-secondary)'
-                            : 'var(--triarq-color-error)')
-                        : 'var(--triarq-color-text-secondary)'">
-                  {{ m.actual_date ?? '—' }}
-                </span>
-                <!-- Inline actual date edit (manual entry for data quality path) -->
-                <div *ngIf="editingActualDateGate === m.gate_name"
-                     style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
-                  <!-- Styled date input per Visual Layout Standards 6.1 -->
-                  <input [formControl]="actualDateControl" type="date"
-                         style="background:#fff;border:1.5px solid #D0D0D0;border-radius:5px;
-                                padding:10px;font-size:14px;font-family:Roboto,sans-serif;
-                                outline:none;" />
-                  <button class="oi-btn-primary"
-                          (click)="saveActualDate(m.gate_name)"
-                          [disabled]="savingActualDate"
-                          style="font-size:10px;padding:2px 6px;white-space:nowrap;
-                                 display:flex;align-items:center;gap:4px;">
-                    <ion-spinner *ngIf="savingActualDate" name="crescent" style="width:12px;height:12px;"></ion-spinner>
-                    <span>{{ savingActualDate ? '…' : 'Set' }}</span>
-                  </button>
-                  <button (click)="cancelActualDateEdit()"
-                          style="background:none;border:none;cursor:pointer;
-                                 font-size:10px;color:var(--triarq-color-text-secondary);">
-                    ✕
-                  </button>
-                  <div *ngIf="actualDateError"
-                       style="color:var(--triarq-color-error);font-size:10px;margin-top:2px;width:100%;">
-                    {{ actualDateError }}
-                  </div>
-                </div>
-              </div>
-              <!-- ⚠ row-level warning: gate approved, actual_date missing (data quality path) -->
-              <ng-template #missingActualBlock>
-                <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
-                  <span style="color:var(--triarq-color-sunray,#f5a623);font-size:12px;"
-                        title="Actual date missing for an approved Gate">⚠</span>
-                  <span style="color:var(--triarq-color-text-secondary);font-size:10px;">—</span>
-                  <button (click)="startActualDateEdit(m.gate_name)"
-                          style="font-size:10px;color:var(--triarq-color-primary);
-                                 background:none;border:none;cursor:pointer;padding:0;">
-                    Add
-                  </button>
-                </div>
-              </ng-template>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Target Date</div>
+              <span *ngIf="m.target_date" [style.color]="milestoneTargetColor(m)">{{ m.target_date }}</span>
+              <span *ngIf="!m.target_date" style="color:#9E9E9E;">—</span>
             </div>
 
-            <!-- Status column — Item 1 (Part 3) -->
+            <!-- Col 3: Actual Date — display only; warn if gate approved but no actual date -->
             <div>
-              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:4px;">
-                Status
-              </div>
+              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Actual Date</div>
+              <span *ngIf="m.actual_date"
+                    [style.color]="m.actual_date <= (m.target_date ?? m.actual_date)
+                      ? 'var(--triarq-color-text-secondary)'
+                      : 'var(--triarq-color-error)'">
+                {{ m.actual_date }}
+              </span>
+              <span *ngIf="!m.actual_date && isMissingActualDate(m.gate_name)"
+                    style="color:var(--triarq-color-sunray,#f5a623);"
+                    title="Gate approved but actual date not recorded">⚠ missing</span>
+              <span *ngIf="!m.actual_date && !isMissingActualDate(m.gate_name)"
+                    style="color:#9E9E9E;">—</span>
+            </div>
 
-              <!-- Behind: system-set, not user-editable -->
-              <div *ngIf="m.date_status === 'behind'">
-                <span class="oi-pill"
-                      [style.background]="dateStatusBg('behind')"
-                      [style.color]="dateStatusColor('behind')"
-                      style="font-size:10px;">Behind</span>
-                <div style="font-size:10px;color:var(--triarq-color-text-secondary);
-                            font-style:italic;margin-top:3px;">
-                  System-set — change target date to re-plan
-                </div>
-              </div>
-
-              <!-- Complete: show pill + Unset Complete link -->
-              <div *ngIf="m.date_status === 'complete'">
-                <span class="oi-pill"
-                      [style.background]="dateStatusBg('complete')"
-                      [style.color]="dateStatusColor('complete')"
-                      style="font-size:10px;">Complete</span>
-                <!-- Inline Unset Complete confirmation (D-183 / Principle 13) -->
-                <div *ngIf="unsetCompleteGate !== m.gate_name">
-                  <button (click)="startUnsetComplete(m.gate_name)"
-                          style="font-size:10px;color:var(--triarq-color-text-secondary);
-                                 background:none;border:none;cursor:pointer;padding:0;
-                                 margin-top:3px;text-decoration:underline;">
-                    Unset Complete
-                  </button>
-                </div>
-                <!-- Confirmation form — requires reason ≥ 10 chars (D-183) -->
-                <div *ngIf="unsetCompleteGate === m.gate_name"
-                     style="margin-top:6px;padding:8px;background:var(--triarq-color-background-subtle);
-                            border-radius:5px;border:1px solid var(--triarq-color-border);">
-                  <div style="font-size:11px;font-weight:500;margin-bottom:4px;
-                               color:var(--triarq-color-text-primary);">
-                    Unsetting Complete will remove the recorded Gate clearance date and return this Milestone to Not Started. This cannot be undone without reapproving the Gate.
-                  </div>
-                  <div style="font-size:10px;color:var(--triarq-color-text-secondary);margin-bottom:6px;">
-                    The change is logged in the cycle event log.
-                  </div>
-                  <label style="display:block;font-size:10px;margin-bottom:2px;">
-                    Reason <span style="color:var(--triarq-color-error);">*</span>
-                    <span style="color:var(--triarq-color-text-secondary);font-weight:400;"> (min 10 chars)</span>
-                  </label>
-                  <textarea [formControl]="unsetCompleteReason"
-                            class="oi-input"
-                            rows="2"
-                            style="font-size:11px;width:100%;resize:vertical;"
-                            placeholder="Required for audit trail — describe why this Gate clearance is being reversed.">
-                  </textarea>
-                  <div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
-                    <button class="oi-btn-primary"
-                            (click)="confirmUnsetComplete()"
-                            [disabled]="unsetCompleteReason.invalid || unsetCompleteSaving"
-                            style="font-size:10px;padding:2px 8px;
-                                   display:flex;align-items:center;gap:4px;">
-                      <ion-spinner *ngIf="unsetCompleteSaving" name="crescent"
-                                   style="width:12px;height:12px;"></ion-spinner>
-                      <span>{{ unsetCompleteSaving ? '…' : 'Confirm' }}</span>
-                    </button>
-                    <button (click)="cancelUnsetComplete()"
-                            style="background:none;border:none;cursor:pointer;
-                                   font-size:10px;color:var(--triarq-color-text-secondary);">
-                      Cancel
-                    </button>
-                  </div>
-                  <div *ngIf="unsetCompleteError"
-                       style="color:var(--triarq-color-error);font-size:10px;margin-top:4px;">
-                    {{ unsetCompleteError }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Gate status: display-only colored text per Visual Layout Standards 1.7 -->
-              <!-- D-205: status is system-derived from date state model — not user-editable. -->
-              <!-- Source: build-c-view-correction-spec-2026-04-09 Section 2.4 -->
-              <div *ngIf="m.date_status !== 'behind' && m.date_status !== 'complete'">
-                <span [style.color]="gateStatusTextColor(m.date_status)"
-                      [style.font-weight]="gateStatusFontWeight(m.date_status)"
-                      style="font-size:13px;">
-                  {{ gateStatusDisplayLabel(m.date_status) }}
-                </span>
-              </div>
+            <!-- Col 4: Milestone Status 5-color dot + label (D-244) -->
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span [style.background]="milestoneStatusDotColor(m.date_status)"
+                    style="display:inline-block;width:10px;height:10px;
+                           border-radius:50%;flex-shrink:0;">
+              </span>
+              <span [style.color]="milestoneStatusDotColor(m.date_status)"
+                    style="font-size:12px;font-weight:500;">
+                {{ gateStatusDisplayLabel(m.date_status) }}
+              </span>
             </div>
 
           </div><!-- end *ngFor milestone rows -->
@@ -1394,7 +1198,15 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
     </div>
   `
 })
-export class DeliveryCycleDetailComponent implements OnInit {
+export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
+
+  /** Panel mode: cycleId provided as @Input from dashboard. Route mode: read from ActivatedRoute. */
+  @Input() cycleId?: string;
+  /** Emitted when user clicks the panel close button. Dashboard handles S-008 re-query. */
+  @Output() close = new EventEmitter<void>();
+
+  /** True when component is embedded as a right panel (cycleId provided via @Input). */
+  get panelMode(): boolean { return !!this.cycleId; }
 
   cycle:         DeliveryCycle | null    = null;
   events:        CycleEventLogEntry[]    = [];
@@ -1459,6 +1271,14 @@ export class DeliveryCycleDetailComponent implements OnInit {
   regressBusy        = false;
   regressError       = '';
 
+  // Cancel / Un-cancel (Contract 1 action zone, D-183 two-step pattern)
+  cancelConfirming   = false;
+  cancelBusy         = false;
+  cancelError        = '';
+  uncancelConfirming = false;
+  uncancelBusy       = false;
+  uncancelError      = '';
+
   // DS / CB assignment
   allUsers:   User[] = [];
   editingDs   = false;
@@ -1511,10 +1331,14 @@ export class DeliveryCycleDetailComponent implements OnInit {
       display_name: ['', Validators.required],
       external_url: ['', Validators.required]
     });
-    const cycleId = this.route.snapshot.paramMap.get('cycle_id');
-    if (cycleId) { this.loadCycle(cycleId); }
-    // Load user list for DS/CB picker dropdowns
-    this.loadAllUsers();
+    const id = this.cycleId ?? this.route.snapshot.paramMap.get('cycle_id');
+    if (id) { this.loadCycle(id); }
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['cycleId'] && !changes['cycleId'].firstChange && this.cycleId) {
+      this.loadCycle(this.cycleId);
+    }
   }
 
   private loadAllUsers(): void {
@@ -1635,6 +1459,60 @@ export class DeliveryCycleDetailComponent implements OnInit {
   get canPlaceOnHold(): boolean {
     const blocked: LifecycleStage[] = ['COMPLETE', 'CANCELLED', 'ON_HOLD'];
     return !!this.cycle && !blocked.includes(this.cycle.current_lifecycle_stage);
+  }
+
+  // Contract 1: Cancel Cycle — available when not CANCELLED and not COMPLETE.
+  get canCancelCycle(): boolean {
+    const terminal: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
+    return !!this.cycle && !terminal.includes(this.cycle.current_lifecycle_stage);
+  }
+
+  // Contract 1: Submit Gate for Approval shortcut — next pending gate for current stage.
+  // Returns null when no gate is pending or gate is already submitted/approved.
+  get pendingGateForSubmit(): GateName | null {
+    if (!this.cycle) { return null; }
+    const nextGate = NEXT_GATE_BY_STAGE[this.cycle.current_lifecycle_stage as LifecycleStage];
+    if (!nextGate) { return null; }
+    const record = this.cycle.gate_records?.find(r => r.gate_name === nextGate);
+    if (record?.gate_status === 'pending' || record?.gate_status === 'approved') { return null; }
+    return nextGate;
+  }
+
+  // D-244: Milestone Status 5-color dot — maps date_status to color token.
+  milestoneStatusDotColor(dateStatus: DateStatus | undefined): string {
+    const map: Record<string, string> = {
+      not_started: '#9E9E9E',
+      on_track:    '#2E7D32',
+      at_risk:     '#F2A620',
+      behind:      '#D32F2F',
+      complete:    '#257099'
+    };
+    return map[dateStatus ?? 'not_started'] ?? '#9E9E9E';
+  }
+
+  // D-245: Gate Approval Status as contextual narrative text.
+  gateApprovalNarrative(gateName: GateName): string {
+    const record = this.cycle?.gate_records?.find(r => r.gate_name === gateName);
+    if (!record) { return ''; }
+    switch (record.gate_status) {
+      case 'pending':  return 'Under Review — awaiting decision';
+      case 'approved': return 'Approved';
+      case 'returned': return 'Returned for revision';
+      case 'blocked':  return 'Blocked — workstream inactive';
+      default:         return '';
+    }
+  }
+
+  // D-245: Color for Gate Approval Status narrative.
+  gateApprovalNarrativeColor(gateName: GateName): string {
+    const record = this.cycle?.gate_records?.find(r => r.gate_name === gateName);
+    switch (record?.gate_status) {
+      case 'approved': return 'var(--triarq-color-primary)';
+      case 'returned': return 'var(--triarq-color-error)';
+      case 'blocked':  return 'var(--triarq-color-error)';
+      case 'pending':  return 'var(--triarq-color-sunray,#F2A620)';
+      default:         return 'var(--triarq-color-text-secondary)';
+    }
   }
 
   /**
@@ -1943,6 +1821,67 @@ export class DeliveryCycleDetailComponent implements OnInit {
       error: (err: { error?: string }) => {
         this.holdError = err.error ?? 'Could not resume cycle from hold.';
         this.holdBusy  = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // ── Contract 1 action zone methods ────────────────────────────────────────
+
+  // Edit Cycle stub — Contract 2 will implement the edit route.
+  // Source: Contract 1 action zone item 1, 2026-04-10.
+  editCycleStub(): void {
+    // Stub: Edit Cycle route not yet built. Contract 2 scope.
+    window.alert('Edit Cycle — available in the next release.');
+  }
+
+  // Cancel Cycle action — D-183 two-step pattern. State: cancelConfirming guards the button.
+  cancelCycleAction(): void {
+    if (!this.cycle) { return; }
+    this.cancelBusy  = true;
+    this.cancelError = '';
+    this.cdr.markForCheck();
+
+    this.delivery.cancelCycle(this.cycle.delivery_cycle_id).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.cycle           = res.data;
+          this.cancelConfirming = false;
+        } else {
+          this.cancelError = res.error ?? 'Cancel failed. Please try again.';
+        }
+        this.cancelBusy = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.cancelError = 'Cancel failed. Please try again.';
+        this.cancelBusy  = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // Un-cancel Cycle action — D-183 two-step pattern. State: uncancelConfirming guards the button.
+  uncancelCycleAction(): void {
+    if (!this.cycle) { return; }
+    this.uncancelBusy  = true;
+    this.uncancelError = '';
+    this.cdr.markForCheck();
+
+    this.delivery.uncancelCycle(this.cycle.delivery_cycle_id).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.cycle             = res.data;
+          this.uncancelConfirming = false;
+        } else {
+          this.uncancelError = res.error ?? 'Restore failed. Please try again.';
+        }
+        this.uncancelBusy = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.uncancelError = 'Restore failed. Please try again.';
+        this.uncancelBusy  = false;
         this.cdr.markForCheck();
       }
     });

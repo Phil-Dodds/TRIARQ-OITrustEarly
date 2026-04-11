@@ -132,6 +132,14 @@ export class DeliveryService {
     return this.mcp.call<DeliveryCycle>('delivery', 'resume_cycle_from_hold', { delivery_cycle_id });
   }
 
+  cancelCycle(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'cancel_delivery_cycle', { delivery_cycle_id });
+  }
+
+  uncancelCycle(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'uncancel_delivery_cycle', { delivery_cycle_id });
+  }
+
   setOutcomeStatement(params: {
     delivery_cycle_id: string;
     outcome_statement: string;
