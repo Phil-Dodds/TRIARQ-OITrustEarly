@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["angular:styles/component:css;0f12f3fb35f93a9e6e8c4c570fd2fd1a8a477a9ca443df3ee5cce9d2b000aa9a;C:/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/.claude/worktrees/vibrant-bhabha/angular/src/app/features/home/components/my-delivery-cycles-card.component.ts"],
-  "sourcesContent": ["h4 { margin: 0 0 var(--triarq-space-md) 0; }"],
-  "mappings": ";AAAA;AAAK,UAAQ,EAAE,EAAE,IAAI,mBAAmB;AAAG;",
-  "names": []
-}

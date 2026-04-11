@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["angular:styles/component:css;f7c5eec747ab66a9f0cdcb877b52626de1e4072f19d6b3b8f7357ee53585ba37;C:/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/.claude/worktrees/vibrant-bhabha/angular/src/app/features/home/components/system-health-card.component.ts"],
-  "sourcesContent": ["\n    h4 { margin: 0 0 var(--triarq-space-md) 0; font-size: var(--triarq-text-h4); }\n    .oi-health-stats { display: flex; gap: var(--triarq-space-lg); }\n    .oi-stat { display: flex; flex-direction: column; align-items: center; }\n    .oi-stat-value { font-size: var(--triarq-text-h3); font-weight: var(--triarq-font-weight-bold); color: var(--triarq-color-primary); }\n    .oi-stat-label { font-size: var(--triarq-text-caption); color: var(--triarq-color-text-secondary); }\n    .oi-card-empty { color: var(--triarq-color-text-secondary); font-size: var(--triarq-text-small); }\n  "],
-  "mappings": ";AACI;AAAK,UAAQ,EAAE,EAAE,IAAI,mBAAmB;AAAG,aAAW,IAAI;AAAmB;AAC7E,CAAC;AAAkB,WAAS;AAAM,OAAK,IAAI;AAAoB;AAC/D,CAAC;AAAU,WAAS;AAAM,kBAAgB;AAAQ,eAAa;AAAQ;AACvE,CAAC;AAAgB,aAAW,IAAI;AAAmB,eAAa,IAAI;AAA4B,SAAO,IAAI;AAAyB;AACpI,CAAC;AAAgB,aAAW,IAAI;AAAwB,SAAO,IAAI;AAAgC;AACnG,CAAC;AAAgB,SAAO,IAAI;AAAgC,aAAW,IAAI;AAAsB;",
-  "names": []
-}

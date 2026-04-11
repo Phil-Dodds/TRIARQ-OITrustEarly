@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["src/app/features/oi-library/oi-library.module.ts"],
-  "sourcesContent": ["// oi-library.module.ts — OILibraryModule (lazy-loaded, D-143)\r\n\r\nimport { NgModule }     from '@angular/core';\r\nimport { CommonModule } from '@angular/common';\r\nimport { RouterModule } from '@angular/router';\r\nimport { IonicModule }  from '@ionic/angular';\r\n\r\n@NgModule({\r\n  imports: [\r\n    CommonModule,\r\n    IonicModule,\r\n    RouterModule.forChild([\r\n      { path: '', loadComponent: () => import('./oi-library.component').then(c => c.OILibraryComponent) },\r\n      { path: ':id', loadComponent: () => import('./artifact-detail.component').then(c => c.ArtifactDetailComponent) }\r\n    ])\r\n  ]\r\n})\r\nexport class OILibraryModule {}\r\n"],
-  "mappings": ";;;;;;;;;;;;;;;;;;;;;;;;AAEA,SAAS,gBAAoB;AAC7B,SAAS,oBAAoB;AAC7B,SAAS,oBAAoB;;AAavB,IAAO,kBAAP,MAAO,iBAAe;;;uBAAf,kBAAe;IAAA;EAAA;;2EAAf,iBAAe,CAAA;EAAA;;;MARxB;MACA;MACA,aAAa,SAAS;QACpB,EAAE,MAAM,IAAI,eAAe,MAAM,OAAO,oCAAwB,EAAE,KAAK,OAAK,EAAE,kBAAkB,EAAC;QACjG,EAAE,MAAM,OAAO,eAAe,MAAM,OAAO,yCAA6B,EAAE,KAAK,OAAK,EAAE,uBAAuB,EAAC;OAC/G;IAAC,EAAA,CAAA;EAAA;;",
-  "names": []
-}
