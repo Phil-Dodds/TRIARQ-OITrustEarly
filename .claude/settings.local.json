@@ -56,7 +56,8 @@
       "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/mcp\" ls \"$BASE/\" ls \"$BASE/delivery-cycle-mcp/src/tools/\")",
       "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/mcp\")",
       "Read(//c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/angular/src/app/features/delivery/dashboard/$BASE/delivery-cycle-mcp/**)",
-      "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/mcp/delivery-cycle-mcp/src\")"
+      "Bash(BASE=\"/c/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/mcp/delivery-cycle-mcp/src\")",
+      "mcp__Claude_Preview__preview_start"
     ],
     "deny": [
       "Bash(git reset --hard *)",
