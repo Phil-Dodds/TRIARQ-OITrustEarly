@@ -40,8 +40,9 @@ import {
 import { IonicModule }         from '@ionic/angular';
 import { DeliveryService }         from '../../../core/services/delivery.service';
 import { UserProfileService }      from '../../../core/services/user-profile.service';
-import { StageTrackComponent }     from '../stage-track/stage-track.component';
-import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
+import { StageTrackComponent }              from '../stage-track/stage-track.component';
+import { LoadingOverlayComponent }          from '../../../shared/components/loading-overlay/loading-overlay.component';
+import { DeliveryCycleEditPanelComponent }  from '../edit-panel/delivery-cycle-edit-panel.component';
 import { User }                    from '../../../core/types/database';
 import {
   DeliveryCycle,
@@ -89,7 +90,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent],
   template: `
     <!-- D-178 Tier 1: Skeleton screen for initial cycle load -->
     <div *ngIf="loading" style="max-width:1100px;margin:var(--triarq-space-xl) auto;
@@ -124,10 +125,21 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
     </div>
 
     <!-- Panel-aware wrapper: no max-width in panel mode; 860px max in route mode. Source: approved plan 2026-04-10 -->
+    <!-- position:relative required for Edit panel absolute overlay per S-006. Contract 2 2026-04-10. -->
     <div *ngIf="!loading && cycle"
+         style="position:relative;"
          [ngStyle]="panelMode
            ? {padding: 'var(--triarq-space-md)'}
            : {'max-width': '860px', margin: 'var(--triarq-space-xl) auto', padding: '0 var(--triarq-space-md)'}">
+
+      <!-- Edit Cycle panel overlay — S-006 push pattern. Replaces editCycleStub(). Contract 2 2026-04-10. -->
+      <app-delivery-cycle-edit-panel
+        *ngIf="showEditPanel && cycle"
+        [cycle]="cycle"
+        [allUsers]="allUsers"
+        (saved)="onEditSaved()"
+        (cancelled)="onEditCancelled()">
+      </app-delivery-cycle-edit-panel>
 
       <!-- Panel close button — only in panel mode (S-006) -->
       <div *ngIf="panelMode"
@@ -196,8 +208,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <!-- Actions: Edit Cycle | Submit Gate | Regress Stage | Cancel | Un-cancel -->
           <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;">
 
-            <!-- 1. Edit Cycle — always shown; stub navigates to edit route (Contract 2) -->
-            <button (click)="editCycleStub()"
+            <!-- 1. Edit Cycle — opens Edit panel per S-006. Contract 2 2026-04-10. -->
+            <button (click)="openEditPanel()"
                     class="oi-btn-primary"
                     style="white-space:nowrap;font-size:var(--triarq-text-small);">
               ✎ Edit Cycle
@@ -1214,6 +1226,9 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   loadingEvents  = false;
   loadError      = '';
 
+  // Edit Cycle panel — S-006 push/pop. Contract 2 2026-04-10.
+  showEditPanel  = false;
+
   // Outcome
   editingOutcome = false;
   savingOutcome  = false;
@@ -1828,11 +1843,24 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   // ── Contract 1 action zone methods ────────────────────────────────────────
 
-  // Edit Cycle stub — Contract 2 will implement the edit route.
-  // Source: Contract 1 action zone item 1, 2026-04-10.
-  editCycleStub(): void {
-    // Stub: Edit Cycle route not yet built. Contract 2 scope.
-    window.alert('Edit Cycle — available in the next release.');
+  // Opens Edit Cycle panel — S-006 push. Replaces editCycleStub() from Contract 1.
+  // Contract 2 2026-04-10.
+  openEditPanel(): void {
+    this.showEditPanel = true;
+    this.cdr.markForCheck();
+  }
+
+  // Edit saved: pop Edit from stack, re-query cycle unconditionally per S-008.
+  onEditSaved(): void {
+    this.showEditPanel = false;
+    this.loadCycle(this.cycle!.delivery_cycle_id);   // S-008: unconditional re-query on every stack pop.
+    this.cdr.markForCheck();
+  }
+
+  // Edit cancelled: pop Edit from stack. No re-query (spec 2.6).
+  onEditCancelled(): void {
+    this.showEditPanel = false;
+    this.cdr.markForCheck();
   }
 
   // Cancel Cycle action — D-183 two-step pattern. State: cancelConfirming guards the button.

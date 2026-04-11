@@ -37,10 +37,17 @@ type ScopeType = 'division_tree' | 'trust' | 'user_divisions' | 'all';
     <div class="ws-picker-overlay" (click)="onOverlayClick($event)">
       <div class="ws-picker-modal" role="dialog" aria-modal="true" aria-label="Select Workstream">
 
-        <!-- Header -->
+        <!-- Header — Show Inactive toggle at upper right per Contract 2 correction. -->
         <div class="ws-picker-header">
           <h2 class="ws-picker-title">Select Workstream</h2>
-          <button class="ws-picker-close" (click)="cancel()" aria-label="Close picker">✕</button>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;
+                           font-size:12px;color:var(--triarq-color-stone,#8a9ba8);white-space:nowrap;">
+              <input type="checkbox" [formControl]="showInactiveCtrl" />
+              Show inactive
+            </label>
+            <button class="ws-picker-close" (click)="cancel()" aria-label="Close picker">✕</button>
+          </div>
         </div>
 
         <!-- Scope radio — D-195: suppress Trust option when division is Trust-level (depth=1) -->
@@ -52,17 +59,6 @@ type ScopeType = 'division_tree' | 'trust' | 'user_divisions' | 'all';
               {{ opt.label }}
             </label>
           </ng-container>
-        </div>
-
-        <!-- Show inactive toggle — D-195: visually separated, smaller text, muted color -->
-        <div class="ws-inactive-toggle"
-             style="border-top:1px solid var(--triarq-color-border,#e0e0e0);
-                    padding-top:8px;margin-top:4px;">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;
-                         font-size:12px;color:var(--triarq-color-stone,#8a9ba8);">
-            <input type="checkbox" [formControl]="showInactiveCtrl" />
-            Show inactive Workstreams
-          </label>
         </div>
 
         <!-- Error message -->

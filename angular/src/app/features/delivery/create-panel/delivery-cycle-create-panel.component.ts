@@ -121,23 +121,32 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
             <div class="cp-gate-note">Required before Brief Review Gate.</div>
           </div>
 
-          <!-- 4. Tier Classification (radio, no default — D-124) -->
+          <!-- 4. Tier Classification (option cards, no default — D-124. Contract 2 correction.) -->
           <div class="cp-field">
             <label class="cp-label">
               Tier Classification <span class="cp-required" aria-hidden="true">*</span>
             </label>
-            <div class="cp-radio-group" role="radiogroup" aria-label="Tier Classification">
-              <label class="cp-radio-option">
-                <input type="radio" formControlName="tier_classification" value="tier_1" />
-                Tier 1
+            <div class="cp-tier-cards" role="radiogroup" aria-label="Tier Classification">
+              <label class="cp-tier-card"
+                     [class.cp-tier-card--selected]="f['tier_classification'].value === 'tier_1'">
+                <input type="radio" formControlName="tier_classification" value="tier_1"
+                       style="position:absolute;opacity:0;pointer-events:none;" />
+                <span class="cp-tier-card-name">Tier 1</span>
+                <span class="cp-tier-card-desc">Fast Lane</span>
               </label>
-              <label class="cp-radio-option">
-                <input type="radio" formControlName="tier_classification" value="tier_2" />
-                Tier 2
+              <label class="cp-tier-card"
+                     [class.cp-tier-card--selected]="f['tier_classification'].value === 'tier_2'">
+                <input type="radio" formControlName="tier_classification" value="tier_2"
+                       style="position:absolute;opacity:0;pointer-events:none;" />
+                <span class="cp-tier-card-name">Tier 2</span>
+                <span class="cp-tier-card-desc">Structured</span>
               </label>
-              <label class="cp-radio-option">
-                <input type="radio" formControlName="tier_classification" value="tier_3" />
-                Tier 3
+              <label class="cp-tier-card"
+                     [class.cp-tier-card--selected]="f['tier_classification'].value === 'tier_3'">
+                <input type="radio" formControlName="tier_classification" value="tier_3"
+                       style="position:absolute;opacity:0;pointer-events:none;" />
+                <span class="cp-tier-card-name">Tier 3</span>
+                <span class="cp-tier-card-desc">Governed</span>
               </label>
             </div>
             <div *ngIf="f['tier_classification'].invalid && f['tier_classification'].touched"
@@ -186,18 +195,14 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
             <div class="cp-gate-note">Required before Go to Build Gate.</div>
           </div>
 
-          <!-- 7. Outcome Statement (optional, amber warning when empty) -->
+          <!-- 7. Outcome Statement (optional — gray hint text per D-200 Pattern 1. Contract 2 correction.) -->
           <div class="cp-field">
             <label class="cp-label">Outcome Statement</label>
             <textarea formControlName="outcome_statement" class="cp-input cp-textarea"
                       rows="3"
                       placeholder="What measurable result will this Delivery Cycle deliver?">
             </textarea>
-            <!-- Persistent amber warning per correction spec — shown when field is empty -->
-            <div *ngIf="!f['outcome_statement'].value?.trim()"
-                 class="cp-amber-warning">
-              Outcome Statement should be set before Brief Review. You can add it now or after creation.
-            </div>
+            <div class="cp-gate-note">Should be set before Brief Review Gate.</div>
           </div>
 
           <!-- 8. Jira Epic Link (optional) -->
@@ -314,11 +319,24 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
       margin-top: 4px; font: 400 12px italic Roboto, sans-serif; color: #9E9E9E;
     }
 
-    /* Radio group */
-    .cp-radio-group { display: flex; gap: 24px; align-items: center; padding: 8px 0; }
-    .cp-radio-option {
-      display: flex; align-items: center; gap: 8px;
-      font: 400 14px Roboto, sans-serif; color: #262626; cursor: pointer;
+    /* Tier option cards (Contract 2 correction — replaced radio group) */
+    .cp-tier-cards { display: flex; gap: 10px; padding: 4px 0; }
+    .cp-tier-card {
+      flex: 1; position: relative; cursor: pointer;
+      border: 1.5px solid #D0D0D0; border-radius: 8px;
+      padding: 12px 10px; text-align: center;
+      display: flex; flex-direction: column; gap: 3px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .cp-tier-card:hover { border-color: #257099; }
+    .cp-tier-card--selected {
+      border-color: #257099; background: rgba(37,112,153,0.06);
+    }
+    .cp-tier-card-name {
+      font: 600 14px Roboto, sans-serif; color: #1E1E1E;
+    }
+    .cp-tier-card-desc {
+      font: 400 12px Roboto, sans-serif; color: #5A5A5A;
     }
 
     /* Picker trigger */
@@ -351,17 +369,6 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
       font: 400 12px Roboto, sans-serif; color: #9E9E9E; padding: 2px 4px;
     }
     .cp-chip-remove:hover { color: #C62828; }
-
-    /* Amber warning — Outcome Statement */
-    .cp-amber-warning {
-      margin-top: 6px;
-      background: #FFF8E1;
-      border-left: 3px solid #F2A620;
-      border-radius: 4px;
-      padding: 10px 12px;
-      font: 400 12px italic Roboto, sans-serif;
-      color: #5A5A5A;
-    }
 
     /* Submit error */
     .cp-submit-error {
