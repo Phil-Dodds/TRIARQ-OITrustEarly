@@ -1,5 +1,5 @@
 # Claude Code — Session Active Rules
-Pathways OI Trust | v1.2 | April 2026 | CONFIDENTIAL
+Pathways OI Trust | v1.3 | April 2026 | CONFIDENTIAL
 Owner: Phil Sappington, EVP Performance & Governance
 
 These rules are active from the start of every Claude Code session with Phil.
@@ -261,6 +261,32 @@ depend on the missing file, and open the CodeClose file with a prominent header:
 `⚠ PARTIAL SESSION — [task name] skipped: [filename] not found at [path].` Do
 not create a substitute from scratch unless the session brief explicitly
 authorizes it.
+
+---
+
+## Rule 19 — Plan-Mode Checkpoint (D-240)
+
+Every Code session opens with plan mode against the session contract before touching any
+files. Code produces a written plan surfacing: gaps in the contract, stated assumptions,
+conflicts with CLAUDE.md or locked decisions. Phil reviews and approves or redirects.
+No file modifications until Phil explicitly approves the plan. If Phil is unavailable,
+wait — do not proceed on assumption of approval.
+
+Binary test: did this session produce a written plan before the first file modification?
+Yes = compliant. No = violation.
+
+---
+
+## Rule 20 — As-Built Document (D-241)
+
+At every session close, update `docs/as-built.md`. One section per surface touched this
+session. Format per section: **Implemented:** [what was built] / **Deviations:** [list
+or "None"] / **Open questions:** [list or "None"]. Create the file if it does not exist.
+This is a required session close step — session is not complete without as-built.md
+updated and committed.
+
+Binary test: was `docs/as-built.md` updated and committed before session close?
+Yes = compliant. No = violation.
 
 ---
 

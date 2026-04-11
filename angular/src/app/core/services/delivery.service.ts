@@ -80,6 +80,22 @@ export class DeliveryService {
     return this.mcp.call<DeliveryCycle>('delivery', 'create_delivery_cycle', params as Record<string, unknown>);
   }
 
+  // Update mutable fields on a Delivery Cycle. Only supplied fields are changed.
+  // D-229: logs field_edit event per changed field. CC-Decision-2026-04-10-D.
+  updateCycle(params: {
+    delivery_cycle_id:       string;
+    cycle_title?:            string;
+    division_id?:            string;
+    outcome_statement?:      string | null;
+    workstream_id?:          string | null;
+    tier_classification?:    TierClassification;
+    assigned_ds_user_id?:    string | null;
+    assigned_cb_user_id?:    string | null;
+    jira_epic_key?:          string | null;
+  }): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'update_delivery_cycle', params as Record<string, unknown>);
+  }
+
   getCycle(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>('delivery', 'get_delivery_cycle', { delivery_cycle_id });
   }
@@ -130,6 +146,14 @@ export class DeliveryService {
 
   resumeFromHold(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>('delivery', 'resume_cycle_from_hold', { delivery_cycle_id });
+  }
+
+  cancelCycle(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'cancel_delivery_cycle', { delivery_cycle_id });
+  }
+
+  uncancelCycle(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>('delivery', 'uncancel_delivery_cycle', { delivery_cycle_id });
   }
 
   setOutcomeStatement(params: {

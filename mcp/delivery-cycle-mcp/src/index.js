@@ -22,6 +22,7 @@ const { list_delivery_workstreams }      = require('./tools/list_delivery_workst
 const { update_workstream_active_status } = require('./tools/update_workstream_active_status');
 
 const { create_delivery_cycle }          = require('./tools/create_delivery_cycle');
+const { update_delivery_cycle }          = require('./tools/update_delivery_cycle');
 const { get_delivery_cycle }             = require('./tools/get_delivery_cycle');
 const { list_delivery_cycles }           = require('./tools/list_delivery_cycles');
 const { advance_cycle_stage }            = require('./tools/advance_cycle_stage');
@@ -57,6 +58,7 @@ const TOOLS = {
 
   // Delivery Cycle lifecycle
   create_delivery_cycle,
+  update_delivery_cycle,
   get_delivery_cycle,
   list_delivery_cycles,
   advance_cycle_stage,

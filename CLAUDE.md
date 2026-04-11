@@ -402,6 +402,31 @@ All files, methods, and exports in this codebase follow these five rules. All ru
 
 ---
 
+## Design Contract Standards (D-239, D-242, D-243)
+
+Added Contract 2 2026-04-10. These rules govern how Code interprets and executes
+thin contract documents.
+
+**D-239 — Thin Contract:** The contract is the complete execution instruction. Do not
+expand scope beyond what the contract specifies. Any scope question requires stopping
+and surfacing to Phil — never inferring and building.
+
+**D-242 — Field Completeness:** If an ARCH note or decision marks a field "required at
+creation/edit" but that field is absent from the form spec, record a CC-decision and
+surface to Phil — do not infer the field implementation.
+
+Binary test: Is every field in the implemented form explicitly present in the spec?
+Yes = compliant. Any inferred field = violation.
+
+**D-243 — Spec Completeness:** Do not infer behavior from ARCH notes, decisions, or
+prior sessions. If a behavior is not in the spec section, it is not specced — record a
+CC-decision.
+
+Binary test: Is every implemented behavior traceable to an explicit line in the
+current contract or spec? Yes = compliant. Any inferred behavior = violation.
+
+---
+
 ## Responsibility Declaration (D-226)
 
 Before creating any new service or component file, add a one-line responsibility declaration as the first comment in the file. The declaration must contain two parts:
