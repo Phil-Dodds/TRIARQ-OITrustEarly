@@ -1,6 +1,6 @@
 -- 001_seed_system_admin.sql
 -- Pathways OI Trust — Build A Bootstrap
--- Creates Phil Sappington's System Admin user record.
+-- Creates Phil Dodds's System Admin user record.
 --
 -- BEFORE RUNNING THIS SEED:
 -- 1. Go to Supabase Dashboard > Authentication > Users
@@ -29,7 +29,7 @@ BEGIN
     ) VALUES (
         phil_user_id,
         'pdodds@triarqhealth.com',
-        'Phil Sappington',
+        'Phil Dodds',
         'phil',
         true,                           -- D-139 override: Phil holds both admin + functional roles
         true

@@ -1,6 +1,6 @@
 # Delivery Cycle — Dashboard List & Detail View Design Specification
 Pathways OI Trust | v1.0 | April 2026 | CONFIDENTIAL
-Owner: Phil Sappington, EVP Performance & Governance
+Owner: Phil Dodds, EVP Performance & Governance
 
 For Claude Code. This document describes the complete visual and behavioral
 specification for the Delivery Cycle dashboard list view and the cycle detail

@@ -1,6 +1,6 @@
 # Claude Code — Session Active Rules
 Pathways OI Trust | v1.3 | April 2026 | CONFIDENTIAL
-Owner: Phil Sappington, EVP Performance & Governance
+Owner: Phil Dodds, EVP Performance & Governance
 
 These rules are active from the start of every Claude Code session with Phil.
 They do not need to be re-prompted — they are standing behavioral requirements.
