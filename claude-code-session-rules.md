@@ -295,6 +295,7 @@ Yes = compliant. No = violation.
 At the start of every Claude Code session, read these documents in order before
 writing any code or calling any tool:
 
+0. Set effort to high at session start before any other action.
 1. `CLAUDE.md` — architectural rules and non-negotiables
 2. `claude-code-session-rules.md` — this file
 3. `docs/design-principles.md` — UX and navigation constraints
