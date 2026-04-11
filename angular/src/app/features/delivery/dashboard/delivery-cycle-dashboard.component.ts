@@ -19,6 +19,15 @@
 // CC-Decision-2026-04-10-B: filterGateStatus 'overdue' value confirmed present — no addition needed.
 // CC-Decision-2026-04-10-C: Team cell lift-up per Phil direction — CB / Workstream / DS; if all null
 //   render single muted "Unassigned" label.
+// CC-Decision-2026-04-11-A: Freeze fix — three root causes identified and fixed:
+//   (1) buildGateStateMap() was called in *ngFor template, creating new object references every CD cycle.
+//       With OnPush on StageTrackComponent, each new reference forced re-render of all 20+ track rows.
+//       Fix: memoize into gateStateMapsCache (Map<cycleId, GateStateMap>), populated once per applyFilters().
+//   (2) assignedPersonOptions getter returned new array every CD cycle, rebuilding filter DOM on every tick.
+//       Fix: converted to readonly class field.
+//   (3) toggleFilterPanel() did not call cdr.markForCheck(), so filter panel state change was not visible
+//       until the next unrelated CD cycle triggered a repaint.
+//       Fix: added markForCheck() call. Source: Contract 3 Block 1.
 
 import {
   Component,
@@ -648,10 +657,10 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         </div>
       </div>
 
-            <!-- ── Loading skeleton (D-178 Tier 1) — 5-column ────────────────── -->
+            <!-- ── Loading skeleton (D-178 Tier 1) — 7-column (Contract 3 Block 3: DS/CB split) ── -->
       <div *ngIf="loading">
         <div *ngFor="let _ of skeletonRows"
-             style="display:grid;grid-template-columns:48px 88px 180px 1fr 118px 128px;
+             style="display:grid;grid-template-columns:48px 88px 180px 1fr 118px 88px 88px;
                     gap:8px;padding:16px;
                     border-bottom:1px solid var(--triarq-color-border);align-items:center;">
           <ion-skeleton-text animated style="height:40px;border-radius:50%;width:40px;"></ion-skeleton-text>
@@ -659,7 +668,8 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:40px;border-radius:4px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:40px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:20px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:20px;border-radius:4px;"></ion-skeleton-text>
         </div>
       </div>
 
@@ -674,12 +684,13 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         </div>
       </div>
 
-      <!-- ── Column header row — D-196: 5 columns, always rendered ─────────────── -->
-      <!-- Contract 1 2026-04-10: 5-column design supersedes D-172 11-column for this view. -->
-      <!-- D-196: headers always shown even when no rows.                                   -->
+      <!-- ── Column header row — D-196: 7 columns, always rendered ─────────────── -->
+      <!-- Contract 1 2026-04-10: supersedes D-172 11-column.                        -->
+      <!-- Contract 3 Block 3: Team column split into DS + CB. Source: contract-3-spec.md. -->
+      <!-- D-196: headers always shown even when no rows.                             -->
       <div *ngIf="!loading"
            style="display:grid;
-                  grid-template-columns:48px 88px 180px 1fr 118px 128px;
+                  grid-template-columns:48px 88px 180px 1fr 118px 88px 88px;
                   gap:8px;padding:8px 16px;
                   font-size:13px;font-weight:500;color:#fff;text-transform:uppercase;
                   background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;">
@@ -688,19 +699,20 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
         <span>Cycle Name</span>
         <span>Outcome</span>
         <span>Stage</span>
-        <span>Team</span>
+        <span>DS</span>
+        <span>CB</span>
       </div>
 
-      <!-- ── Cycle rows — 5-column (Contract 1 2026-04-10) ───────────────────────── -->
-      <!-- Col order: tier-dot | division | cycle-name+tier-badge | outcome | stage(3-line) | team -->
-      <!-- S-005: full-row tap opens right panel (not routerLink navigation). Source: Contract 1.  -->
+      <!-- ── Cycle rows — 7-column (Contract 3 Block 3: DS/CB split) ───────────────────── -->
+      <!-- Col order: tier-dot | division | cycle-name+tier-badge | outcome | stage(3-line) | DS | CB -->
+      <!-- S-005: full-row tap opens right panel (not routerLink navigation). Source: Contract 1.     -->
       <div *ngFor="let cycle of filtered">
         <div
           (click)="openCyclePanel(cycle.delivery_cycle_id)"
           [style.background]="selectedCycleId === cycle.delivery_cycle_id ? '#E8F0FE' : ''"
           [style.border-left]="selectedCycleId === cycle.delivery_cycle_id ? '3px solid var(--triarq-color-primary,#257099)' : '3px solid transparent'"
           style="display:grid;
-                 grid-template-columns:48px 88px 180px 1fr 118px 128px;
+                 grid-template-columns:48px 88px 180px 1fr 118px 88px 88px;
                  gap:8px;padding:16px;
                  border-bottom:1px solid #E8E8E8;
                  align-items:start;cursor:pointer;min-height:88px;"
@@ -762,7 +774,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
             </div>
             <app-stage-track
               [currentStageId]="cycle.current_lifecycle_stage"
-              [gateStateMap]="buildGateStateMap(cycle)"
+              [gateStateMap]="gateStateMapsCache.get(cycle.delivery_cycle_id) ?? buildGateStateMap(cycle)"
               displayMode="condensed"
             ></app-stage-track>
             <div style="font-size:11px;margin-top:2px;
@@ -772,26 +784,33 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
             </div>
           </div>
 
-          <!-- Col 6: Team — CB / Workstream / DS, lift-up when null (CC-Decision-2026-04-10-C) -->
-          <div style="font-size:12px;overflow:hidden;">
-            <ng-container *ngIf="cycle.assigned_cb_display_name || cycle.workstream || cycle.assigned_ds_display_name; else unassignedTeamCell">
-              <div *ngIf="cycle.assigned_cb_display_name"
-                   style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-                          color:#1E1E1E;margin-bottom:1px;">
-                {{ cycle.assigned_cb_display_name }}
-              </div>
-              <div *ngIf="cycle.workstream"
-                   style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#5A5A5A;">
-                {{ cycle.workstream.workstream_name }}
-              </div>
-              <div *ngIf="cycle.assigned_ds_display_name"
-                   style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-                          color:#5A5A5A;margin-top:1px;">
-                {{ cycle.assigned_ds_display_name }}
-              </div>
-            </ng-container>
-            <ng-template #unassignedTeamCell>
-              <span style="color:#9E9E9E;font-style:italic;font-size:11px;">Unassigned</span>
+          <!-- Col 6: Assigned DS — tappable chip per D-181. Contract 3 Block 3. -->
+          <div style="overflow:hidden;padding-top:6px;" (click)="$event.stopPropagation()">
+            <span *ngIf="cycle.assigned_ds_display_name; else noDsCell"
+                  style="display:inline-block;padding:2px 6px;border-radius:4px;
+                         background:rgba(37,112,153,0.08);color:#257099;font-size:11px;
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                         max-width:84px;cursor:default;"
+                  title="{{ cycle.assigned_ds_display_name }}">
+              {{ cycle.assigned_ds_display_name }}
+            </span>
+            <ng-template #noDsCell>
+              <span style="color:#9E9E9E;font-style:italic;font-size:11px;">—</span>
+            </ng-template>
+          </div>
+
+          <!-- Col 7: Assigned CB — tappable chip per D-181. Contract 3 Block 3. -->
+          <div style="overflow:hidden;padding-top:6px;" (click)="$event.stopPropagation()">
+            <span *ngIf="cycle.assigned_cb_display_name; else noCbCell"
+                  style="display:inline-block;padding:2px 6px;border-radius:4px;
+                         background:rgba(37,112,153,0.08);color:#257099;font-size:11px;
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                         max-width:84px;cursor:default;"
+                  title="{{ cycle.assigned_cb_display_name }}">
+              {{ cycle.assigned_cb_display_name }}
+            </span>
+            <ng-template #noCbCell>
+              <span style="color:#9E9E9E;font-style:italic;font-size:11px;">—</span>
             </ng-template>
           </div>
 
@@ -802,7 +821,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <!-- Column headers always render above this. Empty state row spans all columns. -->
       <div *ngIf="!loading && !loadError && filtered.length === 0"
            style="display:grid;
-                  grid-template-columns:48px 88px 180px 1fr 118px 128px;
+                  grid-template-columns:48px 88px 180px 1fr 118px 88px 88px;
                   border-bottom:1px solid #E8E8E8;">
         <div style="grid-column:1/-1;min-height:200px;
                     display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -956,6 +975,19 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   // D-178 Tier 1: skeleton rows for loading state
   readonly skeletonRows = [1, 2, 3, 4, 5];
+
+  // Block 1 freeze fix (CC-Decision-2026-04-11-A): stable references so OnPush StageTrackComponent
+  // does not re-render every CD cycle. Populated at the end of applyFilters(). Source: Contract 3 Block 1.
+  // Not private — Angular template compilation requires non-private for template binding access.
+  gateStateMapsCache = new Map<string, GateStateMap>();
+
+  // Block 1 freeze fix (CC-Decision-2026-04-11-A): readonly field avoids new array reference every CD cycle.
+  readonly assignedPersonOptions: { value: string; label: string }[] = [
+    { value: '',               label: 'Anyone' },
+    { value: 'my_cycles',     label: 'My Cycles' },
+    { value: 'unassigned_ds', label: 'Unassigned DS' },
+    { value: 'unassigned_cb', label: 'Unassigned CB' }
+  ];
 
   constructor(
     private readonly delivery:     DeliveryService,
@@ -1491,6 +1523,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     });
 
     this.filtered = result;
+    // Block 1 freeze fix: rebuild gate state map cache once per filter run so template
+    // receives stable object references — prevents OnPush re-render cascade. Source: CC-Decision-2026-04-11-A.
+    this.gateStateMapsCache = new Map(
+      this.cycles.map(c => [c.delivery_cycle_id, this.buildGateStateMap(c)])
+    );
     if (persist) { this.saveScreenState(); }
     this.cdr.markForCheck();
   }
@@ -1685,19 +1722,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return n;
   }
 
-  /** Assigned person filter radio options. */
-  get assignedPersonOptions(): { value: string; label: string }[] {
-    return [
-      { value: '',               label: 'Anyone' },
-      { value: 'my_cycles',     label: 'My Cycles' },
-      { value: 'unassigned_ds', label: 'Unassigned DS' },
-      { value: 'unassigned_cb', label: 'Unassigned CB' }
-    ];
-  }
+  // assignedPersonOptions getter removed — replaced by readonly field. Source: CC-Decision-2026-04-11-A.
 
-  /** Toggle filter panel open/close. */
+  /** Toggle filter panel open/close. Block 1 freeze fix: markForCheck() required for OnPush. Source: CC-Decision-2026-04-11-A. */
   toggleFilterPanel(): void {
     this.showFilterPanel = !this.showFilterPanel;
+    this.cdr.markForCheck();
   }
 
   /** Count card tap: My Cycles — sets assigned person filter, does NOT persist to memory. Source: D-HubCounts-2026-04-06. */

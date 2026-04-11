@@ -17,7 +17,17 @@ interface HubCard {
   icon:        string;
 }
 
+// Contract 3 Block 2: Remove "Division Summary", rename "Upcoming Gate Summary" → "Gate Schedule",
+// add "Deploy Gate by Quarter". Source: contract-3-spec.md Block 2.
 const HUB_CARDS: HubCard[] = [
+  {
+    title:       'All Delivery Cycles',
+    route:       '/delivery/cycles',
+    icon:        '≡',
+    description: 'The full list of active cycles with filtering by stage, tier, workstream, ' +
+                 'division, and next gate. Use this when you know the cycle you are looking ' +
+                 'for, or want to apply a combination of filters.'
+  },
   {
     title:       'Workstream Summary',
     route:       '/delivery/workstreams',
@@ -27,28 +37,20 @@ const HUB_CARDS: HubCard[] = [
                  'are queued at each gate. Click a count to see the matching cycles.'
   },
   {
-    title:       'Division Summary',
-    route:       '/delivery/divisions',
-    icon:        '◫',
-    description: 'Active cycle count by Division, displayed in hierarchy order. ' +
-                 'Use this to see which Divisions have the most in-flight work. ' +
-                 'Click a Division to see all its cycles in the full list.'
-  },
-  {
-    title:       'Upcoming Gate Summary',
+    title:       'Gate Schedule',
     route:       '/delivery/gates',
     icon:        '▷',
     description: 'Gates coming up in the next 7 days and gates with overdue target dates. ' +
                  'Use this to prioritize approval actions and identify stalled cycles. ' +
-                 'Click a Gate row to see the Delivery Cycles waiting on it.'
+                 'Click a gate row to see the Delivery Cycles waiting on it.'
   },
   {
-    title:       'All Delivery Cycles',
-    route:       '/delivery/cycles',
-    icon:        '≡',
-    description: 'The full list of active cycles with filtering by stage, tier, workstream, ' +
-                 'division, and next gate. Use this when you know the cycle you are looking ' +
-                 'for, or want to apply a combination of filters.'
+    title:       'Deploy Gate by Quarter',
+    route:       '/delivery/deploy-schedule',
+    icon:        '◫',
+    description: 'Go to Release gates grouped by quarter. See which cycles are scheduled ' +
+                 'to reach production each quarter and track commitment against target dates. ' +
+                 'Use this for release planning and capacity conversations.'
   }
 ];
 

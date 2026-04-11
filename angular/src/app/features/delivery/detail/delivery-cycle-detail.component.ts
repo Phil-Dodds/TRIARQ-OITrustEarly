@@ -394,8 +394,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       </div>
 
       <!-- ── Stage Track — Full mode ─────────────────────────────────────── -->
+      <!-- Label fixed "Lifecycle Track" → "Stage Track" per S-002 and Contract 3 Block 4 Fix 1. -->
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
-        <div style="font-weight:500;margin-bottom:4px;">Lifecycle Track</div>
+        <div style="font-weight:500;margin-bottom:4px;">Stage Track</div>
         <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
                     margin-bottom:var(--triarq-space-sm);">
           Click a gate diamond to open its record and record a decision.
@@ -481,14 +482,15 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </div>
 
             <!-- Col 4: Milestone Status 5-color dot + label (D-244) -->
+            <!-- effectiveDateStatus() prevents "Behind" when no target date set. Source: Contract 3 Block 4 Fix 4. -->
             <div style="display:flex;align-items:center;gap:6px;">
-              <span [style.background]="milestoneStatusDotColor(m.date_status)"
+              <span [style.background]="milestoneStatusDotColor(effectiveDateStatus(m))"
                     style="display:inline-block;width:10px;height:10px;
                            border-radius:50%;flex-shrink:0;">
               </span>
-              <span [style.color]="milestoneStatusDotColor(m.date_status)"
+              <span [style.color]="milestoneStatusDotColor(effectiveDateStatus(m))"
                     style="font-size:12px;font-weight:500;">
-                {{ gateStatusDisplayLabel(m.date_status) }}
+                {{ gateStatusDisplayLabel(effectiveDateStatus(m)) }}
               </span>
             </div>
 
@@ -1493,6 +1495,14 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return nextGate;
   }
 
+  // Contract 3 Block 4 Fix 4: "Behind" requires target date set AND today > target date.
+  // When no target date is set, raw server value may be 'behind' — treat as 'not_started'.
+  // All template calls for milestone status dot/label go through this wrapper. Source: contract-3-spec.md Block 4 FIX 4.
+  effectiveDateStatus(m: { target_date?: string | null; date_status: DateStatus }): DateStatus {
+    if (!m.target_date && m.date_status === 'behind') { return 'not_started'; }
+    return m.date_status;
+  }
+
   // D-244: Milestone Status 5-color dot — maps date_status to color token.
   milestoneStatusDotColor(dateStatus: DateStatus | undefined): string {
     const map: Record<string, string> = {
@@ -1506,11 +1516,15 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   }
 
   // D-245: Gate Approval Status as contextual narrative text.
+  // Contract 3 Block 4 Fix 3: "Under Review" only shown for the CURRENT gate (the gate this
+  // cycle's lifecycle stage is heading toward). Gates not yet reached show nothing when pending.
+  // Source: contract-3-spec.md Block 4 FIX 3.
   gateApprovalNarrative(gateName: GateName): string {
     const record = this.cycle?.gate_records?.find(r => r.gate_name === gateName);
     if (!record) { return ''; }
+    const currentGate = this.cycle ? NEXT_GATE_BY_STAGE[this.cycle.current_lifecycle_stage] : null;
     switch (record.gate_status) {
-      case 'pending':  return 'Under Review — awaiting decision';
+      case 'pending':  return gateName === currentGate ? 'Under Review — awaiting decision' : '';
       case 'approved': return 'Approved';
       case 'returned': return 'Returned for revision';
       case 'blocked':  return 'Blocked — workstream inactive';
