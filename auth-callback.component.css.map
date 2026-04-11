@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;d40d19aa07caf1da324ff11884c3a15b3e90e151ab15fa7ce95025cb88416be0;C:/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/.claude/worktrees/vibrant-bhabha/angular/src/app/features/login/auth-callback.component.ts"],
+  "sourcesContent": ["\n    .oi-callback-shell {\n      min-height: 100vh;\n      display: flex;\n      align-items: center;\n      justify-content: center;\n      background: var(--triarq-color-background);\n    }\n    .oi-callback-message {\n      color: var(--triarq-color-text-secondary);\n      font-family: var(--triarq-font-family);\n      font-size: var(--triarq-text-body);\n    }\n  "],
+  "mappings": ";AACI,CAAC;AACC,cAAY;AACZ,WAAS;AACT,eAAa;AACb,mBAAiB;AACjB,cAAY,IAAI;AAClB;AACA,CAAC;AACC,SAAO,IAAI;AACX,eAAa,IAAI;AACjB,aAAW,IAAI;AACjB;",
+  "names": []
+}

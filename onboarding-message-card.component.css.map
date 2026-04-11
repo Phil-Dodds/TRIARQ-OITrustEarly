@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;58a47066b4b5d81304f09818da5dc48626391aa6280acaafb2182b3eb8e364e5;C:/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/.claude/worktrees/vibrant-bhabha/angular/src/app/features/home/components/onboarding-message-card.component.ts"],
+  "sourcesContent": ["\n    .oi-onboarding-card {\n      max-width: 520px;\n      margin: 64px auto;\n      text-align: center;\n      padding: var(--triarq-space-2xl);\n    }\n    h3 { color: var(--triarq-color-primary); margin-bottom: var(--triarq-space-md); }\n    .oi-onboarding-primary  { font-size: var(--triarq-text-body); font-weight: var(--triarq-font-weight-medium); }\n    .oi-onboarding-secondary { font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); }\n  "],
+  "mappings": ";AACI,CAAC;AACC,aAAW;AACX,UAAQ,KAAK;AACb,cAAY;AACZ,WAAS,IAAI;AACf;AACA;AAAK,SAAO,IAAI;AAAyB,iBAAe,IAAI;AAAoB;AAChF,CAAC;AAAyB,aAAW,IAAI;AAAqB,eAAa,IAAI;AAA8B;AAC7G,CAAC;AAA0B,aAAW,IAAI;AAAsB,SAAO,IAAI;AAAgC;",
+  "names": []
+}

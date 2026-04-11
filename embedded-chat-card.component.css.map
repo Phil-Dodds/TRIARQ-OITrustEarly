@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["angular:styles/component:css;b465ba569b529cc36f9f7cf1ac432a002a830d19e1f327292ca3eadac174feaa;C:/Users/PhilipDodds/OneDrive - Triarq Health/Desktop/OI Trust Project Keepsakes/OI TRUST Early Builds/.claude/worktrees/vibrant-bhabha/angular/src/app/features/home/components/embedded-chat-card.component.ts"],
+  "sourcesContent": ["\n    h4 { margin: 0 0 var(--triarq-space-sm) 0; font-size: var(--triarq-text-h4); }\n    .oi-card-shell { border: 1px dashed var(--triarq-color-border); }\n    .oi-shell-message { color: var(--triarq-color-text-secondary); font-size: var(--triarq-text-small); margin: 0 0 var(--triarq-space-xs) 0; }\n    .oi-shell-sub { color: var(--triarq-color-text-disabled); font-size: var(--triarq-text-caption); margin: 0; }\n  "],
+  "mappings": ";AACI;AAAK,UAAQ,EAAE,EAAE,IAAI,mBAAmB;AAAG,aAAW,IAAI;AAAmB;AAC7E,CAAC;AAAgB,UAAQ,IAAI,OAAO,IAAI;AAAwB;AAChE,CAAC;AAAmB,SAAO,IAAI;AAAgC,aAAW,IAAI;AAAsB,UAAQ,EAAE,EAAE,IAAI,mBAAmB;AAAG;AAC1I,CAAC;AAAe,SAAO,IAAI;AAA+B,aAAW,IAAI;AAAwB,UAAQ;AAAG;",
+  "names": []
+}

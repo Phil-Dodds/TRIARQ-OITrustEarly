@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/features/chat/chat.component.ts"],
+  "sourcesContent": ["// chat.component.ts — Build A stub\r\nimport { Component, ChangeDetectionStrategy } from '@angular/core';\r\n\r\n@Component({\r\n  selector: 'app-chat', standalone: true,\r\n  changeDetection: ChangeDetectionStrategy.OnPush,\r\n  template: `\r\n    <div class=\"oi-card\" style=\"max-width:600px;margin:var(--triarq-space-2xl) auto;text-align:center;\">\r\n      <h3>OI Assistant</h3>\r\n      <p style=\"color:var(--triarq-color-text-secondary);font-size:var(--triarq-text-small);\">\r\n        AI-powered knowledge chat is coming in Build B.\r\n      </p>\r\n    </div>`\r\n})\r\nexport class ChatComponent {}\r\n"],
+  "mappings": ";;;AACA,SAAS,WAAW,+BAA+B;;AAa7C,IAAO,gBAAP,MAAO,eAAa;;;uBAAb,gBAAa;IAAA;EAAA;;4EAAb,gBAAa,WAAA,CAAA,CAAA,UAAA,CAAA,GAAA,YAAA,MAAA,UAAA,CAAA,gCAAA,GAAA,OAAA,GAAA,MAAA,GAAA,QAAA,CAAA,CAAA,GAAA,WAAA,GAAA,aAAA,SAAA,UAAA,gCAAA,cAAA,QAAA,GAAA,CAAA,GAAA,SAAA,sCAAA,aAAA,0BAAA,CAAA,GAAA,UAAA,SAAA,uBAAA,IAAA,KAAA;AAAA,UAAA,KAAA,GAAA;AAPtB,QAAA,4BAAA,GAAA,OAAA,CAAA,EAAoG,GAAA,IAAA;AAC9F,QAAA,oBAAA,GAAA,cAAA;AAAY,QAAA,0BAAA;AAChB,QAAA,4BAAA,GAAA,KAAA,CAAA;AACE,QAAA,oBAAA,GAAA,mDAAA;AACF,QAAA,0BAAA,EAAI;;;;;;gFAGG,eAAa,EAAA,WAAA,iBAAA,UAAA,+CAAA,YAAA,GAAA,CAAA;AAAA,GAAA;",
+  "names": []
+}

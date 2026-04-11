@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/features/chat/chat.module.ts"],
+  "sourcesContent": ["// chat.module.ts — ChatModule (lazy-loaded, D-143)\r\n// Build A: stub only. No chat skill, no Vertex AI. (Session 2026-03-29-A)\r\n\r\nimport { NgModule }     from '@angular/core';\r\nimport { CommonModule } from '@angular/common';\r\nimport { RouterModule } from '@angular/router';\r\nimport { IonicModule }  from '@ionic/angular';\r\n\r\n@NgModule({\r\n  imports: [\r\n    CommonModule,\r\n    IonicModule,\r\n    RouterModule.forChild([\r\n      { path: '', loadComponent: () => import('./chat.component').then(c => c.ChatComponent) }\r\n    ])\r\n  ]\r\n})\r\nexport class ChatModule {}\r\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;;;;;AAGA,SAAS,gBAAoB;AAC7B,SAAS,oBAAoB;AAC7B,SAAS,oBAAoB;;AAYvB,IAAO,aAAP,MAAO,YAAU;;;uBAAV,aAAU;IAAA;EAAA;;2EAAV,YAAU,CAAA;EAAA;;;MAPnB;MACA;MACA,aAAa,SAAS;QACpB,EAAE,MAAM,IAAI,eAAe,MAAM,OAAO,8BAAkB,EAAE,KAAK,OAAK,EAAE,aAAa,EAAC;OACvF;IAAC,EAAA,CAAA;EAAA;;",
+  "names": []
+}
