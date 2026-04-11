@@ -1,6 +1,6 @@
 # Project Briefing
 Pathways OI Trust | v5.30 | March 2026 | CONFIDENTIAL
-Owner: Phil Sappington, EVP Performance & Governance
+Owner: Phil Dodds, EVP Performance & Governance
 
 ---
 
@@ -9,7 +9,7 @@ Owner: Phil Sappington, EVP Performance & Governance
 | Field | Value |
 |-------|-------|
 | System Name | Pathways OI Trust (interim — pending Mike review) |
-| Owner | Phil Sappington, EVP Performance & Governance |
+| Owner | Phil Dodds, EVP Performance & Governance |
 | Scope | Phil's full management infrastructure for four authorities: Governance, Performance, Technical Support Services, Enterprise Services |
 | Nine Trusts | Practice Services, Value Services, Enterprise Services, Foundry, Performance, Platform, Governance, Growth, Administration Services |
 | Demo Stack | Angular 19 + Native Federation, Supabase (PostgreSQL + pgvector + Auth), Node.js MCP on Render, Vertex AI (personal GCP), GitHub Pages |

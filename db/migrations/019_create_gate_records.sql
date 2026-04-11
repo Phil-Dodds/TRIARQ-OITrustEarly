@@ -63,7 +63,7 @@ COMMENT ON COLUMN public.gate_records.gate_status IS
     'blocked: workstream inactive at time of submission attempt.';
 
 COMMENT ON COLUMN public.gate_records.approver_user_id IS
-    'Build C: Phil Sappington user_id used as default approver for all gates (Section 4.2). '
+    'Build C: Phil Dodds user_id used as default approver for all gates (Section 4.2). '
     'Build B: resolved from Division-level RACI configuration per D-65.';
 
 COMMENT ON COLUMN public.gate_records.workstream_active_at_clearance IS

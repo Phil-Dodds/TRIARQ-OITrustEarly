@@ -1,6 +1,6 @@
 # Build A Specification
 Pathways OI Trust | Foundation — Container Hierarchy, Bulk Knowledge Seed, Document Access, Embedded Chat | v1.1 | March 2026 | CONFIDENTIAL
-Owner: Phil Sappington, EVP Performance & Governance
+Owner: Phil Dodds, EVP Performance & Governance
 
 ---
 
