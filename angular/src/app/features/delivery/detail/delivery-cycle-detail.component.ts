@@ -3,6 +3,7 @@
 // Spec: build-c-spec Section 5.3 | Contract 1 2026-04-10
 //
 // Contract 1 changes: S-005/S-006 View surface — display-only fields, action zone.
+// Contract 4 changes: D-273 zone reorder (Stage Track above Outcome), D-275 editable gate table, D-276 Outcome display-only (no inline link).
 //   - @Input() cycleId: accepts id from dashboard panel (route fallback for direct URL)
 //   - @Output() close: emits when panel close is triggered (dashboard handles S-008 re-query)
 //   - Panel mode: no full-page wrapper; route mode: max-width:860px per approved plan
@@ -183,26 +184,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     style="color:#9E9E9E;font-style:italic;">Not set</span>
             </div>
 
-            <!-- DS / CB display row — display only in View. Edit available via Edit Cycle action (Contract 2). -->
-            <div style="display:flex;gap:var(--triarq-space-lg);margin-top:var(--triarq-space-sm);
-                        flex-wrap:wrap;">
-              <div style="font-size:var(--triarq-text-small);">
-                <span style="color:var(--triarq-color-text-secondary);">DS: </span>
-                <span *ngIf="cycle.assigned_ds_user_id" style="font-weight:500;">
-                  {{ cycle.assigned_ds_display_name ?? cycle.assigned_ds_user_id }}
-                </span>
-                <span *ngIf="!cycle.assigned_ds_user_id"
-                      style="color:var(--triarq-color-text-secondary);font-style:italic;">Unassigned</span>
-              </div>
-              <div style="font-size:var(--triarq-text-small);">
-                <span style="color:var(--triarq-color-text-secondary);">CB: </span>
-                <span *ngIf="cycle.assigned_cb_user_id" style="font-weight:500;">
-                  {{ cycle.assigned_cb_display_name ?? cycle.assigned_cb_user_id }}
-                </span>
-                <span *ngIf="!cycle.assigned_cb_user_id"
-                      style="color:var(--triarq-color-text-secondary);font-style:italic;">Unassigned</span>
-              </div>
-            </div>
+            <!-- DS/CB moved to Identity zone below Stage Track. D-273. -->
           </div>
           <!-- ── Action Zone (5 actions per Contract 1 2026-04-10) ──────────── -->
           <!-- Actions: Edit Cycle | Submit Gate | Regress Stage | Cancel | Un-cancel -->
@@ -372,28 +354,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
       </div>
 
-      <!-- ── Outcome Statement — display only in View (S-005). Edit via Edit Cycle. ── -->
-      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
-        <div style="font-weight:500;font-size:var(--triarq-text-body);margin-bottom:var(--triarq-space-xs);">
-          Outcome Statement
-        </div>
-        <!-- Amber bordered box per Visual Layout Standards 3.3. Warning text when null. -->
-        <div style="border:1.5px solid var(--triarq-color-sunray,#F2A620);background:#FFFBF0;
-                    border-radius:6px;padding:12px;">
-          <div *ngIf="!cycle.outcome_statement"
-               style="color:var(--triarq-color-sunray,#F2A620);font-size:14px;
-                      font-style:italic;font-family:Roboto,sans-serif;">
-            No Outcome Statement set. Required before Brief Review gate.
-          </div>
-          <div *ngIf="cycle.outcome_statement"
-               style="font-size:14px;font-style:italic;font-family:Roboto,sans-serif;
-                      color:#262626;white-space:pre-wrap;">
-            {{ cycle.outcome_statement }}
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Stage Track — Full mode ─────────────────────────────────────── -->
+      <!-- ── Stage Track — Full mode (D-273: above Outcome) ────────────────────── -->
       <!-- Label fixed "Lifecycle Track" → "Stage Track" per S-002 and Contract 3 Block 4 Fix 1. -->
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
         <div style="font-weight:500;margin-bottom:4px;">Stage Track</div>
@@ -407,6 +368,126 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           displayMode="full"
           (gateClicked)="openGatePanel($event)"
         ></app-stage-track>
+      </div>
+
+      <!-- ── Outcome Statement — display only (D-276: no inline Add/Edit link). ── -->
+      <!-- D-273: below Stage Track. No amber box (D-276). Gray guidance when null.  -->
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+        <div style="font-weight:500;font-size:var(--triarq-text-body);margin-bottom:var(--triarq-space-xs);">
+          Outcome Statement
+        </div>
+        <!-- When null: gray guidance text. D-200 Pattern 1. No inline Add link per D-276. -->
+        <div *ngIf="!cycle.outcome_statement"
+             style="color:var(--triarq-color-text-secondary);font-size:14px;
+                    font-style:italic;font-family:Roboto,sans-serif;">
+          Not set — should be added before Brief Review Gate. Edit via the Edit Cycle button above.
+        </div>
+        <!-- When set: plain italic body text. D-276. -->
+        <div *ngIf="cycle.outcome_statement"
+             style="font-size:14px;font-style:italic;font-family:Roboto,sans-serif;
+                    color:#262626;white-space:pre-wrap;">
+          {{ cycle.outcome_statement }}
+        </div>
+      </div>
+
+      <!-- ── Identity zone — D-273 zone 4: Division / Workstream / DS / CB / Tier / Jira Epic ── -->
+      <!-- D-181: tappable chips. 2-column grid. Unset values: dashed-border chip italic gray.    -->
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+        <div style="font-weight:500;margin-bottom:var(--triarq-space-sm);">Identity</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--triarq-space-sm);">
+
+          <!-- Division -->
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Division</div>
+            <span *ngIf="cycle.division_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:12px;">
+              {{ cycle.division_name }}
+            </span>
+            <span *ngIf="!cycle.division_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
+              Not set
+            </span>
+          </div>
+
+          <!-- Workstream -->
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Workstream</div>
+            <span *ngIf="cycle.workstream?.workstream_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:12px;">
+              {{ cycle.workstream!.workstream_name }}
+            </span>
+            <span *ngIf="!cycle.workstream?.workstream_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
+              Not set
+            </span>
+          </div>
+
+          <!-- DS (Domain Strategist) -->
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Domain Strategist</div>
+            <span *ngIf="cycle.assigned_ds_display_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
+              {{ cycle.assigned_ds_display_name }}
+            </span>
+            <span *ngIf="!cycle.assigned_ds_display_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
+              Unassigned
+            </span>
+          </div>
+
+          <!-- CB (Capability Builder) -->
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Capability Builder</div>
+            <span *ngIf="cycle.assigned_cb_display_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
+              {{ cycle.assigned_cb_display_name }}
+            </span>
+            <span *ngIf="!cycle.assigned_cb_display_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
+              Unassigned
+            </span>
+          </div>
+
+          <!-- Tier — plain text, not a chip per spec -->
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Tier</div>
+            <span style="font-size:13px;font-weight:500;"
+                  [style.color]="tierBadgeColor(cycle.tier_classification)">
+              Tier {{ tierLabel(cycle.tier_classification) }} —
+              {{ cycle.tier_classification === 'tier_1' ? 'Fast Lane' : cycle.tier_classification === 'tier_2' ? 'Structured' : 'Governed' }}
+            </span>
+          </div>
+
+          <!-- Jira Epic Link -->
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Jira Epic</div>
+            <span *ngIf="jiraLink?.jira_epic_key"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
+              {{ jiraLink!.jira_epic_key }}
+            </span>
+            <span *ngIf="!jiraLink?.jira_epic_key"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
+              Not linked
+            </span>
+          </div>
+
+        </div>
       </div>
 
       <!-- ── Session 2026-03-24-F: missing actual date warning ───────────── -->
@@ -423,85 +504,205 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </div>
       </div>
 
-      <!-- Two-column: Milestones + Gate panel -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--triarq-space-md);
-                  margin-bottom:var(--triarq-space-md);">
+      <!-- ── Gates & Milestone Dates — D-273 zone 5, D-275 editable gate rows ──── -->
+      <!-- 4-column table: Gate (diamond+name) / Target Date (editable) / Actual Date / Status -->
+      <!-- D-275: target date, actual date, status editable directly in View gate rows.         -->
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+        <div style="font-weight:500;margin-bottom:var(--triarq-space-sm);">Gates &amp; Milestone Dates</div>
 
-        <!-- ── Milestone Dates ──────────────────────────────────────────── -->
-        <!-- D-244: Milestone Status shown as 5-color dot indicator per gate row.    -->
-        <!-- D-245: Gate Approval Status as contextual narrative text.               -->
-        <!-- Display-only in View (S-005). Target/Actual date editing in Edit Cycle. -->
-        <div class="oi-card">
-          <div style="font-weight:500;margin-bottom:4px;">Milestone Dates</div>
-          <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                      margin-bottom:var(--triarq-space-sm);">
-            Actual date is set automatically when a gate is cleared.
-            Target dates and milestone status are editable via Edit Cycle.
-          </div>
+        <!-- Table header row -->
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 120px;
+                    gap:var(--triarq-space-sm);padding:6px 0;
+                    border-bottom:2px solid var(--triarq-color-border);
+                    font-size:10px;font-weight:600;letter-spacing:0.06em;
+                    text-transform:uppercase;color:var(--triarq-color-text-secondary);">
+          <span>Gate</span>
+          <span>Target Date</span>
+          <span>Actual Date</span>
+          <span>Status</span>
+        </div>
 
-          <!-- Gate row: Gate + Approval Status narrative | Target Date | Actual Date | Milestone Status dot -->
-          <!-- D-244: 5-color dot for Milestone Status. D-245: Approval Status as narrative text.         -->
-          <!-- Display-only in View (S-005). Target date editing and status override in Edit Cycle.        -->
-          <div *ngFor="let m of cycle.milestone_dates; trackBy: trackByMilestoneId"
-               style="display:grid;grid-template-columns:2fr 1fr 1fr 100px;
-                      gap:var(--triarq-space-sm);padding:12px 0;
-                      border-bottom:1px solid var(--triarq-color-border);
-                      font-size:var(--triarq-text-small);align-items:start;">
+        <!-- Gate rows — D-275: target date, actual date, and status editable in View -->
+        <div *ngFor="let m of cycle.milestone_dates; trackBy: trackByMilestoneId"
+             style="border-bottom:1px solid var(--triarq-color-border);">
 
-            <!-- Col 1: Gate name + Gate Approval Status narrative (D-245) -->
-            <div>
-              <span style="font-weight:500;font-size:14px;">{{ GATE_LABELS[m.gate_name] }}</span>
-              <div *ngIf="gateApprovalNarrative(m.gate_name)"
-                   [style.color]="gateApprovalNarrativeColor(m.gate_name)"
-                   style="font-size:11px;margin-top:3px;">
-                {{ gateApprovalNarrative(m.gate_name) }}
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr 120px;
+                      gap:var(--triarq-space-sm);padding:10px 0;
+                      font-size:var(--triarq-text-small);align-items:center;cursor:pointer;"
+               (click)="openGatePanel(m.gate_name)">
+
+            <!-- Col 1: Gate diamond + name + approval narrative -->
+            <div style="display:flex;align-items:flex-start;gap:8px;">
+              <!-- Gate diamond icon -->
+              <span style="display:inline-flex;align-items:center;justify-content:center;
+                           flex-shrink:0;margin-top:1px;">
+                <svg width="14" height="14" viewBox="0 0 14 14"
+                     [attr.fill]="gateDetailStatusBg(m.gate_name)"
+                     [attr.stroke]="gateApprovalNarrativeColor(m.gate_name)"
+                     stroke-width="1.5">
+                  <rect x="2" y="2" width="10" height="10" rx="1" transform="rotate(45 7 7)"/>
+                </svg>
+              </span>
+              <div>
+                <span style="font-weight:500;">{{ GATE_LABELS[m.gate_name] }}</span>
+                <div *ngIf="gateApprovalNarrative(m.gate_name)"
+                     [style.color]="gateApprovalNarrativeColor(m.gate_name)"
+                     style="font-size:11px;margin-top:2px;">
+                  {{ gateApprovalNarrative(m.gate_name) }}
+                </div>
+                <!-- Alert icon: status = Complete but no gate approval -->
+                <span *ngIf="effectiveDateStatus(m) === 'complete' && !isGateApproved(m.gate_name)"
+                      style="font-size:11px;color:var(--triarq-color-sunray,#f5a623);"
+                      title="Status set to Complete but gate not yet approved">⚠</span>
+                <!-- Alert icon: today > target date and status not Behind or Complete -->
+                <span *ngIf="isTargetDateOverdue(m) && effectiveDateStatus(m) !== 'behind' && effectiveDateStatus(m) !== 'complete'"
+                      style="font-size:11px;color:var(--triarq-color-sunray,#f5a623);"
+                      title="Target date has passed — consider updating the milestone status">⚠</span>
               </div>
             </div>
 
-            <!-- Col 2: Target Date — display only -->
-            <div>
-              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Target Date</div>
-              <span *ngIf="m.target_date" [style.color]="milestoneTargetColor(m)">{{ m.target_date }}</span>
-              <span *ngIf="!m.target_date" style="color:#9E9E9E;">—</span>
+            <!-- Col 2: Target Date — editable date input. D-275. -->
+            <div (click)="$event.stopPropagation()">
+              <ng-container *ngIf="editingMilestoneGate === m.gate_name; else targetDateDisplay">
+                <input [formControl]="milestoneDateControl"
+                       type="date"
+                       class="oi-input"
+                       style="width:100%;font-size:12px;padding:3px 6px;" />
+                <div style="display:flex;gap:4px;margin-top:4px;">
+                  <button (click)="saveMilestoneDate(m.gate_name)"
+                          [disabled]="savingMilestone"
+                          style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
+                                 color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                    {{ savingMilestone ? '…' : 'Save' }}
+                  </button>
+                  <button (click)="cancelMilestoneEdit()"
+                          style="font-size:11px;padding:2px 8px;background:none;
+                                 border:1px solid #D0D0D0;border-radius:4px;cursor:pointer;color:#5A5A5A;">
+                    Cancel
+                  </button>
+                </div>
+                <div *ngIf="milestoneError" style="font-size:11px;color:var(--triarq-color-error);margin-top:2px;">{{ milestoneError }}</div>
+              </ng-container>
+              <ng-template #targetDateDisplay>
+                <span *ngIf="m.target_date"
+                      (click)="startMilestoneEdit(m)"
+                      [style.color]="milestoneTargetColor(m)"
+                      style="cursor:pointer;text-decoration:underline dotted;"
+                      title="Click to edit target date">
+                  {{ m.target_date }}
+                </span>
+                <span *ngIf="!m.target_date"
+                      (click)="startMilestoneEdit(m)"
+                      style="font-style:italic;color:#9E9E9E;cursor:pointer;
+                             border-bottom:1px dashed #C0C0C0;"
+                      title="Click to set target date">
+                  Set date
+                </span>
+              </ng-template>
             </div>
 
-            <!-- Col 3: Actual Date — display only; warn if gate approved but no actual date -->
-            <div>
-              <div style="color:var(--triarq-color-text-secondary);font-size:10px;margin-bottom:2px;">Actual Date</div>
-              <span *ngIf="m.actual_date"
-                    [style.color]="m.actual_date <= (m.target_date ?? m.actual_date)
-                      ? 'var(--triarq-color-text-secondary)'
-                      : 'var(--triarq-color-error)'">
-                {{ m.actual_date }}
-              </span>
-              <span *ngIf="!m.actual_date && isMissingActualDate(m.gate_name)"
-                    style="color:var(--triarq-color-sunray,#f5a623);"
-                    title="Gate approved but actual date not recorded">⚠ missing</span>
-              <span *ngIf="!m.actual_date && !isMissingActualDate(m.gate_name)"
-                    style="color:#9E9E9E;">—</span>
+            <!-- Col 3: Actual Date — system-set, user-editable. D-275. -->
+            <div (click)="$event.stopPropagation()">
+              <ng-container *ngIf="editingActualDateGate === m.gate_name; else actualDateDisplay">
+                <input [formControl]="actualDateControl"
+                       type="date"
+                       class="oi-input"
+                       style="width:100%;font-size:12px;padding:3px 6px;" />
+                <div style="display:flex;gap:4px;margin-top:4px;">
+                  <button (click)="saveActualDate(m.gate_name)"
+                          [disabled]="savingActualDate"
+                          style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
+                                 color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                    {{ savingActualDate ? '…' : 'Save' }}
+                  </button>
+                  <button (click)="cancelActualDateEdit()"
+                          style="font-size:11px;padding:2px 8px;background:none;
+                                 border:1px solid #D0D0D0;border-radius:4px;cursor:pointer;color:#5A5A5A;">
+                    Cancel
+                  </button>
+                </div>
+                <div *ngIf="actualDateError" style="font-size:11px;color:var(--triarq-color-error);margin-top:2px;">{{ actualDateError }}</div>
+              </ng-container>
+              <ng-template #actualDateDisplay>
+                <span *ngIf="m.actual_date"
+                      (click)="startActualDateEdit(m.gate_name)"
+                      [style.color]="m.actual_date <= (m.target_date ?? m.actual_date) ? 'var(--triarq-color-text-secondary)' : 'var(--triarq-color-error)'"
+                      style="cursor:pointer;text-decoration:underline dotted;"
+                      title="Click to edit actual date">
+                  {{ m.actual_date }}
+                </span>
+                <span *ngIf="!m.actual_date"
+                      (click)="startActualDateEdit(m.gate_name)"
+                      style="font-style:italic;color:#9E9E9E;cursor:pointer;"
+                      title="Click to set actual date">
+                  Not set
+                </span>
+              </ng-template>
             </div>
 
-            <!-- Col 4: Milestone Status 5-color dot + label (D-244) -->
-            <!-- effectiveDateStatus() prevents "Behind" when no target date set. Source: Contract 3 Block 4 Fix 4. -->
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span [style.background]="milestoneStatusDotColor(effectiveDateStatus(m))"
-                    style="display:inline-block;width:10px;height:10px;
-                           border-radius:50%;flex-shrink:0;">
-              </span>
-              <span [style.color]="milestoneStatusDotColor(effectiveDateStatus(m))"
-                    style="font-size:12px;font-weight:500;">
-                {{ gateStatusDisplayLabel(effectiveDateStatus(m)) }}
-              </span>
+            <!-- Col 4: Status — colored dot (11px) + dropdown. D-275 / D-205: user controls freely. -->
+            <div (click)="$event.stopPropagation()">
+              <ng-container *ngIf="editingMilestoneStatus === m.gate_name; else statusDisplay">
+                <select [(ngModel)]="milestoneStatusValue"
+                        class="oi-input"
+                        style="font-size:12px;padding:3px 6px;width:100%;">
+                  <option value="not_started">Not Started</option>
+                  <option value="on_track">On Track</option>
+                  <option value="at_risk">At Risk</option>
+                  <option value="behind">Behind</option>
+                  <option value="complete">Complete</option>
+                </select>
+                <div style="display:flex;gap:4px;margin-top:4px;">
+                  <button (click)="saveMilestoneStatus(m.gate_name)"
+                          [disabled]="savingMilestoneStatus"
+                          style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
+                                 color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                    {{ savingMilestoneStatus ? '…' : 'Save' }}
+                  </button>
+                  <button (click)="cancelMilestoneStatusEdit()"
+                          style="font-size:11px;padding:2px 8px;background:none;
+                                 border:1px solid #D0D0D0;border-radius:4px;cursor:pointer;color:#5A5A5A;">
+                    Cancel
+                  </button>
+                </div>
+                <div *ngIf="milestoneStatusError" style="font-size:11px;color:var(--triarq-color-error);margin-top:2px;">{{ milestoneStatusError }}</div>
+              </ng-container>
+              <ng-template #statusDisplay>
+                <div style="display:flex;align-items:center;gap:5px;cursor:pointer;"
+                     (click)="startMilestoneStatusEdit(m)"
+                     title="Click to change status">
+                  <span [style.background]="milestoneStatusDotColor(effectiveDateStatus(m))"
+                        style="display:inline-block;width:11px;height:11px;border-radius:50%;flex-shrink:0;">
+                  </span>
+                  <span [style.color]="milestoneStatusDotColor(effectiveDateStatus(m))"
+                        style="font-size:11px;font-weight:500;">
+                    {{ milestoneStatusLabel(effectiveDateStatus(m)) }}
+                  </span>
+                </div>
+              </ng-template>
             </div>
 
-          </div><!-- end *ngFor milestone rows -->
+          </div><!-- end row div -->
+
+        </div><!-- end *ngFor milestone rows -->
+
+        <!-- Status legend below table -->
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:var(--triarq-space-sm);
+                    font-size:11px;color:var(--triarq-color-text-secondary);">
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#9E9E9E;"></span> Not Started</span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#2E7D32;"></span> On Track</span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#F2A620;"></span> At Risk</span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#D32F2F;"></span> Behind</span>
+          <span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#257099;"></span> Complete</span>
         </div>
 
-        <!-- ── Gate Detail Sub-Panel ────────────────────────────────────── -->
-        <!-- S2 (Part 2 Supplement): Structured gate detail layout.         -->
-        <!-- Principle 10: right-panel, no route change, dismissible.       -->
-        <!-- D-178 Tier 3: position:relative required for loading overlay.  -->
-        <div class="oi-card" style="position:relative;">
+
+        <!-- ── Gate Detail Sub-Panel ─────────────────────────────────────── -->
+        <!-- D-273: below the gate table in the same card. Opens on gate row click.  -->
+        <!-- S2 (Part 2 Supplement): Structured gate detail layout.                  -->
+        <!-- Principle 10: right-panel, no route change, dismissible.                -->
+        <!-- D-178 Tier 3: position:relative required for loading overlay.           -->
+        <div style="position:relative;margin-top:var(--triarq-space-sm);">
           <app-loading-overlay [visible]="gateActionBusy" message="Processing gate…"></app-loading-overlay>
 
           <!-- Panel header: gate name + breadcrumb + close button -->
@@ -1562,6 +1763,30 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   isMissingActualDate(gate: GateName): boolean {
     return this.missingActualDateGateNames.includes(gate);
+  }
+
+  /** Returns true when a gate has been approved — used for alert icon check. D-275. */
+  isGateApproved(gate: GateName): boolean {
+    return this.cycle?.gate_records?.find(g => g.gate_name === gate)?.gate_status === 'approved';
+  }
+
+  /** Returns true when today is past the target date and the gate is not yet completed. D-275. */
+  isTargetDateOverdue(m: CycleMilestoneDate): boolean {
+    if (!m.target_date || m.actual_date) { return false; }
+    const today = new Date().toISOString().slice(0, 10);
+    return m.target_date < today;
+  }
+
+  /** Display label for milestone status dot. Distinct from gateStatusDisplayLabel (different label set). */
+  milestoneStatusLabel(dateStatus: DateStatus | undefined): string {
+    const labels: Record<string, string> = {
+      not_started: 'Not Started',
+      on_track:    'On Track',
+      at_risk:     'At Risk',
+      behind:      'Behind',
+      complete:    'Complete'
+    };
+    return labels[dateStatus ?? 'not_started'] ?? (dateStatus ?? 'Not Started');
   }
 
   /** Group cycle artifacts by lifecycle_stage for the artifacts panel.

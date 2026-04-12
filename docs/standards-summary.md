@@ -211,6 +211,56 @@ excluded from filter memory. No further justification needed at the surface leve
 
 ---
 
+### S-010 — Filter Panel Structure
+
+**Rule:** Every filterable list or grid surface uses a slide-in filter panel, collapsed by default. A "Filters" button opens it with a count badge when filters are active. Panel contains filter controls only — no sort, no search.
+
+**Conformance test:** Is the filter panel collapsed on default load? Does Filters button show count badge when active? Are sort controls absent from the panel? All yes = pass.
+
+**Governing decisions:** D-HubFilter-2026-04-06.
+
+---
+
+### S-011 — Filter Panel Commit Model
+
+**Rule:** Filter selections do not trigger queries in real time. Panel has "Apply filters" (runs query, closes panel) and "Clear all" (resets to defaults, no query, panel stays open). X closes panel without side effects. No filter change takes effect until Apply is tapped.
+
+**Conformance test:** Does selecting a filter value alone change grid results? (No = pass.) Does Apply run query and close panel? Does Clear all reset without querying? Does X close without side effects? All correct = pass.
+
+**Governing decisions:** D-HubFilter-2026-04-06, D-171.
+
+---
+
+### S-012 — Active Filter Chips
+
+**Rule:** Active filters render as dismissible chips in a bar below the grid header, above grid rows. Format: "FilterName: Value". Tapping chip X removes that filter and immediately re-queries. Chip bar absent when no filters active.
+
+**Conformance test:** Does each active filter produce one chip with "Name: Value" format? Does removing a chip re-query immediately? Is chip bar absent when no filters active? All yes = pass.
+
+**Governing decisions:** D-HubFilter-2026-04-06, D-203.
+
+---
+
+### S-013 — Filter Drill-in Pattern
+
+**Rule:** Each filter row shows name and current value, collapsed. Tapping expands options inline. Only one row expanded at a time — expanding a second collapses the first. No dropdowns or checkbox lists inside the panel.
+
+**Conformance test:** Are filter options hidden until row is tapped? Does expanding one row collapse others? Are dropdowns used inside panel? (No = pass.) Are checkbox lists used inside panel? (No = pass.) All correct = pass.
+
+**Governing decisions:** D-HubFilter-2026-04-06, D-HubFilter-Division, D-HubFilter-AssignedPerson, D-HubFilter-Tier.
+
+---
+
+### S-014 — Component Library Baseline: Angular Material (Material Design 3)
+
+**Rule:** OI Trust uses Angular Material (MD3) as the default component library. Where an OI Trust Active Standard or locked decision specifies different behavior, OI Trust governs. Where no specification exists, Code consults Angular Material / MD3, extracts the rule in binary-testable form, and proposes it as a Standard candidate before implementing. No silent MD3 adoption.
+
+**Conformance test:** Does every component either trace to an OI Trust Active Standard or locked decision, or cite an explicit Angular Material / MD3 reference in a CC-decision or Standard candidate? Yes = pass. Any silent invention = violation.
+
+**Governing decisions:** D-274.
+
+---
+
 ## Maintenance Rule
 
 When a new Standard is promoted to Active in a design session, a Section F instruction
