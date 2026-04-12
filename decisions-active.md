@@ -1,5 +1,5 @@
 # Design Decisions — Active
-Pathways OI Trust | v3.47-active | April 2026 | CONFIDENTIAL
+Pathways OI Trust | v3.48-active | April 2026 | CONFIDENTIAL
 
 Active = operative locked decisions + open decisions. Superseded decisions are in decisions-archive.md.
 
@@ -530,6 +530,37 @@ These principles apply to every effort, not just this system.
 ---
 
 ### Build C Decisions — Contract 4 (April 2026)
+
+**D-264** — Grid Row Tier Display Removed. Tier is removed from the All Delivery Cycles grid row entirely. D-197 (Tier Avatar Dot — 48px leftmost circle) is superseded. The Tier badge pill below Cycle Title is also removed. Tier will not appear on grid rows until a specific design decision reintroduces it. Rationale: Tier is not a primary scanning dimension on this surface; the visual weight of the dot consumes space without proportionate value. Tier remains visible on the Create and Edit cycle forms, the filter panel drill-in (D-HubFilter-Tier), and the cycle detail panel. Supersedes: D-197. Connects to: D-172, D-198. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
+Note: D-264 badge pill removal is partially superseded by D-281, which restores the pill below cycle title in the grid row. The dot removal remains in force.
+
+**D-265** — Grid Row Team Cell. The Assigned DS and Assigned CB columns (D-172 columns 6 and 7) are replaced by a single stacked Team cell. Display order top to bottom: CB display name / Delivery Workstream short name / DS display name. Each present value renders as a tappable chip per D-181. Null values collapse — no blank line rendered for a missing value. If all three values are null, the cell renders blank. No "Unassigned" label. Column header: TEAM. Supersedes: D-172 columns 6 and 7 (separate DS and CB columns). Rationale: stacked Team cell was the original design intent — lost in the handoff process. Restoring as locked decision. Connects to: D-172, D-181, D-203. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
+
+**D-266** — Grid Row Title and Outcome Wrapping. Cycle Title and Outcome Statement wrap to a maximum of three lines in the grid row. If text exceeds three lines, it is clipped at line 3 with ellipsis. Tooltip on hover shows full text. The "single row per cycle without wrapping" rule in delivery-cycle-dashboard-spec Section 1.1 is superseded — rows expand vertically to accommodate wrapped content. All other columns align to the top of the row. Supersedes: D-172 one-line truncation for Outcome; delivery-cycle-dashboard-spec Section 1.1 no-wrap rule. Connects to: D-172. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
+
+**D-267** — Grid Row Stage and Headline as Separate Columns. Stage Track (Condensed) and Headline are two separate columns — not combined into one cell. Stage column: condensed Stage Track component (5 gate nodes only, per S-002) with current stage name as adjacent text below the nodes ("Currently in BRIEF"). No stage key text, no headline text in this cell. Headline column: computed intelligent summary text per Session 2026-03-24-C business rules: (1) Gate pending approval: "Awaiting [Gate Name] approval · [target date if set]"; (2) Gate overdue: "[Gate Name] approval overdue · X days"; (3) Pre-pilot, pilot target set: "Next: [Gate Name] [date] · Pilot [date]"; (4) Pre-pilot, no pilot target set: "Next: [Gate Name] [date if set]"; (5) Stage active, next gate future: "In [Current Stage] · Next: [Gate Name] [date if set]"; (6) Post-deploy: "Pilot [date] · Release [date if set]". Overdue color Oravive, upcoming color Sunray. Headline is computed fresh on each render — not stored. Corrects Contract 1 CC-Decision-2026-04-10-C deviation which collapsed Stage + Headline + stage label into one cell without design authorization. Connects to: D-172, S-002, Session 2026-03-24-C. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
+
+**D-268** — S-010: Filter Panel Structure. Active Standard. Every filterable list or grid surface uses a slide-in filter panel collapsed by default. Filters button shows count badge when active. Panel contains filter controls only — no sort, no search. See standards.md S-010 for full rationale and conformance test. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
+
+**D-269** — S-011: Filter Panel Commit Model. Active Standard. Filter selections do not trigger real-time queries. Apply runs query and closes panel. Clear all resets without querying and without closing. X closes without side effects. See standards.md S-011. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
+
+**D-270** — S-012: Active Filter Chips. Active Standard. Active filters render as "FilterName: Value" dismissible chips above grid rows. Chip X removal re-queries immediately. Chip bar absent when no filters active. See standards.md S-012. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
+
+**D-271** — S-013: Filter Drill-in Pattern. Active Standard. Filter rows collapsed by default, expand inline on tap. One row expanded at a time — expanding second collapses first. No dropdowns or checkbox lists inside panel. See standards.md S-013. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
+
+**D-273** — Delivery Cycle Detail Panel — View Surface. The View surface opens in the right panel on row click. List remains visible on the left. Eight zones in order top to bottom: (1) Stage Track, (2) Outcome Statement, (3) Identity, (4) Gates & Milestone Dates, (5) Gate Record, (6) Cycle Artifacts, (7) Jira Sync, (8) Event Log. See build-c-spec.md for full zone specifications. Connects to: S-005, S-006, D-275, D-276, build-c-spec.md. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
+
+**D-274** — Component Library Baseline: Angular Material (Material Design 3). OI Trust uses Angular Material implementing Material Design 3 as the default component library. Where an OI Trust Active Standard or locked decision explicitly specifies different behavior, the OI Trust specification governs. Where no OI Trust specification exists for a component behavior, Code consults Angular Material / MD3 documentation, extracts the applicable rule in binary-testable form, and proposes it as a new Standard candidate before implementing. Code does not silently adopt MD3 defaults — it surfaces them as CC-decisions or Standard candidates. This decision fills gaps only — it does not override any existing locked decision or Active Standard. | Source: Claude Chat | 2026-04-11 |
+| impl_status: not-specced |
 
 **D-275** — Gate Record Inline Edit in Cycle View. Gate target date, actual date, and status are editable directly in gate rows within the Delivery Cycle Detail View. This is not a violation of S-005 — the cycle View is read-only for cycle fields; gate rows are a nested sub-surface where the gate record's own edit controls live. Editable gate fields are scoped to gate_records only. No cycle fields are editable in View. | Source: Session 2026-04-11 | April 2026 |
 | impl_status: built |
