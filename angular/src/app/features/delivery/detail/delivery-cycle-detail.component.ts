@@ -416,10 +416,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <div>
             <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
                         color:var(--triarq-color-text-secondary);margin-bottom:4px;">Workstream</div>
+            <!-- D-203: display_name_short preferred; fallback to workstream_name when null. Source: Contract 5 Block 2.4. -->
             <span *ngIf="cycle.workstream?.workstream_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:12px;">
-              {{ cycle.workstream!.workstream_name }}
+              {{ cycle.workstream!.display_name_short ?? cycle.workstream!.workstream_name }}
             </span>
             <span *ngIf="!cycle.workstream?.workstream_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
@@ -460,12 +461,14 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </span>
           </div>
 
-          <!-- Tier — plain text, not a chip per spec -->
+          <!-- Tier — badge chip per Visual Layout Standards 1.7. CC-Decision-2026-04-12-A: Contract 5 restores badge. -->
           <div>
             <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
                         color:var(--triarq-color-text-secondary);margin-bottom:4px;">Tier</div>
-            <span style="font-size:13px;font-weight:500;"
-                  [style.color]="tierBadgeColor(cycle.tier_classification)">
+            <span [style.background]="tierBadgeBg(cycle.tier_classification)"
+                  [style.color]="tierBadgeColor(cycle.tier_classification)"
+                  style="display:inline-block;border-radius:4px;padding:3px 8px;
+                         font-size:12px;font-weight:500;font-family:Roboto,sans-serif;">
               Tier {{ tierLabel(cycle.tier_classification) }} —
               {{ cycle.tier_classification === 'tier_1' ? 'Fast Lane' : cycle.tier_classification === 'tier_2' ? 'Structured' : 'Governed' }}
             </span>
@@ -730,8 +733,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           </div>
 
           <!-- Empty state — no gate selected -->
+          <!-- CC-Decision-2026-04-12-D: Zone explanatory text 11px italic #5A5A5A. Source: Contract 5 Block 2.5. -->
           <div *ngIf="!selectedGate"
-               style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
+               style="font-size:11px;font-style:italic;color:#5A5A5A;">
             <p style="margin:0 0 8px 0;">
               Gates are formal checkpoints in the lifecycle. Each Gate must be approved
               before the Delivery Cycle can advance past it.
@@ -993,8 +997,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     margin-bottom:var(--triarq-space-xs);">
           <span style="font-weight:500;">Cycle Artifacts</span>
         </div>
-        <p style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-small);
-                  color:var(--triarq-color-text-secondary);">
+        <!-- CC-Decision-2026-04-12-D: Zone explanatory text 11px italic #5A5A5A. Source: Contract 5 Block 2.5. -->
+        <p style="margin:0 0 var(--triarq-space-sm) 0;font-size:11px;font-style:italic;color:#5A5A5A;">
           Artifacts are grouped by the lifecycle stage they belong to. Attach an external URL
           to fill a slot. Use "→ OI Library" to record the artifact in the OI Library
           (full submission completes in Build B).
@@ -1285,7 +1289,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
         <!-- State 1: No Jira link yet — show + Link button and inline form -->
         <div *ngIf="!jiraLink">
-          <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+          <!-- CC-Decision-2026-04-12-D: Zone explanatory text 11px italic #5A5A5A. Source: Contract 5 Block 2.5. -->
+          <div style="font-size:11px;font-style:italic;color:#5A5A5A;
                       margin-bottom:var(--triarq-space-xs);">
             No Jira epic linked to this cycle. Link a Jira epic key to enable
             two-way sync of the five governance fields (ARCH-16).
@@ -1366,10 +1371,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       <!-- ── Event Log ─────────────────────────────────────────────────── -->
       <div class="oi-card">
         <div style="font-weight:500;margin-bottom:4px;">Event Log</div>
-        <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+        <!-- CC-Decision-2026-04-12-D: Zone explanatory text 11px italic #5A5A5A. Source: Contract 5 Block 2.5. -->
+        <div style="font-size:11px;font-style:italic;color:#5A5A5A;
                     margin-bottom:var(--triarq-space-sm);">
           Append-only record of all stage advances, gate decisions, artifact attachments,
-          and outcome changes. Oldest events at the top.
+          and outcome changes. Newest events at top.
         </div>
         <!-- D-178 Tier 1: skeleton for event log load -->
         <div *ngIf="loadingEvents">
@@ -2525,13 +2531,16 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   }
 
   /** Compute the display status label for the gate — Section 2.3 of Part 2 spec */
+  // CC-Decision-2026-04-12-B: 'not_started' is the seed status for new gate records.
+  // 'pending' now means submitted for review. Source: Contract 5 Block 2.2.
   gateDetailStatus(gate: GateName): string {
     const record = this.cycle?.gate_records?.find(g => g.gate_name === gate);
-    if (record?.gate_status === 'approved')  { return 'Approved'; }
-    if (record?.gate_status === 'blocked')   { return 'Blocked'; }
-    if (record?.gate_status === 'returned')  { return 'Returned'; }
-    if (record?.gate_status === 'pending')   { return 'Under Review'; }
-    if (this.isGateNotYetActive(gate))       { return 'Not Yet Active'; }
+    if (record?.gate_status === 'approved')    { return 'Approved'; }
+    if (record?.gate_status === 'blocked')     { return 'Blocked'; }
+    if (record?.gate_status === 'returned')    { return 'Returned'; }
+    if (record?.gate_status === 'pending')     { return 'Under Review'; }
+    if (record?.gate_status === 'not_started') { return 'Not Started'; }
+    if (this.isGateNotYetActive(gate))         { return 'Not Yet Active'; }
     const nextGate = NEXT_GATE_BY_STAGE[this.cycle?.current_lifecycle_stage as LifecycleStage ?? 'BRIEF'];
     if (nextGate === gate) { return 'Pending'; }
     return 'Upcoming';
@@ -2544,6 +2553,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     if (s === 'Returned')       { return '#fff8e1'; }
     if (s === 'Under Review')   { return '#e3f2fd'; }
     if (s === 'Pending')        { return 'var(--triarq-color-background-subtle)'; }
+    if (s === 'Not Started')    { return '#f5f5f5'; }
     return '#f5f5f5';
   }
 
@@ -2553,6 +2563,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     if (s === 'Blocked')        { return 'var(--triarq-color-error)'; }
     if (s === 'Returned')       { return '#e65100'; }
     if (s === 'Under Review')   { return 'var(--triarq-color-primary)'; }
+    if (s === 'Not Started')    { return '#9E9E9E'; }
     return 'var(--triarq-color-text-secondary)';
   }
 

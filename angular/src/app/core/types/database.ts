@@ -184,6 +184,7 @@ export type GateDisplayState    = 'pending' | 'blocked' | 'complete' | 'upcoming
 export interface DeliveryWorkstream {
   workstream_id:           string;
   workstream_name:         string;
+  display_name_short?:     string | null; // D-203: max 20 chars; fallback to workstream_name when null. Migration 027.
   home_division_id:        string;
   workstream_lead_user_id: string;
   active_status:           boolean;
