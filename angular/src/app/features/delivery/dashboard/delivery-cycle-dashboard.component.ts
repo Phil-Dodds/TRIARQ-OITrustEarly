@@ -534,13 +534,14 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           Tier: {{ filterTier === 'tier_1' ? 'Tier 1 — Fast Lane' : filterTier === 'tier_2' ? 'Tier 2 — Structured' : 'Tier 3 — Governed' }}
           <button (click)="filterTier='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
         </span>
+        <!-- D-279: chip shows "None assigned" or Division · Workstream short name. CC-Decision-2026-04-12-E. -->
         <span *ngIf="filterWorkstream"
               style="display:inline-flex;align-items:center;gap:4px;background:#fff;
                      border:1.5px solid var(--triarq-color-primary,#257099);
                      color:var(--triarq-color-primary,#257099);border-radius:999px;
                      padding:4px 12px;font-size:13px;">
-          Workstream: {{ filterWorkstream === '__none__' ? 'No workstream assigned' : workstreamName(filterWorkstream) }}
-          <button (click)="filterWorkstream='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          Workstream: {{ filterWorkstream === '__none__' ? 'None assigned' : workstreamChipLabel(filterWorkstream) }}
+          <button (click)="filterWorkstream='';wsScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
         </span>
         <span *ngIf="filterGateStatus"
               style="display:inline-flex;align-items:center;gap:4px;background:#fff;
@@ -550,13 +551,14 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
           Gate Status: {{ filterGateStatus === 'overdue' ? 'Overdue' : filterGateStatus === 'pending' ? 'Pending' : 'Approved' }}
           <button (click)="filterGateStatus='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
         </span>
+        <!-- D-277: chip shows Me / Unassigned DS / Unassigned CB / person name. CC-Decision-2026-04-12-F. -->
         <span *ngIf="filterAssignedPerson"
               style="display:inline-flex;align-items:center;gap:4px;background:#fff;
                      border:1.5px solid var(--triarq-color-primary,#257099);
                      color:var(--triarq-color-primary,#257099);border-radius:999px;
                      padding:4px 12px;font-size:13px;">
-          Assigned: {{ filterAssignedPerson === 'my_cycles' ? 'My Cycles' : filterAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : 'Unassigned CB' }}
-          <button (click)="filterAssignedPerson='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          Assigned: {{ filterAssignedPerson === 'me' ? 'Me' : filterAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : filterAssignedPerson === 'unassigned_cb' ? 'Unassigned CB' : personDisplayName(filterAssignedPerson) }}
+          <button (click)="filterAssignedPerson='';personScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
         </span>
         <span *ngIf="filterDivision"
               style="display:inline-flex;align-items:center;gap:4px;background:#fff;
@@ -629,18 +631,58 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
               <span style="font-weight:500;">Assigned Person</span>
               <span style="display:flex;align-items:center;gap:8px;">
                 <span *ngIf="stagedAssignedPerson" style="font-size:12px;color:var(--triarq-color-primary,#257099);">
-                  {{ stagedAssignedPerson === 'my_cycles' ? 'My Cycles' : stagedAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : 'Unassigned CB' }}
+                  {{ stagedAssignedPerson === 'me' ? 'Me' : stagedAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : stagedAssignedPerson === 'unassigned_cb' ? 'Unassigned CB' : personDisplayName(stagedAssignedPerson) }}
                 </span>
                 <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'person' ? '▲' : '▼' }}</span>
               </span>
             </button>
+            <!-- D-277: peer options model. Terminal = apply immediately. List = staged. CC-Decision-2026-04-12-F. -->
             <div *ngIf="openFilterRow === 'person'" style="padding:0 20px 16px;">
               <div style="display:flex;flex-direction:column;gap:8px;">
-                <label *ngFor="let opt of assignedPersonOptions"
-                       style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" [value]="opt.value" [(ngModel)]="stagedAssignedPerson" />
-                  {{ opt.label }}
+                <!-- Scope activators — list renders below -->
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                  <input type="radio" name="personScopeRadio" [value]="'normal'" [(ngModel)]="personScope"
+                         (change)="stagedAssignedPerson=''" />
+                  Normal List
                 </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                  <input type="radio" name="personScopeRadio" [value]="'bigger'" [(ngModel)]="personScope"
+                         (change)="stagedAssignedPerson=''" />
+                  Bigger List
+                </label>
+                <!-- Terminal selections — apply immediately per D-277 -->
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                  <input type="radio" name="personScopeRadio" [value]="'me_terminal'" [(ngModel)]="personScope"
+                         (change)="stagedAssignedPerson='me'; applyFilterPanel()" />
+                  Me
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                  <input type="radio" name="personScopeRadio" [value]="'unassigned_ds_terminal'" [(ngModel)]="personScope"
+                         (change)="stagedAssignedPerson='unassigned_ds'; applyFilterPanel()" />
+                  Unassigned DS
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                  <input type="radio" name="personScopeRadio" [value]="'unassigned_cb_terminal'" [(ngModel)]="personScope"
+                         (change)="stagedAssignedPerson='unassigned_cb'; applyFilterPanel()" />
+                  Unassigned CB
+                </label>
+              </div>
+              <!-- Person list: renders when Normal or Bigger scope selected -->
+              <div *ngIf="personScope === 'normal' || personScope === 'bigger'"
+                   style="margin-top:10px;max-height:200px;overflow-y:auto;
+                          display:flex;flex-direction:column;gap:6px;">
+                <ng-container *ngFor="let p of (personScope === 'normal' ? assignedPersonListNormal : assignedPersonListAll)">
+                  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#1E1E1E;">
+                    <input type="radio" [value]="p.user_id" [(ngModel)]="stagedAssignedPerson" />
+                    <span>{{ p.display_name }}
+                      <span *ngIf="p.division_name" style="color:#9E9E9E;font-size:11px;"> · {{ p.division_name }}</span>
+                    </span>
+                  </label>
+                </ng-container>
+                <div *ngIf="(personScope === 'normal' ? assignedPersonListNormal : assignedPersonListAll).length === 0"
+                     style="font-size:12px;color:#9E9E9E;font-style:italic;padding:4px 0;">
+                  No persons found in this scope.
+                </div>
               </div>
             </div>
           </div>
@@ -659,12 +701,9 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                 <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'stage' ? '▲' : '▼' }}</span>
               </span>
             </button>
+            <!-- D-278: absence of selection = no filter. No named "All Stages" option. Source: Contract 5 Block 3.3. -->
             <div *ngIf="openFilterRow === 'stage'" style="padding:0 20px 16px;">
               <div style="display:flex;flex-direction:column;gap:8px;">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" value="" [(ngModel)]="stagedStage" />
-                  All Stages
-                </label>
                 <label *ngFor="let s of stages"
                        style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" [value]="s" [(ngModel)]="stagedStage" />
@@ -688,11 +727,9 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                 <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'gate' ? '▲' : '▼' }}</span>
               </span>
             </button>
+            <!-- D-278: absence of selection = no filter. No named "All" option. Source: Contract 5 Block 3.3. -->
             <div *ngIf="openFilterRow === 'gate'" style="padding:0 20px 16px;">
               <div style="display:flex;flex-direction:column;gap:8px;">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" value="" [(ngModel)]="stagedGateStatus" />All
-                </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" value="overdue" [(ngModel)]="stagedGateStatus" />Overdue
                 </label>
@@ -720,11 +757,9 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                 <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'tier' ? '▲' : '▼' }}</span>
               </span>
             </button>
+            <!-- D-278: absence of selection = no filter. No named "All Tiers" option. Source: Contract 5 Block 3.3. -->
             <div *ngIf="openFilterRow === 'tier'" style="padding:0 20px 16px;">
               <div style="display:flex;flex-direction:column;gap:8px;">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" value="" [(ngModel)]="stagedTier" />All Tiers
-                </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" value="tier_1" [(ngModel)]="stagedTier" />
                   <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4CAF50;flex-shrink:0;"></span>Tier 1 — Fast Lane
@@ -750,48 +785,51 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
               <span style="font-weight:500;">Workstream</span>
               <span style="display:flex;align-items:center;gap:8px;">
                 <span *ngIf="stagedWorkstream" style="font-size:12px;color:var(--triarq-color-primary,#257099);">
-                  {{ stagedWorkstream === '__none__' ? 'No workstream assigned' : workstreamName(stagedWorkstream) }}
+                  {{ stagedWorkstream === '__none__' ? 'None assigned' : workstreamChipLabel(stagedWorkstream) }}
                 </span>
                 <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'workstream' ? '▲' : '▼' }}</span>
               </span>
             </button>
+            <!-- D-272 amended 2026-04-12 / D-279: peer options model. CC-Decision-2026-04-12-E. -->
+            <!-- Terminal = apply immediately. Scope activators = list renders below (staged). -->
             <div *ngIf="openFilterRow === 'workstream'" style="padding:0 20px 16px;">
-              <!-- Normal / Bigger list size toggle — D-272 -->
-              <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <button (click)="wsListSize='normal'"
-                        [style.background]="wsListSize === 'normal' ? 'var(--triarq-color-primary,#257099)' : '#fff'"
-                        [style.color]="wsListSize === 'normal' ? '#fff' : '#5A5A5A'"
-                        style="border:1px solid var(--triarq-color-primary,#257099);border-radius:4px;
-                               padding:4px 12px;font-size:12px;cursor:pointer;">
+              <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
+                <!-- Scope activators -->
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                  <input type="radio" name="wsScopeRadio" [value]="'normal'" [(ngModel)]="wsScope"
+                         (change)="stagedWorkstream === '__none__' ? stagedWorkstream = '' : null" />
                   Normal List
-                </button>
-                <button (click)="wsListSize='bigger'"
-                        [style.background]="wsListSize === 'bigger' ? 'var(--triarq-color-primary,#257099)' : '#fff'"
-                        [style.color]="wsListSize === 'bigger' ? '#fff' : '#5A5A5A'"
-                        style="border:1px solid var(--triarq-color-primary,#257099);border-radius:4px;
-                               padding:4px 12px;font-size:12px;cursor:pointer;">
-                  Bigger List
-                </button>
-              </div>
-              <div [style.max-height]="wsListSize === 'normal' ? '160px' : '320px'"
-                   style="overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
-                <!-- "No workstream assigned" always at top — D-272 -->
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#5A5A5A;font-style:italic;">
-                  <input type="radio" value="__none__" [(ngModel)]="stagedWorkstream" />
-                  No workstream assigned
                 </label>
-                <!-- All workstreams: Division hierarchy sorted. D-272: Division short + Workstream short per row. -->
-                <ng-container *ngFor="let ws of workstreamsSortedByDivision">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                  <input type="radio" name="wsScopeRadio" [value]="'bigger'" [(ngModel)]="wsScope"
+                         (change)="stagedWorkstream === '__none__' ? stagedWorkstream = '' : null" />
+                  Bigger List
+                </label>
+                <!-- Terminal: No Workstream Assigned — applies immediately per D-272 -->
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;font-style:italic;">
+                  <input type="radio" name="wsScopeRadio" [value]="'none_terminal'" [(ngModel)]="wsScope"
+                         (change)="stagedWorkstream='__none__'; applyFilterPanel()" />
+                  No Workstream Assigned
+                </label>
+              </div>
+              <!-- Workstream list: renders when Normal or Bigger scope selected -->
+              <div *ngIf="wsScope === 'normal' || wsScope === 'bigger'"
+                   [style.max-height]="wsScope === 'normal' ? '200px' : '360px'"
+                   style="overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+                <ng-container *ngFor="let ws of (wsScope === 'normal' ? workstreamsScopedNormal : workstreamsSortedByDivision)">
                   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#1E1E1E;">
                     <input type="radio" [value]="ws.workstream_id" [(ngModel)]="stagedWorkstream" />
                     <span>
-                      <span style="color:#9E9E9E;font-size:11px;">{{ ws.home_division_name ?? '' }}</span>
-                      <span *ngIf="ws.home_division_name"> · </span>
-                      {{ ws.workstream_name }}
+                      <span *ngIf="ws.home_division_name" style="color:#9E9E9E;font-size:11px;">{{ ws.home_division_name }} · </span>
+                      {{ ws.display_name_short ?? ws.workstream_name }}
                       <span *ngIf="!ws.active_status" style="color:#9E9E9E;font-size:11px;"> (Inactive)</span>
                     </span>
                   </label>
                 </ng-container>
+                <div *ngIf="(wsScope === 'normal' ? workstreamsScopedNormal : workstreamsSortedByDivision).length === 0"
+                     style="font-size:12px;color:#9E9E9E;font-style:italic;padding:4px 0;">
+                  No workstreams found in this scope.
+                </div>
               </div>
             </div>
           </div>
@@ -886,13 +924,22 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
             </span>
           </div>
 
-          <!-- Col 2: Cycle Name — 3-line clamp, tooltip on hover. D-266. D-264: Tier badge removed. -->
+          <!-- Col 2: Cycle Name — 3-line clamp + Tier badge. CC-Decision-2026-04-12-A: Contract 5 restores Tier badge (D-264 overridden). -->
           <div>
             <div style="font-size:14px;font-weight:600;color:#1E1E1E;
                         display:-webkit-box;-webkit-line-clamp:3;
                         -webkit-box-orient:vertical;overflow:hidden;"
                  title="{{ cycle.cycle_title }}">
               {{ cycle.cycle_title }}
+            </div>
+            <div *ngIf="cycle.tier_classification" style="margin-top:4px;">
+              <span [style.background]="tierBadgeBg(cycle.tier_classification)"
+                    [style.color]="tierBadgeColor(cycle.tier_classification)"
+                    style="display:inline-block;border-radius:4px;padding:3px 8px;
+                           font-size:12px;font-weight:500;font-family:Roboto,sans-serif;">
+                Tier {{ tierLabel(cycle.tier_classification) }} —
+                {{ cycle.tier_classification === 'tier_1' ? 'Fast Lane' : cycle.tier_classification === 'tier_2' ? 'Structured' : 'Governed' }}
+              </span>
             </div>
           </div>
 
@@ -911,17 +958,15 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
             </span>
           </div>
 
-          <!-- Col 4: Stage — condensed track + "Currently in [STAGE]". D-267: separate from Headline. -->
-          <div style="overflow:hidden;" (click)="$event.stopPropagation(); openCyclePanel(cycle.delivery_cycle_id)">
-            <app-stage-track
-              [currentStageId]="cycle.current_lifecycle_stage"
-              [gateStateMap]="gateStateMapsCache.get(cycle.delivery_cycle_id) ?? buildGateStateMap(cycle)"
-              displayMode="condensed"
-            ></app-stage-track>
-            <div style="font-size:11px;margin-top:3px;color:var(--triarq-color-text-secondary);
-                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              Currently in {{ STAGE_LABEL_MAP[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
-            </div>
+          <!-- Col 4: Stage — plain badge only. CC-Decision-2026-04-12-A: Contract 5 removes Stage Track from grid rows (S-002). -->
+          <!-- Stage Track belongs in detail panel only. No condensed component, no subtext. -->
+          <div style="overflow:hidden;">
+            <span style="display:inline-block;background:#12274A;color:#fff;
+                         font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
+                         text-transform:uppercase;border-radius:4px;padding:3px 8px;
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:126px;">
+              {{ STAGE_LABEL_MAP[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
+            </span>
           </div>
 
           <!-- Col 5: Headline — computed intelligent summary text. D-267: separate from Stage. -->
@@ -1097,8 +1142,17 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // S-013: Accordion — which filter row is currently expanded. Empty = all collapsed.
   openFilterRow: string = '';
 
-  // D-272: Workstream list size toggle in filter panel. 'normal' = compact, 'bigger' = expanded.
-  wsListSize: 'normal' | 'bigger' = 'normal';
+  // D-272 amended 2026-04-12: peer options scope selector for workstream filter.
+  // '' = no scope selected (no list shown, no filter active per D-278).
+  // 'normal' | 'bigger' = scope activators (list renders below).
+  // 'none_terminal' = radio value for "No Workstream Assigned" terminal selection.
+  // CC-Decision-2026-04-12-E: replaces wsListSize. Source: Contract 5 Block 3.1.
+  wsScope: '' | 'normal' | 'bigger' | 'none_terminal' = '';
+
+  // D-277: peer options scope selector for assigned person filter.
+  // '' = no option selected. 'normal'|'bigger' = scope activators. Others = terminal radio values.
+  // CC-Decision-2026-04-12-F: replaces assignedPersonOptions loop. Source: Contract 5 Block 3.2.
+  personScope: '' | 'normal' | 'bigger' | 'me_terminal' | 'unassigned_ds_terminal' | 'unassigned_cb_terminal' = '';
 
   // Gate status filter: 'overdue' | 'pending' | 'approved' | ''
   filterGateStatus: string = '';
@@ -1150,13 +1204,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // Not private — Angular template compilation requires non-private for template binding access.
   gateStateMapsCache = new Map<string, GateStateMap>();
 
-  // Block 1 freeze fix (CC-Decision-2026-04-11-A): readonly field avoids new array reference every CD cycle.
-  readonly assignedPersonOptions: { value: string; label: string }[] = [
-    { value: '',               label: 'Anyone' },
-    { value: 'my_cycles',     label: 'My Cycles' },
-    { value: 'unassigned_ds', label: 'Unassigned DS' },
-    { value: 'unassigned_cb', label: 'Unassigned CB' }
-  ];
+  // assignedPersonOptions array removed — replaced by personScope + peer options template.
+  // D-278: no named "Anyone" option. D-277: peer options model. CC-Decision-2026-04-12-F.
+  // Source: CC-Decision-2026-04-11-A (original field stability fix — now superseded by template redesign).
 
   constructor(
     private readonly delivery:     DeliveryService,
@@ -1531,6 +1581,58 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       .sort((a, b) => a.display_name.localeCompare(b.display_name));
   }
 
+  /** D-277: All unique DS + CB persons across loaded cycles — deduped by user_id.
+   * Source for Assigned Person filter Bigger List. CC-Decision-2026-04-12-F. */
+  get assignedPersonListAll(): { user_id: string; display_name: string; division_name?: string }[] {
+    const seen = new Map<string, { user_id: string; display_name: string; division_name?: string }>();
+    for (const c of this.cycles) {
+      if (c.assigned_ds_user_id && c.assigned_ds_display_name) {
+        seen.set(c.assigned_ds_user_id, { user_id: c.assigned_ds_user_id, display_name: c.assigned_ds_display_name, division_name: c.division_name ?? undefined });
+      }
+      if (c.assigned_cb_user_id && c.assigned_cb_display_name && !seen.has(c.assigned_cb_user_id)) {
+        seen.set(c.assigned_cb_user_id, { user_id: c.assigned_cb_user_id, display_name: c.assigned_cb_display_name, division_name: c.division_name ?? undefined });
+      }
+    }
+    return Array.from(seen.values()).sort((a, b) => a.display_name.localeCompare(b.display_name));
+  }
+
+  /** D-277: Persons from cycles in user's own Divisions only — for Normal List scope.
+   * CC-Decision-2026-04-12-F: sourced from loaded cycle data. */
+  get assignedPersonListNormal(): { user_id: string; display_name: string; division_name?: string }[] {
+    const userDivisionIds = new Set(this.userDivisions.map(d => d.id));
+    const seen = new Map<string, { user_id: string; display_name: string; division_name?: string }>();
+    for (const c of this.cycles) {
+      if (!c.division_id || !userDivisionIds.has(c.division_id)) { continue; }
+      if (c.assigned_ds_user_id && c.assigned_ds_display_name) {
+        seen.set(c.assigned_ds_user_id, { user_id: c.assigned_ds_user_id, display_name: c.assigned_ds_display_name, division_name: c.division_name ?? undefined });
+      }
+      if (c.assigned_cb_user_id && c.assigned_cb_display_name && !seen.has(c.assigned_cb_user_id)) {
+        seen.set(c.assigned_cb_user_id, { user_id: c.assigned_cb_user_id, display_name: c.assigned_cb_display_name, division_name: c.division_name ?? undefined });
+      }
+    }
+    return Array.from(seen.values()).sort((a, b) => a.display_name.localeCompare(b.display_name));
+  }
+
+  /** D-279: Workstream chip label — [div_name] · [ws_short ?? ws_name]. CC-Decision-2026-04-12-E. */
+  workstreamChipLabel(wsId: string): string {
+    const ws = this.workstreams.find(w => w.workstream_id === wsId);
+    if (!ws) { return wsId; }
+    const wsLabel  = ws.display_name_short ?? ws.workstream_name;
+    const divLabel = ws.home_division_name ?? '';
+    return divLabel ? `${divLabel} · ${wsLabel}` : wsLabel;
+  }
+
+  /** D-277: Person display name by user_id — for chip label. CC-Decision-2026-04-12-F. */
+  personDisplayName(userId: string): string {
+    return this.assignedPersonListAll.find(p => p.user_id === userId)?.display_name ?? userId;
+  }
+
+  /** D-272: Workstreams scoped to user's own Divisions — for Normal List in workstream filter. */
+  get workstreamsScopedNormal(): DeliveryWorkstream[] {
+    const userDivisionIds = new Set(this.userDivisions.map(d => d.id));
+    return this.workstreamsSortedByDivision.filter(w => userDivisionIds.has(w.home_division_id));
+  }
+
   private loadDivisions(): void {
     // all_levels:true returns all divisions across the hierarchy, not just root trusts.
     // Needed so the Owner Division create-form dropdown has a full list to choose from.
@@ -1626,7 +1728,10 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (typeof saved['filterDs']             === 'string') { this.filterDs             = saved['filterDs']; }
     if (typeof saved['filterCb']             === 'string') { this.filterCb             = saved['filterCb']; }
     if (typeof saved['filterGateStatus']     === 'string') { this.filterGateStatus     = saved['filterGateStatus']; }
-    if (typeof saved['filterAssignedPerson'] === 'string') { this.filterAssignedPerson = saved['filterAssignedPerson']; }
+    // CC-Decision-2026-04-12-F: migrate legacy 'my_cycles' screen state to 'me'.
+    if (typeof saved['filterAssignedPerson'] === 'string') {
+      this.filterAssignedPerson = saved['filterAssignedPerson'] === 'my_cycles' ? 'me' : saved['filterAssignedPerson'];
+    }
     if (typeof saved['sortField']        === 'string') {
       this.sortField = saved['sortField'] as 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification';
     }
@@ -1663,15 +1768,20 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       // D-172: Assigned CB filter
       if (this.filterCb && c.assigned_cb_user_id !== this.filterCb) { return false; }
 
-      // D-HubFilter-2026-04-06: Assigned Person shortcut filter
+      // D-HubFilter-2026-04-06 / D-277: Assigned Person filter.
+      // CC-Decision-2026-04-12-F: 'my_cycles' renamed to 'me'. UUID = specific person (DS or CB).
       if (this.filterAssignedPerson) {
         const userId = this.profile.getCurrentProfile()?.id ?? '';
-        if (this.filterAssignedPerson === 'my_cycles') {
+        if (this.filterAssignedPerson === 'me') {
           if (c.assigned_ds_user_id !== userId && c.assigned_cb_user_id !== userId) { return false; }
         } else if (this.filterAssignedPerson === 'unassigned_ds') {
           if (c.assigned_ds_user_id) { return false; }
         } else if (this.filterAssignedPerson === 'unassigned_cb') {
           if (c.assigned_cb_user_id) { return false; }
+        } else {
+          // UUID: filter to cycles where that person is DS or CB. D-277.
+          if (c.assigned_ds_user_id !== this.filterAssignedPerson &&
+              c.assigned_cb_user_id !== this.filterAssignedPerson) { return false; }
         }
       }
 
@@ -1932,6 +2042,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       this.stagedDivision       = this.filterDivision;
       this.stagedIncludeChildren = this.includeChildDivisions;
       this.openFilterRow        = '';
+      // Restore scope activator state from applied filter values. CC-Decision-2026-04-12-E/F.
+      this.wsScope     = (this.filterWorkstream && this.filterWorkstream !== '__none__') ? 'normal' : (this.filterWorkstream === '__none__' ? 'none_terminal' : '');
+      this.personScope = '';
     }
     this.showFilterPanel = !this.showFilterPanel;
     this.cdr.markForCheck();
@@ -1973,6 +2086,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.stagedDivision       = '';
     this.stagedIncludeChildren = false;
     this.openFilterRow        = '';
+    this.wsScope              = '';  // CC-Decision-2026-04-12-E
+    this.personScope          = '';  // CC-Decision-2026-04-12-F
     this.cdr.markForCheck();
   }
 
@@ -1983,8 +2098,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   }
 
   /** Count card tap: My Cycles — sets assigned person filter, does NOT persist to memory. Source: D-HubCounts-2026-04-06. */
+  // CC-Decision-2026-04-12-F: 'my_cycles' renamed to 'me'. Source: Contract 5 Block 3.2.
   onMyCyclesTap(): void {
-    this.filterAssignedPerson = 'my_cycles';
+    this.filterAssignedPerson = 'me';
     this.applyFilters(false);
   }
 

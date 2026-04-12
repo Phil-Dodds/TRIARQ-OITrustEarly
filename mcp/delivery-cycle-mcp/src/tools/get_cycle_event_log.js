@@ -73,7 +73,7 @@ async function get_cycle_event_log(params, caller_user_id) {
       created_at
     `)
     .eq('delivery_cycle_id', delivery_cycle_id)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false }); // Contract 5 Block 2.1: newest events first.
 
   if (logErr) {
     return { success: false, error: `Failed to retrieve event log: ${logErr.message}` };

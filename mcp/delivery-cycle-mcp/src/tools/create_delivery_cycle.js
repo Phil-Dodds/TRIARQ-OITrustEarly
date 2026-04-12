@@ -195,10 +195,12 @@ async function create_delivery_cycle(params, caller_user_id) {
   }
 
   // ── Seed five gate_record rows ─────────────────────────────────────────────
+  // CC-Decision-2026-04-12-B: seed as 'not_started'. 'pending' is now reserved for
+  // submitted-for-review state. Prevents premature "Under Review" display on new cycles.
   const gateRows = ALL_GATES.map(gate_name => ({
     delivery_cycle_id: cycle_id,
     gate_name,
-    gate_status:       'pending'
+    gate_status:       'not_started'
   }));
 
   const { error: gatesErr } = await supabase

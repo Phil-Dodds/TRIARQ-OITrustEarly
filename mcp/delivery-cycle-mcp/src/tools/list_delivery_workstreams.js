@@ -129,6 +129,7 @@ async function list_delivery_workstreams(params, caller_user_id) {
     .select(`
       workstream_id,
       workstream_name,
+      display_name_short,
       home_division_id,
       workstream_lead_user_id,
       active_status,
@@ -219,6 +220,7 @@ async function list_delivery_workstreams(params, caller_user_id) {
   // ── Enrich and return ─────────────────────────────────────────────────────
   const enriched = workstreams.map(w => ({
     ...w,
+    display_name_short:  w.display_name_short ?? null, // D-203: null = fallback to workstream_name in UI
     home_division_name:  divisionMap[w.home_division_id] ?? null,
     lead_display_name:   w.workstream_lead_user_id ? (leadMap[w.workstream_lead_user_id] ?? null) : null,
     active_cycle_count:  cycleCountMap[w.workstream_id] ?? 0
