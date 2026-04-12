@@ -290,6 +290,31 @@ Yes = compliant. No = violation.
 
 ---
 
+## Rule 21 — CC-Decision Sequence Completeness Check at Code Close (D-293)
+
+At every Code session close, before producing the session output file, enumerate all
+CC-decisions in sequence order, confirm no gaps exist, and verify each appears in the
+CCode-decisions list in the session output. A gap = a missing decision number — recover
+the missing decision before closing.
+
+Binary test: were all CC-decisions enumerated in sequence and verified before the session
+output was written? Yes = compliant. No = violation.
+
+---
+
+## Rule 22 — Supabase Migration Execution Pattern (D-295)
+
+Never execute migrations directly against Supabase from a Code session. Required pattern:
+(1) write migration file to the repo, (2) display the full SQL content to Phil in the
+session, (3) wait for Phil to explicitly confirm execution before proceeding.
+
+Attempting to execute a migration directly without Phil confirmation is a process violation.
+
+Binary test: did any migration in this session follow the write → display → confirm pattern?
+Yes = compliant. Any direct execution = violation.
+
+---
+
 ## Session Initialization Checklist
 
 At the start of every Claude Code session, read these documents in order before

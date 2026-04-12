@@ -604,3 +604,37 @@ Note: D-264 badge pill removal is partially superseded by D-281, which restores 
 
 **D-286** — Assigned Person Filter: personScope State Variable, Cycle-Data Person List, and my_cycles → me Migration. The assigned person filter replaces the assignedPersonOptions readonly array with personScope: '' | 'normal' | 'bigger' | 'me_terminal' | 'unassigned_ds_terminal' | 'unassigned_cb_terminal'. Terminal values trigger applyFilterPanel() immediately on change — named exception to S-011 per D-277, same pattern as D-285. Person list for Normal and Bigger scopes sourced from loaded cycle DS+CB data (no new MCP tool): assignedPersonListAll merges and deduplicates DS+CB persons across all loaded cycles; assignedPersonListNormal filters to cycles in user's own divisions. Server-side person lookup deferred to Build B. filterAssignedPerson accepts a user UUID as a fourth state beyond the three keywords; applyFilters() filters to cycles where assigned_ds_user_id or assigned_cb_user_id matches. personDisplayName(userId) helper looks up display name for chip label. 'my_cycles' → 'me' rename: filter value changed, onMyCyclesTap() updated, screen state restore applies migration guard (=== 'my_cycles' ? 'me' : value) to prevent saved state breakage. assignedPersonOptions array with 'Anyone' option removed per D-278. Connects to: D-277, D-278, D-172, S-011, S-013. | Source: Claude Code | 2026-04-12 |
 | impl_status: built |
+
+---
+
+### Build C Decisions — Contract 6 (April 2026)
+
+**D-287** — Dashboard Filter List Memoization: Cached Lists Rebuilt Once in applyFilters(). The All Delivery Cycles filter panel person and workstream lists are computed once in applyFilters() and stored in memoized cache fields (personListNormal, personListAll, workstreamsSortedByDivision, workstreamsScopedNormal). No object-returning getter is called inside *ngFor. Implements D-253 (No Object-Returning Methods in ngFor) specifically for the delivery cycle dashboard filter panel. Resolves freeze-on-open defect observed in Contract 5 UAT. Commit: bfb6651. Connects to: D-253, D-285, D-286. | Source: Claude Code | 2026-04-12 |
+| impl_status: built |
+
+**D-288** — S-015: Secondary Orienting Text Style. Active Standard. Surface description text below page titles on list/grid/hub surfaces renders at font-size: 11px; font-style: italic; color: #5A5A5A (Stone). Applies to all surfaces that have a page title. Text is placed directly below the page title, above any action buttons or grid content, with 4px top gap from title and 12px bottom gap before next element. Confirmed as Active Standard following Contract 5 UAT validation of zone explanatory text at the same style (D-284). Supersedes the zone-level application in D-284 — D-288/S-015 extends this to page-title surfaces. Connects to: D-284, D-207. | Source: Claude Chat | 2026-04-12 |
+| impl_status: not-specced |
+
+**D-289** — [PLACEHOLDER — number claimed 2026-04-12. Content pending design session.] | Source: Claude Code | 2026-04-12 |
+| impl_status: not-specced |
+
+**D-290** — Create Cycle Form Opens in Right Panel. The New Delivery Cycle form opens as a right panel alongside the All Delivery Cycles grid — never as a full-width overlay or inline card expanding within the grid area. The grid remains visible behind the panel. Panel width matches View and Edit panels (60% viewport on wide screens per Visual Layout Standards Section 1.4). Connects to: D-180, S-005, S-006, D-291, D-292. | Source: Claude Chat | 2026-04-12 |
+| impl_status: not-specced |
+
+**D-291** — Panel Header Sticky on All Three Panel Types (View, Edit, Create). The header zone of every right panel surface has position: sticky; top: 0; z-index: 5. Header contains: panel title (left) + primary action controls (right). As the user scrolls panel content, the header remains fixed at the top. The scrollable area is the panel body only — the header is not part of the scroll container. ESC key closes all panels: View = close immediately; Edit and Create = dirty-state check per D-292. Connects to: S-005, S-006, D-292. | Source: Claude Chat | 2026-04-12 |
+| impl_status: not-specced |
+
+**D-292** — Panel Modality: View Non-Modal; Edit and Create Modal with Scrim and Dirty-State Check. View panel: non-modal, no scrim, list remains visible and fully interactive behind the panel. Edit panel: modal, a scrim (rgba(0,0,0,0.32) per MD3 default, D-274) covers the list when the Edit panel is open — list is not interactive while Edit is open. Create panel: modal, same scrim behavior as Edit. Click on scrim = ESC = Cancel. Dirty-state check on Edit and Create: if no fields have been changed/entered, close immediately; if any field has a value, prompt "Discard unsaved changes?" with "Discard" (closes, clears) and "Keep Editing" (returns to form). Connects to: D-291, S-005, D-274. | Source: Claude Chat | 2026-04-12 |
+| impl_status: not-specced |
+
+**D-293** — CC-Decision Sequence Completeness Check at Code Close. At every Code session close, before producing the session output file, enumerate all CC-decisions in sequence order, confirm no gaps exist, and verify each appears in the CCode-decisions list. A gap = a missing decision — recover before closing. Added to claude-code-session-rules.md as Rule 21. | Source: Claude Chat | 2026-04-12 |
+| impl_status: not-specced |
+
+**D-294** — Worktree Merge Check Before Deploy Prompt. Before producing any prompt that includes a deploy step, confirm whether open worktrees exist that have not been merged to master. If yes, include merge as Step 1 of the deploy prompt. Added to CLAUDE.md worktree rules section. | Source: Claude Chat | 2026-04-12 |
+| impl_status: not-specced |
+
+**D-295** — Supabase Migration Execution Pattern. Never execute migrations directly against Supabase from a Code session. Required pattern: (1) write migration file, (2) display full SQL to Phil, (3) wait for Phil to confirm execution before proceeding. Attempting direct execution is a process violation. Added to claude-code-session-rules.md as Rule 22. Connects to: all migration steps across Build C. | Source: Claude Chat | 2026-04-12 |
+| impl_status: not-specced |
+
+**D-296** — Outcome Statement Display Style in Cycle View. The set value of the Outcome Statement field in the Delivery Cycle Detail View renders as regular body text (Roboto Regular, standard body color). Not italic. The null/empty guidance text is not affected — it retains its gray guidance styling. Amends D-276: supersedes the "plain italic body text" language in D-276. All other operative text in D-276 remains in force. Connects to: D-276, S-005. | Source: Claude Chat | 2026-04-12 |
+| impl_status: not-specced |
