@@ -1204,9 +1204,15 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // Not private — Angular template compilation requires non-private for template binding access.
   gateStateMapsCache = new Map<string, GateStateMap>();
 
+  // D-253 memoization: person list and workstream list caches — stable array references for template *ngFor.
+  // Getters that return new objects on every call cause OnPush CD to loop → page freeze.
+  // All four caches rebuilt in rebuildFilterCaches(), called at end of applyFilters() and after data loads.
   // assignedPersonOptions array removed — replaced by personScope + peer options template.
   // D-278: no named "Anyone" option. D-277: peer options model. CC-Decision-2026-04-12-F.
-  // Source: CC-Decision-2026-04-11-A (original field stability fix — now superseded by template redesign).
+  _personListAllCache:    { user_id: string; display_name: string; division_name?: string }[] = [];
+  _personListNormalCache: { user_id: string; display_name: string; division_name?: string }[] = [];
+  _workstreamsSortedCache:       DeliveryWorkstream[] = [];
+  _workstreamsScopedNormalCache: DeliveryWorkstream[] = [];
 
   constructor(
     private readonly delivery:     DeliveryService,
@@ -1528,6 +1534,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
           this.workstreams       = Array.isArray(res.data) ? res.data : [];
           this.activeWorkstreams = this.workstreams.filter(w =>  w.active_status);
           // inactiveWorkstreams is a getter — no separate field needed
+          // D-253: rebuild workstream caches now that workstreams are loaded.
+          // Avoids workstreamsSortedByDivision/workstreamsScopedNormal computing on every CD cycle.
+          this.rebuildFilterCaches();
           this.cdr.markForCheck();
         }
       },
@@ -1541,9 +1550,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return this.workstreams.filter(w => !w.active_status);
   }
 
-  /** D-272: Workstreams sorted by Division hierarchy (home_division_name alphabetically, then workstream_name).
-   * Active workstreams first, then inactive. Used in the filter panel workstream accordion row. */
-  get workstreamsSortedByDivision(): DeliveryWorkstream[] {
+  /** D-272/D-253: workstreamsSortedByDivision — reads from _workstreamsSortedCache.
+   * Cache rebuilt in rebuildFilterCaches() — never computed in template. */
+  get workstreamsSortedByDivision(): DeliveryWorkstream[] { return this._workstreamsSortedCache; }
+
+  /** D-253: private compute used by rebuildFilterCaches() only — never called from template. */
+  private _computeWorkstreamsSorted(): DeliveryWorkstream[] {
     return [...this.workstreams].sort((a, b) => {
       // Active before inactive
       if (a.active_status !== b.active_status) { return a.active_status ? -1 : 1; }
@@ -1582,8 +1594,20 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   }
 
   /** D-277: All unique DS + CB persons across loaded cycles — deduped by user_id.
-   * Source for Assigned Person filter Bigger List. CC-Decision-2026-04-12-F. */
+   * Source for Assigned Person filter Bigger List. CC-Decision-2026-04-12-F.
+   * D-253: reads from _personListAllCache — never computes inline. Cache rebuilt in rebuildFilterCaches(). */
   get assignedPersonListAll(): { user_id: string; display_name: string; division_name?: string }[] {
+    return this._personListAllCache;
+  }
+
+  /** D-277/D-253: Assigned Person Normal List — reads from _personListNormalCache.
+   * Cache rebuilt in rebuildFilterCaches(). */
+  get assignedPersonListNormal(): { user_id: string; display_name: string; division_name?: string }[] {
+    return this._personListNormalCache;
+  }
+
+  /** D-253: private compute for person All list — called only from rebuildFilterCaches(). */
+  private _computePersonListAll(): { user_id: string; display_name: string; division_name?: string }[] {
     const seen = new Map<string, { user_id: string; display_name: string; division_name?: string }>();
     for (const c of this.cycles) {
       if (c.assigned_ds_user_id && c.assigned_ds_display_name) {
@@ -1596,9 +1620,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return Array.from(seen.values()).sort((a, b) => a.display_name.localeCompare(b.display_name));
   }
 
-  /** D-277: Persons from cycles in user's own Divisions only — for Normal List scope.
-   * CC-Decision-2026-04-12-F: sourced from loaded cycle data. */
-  get assignedPersonListNormal(): { user_id: string; display_name: string; division_name?: string }[] {
+  /** D-253: private compute for person Normal list — called only from rebuildFilterCaches(). */
+  private _computePersonListNormal(): { user_id: string; display_name: string; division_name?: string }[] {
     const userDivisionIds = new Set(this.userDivisions.map(d => d.id));
     const seen = new Map<string, { user_id: string; display_name: string; division_name?: string }>();
     for (const c of this.cycles) {
@@ -1613,6 +1636,16 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return Array.from(seen.values()).sort((a, b) => a.display_name.localeCompare(b.display_name));
   }
 
+  /** D-253: Rebuild all four filter list caches. Called at end of applyFilters() and after data loads.
+   * Prevents object-returning getters from being called on every CD cycle (freeze pattern). Source: D-253. */
+  private rebuildFilterCaches(): void {
+    this._personListAllCache           = this._computePersonListAll();
+    this._personListNormalCache        = this._computePersonListNormal();
+    this._workstreamsSortedCache       = this._computeWorkstreamsSorted();
+    const userDivisionIds = new Set(this.userDivisions.map(d => d.id));
+    this._workstreamsScopedNormalCache = this._workstreamsSortedCache.filter(w => userDivisionIds.has(w.home_division_id));
+  }
+
   /** D-279: Workstream chip label — [div_name] · [ws_short ?? ws_name]. CC-Decision-2026-04-12-E. */
   workstreamChipLabel(wsId: string): string {
     const ws = this.workstreams.find(w => w.workstream_id === wsId);
@@ -1622,15 +1655,15 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return divLabel ? `${divLabel} · ${wsLabel}` : wsLabel;
   }
 
-  /** D-277: Person display name by user_id — for chip label. CC-Decision-2026-04-12-F. */
+  /** D-277/D-253: Person display name by user_id — reads from _personListAllCache directly.
+   * Avoids calling assignedPersonListAll getter on every template evaluation. */
   personDisplayName(userId: string): string {
-    return this.assignedPersonListAll.find(p => p.user_id === userId)?.display_name ?? userId;
+    return this._personListAllCache.find(p => p.user_id === userId)?.display_name ?? userId;
   }
 
-  /** D-272: Workstreams scoped to user's own Divisions — for Normal List in workstream filter. */
+  /** D-272/D-253: Workstreams scoped to user's own Divisions — reads from _workstreamsScopedNormalCache. */
   get workstreamsScopedNormal(): DeliveryWorkstream[] {
-    const userDivisionIds = new Set(this.userDivisions.map(d => d.id));
-    return this.workstreamsSortedByDivision.filter(w => userDivisionIds.has(w.home_division_id));
+    return this._workstreamsScopedNormalCache;
   }
 
   private loadDivisions(): void {
@@ -1821,6 +1854,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.gateStateMapsCache = new Map(
       this.cycles.map(c => [c.delivery_cycle_id, this.buildGateStateMap(c)])
     );
+    // D-253: rebuild person list and workstream caches once per filter run.
+    // Prevents assignedPersonListAll/Normal and workstream getters from computing on every CD cycle → freeze fix.
+    this.rebuildFilterCaches();
     if (persist) { this.saveScreenState(); }
     this.cdr.markForCheck();
   }
