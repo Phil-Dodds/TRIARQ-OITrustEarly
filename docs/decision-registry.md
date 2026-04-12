@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | April 2026 | CONFIDENTIAL
+# Pathways OI Trust | v2.9 | April 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file before allocating any new D-number.
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-231**
+**Next available: D-277**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -119,6 +119,8 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-228 | Tier Classification Edit Behavior on Existing Cycles — amber non-blocking warning | Claude Chat | April 2026 | Active |
 | D-229 | Delivery Cycle Field Edit Audit Log — structured event log entry on every update_delivery_cycle call | Claude Chat | April 2026 | Active |
 | D-230 | Cancelled Item Visibility Philosophy — hidden by default, explicit reveal control, no persist (S-009 operative) | Claude Chat | April 2026 | Active |
+| D-275 | Gate Record Inline Edit in Cycle View — gate rows are nested sub-surface; editable fields scoped to gate_records only | Session 2026-04-11 | April 2026 | Active |
+| D-276 | Outcome Statement Display in Cycle View — display-only; plain italic or gray guidance text; no inline Add/Edit link | Session 2026-04-11 | April 2026 | Active |
 
 ---
 
@@ -146,6 +148,7 @@ D-152 through D-153: Pre-existing decisions not yet entered in this registry.
 D-156 through D-162: Pre-existing or open decisions not yet entered in this registry.
 D-201 through D-218: Allocated by Claude Chat / Claude Code in worktree sessions April 2026 — content exists in session outputs and worktree code but not yet backfilled to this registry table.
 D-220 through D-221: Allocated by Claude Chat April 2026 — content not yet backfilled.
+D-231 through D-274: Allocated by Claude Chat / Claude Code in design and build sessions April 2026 — content exists in session outputs and worktree code but not yet backfilled to this registry table.
 
 These gaps are not available for allocation — the numbers exist in decisions-active.md or
 decisions-archive.md. They are listed here to prevent accidental reuse. A future session

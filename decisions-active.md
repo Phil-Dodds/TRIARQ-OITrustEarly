@@ -1,5 +1,5 @@
 # Design Decisions — Active
-Pathways OI Trust | v3.7-active | March 2026 | CONFIDENTIAL
+Pathways OI Trust | v3.46-active | April 2026 | CONFIDENTIAL
 
 Active = operative locked decisions + open decisions. Superseded decisions are in decisions-archive.md.
 
@@ -526,3 +526,13 @@ These principles apply to every effort, not just this system.
 
 **D-197** — Tier Avatar Dot Column on Hub Screen Rows. Each cycle row on /delivery/cycles shows a colored circle in the avatar column (48px) indicating Tier. Colors: Tier 1 = green (#4CAF50), Tier 2 = amber (--triarq-color-sunray), Tier 3 = teal (--triarq-color-primary). No initials or icon — color alone carries the signal. Tier badge (pill, matching color, white text) renders below the cycle title in the Cycle Name column. | Source: Claude Chat | April 2026 |
 | impl_status: built |
+
+---
+
+### Build C Decisions — Contract 4 (April 2026)
+
+**D-275** — Gate Record Inline Edit in Cycle View. Gate target date, actual date, and status are editable directly in gate rows within the Delivery Cycle Detail View. This is not a violation of S-005 — the cycle View is read-only for cycle fields; gate rows are a nested sub-surface where the gate record's own edit controls live. Editable gate fields are scoped to gate_records only. No cycle fields are editable in View. | Source: Session 2026-04-11 | April 2026 |
+| impl_status: specced |
+
+**D-276** — Outcome Statement Display in Cycle View. Outcome Statement zone in the Delivery Cycle Detail View is display-only. Set value shows as plain italic body text; null shows gray guidance text. No inline Add or Edit link. Edit via the standard Edit Cycle action button, consistent with all other cycle fields and S-005. Supersedes the Add/Edit link spec in Contract 4 Block 3. | Source: Session 2026-04-11 | April 2026 |
+| impl_status: specced |
