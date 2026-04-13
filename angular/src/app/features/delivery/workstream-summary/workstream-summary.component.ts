@@ -68,11 +68,9 @@ const ALL_GATES: GateName[] = [
           ← Delivery Cycle Tracking
         </a>
         <h3 style="margin:8px 0 4px 0;">Workstream Summary</h3>
-        <p style="margin:0;font-size:var(--triarq-text-small);
-                  color:var(--triarq-color-text-secondary);">
-          Active Delivery Cycle count and WIP breakdown per Workstream. Prep = Brief/Design/Spec, Build = Build/Validate,
-          Outcome = Pilot/UAT/Release/Outcome. Limit is 4 per category.
-          Click any count to see the matching cycles.
+        <!-- S-015 / D-288: surface description text. Source: Contract 6 Step 4.2. -->
+        <p style="margin:4px 0 12px 0;font-size:11px;font-style:italic;color:#5A5A5A;">
+          Monitor workstream capacity and WIP limits across active delivery cycles.
         </p>
       </div>
 

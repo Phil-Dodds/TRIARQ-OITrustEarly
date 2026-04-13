@@ -26,7 +26,8 @@ import {
   SimpleChanges,
   Input,
   Output,
-  EventEmitter
+  EventEmitter,
+  HostListener
 } from '@angular/core';
 import { CommonModule }       from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
@@ -153,7 +154,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       </div>
 
       <!-- ── Cycle Header ───────────────────────────────────────────────── -->
-      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+      <!-- D-291: sticky so header stays visible when panel body scrolls. Source: D-291. -->
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);
+                                  position:sticky;top:0;z-index:5;background:#fff;">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;
                     flex-wrap:wrap;gap:var(--triarq-space-sm);">
           <div>
@@ -233,7 +236,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     style="white-space:nowrap;font-size:11px;color:var(--triarq-color-error);
                            background:none;border:1px solid var(--triarq-color-error);
                            border-radius:5px;padding:3px 8px;cursor:pointer;">
-              ✕ Cancel Cycle
+              Cancel Cycle
             </button>
 
             <!-- 5. Un-cancel Cycle — CANCELLED stage only -->
@@ -307,7 +310,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     style="font-size:11px;padding:3px 10px;background:var(--triarq-color-error);
                            display:flex;align-items:center;gap:4px;">
               <ion-spinner *ngIf="cancelBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
-              {{ cancelBusy ? 'Cancelling…' : 'Confirm Cancel' }}
+              {{ cancelBusy ? 'Cancelling…' : 'Cancel Cycle' }}
             </button>
             <button (click)="cancelConfirming = false; cancelError = ''"
                     style="font-size:11px;background:none;border:none;cursor:pointer;
@@ -382,9 +385,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     font-style:italic;font-family:Roboto,sans-serif;">
           Not set — should be added before Brief Review Gate. Edit via the Edit Cycle button above.
         </div>
-        <!-- When set: plain italic body text. D-276. -->
+        <!-- When set: regular body text, not italic. D-296 amends D-276. Source: D-296. -->
         <div *ngIf="cycle.outcome_statement"
-             style="font-size:14px;font-style:italic;font-family:Roboto,sans-serif;
+             style="font-size:14px;font-family:Roboto,sans-serif;
                     color:#262626;white-space:pre-wrap;">
           {{ cycle.outcome_statement }}
         </div>
@@ -1425,6 +1428,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   @Input() cycleId?: string;
   /** Emitted when user clicks the panel close button. Dashboard handles S-008 re-query. */
   @Output() close = new EventEmitter<void>();
+  /** D-292: Emitted when edit panel opens — dashboard activates scrim. Source: D-292. */
+  @Output() editPanelOpened = new EventEmitter<void>();
+  /** D-292: Emitted when edit panel closes (saved or cancelled) — dashboard deactivates scrim. Source: D-292. */
+  @Output() editPanelClosed = new EventEmitter<void>();
+  /** D-292: Dashboard increments to signal cancel to edit panel when scrim is clicked. Source: D-292. */
+  @Input() cancelEditSignal = 0;
 
   /** True when component is embedded as a right panel (cycleId provided via @Input). */
   get panelMode(): boolean { return !!this.cycleId; }
@@ -1562,6 +1571,23 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['cycleId'] && !changes['cycleId'].firstChange && this.cycleId) {
       this.loadCycle(this.cycleId);
+    }
+    // D-292: Dashboard increments cancelEditSignal to close edit panel (e.g. scrim click). Source: D-292.
+    if (changes['cancelEditSignal'] && !changes['cancelEditSignal'].firstChange) {
+      if (this.showEditPanel) {
+        this.onEditCancelled();
+      }
+    }
+  }
+
+  // D-292: ESC key in panel mode — close edit panel if open, otherwise close the detail panel. Source: D-292.
+  @HostListener('document:keydown.escape')
+  onEscKey(): void {
+    if (!this.panelMode) { return; }
+    if (this.showEditPanel) {
+      this.onEditCancelled();
+    } else {
+      this.close.emit();
     }
   }
 
@@ -2092,12 +2118,16 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   // Contract 2 2026-04-10.
   openEditPanel(): void {
     this.showEditPanel = true;
+    // D-292: notify dashboard to show scrim. Source: D-292.
+    this.editPanelOpened.emit();
     this.cdr.markForCheck();
   }
 
   // Edit saved: pop Edit from stack, re-query cycle unconditionally per S-008.
   onEditSaved(): void {
     this.showEditPanel = false;
+    // D-292: notify dashboard to hide scrim. Source: D-292.
+    this.editPanelClosed.emit();
     this.loadCycle(this.cycle!.delivery_cycle_id);   // S-008: unconditional re-query on every stack pop.
     this.cdr.markForCheck();
   }
@@ -2105,6 +2135,8 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   // Edit cancelled: pop Edit from stack. No re-query (spec 2.6).
   onEditCancelled(): void {
     this.showEditPanel = false;
+    // D-292: notify dashboard to hide scrim. Source: D-292.
+    this.editPanelClosed.emit();
     this.cdr.markForCheck();
   }
 

@@ -58,10 +58,9 @@ const GATE_LABELS: Record<GateName, string> = {
           ← Delivery Cycle Tracking
         </a>
         <h3 style="margin:8px 0 4px 0;">Upcoming Gate Summary</h3>
-        <p style="margin:0;font-size:var(--triarq-text-small);
-                  color:var(--triarq-color-text-secondary);">
-          Gates with target dates in the next 7 days and gates with overdue target dates.
-          Click a Gate row to see all Delivery Cycles pending it.
+        <!-- S-015 / D-288: surface description text. Source: Contract 6 Step 4.3. -->
+        <p style="margin:4px 0 12px 0;font-size:11px;font-style:italic;color:#5A5A5A;">
+          View upcoming and overdue gates across all active delivery cycles.
         </p>
       </div>
 

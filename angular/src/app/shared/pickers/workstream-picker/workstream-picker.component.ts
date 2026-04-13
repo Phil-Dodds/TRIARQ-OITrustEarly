@@ -191,21 +191,13 @@ type ScopeType = 'division_tree' | 'trust' | 'user_divisions' | 'all';
       font-size: var(--triarq-text-caption);
       cursor: pointer;
     }
-    .ws-inactive-toggle {
-      padding: var(--triarq-space-xs) var(--triarq-space-lg);
-      background: #fafafa;
-    }
-    .ws-toggle-label {
-      font-size: var(--triarq-text-caption);
-      display: flex; align-items: center; gap: 6px;
-      cursor: pointer;
-    }
     .ws-load-error, .ws-loading, .ws-empty {
       padding: var(--triarq-space-md) var(--triarq-space-lg);
       font-size: var(--triarq-text-body);
     }
-    .ws-error-primary { display: block; color: var(--triarq-color-error, #e53935); }
-    .ws-error-secondary { display: block; font-size: var(--triarq-text-caption); color: var(--triarq-color-text-secondary); margin-top: 2px; }
+    .ws-error-primary, .ws-error-secondary { display: block; }
+    .ws-error-primary { color: var(--triarq-color-error, #e53935); }
+    .ws-error-secondary { font-size: var(--triarq-text-caption); color: var(--triarq-color-text-secondary); margin-top: 2px; }
     .ws-list-container { flex: 1; overflow-y: auto; }
     .ws-table { width: 100%; border-collapse: collapse; }
     .ws-table th {
@@ -246,8 +238,9 @@ type ScopeType = 'division_tree' | 'trust' | 'user_divisions' | 'all';
       gap: var(--triarq-space-xs);
     }
     .ws-echo-row { display: contents; }
-    .ws-echo-label { font-size: var(--triarq-text-caption); color: var(--triarq-color-text-secondary); }
-    .ws-echo-value { font-size: var(--triarq-text-caption); color: var(--triarq-color-text-primary); }
+    .ws-echo-label, .ws-echo-value { font-size: var(--triarq-text-caption); }
+    .ws-echo-label { color: var(--triarq-color-text-secondary); }
+    .ws-echo-value { color: var(--triarq-color-text-primary); }
     .ws-echo-inactive { color: var(--triarq-color-error, #e53935); }
     .ws-inactive-warning {
       padding: var(--triarq-space-xs) var(--triarq-space-lg);
@@ -259,23 +252,15 @@ type ScopeType = 'division_tree' | 'trust' | 'user_divisions' | 'all';
       padding: var(--triarq-space-sm) var(--triarq-space-lg);
       border-top: 1px solid #e5e5e5;
     }
-    .ws-btn-cancel {
-      background: none;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      padding: var(--triarq-space-xs) var(--triarq-space-md);
-      cursor: pointer;
-      font-size: var(--triarq-text-body);
+    /* Shared button base (Step 7 CSS consolidation). */
+    .ws-btn-cancel, .ws-btn-ok {
+      border-radius: 5px; padding: var(--triarq-space-xs) var(--triarq-space-md);
+      cursor: pointer; font-size: var(--triarq-text-body);
     }
+    .ws-btn-cancel { background: none; border: 1px solid #ccc; }
     .ws-btn-ok {
-      background: var(--triarq-color-primary, #257099);
-      color: #fff;
-      border: none;
-      border-radius: 5px;
-      padding: var(--triarq-space-xs) var(--triarq-space-md);
-      cursor: pointer;
-      font-size: var(--triarq-text-body);
-      font-weight: var(--triarq-font-weight-bold);
+      background: var(--triarq-color-primary, #257099); color: #fff;
+      border: none; font-weight: var(--triarq-font-weight-bold);
     }
     .ws-btn-ok:disabled { opacity: 0.45; cursor: not-allowed; }
   `]

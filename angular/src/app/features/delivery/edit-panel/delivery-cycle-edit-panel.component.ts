@@ -20,7 +20,7 @@
 
 import {
   Component, OnInit, OnDestroy, Input, Output, EventEmitter,
-  ChangeDetectionStrategy, ChangeDetectorRef
+  ChangeDetectionStrategy, ChangeDetectorRef, HostListener
 } from '@angular/core';
 import {
   FormBuilder, FormGroup, Validators, ReactiveFormsModule
@@ -48,7 +48,6 @@ import {
     <!-- S-006: Edit surface — pushes onto navigation stack, View remains below.
          Positioned as an absolute overlay within the detail panel container. -->
     <div class="ep-overlay">
-      <div class="ep-panel">
 
         <!-- Panel header: Deep Navy, Save + Cancel always visible (spec 2.2) -->
         <div class="ep-header">
@@ -56,7 +55,7 @@ import {
           <div class="ep-header-actions">
             <button type="button" class="ep-btn-cancel-header"
                     [disabled]="saving"
-                    (click)="onCancel()">
+                    (click)="requestCancel()">
               Cancel
             </button>
             <button type="button" class="ep-btn-save"
@@ -195,7 +194,33 @@ import {
           </form>
         </div>
 
-      </div>
+        <!-- D-292: Discard unsaved changes confirm panel. Source: D-292. -->
+        <div *ngIf="showDiscardConfirm"
+             style="position:absolute;inset:0;z-index:20;background:rgba(255,255,255,0.97);
+                    display:flex;flex-direction:column;align-items:center;justify-content:center;
+                    padding:32px;">
+          <div style="max-width:320px;text-align:center;">
+            <div style="font:600 16px Roboto,sans-serif;color:#1E1E1E;margin-bottom:8px;">
+              Discard unsaved changes?
+            </div>
+            <div style="font:400 13px Roboto,sans-serif;color:#5A5A5A;margin-bottom:24px;">
+              Your edits have not been saved.
+            </div>
+            <div style="display:flex;gap:12px;justify-content:center;">
+              <button type="button" (click)="keepEditing()"
+                      style="background:#fff;border:1.5px solid #D0D0D0;border-radius:5px;
+                             padding:10px 20px;font:500 14px Roboto,sans-serif;color:#5A5A5A;cursor:pointer;">
+                Keep Editing
+              </button>
+              <button type="button" (click)="confirmDiscard()"
+                      style="background:#E96127;border:none;border-radius:5px;
+                             padding:10px 20px;font:500 14px Roboto,sans-serif;color:#fff;cursor:pointer;">
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+
     </div>
 
     <!-- Workstream Picker modal (D-182, CC-002) -->
@@ -216,16 +241,13 @@ import {
       overflow: hidden;
     }
 
-    .ep-panel {
-      display: flex; flex-direction: column;
-      height: 100%; overflow: hidden;
-    }
-
     /* Header — Deep Navy, Save + Cancel always visible (spec 2.2) */
+    /* D-291: sticky so header stays visible when panel body scrolls. Source: D-291. */
     .ep-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 20px; height: 64px; flex-shrink: 0;
       background: #12274A;
+      position: sticky; top: 0; z-index: 5;
     }
     .ep-title {
       margin: 0; font: 700 20px/1.2 Roboto, sans-serif; color: #fff;
@@ -262,12 +284,12 @@ import {
     }
     .ep-required { color: #E96127; margin-left: 2px; }
 
-    .ep-input {
-      width: 100%; box-sizing: border-box;
-      border: 1.5px solid #D0D0D0; border-radius: 5px;
-      padding: 10px 12px; font: 400 14px Roboto, sans-serif; color: #262626;
-      background: #fff;
+    /* Shared input + picker-trigger base (Step 7 CSS consolidation). */
+    .ep-input, .ep-picker-trigger {
+      width: 100%; border: 1.5px solid #D0D0D0; border-radius: 5px;
+      padding: 10px 12px; font: 400 14px Roboto, sans-serif; background: #fff; color: #262626;
     }
+    .ep-input { box-sizing: border-box; }
     .ep-input:focus {
       outline: none; border-color: #257099;
       box-shadow: 0 0 0 3px rgba(37,112,153,0.15);
@@ -291,12 +313,7 @@ import {
     }
 
     /* Picker trigger */
-    .ep-picker-trigger {
-      width: 100%; text-align: left; cursor: pointer;
-      border: 1.5px solid #D0D0D0; border-radius: 5px;
-      padding: 10px 12px; font: 400 14px Roboto, sans-serif;
-      background: #fff; color: #262626;
-    }
+    .ep-picker-trigger { text-align: left; cursor: pointer; }
     .ep-picker-trigger:hover { border-color: #257099; }
     .ep-picker-placeholder { color: #9E9E9E; }
     .ep-entity-chip {
@@ -335,6 +352,8 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy {
 
   saving    = false;
   saveError = '';
+  // D-292: dirty-state discard confirmation. Source: D-292.
+  showDiscardConfirm = false;
 
   // Populated on init from get_user_divisions MCP call.
   availableDivisions: Division[] = [];
@@ -577,8 +596,45 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Cancel ────────────────────────────────────────────────────────────────────
-  onCancel(): void {
-    this.cancelled.emit(); // Pop Edit from stack, return to View. No re-query (spec 2.6).
+  // ── Cancel / dirty-state (D-292) ─────────────────────────────────────────────
+
+  // D-292: ESC key triggers dirty-state check. Source: D-292.
+  @HostListener('document:keydown.escape')
+  onEscKey(): void { this.requestCancel(); }
+
+  // D-292: Check dirty state before cancelling. If dirty → show confirm; if clean → emit cancelled.
+  requestCancel(): void {
+    if (this.showDiscardConfirm) { return; }
+    if (this.isDirty()) {
+      this.showDiscardConfirm = true;
+      this.cdr.markForCheck();
+    } else {
+      this.cancelled.emit();
+    }
+  }
+
+  // D-292: Any form field differs from original cycle value, or Workstream has changed.
+  isDirty(): boolean {
+    const f = this.form.value as Record<string, unknown>;
+    return (
+      f['cycle_title']         !== this.cycle.cycle_title ||
+      f['division_id']         !== this.cycle.division_id ||
+      f['outcome_statement']   !== (this.cycle.outcome_statement   ?? '') ||
+      f['tier_classification'] !== this.cycle.tier_classification ||
+      f['assigned_ds_user_id'] !== (this.cycle.assigned_ds_user_id ?? '') ||
+      f['assigned_cb_user_id'] !== (this.cycle.assigned_cb_user_id ?? '') ||
+      f['jira_epic_key']       !== (this.cycle.jira_epic_key       ?? '') ||
+      (this.selectedWorkstream?.workstream_id ?? null) !== (this.cycle.workstream_id ?? null)
+    );
+  }
+
+  confirmDiscard(): void {
+    this.showDiscardConfirm = false;
+    this.cancelled.emit();
+  }
+
+  keepEditing(): void {
+    this.showDiscardConfirm = false;
+    this.cdr.markForCheck();
   }
 }

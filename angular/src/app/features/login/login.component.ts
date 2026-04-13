@@ -171,25 +171,12 @@ type LoginState = 'idle' | 'signing-in' | 'error';
       font-family: Arial, sans-serif;
     }
 
-    /* ── Left panel ── */
-    .login-left {
-      flex: 1;
-      background: #ffffff;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 3rem 3.5rem;
+    /* ── Left + right panels (shared layout — Step 7 CSS consolidation) ── */
+    .login-left, .login-right {
+      flex: 1; display: flex; flex-direction: column; justify-content: center;
     }
-
-    /* ── Right panel ── */
-    .login-right {
-      flex: 1;
-      background: #12274A;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 3rem 3rem;
-    }
+    .login-left { background: #ffffff; padding: 3rem 3.5rem; }
+    .login-right { background: #12274A; padding: 3rem 3rem; }
 
     /* ── Logo block ── */
     .logo-block { margin-bottom: 2.5rem; }
