@@ -65,13 +65,11 @@ async function set_milestone_target_date(params, caller_user_id) {
     return { success: false, error: `Milestone for gate '${gate_name}' not found on this cycle.` };
   }
 
-  // Derive new date_status from context (date state model Session 2026-03-24-A)
+  // B-16 fix: Session 2026-03-24-O — status must remain 'not_started' when target date is set.
+  // Human must affirmatively set 'on_track'. System must never auto-advance status to on_track.
+  // Previous logic auto-set on_track when not_started + date set — removed.
   // When actual_date is already set, target_date update doesn't change date_status.
-  // When actual_date is null and status was not_started, move to on_track.
-  let new_date_status = milestone.date_status;
-  if (!milestone.actual_date && milestone.date_status === 'not_started') {
-    new_date_status = 'on_track';
-  }
+  const new_date_status = milestone.date_status;
 
   const { data: updated, error: updateErr } = await supabase
     .from('cycle_milestone_dates')

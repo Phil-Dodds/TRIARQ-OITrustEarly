@@ -135,13 +135,20 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
            : {'max-width': '860px', margin: 'var(--triarq-space-xl) auto', padding: '0 var(--triarq-space-md)'}">
 
       <!-- Edit Cycle panel overlay — S-006 push pattern. Replaces editCycleStub(). Contract 2 2026-04-10. -->
+      <!-- B-12 fix: [cancelSignal] routes scrim-click through edit panel's dirty-state check. -->
       <app-delivery-cycle-edit-panel
         *ngIf="showEditPanel && cycle"
         [cycle]="cycle"
         [allUsers]="allUsers"
+        [cancelSignal]="cancelEditSignal"
         (saved)="onEditSaved()"
         (cancelled)="onEditCancelled()">
       </app-delivery-cycle-edit-panel>
+
+      <!-- D-291: sticky outer wrapper — B-11 fix: close button + header card both sticky.
+           Close button was a separate non-sticky element above the card; scrolled away
+           leaving × inaccessible. Now both are inside one sticky container. Source: D-291. -->
+      <div style="position:sticky;top:0;z-index:5;background:#fff;">
 
       <!-- Panel close button — only in panel mode (S-006) -->
       <div *ngIf="panelMode"
@@ -154,9 +161,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       </div>
 
       <!-- ── Cycle Header ───────────────────────────────────────────────── -->
-      <!-- D-291: sticky so header stays visible when panel body scrolls. Source: D-291. -->
-      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);
-                                  position:sticky;top:0;z-index:5;background:#fff;">
+      <!-- D-291: in sticky outer wrapper. Source: D-291. -->
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+
         <div style="display:flex;align-items:flex-start;justify-content:space-between;
                     flex-wrap:wrap;gap:var(--triarq-space-sm);">
           <div>
@@ -357,6 +364,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
       </div>
 
+      </div><!-- end D-291 sticky outer wrapper (B-11) -->
+
       <!-- ── Stage Track — Full mode (D-273: above Outcome) ────────────────────── -->
       <!-- Label fixed "Lifecycle Track" → "Stage Track" per S-002 and Contract 3 Block 4 Fix 1. -->
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
@@ -408,10 +417,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                          background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:12px;">
               {{ cycle.division_name }}
             </span>
+            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
             <span *ngIf="!cycle.division_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Not set
+              Division: Not set
             </span>
           </div>
 
@@ -425,10 +435,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                          background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:12px;">
               {{ cycle.workstream!.display_name_short ?? cycle.workstream!.workstream_name }}
             </span>
+            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
             <span *ngIf="!cycle.workstream?.workstream_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Not set
+              Workstream: Not set
             </span>
           </div>
 
@@ -441,10 +452,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                          background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
               {{ cycle.assigned_ds_display_name }}
             </span>
+            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
             <span *ngIf="!cycle.assigned_ds_display_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Unassigned
+              Domain Strategist: Unassigned
             </span>
           </div>
 
@@ -457,10 +469,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                          background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
               {{ cycle.assigned_cb_display_name }}
             </span>
+            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
             <span *ngIf="!cycle.assigned_cb_display_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Unassigned
+              Capability Builder: Unassigned
             </span>
           </div>
 
@@ -468,12 +481,19 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <div>
             <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
                         color:var(--triarq-color-text-secondary);margin-bottom:4px;">Tier</div>
-            <span [style.background]="tierBadgeBg(cycle.tier_classification)"
+            <span *ngIf="cycle.tier_classification"
+                  [style.background]="tierBadgeBg(cycle.tier_classification)"
                   [style.color]="tierBadgeColor(cycle.tier_classification)"
                   style="display:inline-block;border-radius:4px;padding:3px 8px;
                          font-size:12px;font-weight:500;font-family:Roboto,sans-serif;">
               Tier {{ tierLabel(cycle.tier_classification) }} —
               {{ cycle.tier_classification === 'tier_1' ? 'Fast Lane' : cycle.tier_classification === 'tier_2' ? 'Structured' : 'Governed' }}
+            </span>
+            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
+            <span *ngIf="!cycle.tier_classification"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
+              Tier: Not set
             </span>
           </div>
 
@@ -486,10 +506,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                          background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
               {{ jiraLink!.jira_epic_key }}
             </span>
+            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
             <span *ngIf="!jiraLink?.jira_epic_key"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Not linked
+              Jira Epic: Not linked
             </span>
           </div>
 
@@ -590,10 +611,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 <div *ngIf="milestoneError" style="font-size:11px;color:var(--triarq-color-error);margin-top:2px;">{{ milestoneError }}</div>
               </ng-container>
               <ng-template #targetDateDisplay>
+                <!-- D-300 / B-15 fix: date text neutral black — status dot and label carry color, not date text. -->
                 <span *ngIf="m.target_date"
                       (click)="startMilestoneEdit(m)"
-                      [style.color]="milestoneTargetColor(m)"
-                      style="cursor:pointer;text-decoration:underline dotted;"
+                      style="cursor:pointer;text-decoration:underline dotted;color:#1a1a1a;"
                       title="Click to edit target date">
                   {{ m.target_date }}
                 </span>
@@ -630,10 +651,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 <div *ngIf="actualDateError" style="font-size:11px;color:var(--triarq-color-error);margin-top:2px;">{{ actualDateError }}</div>
               </ng-container>
               <ng-template #actualDateDisplay>
+                <!-- D-300 / B-15 fix: date text neutral black — removed overdue error-color binding on date text. -->
                 <span *ngIf="m.actual_date"
                       (click)="startActualDateEdit(m.gate_name)"
-                      [style.color]="m.actual_date <= (m.target_date ?? m.actual_date) ? 'var(--triarq-color-text-secondary)' : 'var(--triarq-color-error)'"
-                      style="cursor:pointer;text-decoration:underline dotted;"
+                      style="cursor:pointer;text-decoration:underline dotted;color:#1a1a1a;"
                       title="Click to edit actual date">
                   {{ m.actual_date }}
                 </span>
@@ -1565,12 +1586,9 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     if (changes['cycleId'] && !changes['cycleId'].firstChange && this.cycleId) {
       this.loadCycle(this.cycleId);
     }
-    // D-292: Dashboard increments cancelEditSignal to close edit panel (e.g. scrim click). Source: D-292.
-    if (changes['cancelEditSignal'] && !changes['cancelEditSignal'].firstChange) {
-      if (this.showEditPanel) {
-        this.onEditCancelled();
-      }
-    }
+    // D-292: cancelEditSignal proxied to edit panel via [cancelSignal] binding.
+    // B-12 fix: edit panel's ngOnChanges calls requestCancel() — dirty-state check fires correctly.
+    // No action needed here; Angular binding propagates the signal to the edit panel directly.
   }
 
   // D-292: ESC key in panel mode — close edit panel if open, otherwise close the detail panel. Source: D-292.
@@ -2848,13 +2866,15 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           this.editingActualDateGate = null;
           this.loadEvents(this.cycle!.delivery_cycle_id);
         } else {
-          this.actualDateError = res.error ?? 'Save failed.';
+          // B-17 fix: translate raw DB constraint errors to plain language. Source: D-140.
+          this.actualDateError = translateMilestoneError(res.error ?? 'Save failed.');
         }
         this.savingActualDate = false;
         this.cdr.markForCheck();
       },
       error: (err: { error?: string }) => {
-        this.actualDateError  = err.error ?? 'Save failed. Try again.';
+        // B-17 fix: translate raw DB constraint errors to plain language. Source: D-140.
+        this.actualDateError  = translateMilestoneError(err?.error ?? 'Save failed. Try again.');
         this.savingActualDate = false;
         this.cdr.markForCheck();
       }
@@ -2893,4 +2913,16 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   attachedCountInGroup(slots: CycleArtifact[]): number {
     return slots.filter(s => s.external_url || s.oi_library_artifact_id).length;
   }
+}
+
+// ── B-17: Error translation helper ────────────────────────────────────────────
+// Translates raw DB constraint error messages to plain-language user messages.
+// Raw constraint names must never appear in the UI per D-140. Source: B-17.
+function translateMilestoneError(raw: string): string {
+  if (raw.includes('cycle_milestone_dates_date_status_check') ||
+      raw.includes('check constraint')) {
+    return 'Could not save date — the status value may be incompatible with this gate. ' +
+           'Try setting the status to \'Not Started\' and saving again.';
+  }
+  return raw;
 }
