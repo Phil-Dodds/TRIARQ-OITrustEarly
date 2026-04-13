@@ -485,9 +485,11 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
   onEscKey(): void { this.requestClose(); }
 
   // D-292: isDirty — true if any form field has a value or any picker has a selection.
+  // B-3 fix: division_id was missing — dropdown change not detected as dirty. Source: D-292.
   isDirty(): boolean {
     const v = this.form.value as Record<string, unknown>;
     return !!(
+      v['division_id'] ||
       v['cycle_title'] ||
       v['outcome_statement'] ||
       v['tier_classification'] ||

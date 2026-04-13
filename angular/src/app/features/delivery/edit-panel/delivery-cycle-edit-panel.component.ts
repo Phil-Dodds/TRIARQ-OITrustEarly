@@ -19,7 +19,8 @@
 // ChangeDetection: OnPush.
 
 import {
-  Component, OnInit, OnDestroy, Input, Output, EventEmitter,
+  Component, OnInit, OnDestroy, OnChanges, SimpleChanges,
+  Input, Output, EventEmitter,
   ChangeDetectionStrategy, ChangeDetectorRef, HostListener
 } from '@angular/core';
 import {
@@ -114,10 +115,10 @@ import {
             </div>
 
             <!-- 4. Delivery Workstream (entity picker, re-scopes on Division change) -->
+            <!-- B-14 fix: Workstream is optional at edit time per D-165. Removed required asterisk
+                 and required validation. Gate-enforcement only (Brief Review gate). Source: D-165. -->
             <div class="ep-field">
-              <label class="ep-label">
-                Delivery Workstream <span class="ep-required">*</span>
-              </label>
+              <label class="ep-label">Delivery Workstream</label>
               <!-- Workstream cleared notice after division change -->
               <div *ngIf="workstreamClearedNote" class="ep-amber-note">
                 {{ workstreamClearedNote }}
@@ -134,8 +135,7 @@ import {
               <button *ngIf="selectedWorkstream" type="button"
                       class="ep-chip-remove"
                       (click)="clearWorkstream()">✕ Remove</button>
-              <div *ngIf="workstreamRequired && !selectedWorkstream"
-                   class="ep-field-error">Delivery Workstream is required.</div>
+              <div class="ep-hint">Required before Brief Review Gate.</div>
             </div>
 
             <!-- 5. Tier Classification (dropdown in Edit — not option cards; spec 2.3 note 4) -->
@@ -336,12 +336,15 @@ import {
     }
   `]
 })
-export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy {
+export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnChanges {
 
   // The cycle to edit — passed from the View panel.
   @Input() cycle!: DeliveryCycle;
   // All users accessible in the caller's context — used to filter DS/CB dropdowns.
   @Input() allUsers: User[] = [];
+  // D-292: Dashboard/detail increments to signal cancel (scrim click). Source: D-292.
+  // B-12 fix: cancelSignal routes through requestCancel() — dirty-state check fires correctly.
+  @Input() cancelSignal = 0;
 
   // Emitted on successful save (View re-queries unconditionally per S-008).
   @Output() saved     = new EventEmitter<void>();
@@ -370,8 +373,8 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy {
   showTierChangeWarning = false;
   private originalTier: TierClassification = '' as TierClassification;
 
-  // Validation guard: Workstream is required (D-165 — optional at creation, required by Brief Review).
-  // In Edit, we enforce it if the cycle already has one or if form was submitted.
+  // B-14 fix: workstreamRequired no longer used — Workstream is optional at edit per D-165.
+  // Kept as field (value always false) to avoid removing template references if any remain.
   workstreamRequired = false;
 
   private subs = new Subscription();
@@ -446,6 +449,14 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void { this.subs.unsubscribe(); }
 
+  // D-292: cancelSignal from detail component (proxied from dashboard scrim click). Source: D-292.
+  // B-12 fix: route through requestCancel() so dirty-state check fires before closing.
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['cancelSignal'] && !changes['cancelSignal'].firstChange) {
+      this.requestCancel();
+    }
+  }
+
   // ── Division loading ─────────────────────────────────────────────────────────
   private loadDivisions(): void {
     this.subs.add(
@@ -516,7 +527,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy {
   // ── Save ──────────────────────────────────────────────────────────────────────
   onSave(): void {
     this.form.markAllAsTouched();
-    this.workstreamRequired = true;
+    // B-14 fix: removed workstreamRequired = true. Workstream is optional per D-165.
 
     if (this.form.invalid || this.saving) { return; }
 

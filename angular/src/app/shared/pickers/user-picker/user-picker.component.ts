@@ -92,25 +92,32 @@ function avatarColorFromName(name: string): string {
                  aria-label="Search users" />
         </div>
 
-        <!-- D-297: No division selected — show prompt instead of loading users. Source: D-297. -->
+        <!-- D-299 / B-13 fix: "This Division" scope with no divisionId — inline inform only.
+             Does NOT block the list — shows below scope row. Source: D-299. -->
         <div *ngIf="noDivisionMessage" class="up-no-division-msg">
-          Select a Division first to load members.
+          This Delivery Cycle doesn't have a Division set yet. Select a Division on the form to filter by Division.
         </div>
 
         <!-- Error -->
-        <div *ngIf="!noDivisionMessage && loadError" class="up-load-error" role="alert">
+        <div *ngIf="loadError" class="up-load-error" role="alert">
           <span class="up-error-primary">Could not load users.</span>
           <span class="up-error-secondary">{{ loadError }}</span>
         </div>
 
         <!-- Loading -->
-        <div *ngIf="!noDivisionMessage && loading && !loadError" class="up-loading">
+        <div *ngIf="loading && !loadError" class="up-loading">
           Loading users…
         </div>
 
         <!-- User list -->
-        <div *ngIf="!noDivisionMessage && !loading && !loadError" class="up-list-container">
-          <div *ngIf="filteredRows.length === 0" class="up-empty">
+        <div *ngIf="!loading && !loadError" class="up-list-container">
+          <!-- B-13 fix: specific message when This Division has no users of this role.
+               Distinguishes empty result from genuine error. Source: D-297. -->
+          <div *ngIf="filteredRows.length === 0 && divisionEmptyMessage" class="up-empty">
+            {{ divisionEmptyMessage }}
+            <span class="up-expand-hint">Try "All Divisions" to search the full system.</span>
+          </div>
+          <div *ngIf="filteredRows.length === 0 && !divisionEmptyMessage" class="up-empty">
             No {{ roleLabel }}s found in this scope.
             <span *ngIf="scopeCtrl.value === 'division'"
                   class="up-expand-hint">
@@ -222,7 +229,8 @@ function avatarColorFromName(name: string): string {
       box-shadow: 0 0 0 3px rgba(37,112,153,0.15);
     }
 
-    /* D-297: No-division prompt — shown instead of list when picker opened without Division. Source: D-297. */
+    /* D-299/B-13: Shown inline when user selects "This Division" scope with no Division on cycle.
+       Does not block the list — list still loads below this message. Source: D-299. */
     .up-no-division-msg {
       padding: 24px 20px; text-align: center;
       font: 400 14px Roboto, sans-serif; color: #5A5A5A; font-style: italic;
@@ -330,10 +338,14 @@ export class UserPickerComponent implements OnInit, OnDestroy {
   filteredRows: UserPickerRow[] = [];
   loading       = false;
   loadError     = '';
+  // B-13 fix: separate empty-state message for "This Division has no users of this role"
+  // vs a genuine network/server error. Source: D-297.
+  divisionEmptyMessage = '';
   selectedRow:  UserPickerRow | null = null;
   selectedUserId: string | null = null;
   blockedRowId: string | null = null;
-  // D-297: True when picker opened without a Division selected — shows prompt, skips loadUsers. Source: D-297.
+  // D-297/D-299: shown when user explicitly selects "This Division" scope but cycle has no Division.
+  // B-13/D-299 fix: noDivisionMessage only shown on explicit scope switch, not on initial open. Source: D-299.
   noDivisionMessage = false;
 
   scopeOptions: { value: UserPickerScope; label: string }[] = [];
@@ -350,12 +362,9 @@ export class UserPickerComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // D-297: No division → show prompt, skip loading. Source: D-297.
-    if (!this.divisionId) {
-      this.noDivisionMessage = true;
-      this.cdr.markForCheck();
-      return;
-    }
+    // D-299 fix: when no Division set on cycle, default scope to 'all' and load immediately.
+    // Previous behavior: noDivisionMessage = true blocked all loading. Source: D-299.
+    // D-297: "This Division" scope with no divisionId shows inline inform message (not a blocker).
 
     // Build scope options — D-182: tightest scope first
     this.scopeOptions = [
@@ -363,13 +372,28 @@ export class UserPickerComponent implements OnInit, OnDestroy {
       { value: 'all',      label: 'All Divisions' }
     ];
 
+    // D-299: when cycle has no Division, open with All Divisions scope.
+    if (!this.divisionId) {
+      this.scopeCtrl.setValue('all', { emitEvent: false });
+    }
+
     // Pre-select current user if one is set
     this.selectedUserId = this.currentUserId;
 
     // React to scope changes
     this.subs.add(
-      this.scopeCtrl.valueChanges.subscribe(() => {
-        this.loadUsers();
+      this.scopeCtrl.valueChanges.subscribe(scope => {
+        // D-299: if user switches to "This Division" with no divisionId, show inline inform.
+        // All Divisions list remains visible (noDivisionMessage does NOT block the list).
+        if (scope === 'division' && !this.divisionId) {
+          this.noDivisionMessage = true;
+          // Load all divisions anyway — user can still select
+          this.loadUsers();
+        } else {
+          this.noDivisionMessage = false;
+          this.loadUsers();
+        }
+        this.cdr.markForCheck();
       })
     );
 
@@ -386,18 +410,21 @@ export class UserPickerComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void { this.subs.unsubscribe(); }
 
   private loadUsers(): void {
-    this.loading   = true;
-    this.loadError = '';
-    this.allRows   = [];
-    this.filteredRows = [];
-    this.blockedRowId = null;
+    this.loading          = true;
+    this.loadError        = '';
+    this.divisionEmptyMessage = '';
+    this.allRows          = [];
+    this.filteredRows     = [];
+    this.blockedRowId     = null;
     this.cdr.markForCheck();
 
     const scope = this.scopeCtrl.value as UserPickerScope;
     const params: Record<string, unknown> = {};
+    // D-299: use division_id only when scope is 'division' AND a divisionId is available.
     if (scope === 'division' && this.divisionId) {
       params['division_id'] = this.divisionId;
     }
+    // D-299: if scope is 'division' but no divisionId, load all users (show inform message separately).
 
     this.mcp.call<User[]>('division', 'list_users', params).subscribe({
       next: (res) => {
@@ -412,6 +439,13 @@ export class UserPickerComponent implements OnInit, OnDestroy {
         const users = (res.data ?? []).filter(u =>
           u.system_role === targetRole && !u.deleted_at
         );
+        // B-13 fix: distinguish empty result from error. When scope is 'division' and
+        // MCP succeeded but no users of this role exist in the Division, show plain message.
+        // Previous behavior: any non-result showed generic "Network error" message. Source: D-297.
+        if (users.length === 0 && scope === 'division' && this.divisionId) {
+          this.divisionEmptyMessage =
+            `No ${this.roleLabel}s found in this Division.`;
+        }
         // Sort: active first alphabetically, inactive at bottom
         users.sort((a, b) => {
           if (a.is_active !== b.is_active) { return a.is_active ? -1 : 1; }
@@ -432,8 +466,9 @@ export class UserPickerComponent implements OnInit, OnDestroy {
         this.applySearch(this.searchCtrl.value ?? '');
         this.cdr.markForCheck();
       },
-      error: () => {
-        this.loadError = 'Network error loading users. Try again.';
+      error: (err: { error?: string }) => {
+        // B-13 fix: genuine network/server errors show the server error message when available.
+        this.loadError = err?.error ?? 'Network error loading users. Try again.';
         this.loading   = false;
         this.cdr.markForCheck();
       }
