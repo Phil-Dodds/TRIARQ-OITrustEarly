@@ -1412,13 +1412,6 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </div>
       </div>
 
-      <!-- Footer nav -->
-      <div style="margin-top:var(--triarq-space-lg);">
-        <a routerLink="/delivery"
-           style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);">
-          ← Delivery Dashboard
-        </a>
-      </div>
     </div>
   `
 })

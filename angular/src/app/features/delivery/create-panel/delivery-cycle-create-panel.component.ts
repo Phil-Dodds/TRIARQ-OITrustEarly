@@ -72,6 +72,7 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
               Division <span class="cp-required" aria-hidden="true">*</span>
             </label>
             <select formControlName="division_id" class="cp-input"
+                    [class.cp-input--error]="f['division_id'].invalid && f['division_id'].touched"
                     (change)="onDivisionChange()">
               <option value="">— Select Division —</option>
               <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
@@ -86,6 +87,7 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
               Delivery Cycle Title <span class="cp-required" aria-hidden="true">*</span>
             </label>
             <input formControlName="cycle_title" class="cp-input"
+                   [class.cp-input--error]="f['cycle_title'].invalid && f['cycle_title'].touched"
                    type="text" maxlength="120"
                    placeholder="e.g. Member Attribution Model" />
             <div *ngIf="f['cycle_title'].invalid && f['cycle_title'].touched"
@@ -130,34 +132,18 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
             <div class="cp-gate-note">Required before Brief Review Gate.</div>
           </div>
 
-          <!-- 5. Tier Classification (option cards, no default — D-124) -->
+          <!-- 5. Tier Classification — dropdown per D-191 (locked: not cards, not radio buttons). Source: D-191. -->
           <div class="cp-field">
             <label class="cp-label">
               Tier Classification <span class="cp-required" aria-hidden="true">*</span>
             </label>
-            <div class="cp-tier-cards" role="radiogroup" aria-label="Tier Classification">
-              <label class="cp-tier-card"
-                     [class.cp-tier-card--selected]="f['tier_classification'].value === 'tier_1'">
-                <input type="radio" formControlName="tier_classification" value="tier_1"
-                       style="position:absolute;opacity:0;pointer-events:none;" />
-                <span class="cp-tier-card-name">Tier 1</span>
-                <span class="cp-tier-card-desc">Fast Lane</span>
-              </label>
-              <label class="cp-tier-card"
-                     [class.cp-tier-card--selected]="f['tier_classification'].value === 'tier_2'">
-                <input type="radio" formControlName="tier_classification" value="tier_2"
-                       style="position:absolute;opacity:0;pointer-events:none;" />
-                <span class="cp-tier-card-name">Tier 2</span>
-                <span class="cp-tier-card-desc">Structured</span>
-              </label>
-              <label class="cp-tier-card"
-                     [class.cp-tier-card--selected]="f['tier_classification'].value === 'tier_3'">
-                <input type="radio" formControlName="tier_classification" value="tier_3"
-                       style="position:absolute;opacity:0;pointer-events:none;" />
-                <span class="cp-tier-card-name">Tier 3</span>
-                <span class="cp-tier-card-desc">Governed</span>
-              </label>
-            </div>
+            <select formControlName="tier_classification" class="cp-input"
+                    [class.cp-input--error]="f['tier_classification'].invalid && f['tier_classification'].touched">
+              <option value="">Select tier</option>
+              <option value="tier_1">Tier 1 — Fast Lane: Workflow changes, config updates, no platform dependencies</option>
+              <option value="tier_2">Tier 2 — Structured: Platform changes, integrations, cross-domain dependencies</option>
+              <option value="tier_3">Tier 3 — Governed: Agent deployments, compliance scope changes, AI Governance Board required</option>
+            </select>
             <div *ngIf="f['tier_classification'].invalid && f['tier_classification'].touched"
                  class="cp-field-error">Tier Classification is required.</div>
           </div>
@@ -217,8 +203,9 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
           <div class="cp-footer">
             <button type="button" class="cp-btn-cancel" (click)="close()">Cancel</button>
             <!-- D-178 Tier 2: spinner replaces label during submit -->
+            <!-- Fix B-7: button always enabled — validation runs on submit, never gates the button. Source: D-140. -->
             <button type="submit" class="cp-btn-create"
-                    [disabled]="form.invalid || submitting">
+                    [disabled]="submitting">
               <ion-spinner *ngIf="submitting" name="crescent"
                            style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
               </ion-spinner>
@@ -343,24 +330,10 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
       margin-top: 4px; font: 400 12px italic Roboto, sans-serif; color: #9E9E9E;
     }
 
-    /* Tier option cards (Contract 2 correction — replaced radio group) */
-    .cp-tier-cards { display: flex; gap: 10px; padding: 4px 0; }
-    .cp-tier-card {
-      flex: 1; position: relative; cursor: pointer;
-      border: 1.5px solid #D0D0D0; border-radius: 8px;
-      padding: 12px 10px; text-align: center;
-      display: flex; flex-direction: column; gap: 3px;
-      transition: border-color 0.15s, background 0.15s;
-    }
-    .cp-tier-card:hover { border-color: #257099; }
-    .cp-tier-card--selected {
-      border-color: #257099; background: rgba(37,112,153,0.06);
-    }
-    .cp-tier-card-name {
-      font: 600 14px Roboto, sans-serif; color: #1E1E1E;
-    }
-    .cp-tier-card-desc {
-      font: 400 12px Roboto, sans-serif; color: #5A5A5A;
+    /* Error state for select / input — Pattern 3 per D-200. Source: D-191, D-200. */
+    .cp-input--error {
+      border-color: #C62828;
+      box-shadow: 0 0 0 3px rgba(198,40,40,0.12);
     }
 
     /* Picker trigger */

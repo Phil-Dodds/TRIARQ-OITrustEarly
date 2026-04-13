@@ -92,19 +92,24 @@ function avatarColorFromName(name: string): string {
                  aria-label="Search users" />
         </div>
 
+        <!-- D-297: No division selected — show prompt instead of loading users. Source: D-297. -->
+        <div *ngIf="noDivisionMessage" class="up-no-division-msg">
+          Select a Division first to load members.
+        </div>
+
         <!-- Error -->
-        <div *ngIf="loadError" class="up-load-error" role="alert">
+        <div *ngIf="!noDivisionMessage && loadError" class="up-load-error" role="alert">
           <span class="up-error-primary">Could not load users.</span>
           <span class="up-error-secondary">{{ loadError }}</span>
         </div>
 
         <!-- Loading -->
-        <div *ngIf="loading && !loadError" class="up-loading">
+        <div *ngIf="!noDivisionMessage && loading && !loadError" class="up-loading">
           Loading users…
         </div>
 
         <!-- User list -->
-        <div *ngIf="!loading && !loadError" class="up-list-container">
+        <div *ngIf="!noDivisionMessage && !loading && !loadError" class="up-list-container">
           <div *ngIf="filteredRows.length === 0" class="up-empty">
             No {{ roleLabel }}s found in this scope.
             <span *ngIf="scopeCtrl.value === 'division'"
@@ -217,6 +222,12 @@ function avatarColorFromName(name: string): string {
       box-shadow: 0 0 0 3px rgba(37,112,153,0.15);
     }
 
+    /* D-297: No-division prompt — shown instead of list when picker opened without Division. Source: D-297. */
+    .up-no-division-msg {
+      padding: 24px 20px; text-align: center;
+      font: 400 14px Roboto, sans-serif; color: #5A5A5A; font-style: italic;
+    }
+
     .up-load-error {
       padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;
     }
@@ -322,6 +333,8 @@ export class UserPickerComponent implements OnInit, OnDestroy {
   selectedRow:  UserPickerRow | null = null;
   selectedUserId: string | null = null;
   blockedRowId: string | null = null;
+  // D-297: True when picker opened without a Division selected — shows prompt, skips loadUsers. Source: D-297.
+  noDivisionMessage = false;
 
   scopeOptions: { value: UserPickerScope; label: string }[] = [];
 
@@ -337,13 +350,18 @@ export class UserPickerComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    // D-297: No division → show prompt, skip loading. Source: D-297.
+    if (!this.divisionId) {
+      this.noDivisionMessage = true;
+      this.cdr.markForCheck();
+      return;
+    }
+
     // Build scope options — D-182: tightest scope first
     this.scopeOptions = [
-      { value: 'division', label: this.divisionId ? 'This Division' : 'All Divisions (no Division set)' },
+      { value: 'division', label: 'This Division' },
       { value: 'all',      label: 'All Divisions' }
     ];
-    // If no divisionId, default scope to all immediately
-    if (!this.divisionId) { this.scopeCtrl.setValue('all'); }
 
     // Pre-select current user if one is set
     this.selectedUserId = this.currentUserId;

@@ -107,77 +107,123 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
     <!-- ── Left: grid content ─────────────────────────────────────────────── -->
     <div style="flex:1;min-width:0;max-width:1200px;padding:var(--triarq-space-2xl) var(--triarq-space-md);">
 
-      <!-- ── Back link (D-172) ───────────────────────────────────────────── -->
-      <div style="margin-bottom:var(--triarq-space-sm);">
+      <!-- D-298: Two-row header zone. Row 1: page identity. Row 2: controls. Source: D-298. -->
+
+      <!-- Row 1 — Page identity: back link | rule | title | surface description -->
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;">
         <a routerLink="/delivery"
-           style="font-size:var(--triarq-text-small);
-                  color:var(--triarq-color-primary);text-decoration:none;">
+           style="font-size:13px;color:#257099;text-decoration:none;padding-top:7px;flex-shrink:0;">
           ← Delivery Cycle Tracking
         </a>
+        <span style="border-left:1px solid #ddd;height:16px;align-self:center;margin:0 4px;flex-shrink:0;"></span>
+        <span style="font-size:26px;font-weight:400;color:#1a1a1a;white-space:nowrap;flex-shrink:0;">Delivery Cycles</span>
+        <!-- S-015 / D-288: surface description. Source: Contract 6 Step 4.1. -->
+        <span style="font-size:12px;font-style:italic;color:#777;flex:1;padding-top:8px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          Track and manage delivery cycles across your divisions and workstreams.
+        </span>
       </div>
 
-      <!-- ── Page header ──────────────────────────────────────────────────── -->
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;
-                  margin-bottom:var(--triarq-space-md);gap:var(--triarq-space-md);">
-        <div>
-          <h3 style="margin:0 0 4px 0;">Delivery Cycles</h3>
-          <!-- S-015 / D-288: surface description text. Source: Contract 6 Step 4.1. -->
-          <p style="margin:4px 0 12px 0;font-size:11px;font-style:italic;color:#5A5A5A;">
-            Track and manage delivery cycles across your divisions and workstreams.
-          </p>
-        </div>
-        <!-- D-290: Opens create panel in right column. Source: D-290. -->
-        <button *ngIf="canCreateCycle"
-                class="oi-btn-primary"
-                (click)="toggleCreatePanel()"
-                style="font-size:var(--triarq-text-small);white-space:nowrap;flex-shrink:0;">
-          + New Cycle
-        </button>
-      </div>
+      <!-- Row 2 — Controls: cards | chips | actions. Bottom-aligned per D-298. -->
+      <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:0;">
 
-      <!-- D-290: Create Cycle form is now in the right panel. Source: D-290. -->
-
-      <!-- ── Summary Cards — Three compact count cards (D-HubCounts-2026-04-06) ─────── -->
-      <!-- Active Cycles: always shown, NOT tappable. My Cycles + Overdue Gates: tappable, -->
-      <!-- set filter, do NOT write to filter memory. Hidden when count is zero.            -->
-      <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-start;">
-
-        <!-- Card 1: Active Cycles — always shown, not tappable -->
-        <div style="background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);
-                    padding:12px;min-width:110px;flex:0 0 auto;">
-          <div style="font-size:28px;font-weight:700;color:var(--triarq-color-primary);line-height:1.1;">
-            {{ activeCycleCount }}
+        <!-- Left: summary cards (compact padding per D-298) -->
+        <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-end;">
+          <!-- Active Cycles — always shown, not tappable -->
+          <div style="background:#fff;border:1px solid #E8E8E8;border-radius:8px;padding:8px 16px 10px;">
+            <div style="font-size:28px;font-weight:300;color:#257099;line-height:1.1;">{{ activeCycleCount }}</div>
+            <div style="font-size:12px;color:#888;">Active Cycles</div>
           </div>
-          <div style="font-size:13px;color:#5A5A5A;">Active Cycles</div>
-        </div>
-
-        <!-- Card 2: My Cycles — hidden at zero, tappable -> Assigned Person filter -->
-        <div *ngIf="myCyclesCount > 0"
-             (click)="onMyCyclesTap()"
-             style="background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);
-                    padding:12px;min-width:110px;flex:0 0 auto;cursor:pointer;"
-             (mouseenter)="$any($event.currentTarget).style.boxShadow='0 2px 8px rgba(37,112,153,0.2)'"
-             (mouseleave)="$any($event.currentTarget).style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'">
-          <div style="font-size:28px;font-weight:700;color:var(--triarq-color-primary);line-height:1.1;">
-            {{ myCyclesCount }}
+          <!-- My Cycles — hidden at zero, tappable → Assigned Person filter -->
+          <div *ngIf="myCyclesCount > 0"
+               (click)="onMyCyclesTap()"
+               style="background:#fff;border:1px solid #E8E8E8;border-radius:8px;padding:8px 16px 10px;cursor:pointer;">
+            <div style="font-size:28px;font-weight:300;color:#257099;line-height:1.1;">{{ myCyclesCount }}</div>
+            <div style="font-size:12px;color:#888;">My Cycles</div>
           </div>
-          <div style="font-size:13px;color:#5A5A5A;">My Cycles</div>
-        </div>
-
-        <!-- Card 3: Overdue Gates — hidden at zero, tappable -> Gate Status filter -->
-        <div *ngIf="overdueGateCount > 0"
-             (click)="onOverdueGatesTap()"
-             style="background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);
-                    padding:12px;min-width:110px;flex:0 0 auto;cursor:pointer;"
-             (mouseenter)="$any($event.currentTarget).style.boxShadow='0 2px 8px rgba(233,97,39,0.2)'"
-             (mouseleave)="$any($event.currentTarget).style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'">
-          <div style="font-size:28px;font-weight:700;color:var(--triarq-color-sunray,#F2A620);line-height:1.1;">
-            {{ overdueGateCount }}
+          <!-- Overdue Gates — hidden at zero, tappable → Gate Status filter -->
+          <div *ngIf="overdueGateCount > 0"
+               (click)="onOverdueGatesTap()"
+               style="background:#fff;border:1px solid #E8E8E8;border-radius:8px;padding:8px 16px 10px;cursor:pointer;">
+            <div style="font-size:28px;font-weight:300;color:#F2A620;line-height:1.1;">{{ overdueGateCount }}</div>
+            <div style="font-size:12px;color:#888;">Overdue Gates</div>
           </div>
-          <div style="font-size:13px;color:#5A5A5A;">Overdue Gates</div>
         </div>
 
-      </div>
+        <!-- Middle: active filter chips — flex:1, flex-wrap. Zone absent when no filters per S-012. -->
+        <div style="flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;">
+          <span *ngIf="filterStage"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Stage: {{ stageLabelFor(filterStage) }}
+            <button (click)="filterStage='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <span *ngIf="filterTier"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Tier: {{ filterTier === 'tier_1' ? 'Tier 1 — Fast Lane' : filterTier === 'tier_2' ? 'Tier 2 — Structured' : 'Tier 3 — Governed' }}
+            <button (click)="filterTier='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <!-- D-279: chip shows "None assigned" or Division · Workstream short name. CC-Decision-2026-04-12-E. -->
+          <span *ngIf="filterWorkstream"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Workstream: {{ filterWorkstream === '__none__' ? 'None assigned' : workstreamChipLabel(filterWorkstream) }}
+            <button (click)="filterWorkstream='';wsScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <span *ngIf="filterGateStatus"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Gate Status: {{ filterGateStatus === 'overdue' ? 'Overdue' : filterGateStatus === 'pending' ? 'Pending' : 'Approved' }}
+            <button (click)="filterGateStatus='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <!-- D-277: chip shows Me / Unassigned DS / Unassigned CB / person name. CC-Decision-2026-04-12-F. -->
+          <span *ngIf="filterAssignedPerson"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Assigned: {{ filterAssignedPerson === 'me' ? 'Me' : filterAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : filterAssignedPerson === 'unassigned_cb' ? 'Unassigned CB' : personDisplayName(filterAssignedPerson) }}
+            <button (click)="filterAssignedPerson='';personScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <span *ngIf="filterDivision"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Division: {{ filterDivisionLabel }}
+            <button (click)="filterDivision='';includeChildDivisions=false;onDivisionFilterChange()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+        </div>
+
+        <!-- Right: Filters + New Cycle — flex-shrink:0, never wraps. Source: D-298. -->
+        <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-end;">
+          <!-- Filters button: badge overlapping corner per D-298 -->
+          <button (click)="toggleFilterPanel()"
+                  style="position:relative;background:#257099;color:#fff;
+                         padding:8px 16px;border:none;border-radius:6px;cursor:pointer;
+                         font-size:14px;font-family:Roboto,sans-serif;font-weight:500;">
+            Filters
+            <span *ngIf="activeFilterCount > 0"
+                  style="position:absolute;top:-8px;right:-8px;
+                         background:#E96127;color:#fff;font-size:11px;font-weight:700;
+                         border-radius:999px;width:18px;height:18px;
+                         display:flex;align-items:center;justify-content:center;line-height:1;">
+              {{ activeFilterCount }}
+            </span>
+          </button>
+          <!-- D-290: Opens create panel in right column. Source: D-290. -->
+          <button *ngIf="canCreateCycle"
+                  (click)="toggleCreatePanel()"
+                  style="background:#257099;color:#fff;border:none;border-radius:6px;
+                         padding:8px 18px;font-size:14px;font-family:Roboto,sans-serif;
+                         font-weight:500;cursor:pointer;white-space:nowrap;">
+            + New Cycle
+          </button>
+        </div>
+
+      </div><!-- /Row 2 -->
 
       <!-- ── Item 5: Drill-down filter visual confirmation — Principle 3 ──── -->
       <!-- When landing from a drill-down (query params set), show the applied filter clearly. -->
@@ -223,76 +269,6 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                        color:var(--triarq-color-text-secondary);text-decoration:underline;">
           Remove all filters
         </button>
-      </div>
-
-      <!-- ── Filters button + active chips (D-HubFilter-2026-04-06) ─────────── -->
-      <!-- Inline dropdowns removed. Filters button opens slide-in panel with 6 filters.  -->
-      <!-- Active filter chips render below button when any filter is set.                -->
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-        <!-- Filters button with active count badge -->
-        <button (click)="toggleFilterPanel()"
-                style="position:relative;background:var(--triarq-color-primary,#257099);color:#fff;
-                       font-size:14px;font-family:Roboto,sans-serif;font-weight:500;
-                       border:none;border-radius:5px;padding:10px 20px;cursor:pointer;">
-          Filters
-          <span *ngIf="activeFilterCount > 0"
-                style="position:absolute;top:-7px;right:-7px;
-                       background:#E96127;color:#fff;font-size:11px;font-weight:700;
-                       border-radius:999px;padding:1px 6px;min-width:18px;text-align:center;line-height:16px;">
-            {{ activeFilterCount }}
-          </span>
-        </button>
-        <!-- Active filter chips — "Name: Value" format per S-012/D-270. Reflect committed (applied) state only. -->
-        <span *ngIf="filterStage"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Stage: {{ stageLabelFor(filterStage) }}
-          <button (click)="filterStage='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <span *ngIf="filterTier"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Tier: {{ filterTier === 'tier_1' ? 'Tier 1 — Fast Lane' : filterTier === 'tier_2' ? 'Tier 2 — Structured' : 'Tier 3 — Governed' }}
-          <button (click)="filterTier='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <!-- D-279: chip shows "None assigned" or Division · Workstream short name. CC-Decision-2026-04-12-E. -->
-        <span *ngIf="filterWorkstream"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Workstream: {{ filterWorkstream === '__none__' ? 'None assigned' : workstreamChipLabel(filterWorkstream) }}
-          <button (click)="filterWorkstream='';wsScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <span *ngIf="filterGateStatus"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Gate Status: {{ filterGateStatus === 'overdue' ? 'Overdue' : filterGateStatus === 'pending' ? 'Pending' : 'Approved' }}
-          <button (click)="filterGateStatus='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <!-- D-277: chip shows Me / Unassigned DS / Unassigned CB / person name. CC-Decision-2026-04-12-F. -->
-        <span *ngIf="filterAssignedPerson"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Assigned: {{ filterAssignedPerson === 'me' ? 'Me' : filterAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : filterAssignedPerson === 'unassigned_cb' ? 'Unassigned CB' : personDisplayName(filterAssignedPerson) }}
-          <button (click)="filterAssignedPerson='';personScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <span *ngIf="filterDivision"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Division: {{ filterDivisionLabel }}
-          <button (click)="filterDivision='';includeChildDivisions=false;onDivisionFilterChange()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
       </div>
 
       <!-- ── Slide-in filter panel (S-010 through S-013, D-268 through D-272) ──── -->
@@ -375,20 +351,20 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                          (change)="stagedAssignedPerson=''" />
                   Bigger List
                 </label>
-                <!-- Terminal selections — apply immediately per D-277 -->
+                <!-- Terminal selections — staged only, query fires on Apply per S-011. Source: S-011. -->
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" name="personScopeRadio" [value]="'me_terminal'" [(ngModel)]="personScope"
-                         (change)="stagedAssignedPerson='me'; applyFilterPanel()" />
+                         (change)="stagedAssignedPerson='me'" />
                   Me
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" name="personScopeRadio" [value]="'unassigned_ds_terminal'" [(ngModel)]="personScope"
-                         (change)="stagedAssignedPerson='unassigned_ds'; applyFilterPanel()" />
+                         (change)="stagedAssignedPerson='unassigned_ds'" />
                   Unassigned DS
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" name="personScopeRadio" [value]="'unassigned_cb_terminal'" [(ngModel)]="personScope"
-                         (change)="stagedAssignedPerson='unassigned_cb'; applyFilterPanel()" />
+                         (change)="stagedAssignedPerson='unassigned_cb'" />
                   Unassigned CB
                 </label>
               </div>
@@ -530,10 +506,10 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                          (change)="stagedWorkstream === '__none__' ? stagedWorkstream = '' : null" />
                   Bigger List
                 </label>
-                <!-- Terminal: No Workstream Assigned — applies immediately per D-272 -->
+                <!-- Terminal: No Workstream Assigned — staged only, query fires on Apply per S-011. Source: S-011. -->
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;font-style:italic;">
                   <input type="radio" name="wsScopeRadio" [value]="'none_terminal'" [(ngModel)]="wsScope"
-                         (change)="stagedWorkstream='__none__'; applyFilterPanel()" />
+                         (change)="stagedWorkstream='__none__'" />
                   No Workstream Assigned
                 </label>
               </div>
@@ -607,12 +583,14 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <!-- ── Column header row — D-196: 6 columns, always rendered ─────────────── -->
       <!-- Contract 4 2026-04-11: D-264 tier dot removed, D-265 TEAM column, D-267 Stage+Headline split. -->
       <!-- D-196: headers always shown even when no rows.                             -->
+      <!-- D-298: sticky top:0 — column labels stay visible on scroll. Source: D-298. -->
       <div *ngIf="!loading"
            style="display:grid;
                   grid-template-columns:88px 180px 1fr 130px 1fr 110px;
                   gap:8px;padding:8px 16px;
                   font-size:13px;font-weight:500;color:#fff;text-transform:uppercase;
-                  background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;">
+                  background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;
+                  position:sticky;top:0;z-index:3;margin-top:10px;">
         <span>Division</span>
         <span>Cycle Name</span>
         <span>Outcome</span>
@@ -828,8 +806,9 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
     </div><!-- /flex container -->
 
     <!-- D-292: Modal scrim — covers grid when create or edit panel is open. Source: D-292. -->
+    <!-- Fix B-2: pointer-events:all explicit — prevents clicks passing through to list rows. Source: S-017. -->
     <div *ngIf="showCreatePanel || showEditScrim"
-         style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.32);"
+         style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.32);pointer-events:all;"
          (click)="onScrimClick()">
     </div>
   `
