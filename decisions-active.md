@@ -638,3 +638,9 @@ Note: D-264 badge pill removal is partially superseded by D-281, which restores 
 
 **D-296** — Outcome Statement Display Style in Cycle View. The set value of the Outcome Statement field in the Delivery Cycle Detail View renders as regular body text (Roboto Regular, standard body color). Not italic. The null/empty guidance text is not affected — it retains its gray guidance styling. Amends D-276: supersedes the "plain italic body text" language in D-276. All other operative text in D-276 remains in force. Connects to: D-276, S-005. | Source: Claude Chat | 2026-04-12 |
 | impl_status: not-specced |
+
+**D-297** — Inform Don't Hide or Disable: When an action depends on a precondition (e.g. a picker requires a Division to be selected first), the trigger control remains always enabled. When the user activates it without the precondition met, display an inline informational message explaining what is needed. Never disable or hide the control to prevent access. Applies system-wide. | Source: Claude Chat | 2026-04-12 |
+| impl_status: built |
+
+**D-298** — All Delivery Cycles Header Zone Layout: The header zone uses a two-row layout. Row 1: back link + vertical rule + surface title (26px weight 400) + surface description (12px italic, flex:1). Row 2: summary cards (compact padding) + active filter chips (flex:1, chip bar absent when empty) + Filters button with overlapping badge (top:-8px right:-8px) + New Cycle button (both flex-shrink:0). The previous four-row layout is retired. Column headers are sticky (position:sticky; top:0; z-index:3; margin-top:10px). | Source: Claude Chat | 2026-04-12 |
+| impl_status: built |

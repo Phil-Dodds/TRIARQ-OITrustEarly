@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-297**
+**Next available: D-299**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -164,6 +164,7 @@ D-272: Registered above (Contract 5 backfill 2026-04-12).
 D-273 through D-274: Allocated by Claude Code in Contract 4 build session April 2026 — content exists in session output 2026-04-11-C but not yet backfilled to this registry table.
 D-275 through D-286: Allocated by Claude Code / Claude Chat in Contract 4 and Contract 5 sessions April 2026 — content exists in decisions-active.md (committed 2026-04-12).
 D-287 through D-296: Allocated by Claude Code / Claude Chat in Contract 5 UAT and Contract 6 design sessions April 2026 — content committed to decisions-active.md 2026-04-12 Contract 6.
+D-297 through D-298: Allocated by Claude Chat in Contract 7 design session April 2026 — content committed to decisions-active.md 2026-04-13 Contract 7 merge.
 
 These gaps are not available for allocation — the numbers exist in decisions-active.md or
 decisions-archive.md. They are listed here to prevent accidental reuse. A future session
@@ -171,4 +172,4 @@ should back-fill these rows if the full registry is needed.
 
 ---
 
-TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | Last updated: 2026-04-12 Contract 6
+TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | Last updated: 2026-04-13 Contract 7 merge
