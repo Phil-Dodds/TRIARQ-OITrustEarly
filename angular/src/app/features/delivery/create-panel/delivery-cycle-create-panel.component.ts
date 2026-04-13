@@ -10,24 +10,20 @@
 //   DS and CB use UserPickerComponent (D-182 DS/CB scope logic, CC-007 two-scope).
 //
 // D-165: Delivery Workstream is optional at creation. Required before Brief Review gate.
-//   CC-correction: correction spec 2026-04-05 incorrectly marked Workstream as Required.
-//   D-165 takes precedence — field remains optional. Noted for Design Chat review.
-//
 // D-174: DS and CB are nullable at creation. Gate enforcement at MCP level only.
+// CC-008: Field order is Division → Delivery Cycle Title → Outcome → Workstream → Tier → DS → CB → Jira.
+//   D-194: Outcome Statement moved to position 3 per Contract 6 spec. Source: Contract 6 Step 5.2.
 //
-// CC-008: Field order is Division → Delivery Cycle Title (not Title → Division as correction spec states).
-//   Phil confirmed Division-first order (2026-04-05 session). CC-004 order preserved.
-//
-// CC-009: Target Dates removed from create form per correction spec 2026-04-05.
-//   They belong on cycle detail view, not creation.
-//
-// D-151, D-184: QPathways design tokens applied throughout. Roboto font. Entity names capitalized.
-// D-178: Tier 2 button spinner during submission, Tier 3 overlay on create operation.
+// D-290: Create form opens in right panel — never full-width overlay. Wired via dashboard. Source: D-290.
+// D-291: Panel header sticky (position:sticky;top:0). Source: D-291.
+// D-292: Create panel modal — ESC and cancelSignal trigger dirty-state check. Source: D-292.
+// D-204: Selecting a Workstream pre-populates CB from workstream lead if CB not yet set. Source: D-204.
 // D-93: No direct Supabase access — all data via DeliveryService → MCP.
 // ChangeDetection: OnPush.
 
 import {
-  Component, OnInit, OnDestroy, Input, Output, EventEmitter,
+  Component, OnInit, OnDestroy, OnChanges, SimpleChanges,
+  Input, Output, EventEmitter, HostListener,
   ChangeDetectionStrategy, ChangeDetectorRef
 } from '@angular/core';
 import {
@@ -76,6 +72,7 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
               Division <span class="cp-required" aria-hidden="true">*</span>
             </label>
             <select formControlName="division_id" class="cp-input"
+                    [class.cp-input--error]="f['division_id'].invalid && f['division_id'].touched"
                     (change)="onDivisionChange()">
               <option value="">— Select Division —</option>
               <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
@@ -90,23 +87,37 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
               Delivery Cycle Title <span class="cp-required" aria-hidden="true">*</span>
             </label>
             <input formControlName="cycle_title" class="cp-input"
+                   [class.cp-input--error]="f['cycle_title'].invalid && f['cycle_title'].touched"
                    type="text" maxlength="120"
                    placeholder="e.g. Member Attribution Model" />
             <div *ngIf="f['cycle_title'].invalid && f['cycle_title'].touched"
                  class="cp-field-error">Delivery Cycle Title is required.</div>
           </div>
 
-          <!-- 3. Delivery Workstream (optional per D-165, picker per D-182/CC-002) -->
+          <!-- 3. Outcome Statement (optional — D-194: position 3. Source: Contract 6 Step 5.2.) -->
+          <div class="cp-field">
+            <label class="cp-label">Outcome Statement</label>
+            <textarea formControlName="outcome_statement" class="cp-input cp-textarea"
+                      rows="3"
+                      placeholder="What measurable result will this Delivery Cycle deliver?">
+            </textarea>
+            <div class="cp-gate-note">Should be set before Brief Review Gate.</div>
+          </div>
+
+          <!-- 4. Delivery Workstream (optional per D-165, picker per D-182/CC-002, position 4 per D-194) -->
           <div class="cp-field">
             <label class="cp-label">
               Delivery Workstream
               <span class="cp-optional-tag"> — recommended</span>
             </label>
+            <!-- D-206: guard — show warning instead of picker if Division not selected -->
+            <div *ngIf="noDivisionWarning"
+                 style="font-size:12px;color:#E65100;margin-bottom:6px;">
+              Select a Division first — Workstream list is scoped to the selected Division.
+            </div>
             <button type="button" class="cp-picker-trigger"
                     (click)="openWorkstreamPicker()">
-              <span *ngIf="!selectedWorkstream" class="cp-picker-placeholder">
-                — Assign later —
-              </span>
+              <!-- D-290 Step 5.4: no 'Assign later' text — empty trigger when no selection. Source: Contract 6 Step 5.4. -->
               <span *ngIf="selectedWorkstream" class="cp-picker-value">
                 <span class="cp-entity-chip">
                   {{ selectedWorkstream.workstream_name }}
@@ -121,39 +132,23 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
             <div class="cp-gate-note">Required before Brief Review Gate.</div>
           </div>
 
-          <!-- 4. Tier Classification (option cards, no default — D-124. Contract 2 correction.) -->
+          <!-- 5. Tier Classification — dropdown per D-191 (locked: not cards, not radio buttons). Source: D-191. -->
           <div class="cp-field">
             <label class="cp-label">
               Tier Classification <span class="cp-required" aria-hidden="true">*</span>
             </label>
-            <div class="cp-tier-cards" role="radiogroup" aria-label="Tier Classification">
-              <label class="cp-tier-card"
-                     [class.cp-tier-card--selected]="f['tier_classification'].value === 'tier_1'">
-                <input type="radio" formControlName="tier_classification" value="tier_1"
-                       style="position:absolute;opacity:0;pointer-events:none;" />
-                <span class="cp-tier-card-name">Tier 1</span>
-                <span class="cp-tier-card-desc">Fast Lane</span>
-              </label>
-              <label class="cp-tier-card"
-                     [class.cp-tier-card--selected]="f['tier_classification'].value === 'tier_2'">
-                <input type="radio" formControlName="tier_classification" value="tier_2"
-                       style="position:absolute;opacity:0;pointer-events:none;" />
-                <span class="cp-tier-card-name">Tier 2</span>
-                <span class="cp-tier-card-desc">Structured</span>
-              </label>
-              <label class="cp-tier-card"
-                     [class.cp-tier-card--selected]="f['tier_classification'].value === 'tier_3'">
-                <input type="radio" formControlName="tier_classification" value="tier_3"
-                       style="position:absolute;opacity:0;pointer-events:none;" />
-                <span class="cp-tier-card-name">Tier 3</span>
-                <span class="cp-tier-card-desc">Governed</span>
-              </label>
-            </div>
+            <select formControlName="tier_classification" class="cp-input"
+                    [class.cp-input--error]="f['tier_classification'].invalid && f['tier_classification'].touched">
+              <option value="">Select tier</option>
+              <option value="tier_1">Tier 1 — Fast Lane: Workflow changes, config updates, no platform dependencies</option>
+              <option value="tier_2">Tier 2 — Structured: Platform changes, integrations, cross-domain dependencies</option>
+              <option value="tier_3">Tier 3 — Governed: Agent deployments, compliance scope changes, AI Governance Board required</option>
+            </select>
             <div *ngIf="f['tier_classification'].invalid && f['tier_classification'].touched"
                  class="cp-field-error">Tier Classification is required.</div>
           </div>
 
-          <!-- 5. Assigned Domain Strategist (optional, UserPicker per D-182) -->
+          <!-- 6. Assigned Domain Strategist (optional, UserPicker per D-182) -->
           <div class="cp-field">
             <label class="cp-label">Assigned Domain Strategist</label>
             <div *ngIf="selectedDs; else noDsPicked" class="cp-user-chip-row">
@@ -165,16 +160,14 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
               <button type="button" class="cp-chip-remove"
                       (click)="clearDs()">✕ Remove</button>
             </div>
+            <!-- D-290 Step 5.4: no 'Assign later' text in trigger. Source: Contract 6 Step 5.4. -->
             <ng-template #noDsPicked>
-              <button type="button" class="cp-picker-trigger"
-                      (click)="openDsPicker()">
-                — Assign later —
-              </button>
+              <button type="button" class="cp-picker-trigger" (click)="openDsPicker()"></button>
             </ng-template>
             <div class="cp-gate-note">Required before Brief Review Gate.</div>
           </div>
 
-          <!-- 6. Assigned Capability Builder (optional, UserPicker per D-182) -->
+          <!-- 7. Assigned Capability Builder (optional, UserPicker per D-182, D-204 pre-populate from WS lead) -->
           <div class="cp-field">
             <label class="cp-label">Assigned Capability Builder</label>
             <div *ngIf="selectedCb; else noCbPicked" class="cp-user-chip-row">
@@ -186,23 +179,11 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
               <button type="button" class="cp-chip-remove"
                       (click)="clearCb()">✕ Remove</button>
             </div>
+            <!-- D-290 Step 5.4: no 'Assign later' text in trigger. Source: Contract 6 Step 5.4. -->
             <ng-template #noCbPicked>
-              <button type="button" class="cp-picker-trigger"
-                      (click)="openCbPicker()">
-                — Assign later —
-              </button>
+              <button type="button" class="cp-picker-trigger" (click)="openCbPicker()"></button>
             </ng-template>
             <div class="cp-gate-note">Required before Go to Build Gate.</div>
-          </div>
-
-          <!-- 7. Outcome Statement (optional — gray hint text per D-200 Pattern 1. Contract 2 correction.) -->
-          <div class="cp-field">
-            <label class="cp-label">Outcome Statement</label>
-            <textarea formControlName="outcome_statement" class="cp-input cp-textarea"
-                      rows="3"
-                      placeholder="What measurable result will this Delivery Cycle deliver?">
-            </textarea>
-            <div class="cp-gate-note">Should be set before Brief Review Gate.</div>
           </div>
 
           <!-- 8. Jira Epic Link (optional) -->
@@ -222,8 +203,9 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
           <div class="cp-footer">
             <button type="button" class="cp-btn-cancel" (click)="close()">Cancel</button>
             <!-- D-178 Tier 2: spinner replaces label during submit -->
+            <!-- Fix B-7: button always enabled — validation runs on submit, never gates the button. Source: D-140. -->
             <button type="submit" class="cp-btn-create"
-                    [disabled]="form.invalid || submitting">
+                    [disabled]="submitting">
               <ion-spinner *ngIf="submitting" name="crescent"
                            style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
               </ion-spinner>
@@ -231,6 +213,33 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
             </button>
           </div>
         </form>
+      </div>
+
+      <!-- D-292: Discard unsaved changes confirm panel. Source: D-292. -->
+      <div *ngIf="showDiscardConfirm"
+           style="position:absolute;inset:0;z-index:20;background:rgba(255,255,255,0.97);
+                  display:flex;flex-direction:column;align-items:center;justify-content:center;
+                  padding:32px;">
+        <div style="max-width:320px;text-align:center;">
+          <div style="font:600 16px Roboto,sans-serif;color:#1E1E1E;margin-bottom:8px;">
+            Discard unsaved changes?
+          </div>
+          <div style="font:400 13px Roboto,sans-serif;color:#5A5A5A;margin-bottom:24px;">
+            Your new cycle has not been saved.
+          </div>
+          <div style="display:flex;gap:12px;justify-content:center;">
+            <button type="button" (click)="keepEditing()"
+                    style="background:#fff;border:1.5px solid #D0D0D0;border-radius:5px;
+                           padding:10px 20px;font:500 14px Roboto,sans-serif;color:#5A5A5A;cursor:pointer;">
+              Keep Editing
+            </button>
+            <button type="button" (click)="confirmDiscard()"
+                    style="background:#E96127;border:none;border-radius:5px;
+                           padding:10px 20px;font:500 14px Roboto,sans-serif;color:#fff;cursor:pointer;">
+              Discard
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -271,10 +280,12 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
     }
 
     /* Header — Deep Navy per visual layout standards */
+    /* D-291: sticky so header stays visible when panel body scrolls. Source: D-291. */
     .cp-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 20px; height: 64px; flex-shrink: 0;
       background: #12274A;
+      position: sticky; top: 0; z-index: 5;
     }
     .cp-title {
       margin: 0; font: 700 20px/1.2 Roboto, sans-serif; color: #fff;
@@ -319,24 +330,10 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
       margin-top: 4px; font: 400 12px italic Roboto, sans-serif; color: #9E9E9E;
     }
 
-    /* Tier option cards (Contract 2 correction — replaced radio group) */
-    .cp-tier-cards { display: flex; gap: 10px; padding: 4px 0; }
-    .cp-tier-card {
-      flex: 1; position: relative; cursor: pointer;
-      border: 1.5px solid #D0D0D0; border-radius: 8px;
-      padding: 12px 10px; text-align: center;
-      display: flex; flex-direction: column; gap: 3px;
-      transition: border-color 0.15s, background 0.15s;
-    }
-    .cp-tier-card:hover { border-color: #257099; }
-    .cp-tier-card--selected {
-      border-color: #257099; background: rgba(37,112,153,0.06);
-    }
-    .cp-tier-card-name {
-      font: 600 14px Roboto, sans-serif; color: #1E1E1E;
-    }
-    .cp-tier-card-desc {
-      font: 400 12px Roboto, sans-serif; color: #5A5A5A;
+    /* Error state for select / input — Pattern 3 per D-200. Source: D-191, D-200. */
+    .cp-input--error {
+      border-color: #C62828;
+      box-shadow: 0 0 0 3px rgba(198,40,40,0.12);
     }
 
     /* Picker trigger */
@@ -398,16 +395,22 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
     .cp-btn-create:disabled { opacity: 0.45; cursor: not-allowed; }
   `]
 })
-export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy {
-  @Input() divisions: Division[] = [];
+export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnChanges {
+  @Input() divisions:    Division[] = [];
+  // D-292: Dashboard increments to signal cancel (ESC or scrim click). Source: D-292.
+  @Input() cancelSignal = 0;
 
   @Output() cycleCreated = new EventEmitter<DeliveryCycle>();
   @Output() panelClosed  = new EventEmitter<void>();
 
   form!: FormGroup;
 
-  submitting  = false;
-  submitError = '';
+  submitting        = false;
+  submitError       = '';
+  // D-292: dirty-state discard confirmation. Source: D-292.
+  showDiscardConfirm = false;
+  // Guard: show warning when user clicks Workstream picker without Division selected.
+  noDivisionWarning  = false;
 
   // Workstream picker state (CC-002)
   showWorkstreamPicker = false;
@@ -470,14 +473,71 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void { this.subs.unsubscribe(); }
 
+  // D-292: Watch cancelSignal from dashboard (ESC or scrim click). Source: D-292.
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['cancelSignal'] && !changes['cancelSignal'].firstChange) {
+      this.requestClose();
+    }
+  }
+
+  // D-292: ESC key triggers dirty-state check. Source: D-292.
+  @HostListener('document:keydown.escape')
+  onEscKey(): void { this.requestClose(); }
+
+  // D-292: isDirty — true if any form field has a value or any picker has a selection.
+  isDirty(): boolean {
+    const v = this.form.value as Record<string, unknown>;
+    return !!(
+      v['cycle_title'] ||
+      v['outcome_statement'] ||
+      v['tier_classification'] ||
+      v['jira_epic_key'] ||
+      this.selectedWorkstream ||
+      this.selectedDs ||
+      this.selectedCb
+    );
+  }
+
+  // D-292: Close or show discard confirm based on dirty state. Source: D-292.
+  requestClose(): void {
+    if (this.showDiscardConfirm) { return; } // already showing confirm
+    if (this.isDirty()) {
+      this.showDiscardConfirm = true;
+      this.cdr.markForCheck();
+    } else {
+      this.panelClosed.emit();
+    }
+  }
+
+  confirmDiscard(): void {
+    this.showDiscardConfirm = false;
+    this.panelClosed.emit();
+  }
+
+  keepEditing(): void {
+    this.showDiscardConfirm = false;
+    this.cdr.markForCheck();
+  }
+
   onDivisionChange(): void {
     // Clear workstream selection when Division changes — scope changes per CC-002
     this.selectedWorkstream = null;
+    this.noDivisionWarning  = false;
     this.cdr.markForCheck();
   }
 
   // ── Workstream picker ───────────────────────────────────────────────────────
-  openWorkstreamPicker(): void { this.showWorkstreamPicker = true; this.cdr.markForCheck(); }
+  openWorkstreamPicker(): void {
+    // D-206: Picker scoped to selected Division. Show warning if Division not yet chosen.
+    if (!this.form.get('division_id')?.value) {
+      this.noDivisionWarning = true;
+      this.cdr.markForCheck();
+      return;
+    }
+    this.noDivisionWarning   = false;
+    this.showWorkstreamPicker = true;
+    this.cdr.markForCheck();
+  }
 
   onWorkstreamSelected(ws: DeliveryWorkstream | null): void {
     this.showWorkstreamPicker = false;
@@ -486,6 +546,16 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy {
       // Supplement spec 3.3: Workstream home Division pre-populates Division if not yet set
       if (!this.form.get('division_id')?.value && ws.home_division_id) {
         this.form.patchValue({ division_id: ws.home_division_id });
+      }
+      // D-204: Pre-populate CB from workstream lead if CB is not already set. Source: D-204.
+      if (!this.selectedCb && ws.workstream_lead_user_id && ws.lead_display_name) {
+        this.selectedCb = {
+          id: ws.workstream_lead_user_id,
+          display_name: ws.lead_display_name,
+          system_role: 'cb',
+          email: ''
+        } as User;
+        this.updateCbChip(this.selectedCb);
       }
     }
     this.cdr.markForCheck();
@@ -574,7 +644,8 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy {
     });
   }
 
-  close(): void { this.panelClosed.emit(); }
+  // D-292: close() routes through dirty-state check per D-292. Source: D-292.
+  close(): void { this.requestClose(); }
 }
 
 // ── Utility functions (duplicated from user-picker to keep component standalone) ──

@@ -42,12 +42,6 @@ import { Subscription } from 'rxjs';
 import { firstValueFrom, filter, take } from 'rxjs';
 import { CommonModule }                   from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
-import {
-  ReactiveFormsModule,
-  FormBuilder,
-  FormGroup,
-  Validators
-} from '@angular/forms';
 import { IonicModule }          from '@ionic/angular';
 import { FormsModule }          from '@angular/forms';
 import { DeliveryService }      from '../../../core/services/delivery.service';
@@ -55,8 +49,9 @@ import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { StageTrackComponent }  from '../stage-track/stage-track.component';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
-import { WorkstreamPickerComponent } from '../../../shared/pickers/workstream-picker/workstream-picker.component';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
+// D-290: Create Cycle form moved to right panel component. Source: D-290.
+import { DeliveryCycleCreatePanelComponent } from '../create-panel/delivery-cycle-create-panel.component';
 import {
   DeliveryCycle,
   Division,
@@ -104,7 +99,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
   selector: 'app-delivery-cycle-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent, WorkstreamPickerComponent, DeliveryCycleDetailComponent],
+  imports: [CommonModule, RouterModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleDetailComponent, DeliveryCycleCreatePanelComponent],
   template: `
     <!-- S-006: flex container — grid left, detail panel right when cycle selected -->
     <div style="display:flex;align-items:flex-start;min-height:100%;">
@@ -112,347 +107,123 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
     <!-- ── Left: grid content ─────────────────────────────────────────────── -->
     <div style="flex:1;min-width:0;max-width:1200px;padding:var(--triarq-space-2xl) var(--triarq-space-md);">
 
-      <!-- ── Back link (D-172) ───────────────────────────────────────────── -->
-      <div style="margin-bottom:var(--triarq-space-sm);">
+      <!-- D-298: Two-row header zone. Row 1: page identity. Row 2: controls. Source: D-298. -->
+
+      <!-- Row 1 — Page identity: back link | rule | title | surface description -->
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;">
         <a routerLink="/delivery"
-           style="font-size:var(--triarq-text-small);
-                  color:var(--triarq-color-primary);text-decoration:none;">
+           style="font-size:13px;color:#257099;text-decoration:none;padding-top:7px;flex-shrink:0;">
           ← Delivery Cycle Tracking
         </a>
+        <span style="border-left:1px solid #ddd;height:16px;align-self:center;margin:0 4px;flex-shrink:0;"></span>
+        <span style="font-size:26px;font-weight:400;color:#1a1a1a;white-space:nowrap;flex-shrink:0;">Delivery Cycles</span>
+        <!-- S-015 / D-288: surface description. Source: Contract 6 Step 4.1. -->
+        <span style="font-size:12px;font-style:italic;color:#777;flex:1;padding-top:8px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          Track and manage delivery cycles across your divisions and workstreams.
+        </span>
       </div>
 
-      <!-- ── Page header ──────────────────────────────────────────────────── -->
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;
-                  margin-bottom:var(--triarq-space-md);gap:var(--triarq-space-md);">
-        <div>
-          <h3 style="margin:0 0 4px 0;">Delivery Cycles</h3>
-          <p style="margin:0;font-size:var(--triarq-text-small);
-                    color:var(--triarq-color-text-secondary);max-width:600px;">
-            Each row is one active Delivery Cycle — a scoped unit of work moving through
-            the 12-stage lifecycle. Click a row to open the full cycle record, set milestone
-            dates, review gate decisions, and attach artifacts.
-          </p>
-        </div>
-        <button *ngIf="canCreateCycle"
-                class="oi-btn-primary"
-                (click)="toggleCreateForm()"
-                style="font-size:var(--triarq-text-small);white-space:nowrap;flex-shrink:0;">
-          + New Cycle
-        </button>
-      </div>
+      <!-- Row 2 — Controls: cards | chips | actions. Bottom-aligned per D-298. -->
+      <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:0;">
 
-      <!-- ── Create form (D-178 Tier 3: section overlay) ────────────────── -->
-      <!-- D-194: Field order: Division → Title → Outcome → Workstream → Tier → DS → CB → Jira → Gate dates -->
-      <!-- D-189: Right panel header: Deep Navy, white text, × close button (Section 3.5) -->
-      <div *ngIf="showCreateForm" style="position:relative;">
-        <app-loading-overlay [visible]="creating" message="Creating Cycle…"></app-loading-overlay>
-        <div class="oi-card"
-             style="margin-bottom:var(--triarq-space-md);padding:0;overflow:hidden;">
-
-          <!-- Panel header — Deep Navy per Section 3.5 -->
-          <div style="display:flex;align-items:center;justify-content:space-between;
-                      padding:var(--triarq-space-sm) var(--triarq-space-md);
-                      background:var(--triarq-color-navy,#1a3a4f);color:#fff;">
-            <span style="font-weight:600;font-size:var(--triarq-text-body);">New Delivery Cycle</span>
-            <button type="button"
-                    (click)="toggleCreateForm()"
-                    style="background:none;border:none;cursor:pointer;color:#fff;
-                           font-size:18px;line-height:1;padding:0 4px;"
-                    title="Close">×</button>
+        <!-- Left: summary cards (compact padding per D-298) -->
+        <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-end;">
+          <!-- Active Cycles — always shown, not tappable -->
+          <div style="background:#fff;border:1px solid #E8E8E8;border-radius:8px;padding:8px 16px 10px;">
+            <div style="font-size:28px;font-weight:300;color:#257099;line-height:1.1;">{{ activeCycleCount }}</div>
+            <div style="font-size:12px;color:#888;">Active Cycles</div>
           </div>
-
-          <div style="padding:var(--triarq-space-md);">
-
-          <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
-
-            <!-- Row 1: Division + Cycle Title -->
-            <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:1fr 2fr;
-                        margin-bottom:var(--triarq-space-sm);">
-              <div>
-                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                  Owner Division *
-                </label>
-                <select formControlName="division_id" class="oi-input"
-                        (change)="onCreateDivisionChange()">
-                  <option value="">— Select Division —</option>
-                  <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
-                </select>
-                <div *ngIf="createForm.get('division_id')?.invalid && createForm.get('division_id')?.touched"
-                     style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                  Division is required.
-                </div>
-              </div>
-              <div>
-                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                  Cycle Title *
-                </label>
-                <input formControlName="cycle_title" class="oi-input"
-                       placeholder="e.g. Member Attribution Model — Q2 Build" />
-                <div *ngIf="createForm.get('cycle_title')?.invalid && createForm.get('cycle_title')?.touched"
-                     style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                  Cycle title is required.
-                </div>
-              </div>
-            </div>
-
-            <!-- Row 2: Outcome Statement (D-194: moved to position 3 — the "why" belongs adjacent to title) -->
-            <div style="margin-bottom:var(--triarq-space-sm);">
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Outcome Statement
-              </label>
-              <textarea formControlName="outcome_statement"
-                        class="oi-input"
-                        rows="2"
-                        style="resize:vertical;"
-                        placeholder="What measurable result will this cycle deliver?">
-              </textarea>
-              <!-- D-190 Pattern 1: Field Guidance — gray sub-text, no banner -->
-              <div style="font-size:12px;color:var(--triarq-color-stone,#8a9ba8);margin-top:3px;">
-                Recommended. Required before Brief Review Gate. You can add it now or after creation.
-              </div>
-            </div>
-
-            <!-- Row 3: Delivery Workstream picker (D-194 position 4) -->
-            <div style="margin-bottom:var(--triarq-space-sm);">
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Delivery Workstream
-              </label>
-              <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);">
-                <button type="button" class="oi-input"
-                        style="text-align:left;cursor:pointer;background:#fff;flex:1;"
-                        (click)="openWorkstreamPicker()">
-                  <span *ngIf="!createSelectedWorkstream"
-                        style="color:var(--triarq-color-text-secondary);">
-                    — Assign later —
-                  </span>
-                  <span *ngIf="createSelectedWorkstream">
-                    {{ createSelectedWorkstream.workstream_name }}
-                    <span style="font-size:10px;color:var(--triarq-color-text-secondary);margin-left:4px;">
-                      ({{ createSelectedWorkstream.home_division_name ?? '' }})
-                    </span>
-                  </span>
-                </button>
-                <button *ngIf="createSelectedWorkstream" type="button"
-                        (click)="clearCreateWorkstream()"
-                        style="background:none;border:none;cursor:pointer;
-                               color:var(--triarq-color-text-secondary);font-size:12px;"
-                        title="Remove Workstream">✕</button>
-              </div>
-              <!-- D-190 Pattern 1 -->
-              <div style="font-size:12px;color:var(--triarq-color-stone,#8a9ba8);margin-top:3px;">
-                Recommended. Required before Brief Review Gate.
-              </div>
-            </div>
-
-            <!-- Row 4: Tier Classification — dropdown with descriptions (D-191) -->
-            <div style="margin-bottom:var(--triarq-space-sm);max-width:480px;">
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Tier Classification *
-              </label>
-              <select formControlName="tier_classification" class="oi-input">
-                <option value="">Select tier classification</option>
-                <option value="tier_1">Tier 1 — Fast Lane: Workflow changes, config updates, no platform dependencies</option>
-                <option value="tier_2">Tier 2 — Structured: Platform changes, integrations, cross-domain dependencies</option>
-                <option value="tier_3">Tier 3 — Governed: Agent deployments, compliance scope changes, AI Governance Board required</option>
-              </select>
-              <div *ngIf="createForm.get('tier_classification')?.invalid && createForm.get('tier_classification')?.touched"
-                   style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;">
-                Tier Classification is required.
-              </div>
-            </div>
-
-            <!-- Row 5: Assigned Domain Strategist (D-194 position 6) -->
-            <div style="margin-bottom:var(--triarq-space-sm);max-width:400px;">
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Assigned Domain Strategist
-              </label>
-              <div *ngIf="autoAssignedDsDisplayName"
-                   style="font-size:var(--triarq-text-small);padding:6px var(--triarq-space-sm);
-                          background:var(--triarq-color-background-subtle);border-radius:5px;
-                          border:1px solid var(--triarq-color-border);">
-                {{ autoAssignedDsDisplayName }}
-                <span style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);margin-left:6px;">
-                  (pre-assigned — you)
-                </span>
-              </div>
-              <div *ngIf="!autoAssignedDsDisplayName"
-                   style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);
-                          padding:6px 0;border:1px solid var(--triarq-color-border);
-                          border-radius:5px;padding:6px var(--triarq-space-sm);
-                          background:var(--triarq-color-background-subtle);">
-                Assign after creation
-              </div>
-              <!-- D-190 Pattern 1 -->
-              <div style="font-size:12px;color:var(--triarq-color-stone,#8a9ba8);margin-top:3px;">
-                Required before Brief Review Gate.
-              </div>
-            </div>
-
-            <!-- Row 6: Assigned Capability Builder (D-194 position 7) -->
-            <div style="margin-bottom:var(--triarq-space-sm);max-width:400px;">
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Assigned Capability Builder
-              </label>
-              <div *ngIf="autoAssignedCbDisplayName"
-                   style="font-size:var(--triarq-text-small);padding:6px var(--triarq-space-sm);
-                          background:var(--triarq-color-background-subtle);border-radius:5px;
-                          border:1px solid var(--triarq-color-border);">
-                {{ autoAssignedCbDisplayName }}
-                <span style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);margin-left:6px;">
-                  (pre-assigned — you)
-                </span>
-              </div>
-              <div *ngIf="!autoAssignedCbDisplayName"
-                   style="font-size:var(--triarq-text-caption);color:var(--triarq-color-text-secondary);
-                          border:1px solid var(--triarq-color-border);
-                          border-radius:5px;padding:6px var(--triarq-space-sm);
-                          background:var(--triarq-color-background-subtle);">
-                Assign after creation
-              </div>
-              <!-- D-190 Pattern 1 -->
-              <div style="font-size:12px;color:var(--triarq-color-stone,#8a9ba8);margin-top:3px;">
-                Required before Go to Build Gate.
-              </div>
-            </div>
-
-            <!-- Row 7: Jira Epic Key (D-194 position 8) -->
-            <div style="margin-bottom:var(--triarq-space-sm);max-width:300px;">
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Jira Epic Link
-              </label>
-              <input formControlName="jira_epic_key" class="oi-input"
-                     placeholder="e.g. PROJ-123" />
-              <!-- D-190 Pattern 1 -->
-              <div style="font-size:12px;color:var(--triarq-color-stone,#8a9ba8);margin-top:3px;">
-                Required before Go to Build Gate.
-              </div>
-            </div>
-
-            <!-- Row 8: Gate target dates -->
-            <div style="margin-bottom:var(--triarq-space-sm);">
-              <div style="font-size:var(--triarq-text-small);font-weight:500;
-                          margin-bottom:var(--triarq-space-xs);">
-                Target Dates
-                <span style="font-weight:400;color:var(--triarq-color-text-secondary);"> — all optional at creation</span>
-              </div>
-              <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:repeat(5,1fr);">
-                <div>
-                  <label style="display:block;font-size:var(--triarq-text-caption);
-                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
-                    Brief Review
-                  </label>
-                  <input type="date" formControlName="milestone_brief_review" class="oi-input"
-                         style="font-size:var(--triarq-text-small);" />
-                </div>
-                <div>
-                  <label style="display:block;font-size:var(--triarq-text-caption);
-                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
-                    Go to Build
-                  </label>
-                  <input type="date" formControlName="milestone_go_to_build" class="oi-input"
-                         style="font-size:var(--triarq-text-small);" />
-                </div>
-                <div>
-                  <label style="display:block;font-size:var(--triarq-text-caption);
-                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
-                    Pilot Start (Go to Deploy)
-                  </label>
-                  <input type="date" formControlName="milestone_go_to_deploy" class="oi-input"
-                         style="font-size:var(--triarq-text-small);" />
-                </div>
-                <div>
-                  <label style="display:block;font-size:var(--triarq-text-caption);
-                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
-                    Production Release (Go to Release)
-                  </label>
-                  <input type="date" formControlName="milestone_go_to_release" class="oi-input"
-                         style="font-size:var(--triarq-text-small);" />
-                </div>
-                <div>
-                  <label style="display:block;font-size:var(--triarq-text-caption);
-                                margin-bottom:3px;color:var(--triarq-color-text-secondary);">
-                    Close Review
-                  </label>
-                  <input type="date" formControlName="milestone_close_review" class="oi-input"
-                         style="font-size:var(--triarq-text-small);" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Submit row -->
-            <div style="display:flex;gap:var(--triarq-space-sm);align-items:center;
-                        margin-top:var(--triarq-space-sm);">
-              <!-- D-178 Tier 2: button spinner while creating -->
-              <button type="submit" class="oi-btn-primary"
-                      [disabled]="createForm.invalid || creating">
-                <ion-spinner *ngIf="creating" name="crescent"
-                             style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
-                </ion-spinner>
-                {{ creating ? 'Creating…' : 'Create Delivery Cycle' }}
-              </button>
-              <div *ngIf="createError"
-                   style="font-size:var(--triarq-text-small);">
-                <span style="color:var(--triarq-color-error);font-weight:500;">{{ createError }}</span>
-                <span style="color:var(--triarq-color-text-secondary);margin-left:6px;">
-                  Check that the Division is valid and you have the required role.
-                </span>
-              </div>
-            </div>
-          </form>
-          </div><!-- /padding wrapper -->
-        </div>
-      </div>
-
-      <!-- ── Workstream Picker modal ─────────────────────────────────────── -->
-      <app-workstream-picker
-        *ngIf="showWorkstreamPicker"
-        [cycleDivisionId]="createForm.get('division_id')?.value || null"
-        [isTrustLevelDivision]="createDivisionIsTrustLevel"
-        [currentWorkstreamId]="createSelectedWorkstream?.workstream_id ?? null"
-        (workstreamSelected)="onWorkstreamSelected($event)">
-      </app-workstream-picker>
-
-      <!-- ── Summary Cards — Three compact count cards (D-HubCounts-2026-04-06) ─────── -->
-      <!-- Active Cycles: always shown, NOT tappable. My Cycles + Overdue Gates: tappable, -->
-      <!-- set filter, do NOT write to filter memory. Hidden when count is zero.            -->
-      <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-start;">
-
-        <!-- Card 1: Active Cycles — always shown, not tappable -->
-        <div style="background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);
-                    padding:12px;min-width:110px;flex:0 0 auto;">
-          <div style="font-size:28px;font-weight:700;color:var(--triarq-color-primary);line-height:1.1;">
-            {{ activeCycleCount }}
+          <!-- My Cycles — hidden at zero, tappable → Assigned Person filter -->
+          <div *ngIf="myCyclesCount > 0"
+               (click)="onMyCyclesTap()"
+               style="background:#fff;border:1px solid #E8E8E8;border-radius:8px;padding:8px 16px 10px;cursor:pointer;">
+            <div style="font-size:28px;font-weight:300;color:#257099;line-height:1.1;">{{ myCyclesCount }}</div>
+            <div style="font-size:12px;color:#888;">My Cycles</div>
           </div>
-          <div style="font-size:13px;color:#5A5A5A;">Active Cycles</div>
-        </div>
-
-        <!-- Card 2: My Cycles — hidden at zero, tappable -> Assigned Person filter -->
-        <div *ngIf="myCyclesCount > 0"
-             (click)="onMyCyclesTap()"
-             style="background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);
-                    padding:12px;min-width:110px;flex:0 0 auto;cursor:pointer;"
-             (mouseenter)="$any($event.currentTarget).style.boxShadow='0 2px 8px rgba(37,112,153,0.2)'"
-             (mouseleave)="$any($event.currentTarget).style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'">
-          <div style="font-size:28px;font-weight:700;color:var(--triarq-color-primary);line-height:1.1;">
-            {{ myCyclesCount }}
+          <!-- Overdue Gates — hidden at zero, tappable → Gate Status filter -->
+          <div *ngIf="overdueGateCount > 0"
+               (click)="onOverdueGatesTap()"
+               style="background:#fff;border:1px solid #E8E8E8;border-radius:8px;padding:8px 16px 10px;cursor:pointer;">
+            <div style="font-size:28px;font-weight:300;color:#F2A620;line-height:1.1;">{{ overdueGateCount }}</div>
+            <div style="font-size:12px;color:#888;">Overdue Gates</div>
           </div>
-          <div style="font-size:13px;color:#5A5A5A;">My Cycles</div>
         </div>
 
-        <!-- Card 3: Overdue Gates — hidden at zero, tappable -> Gate Status filter -->
-        <div *ngIf="overdueGateCount > 0"
-             (click)="onOverdueGatesTap()"
-             style="background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);
-                    padding:12px;min-width:110px;flex:0 0 auto;cursor:pointer;"
-             (mouseenter)="$any($event.currentTarget).style.boxShadow='0 2px 8px rgba(233,97,39,0.2)'"
-             (mouseleave)="$any($event.currentTarget).style.boxShadow='0 1px 3px rgba(0,0,0,0.08)'">
-          <div style="font-size:28px;font-weight:700;color:var(--triarq-color-sunray,#F2A620);line-height:1.1;">
-            {{ overdueGateCount }}
-          </div>
-          <div style="font-size:13px;color:#5A5A5A;">Overdue Gates</div>
+        <!-- Middle: active filter chips — flex:1, flex-wrap. Zone absent when no filters per S-012. -->
+        <div style="flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;">
+          <span *ngIf="filterStage"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Stage: {{ stageLabelFor(filterStage) }}
+            <button (click)="filterStage='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <span *ngIf="filterTier"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Tier: {{ filterTier === 'tier_1' ? 'Tier 1 — Fast Lane' : filterTier === 'tier_2' ? 'Tier 2 — Structured' : 'Tier 3 — Governed' }}
+            <button (click)="filterTier='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <!-- D-279: chip shows "None assigned" or Division · Workstream short name. CC-Decision-2026-04-12-E. -->
+          <span *ngIf="filterWorkstream"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Workstream: {{ filterWorkstream === '__none__' ? 'None assigned' : workstreamChipLabel(filterWorkstream) }}
+            <button (click)="filterWorkstream='';wsScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <span *ngIf="filterGateStatus"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Gate Status: {{ filterGateStatus === 'overdue' ? 'Overdue' : filterGateStatus === 'pending' ? 'Pending' : 'Approved' }}
+            <button (click)="filterGateStatus='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <!-- D-277: chip shows Me / Unassigned DS / Unassigned CB / person name. CC-Decision-2026-04-12-F. -->
+          <span *ngIf="filterAssignedPerson"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Assigned: {{ filterAssignedPerson === 'me' ? 'Me' : filterAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : filterAssignedPerson === 'unassigned_cb' ? 'Unassigned CB' : personDisplayName(filterAssignedPerson) }}
+            <button (click)="filterAssignedPerson='';personScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <span *ngIf="filterDivision"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Division: {{ filterDivisionLabel }}
+            <button (click)="filterDivision='';includeChildDivisions=false;onDivisionFilterChange()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
         </div>
 
-      </div>
+        <!-- Right: Filters + New Cycle — flex-shrink:0, never wraps. Source: D-298. -->
+        <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-end;">
+          <!-- Filters button: badge overlapping corner per D-298 -->
+          <button (click)="toggleFilterPanel()"
+                  style="position:relative;background:#257099;color:#fff;
+                         padding:8px 16px;border:none;border-radius:6px;cursor:pointer;
+                         font-size:14px;font-family:Roboto,sans-serif;font-weight:500;">
+            Filters
+            <span *ngIf="activeFilterCount > 0"
+                  style="position:absolute;top:-8px;right:-8px;
+                         background:#E96127;color:#fff;font-size:11px;font-weight:700;
+                         border-radius:999px;width:18px;height:18px;
+                         display:flex;align-items:center;justify-content:center;line-height:1;">
+              {{ activeFilterCount }}
+            </span>
+          </button>
+          <!-- D-290: Opens create panel in right column. Source: D-290. -->
+          <button *ngIf="canCreateCycle"
+                  (click)="toggleCreatePanel()"
+                  style="background:#257099;color:#fff;border:none;border-radius:6px;
+                         padding:8px 18px;font-size:14px;font-family:Roboto,sans-serif;
+                         font-weight:500;cursor:pointer;white-space:nowrap;">
+            + New Cycle
+          </button>
+        </div>
+
+      </div><!-- /Row 2 -->
 
       <!-- ── Item 5: Drill-down filter visual confirmation — Principle 3 ──── -->
       <!-- When landing from a drill-down (query params set), show the applied filter clearly. -->
@@ -498,76 +269,6 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                        color:var(--triarq-color-text-secondary);text-decoration:underline;">
           Remove all filters
         </button>
-      </div>
-
-      <!-- ── Filters button + active chips (D-HubFilter-2026-04-06) ─────────── -->
-      <!-- Inline dropdowns removed. Filters button opens slide-in panel with 6 filters.  -->
-      <!-- Active filter chips render below button when any filter is set.                -->
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-        <!-- Filters button with active count badge -->
-        <button (click)="toggleFilterPanel()"
-                style="position:relative;background:var(--triarq-color-primary,#257099);color:#fff;
-                       font-size:14px;font-family:Roboto,sans-serif;font-weight:500;
-                       border:none;border-radius:5px;padding:10px 20px;cursor:pointer;">
-          Filters
-          <span *ngIf="activeFilterCount > 0"
-                style="position:absolute;top:-7px;right:-7px;
-                       background:#E96127;color:#fff;font-size:11px;font-weight:700;
-                       border-radius:999px;padding:1px 6px;min-width:18px;text-align:center;line-height:16px;">
-            {{ activeFilterCount }}
-          </span>
-        </button>
-        <!-- Active filter chips — "Name: Value" format per S-012/D-270. Reflect committed (applied) state only. -->
-        <span *ngIf="filterStage"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Stage: {{ stageLabelFor(filterStage) }}
-          <button (click)="filterStage='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <span *ngIf="filterTier"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Tier: {{ filterTier === 'tier_1' ? 'Tier 1 — Fast Lane' : filterTier === 'tier_2' ? 'Tier 2 — Structured' : 'Tier 3 — Governed' }}
-          <button (click)="filterTier='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <!-- D-279: chip shows "None assigned" or Division · Workstream short name. CC-Decision-2026-04-12-E. -->
-        <span *ngIf="filterWorkstream"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Workstream: {{ filterWorkstream === '__none__' ? 'None assigned' : workstreamChipLabel(filterWorkstream) }}
-          <button (click)="filterWorkstream='';wsScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <span *ngIf="filterGateStatus"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Gate Status: {{ filterGateStatus === 'overdue' ? 'Overdue' : filterGateStatus === 'pending' ? 'Pending' : 'Approved' }}
-          <button (click)="filterGateStatus='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <!-- D-277: chip shows Me / Unassigned DS / Unassigned CB / person name. CC-Decision-2026-04-12-F. -->
-        <span *ngIf="filterAssignedPerson"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Assigned: {{ filterAssignedPerson === 'me' ? 'Me' : filterAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : filterAssignedPerson === 'unassigned_cb' ? 'Unassigned CB' : personDisplayName(filterAssignedPerson) }}
-          <button (click)="filterAssignedPerson='';personScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
-        <span *ngIf="filterDivision"
-              style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                     border:1.5px solid var(--triarq-color-primary,#257099);
-                     color:var(--triarq-color-primary,#257099);border-radius:999px;
-                     padding:4px 12px;font-size:13px;">
-          Division: {{ filterDivisionLabel }}
-          <button (click)="filterDivision='';includeChildDivisions=false;onDivisionFilterChange()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-        </span>
       </div>
 
       <!-- ── Slide-in filter panel (S-010 through S-013, D-268 through D-272) ──── -->
@@ -650,20 +351,20 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                          (change)="stagedAssignedPerson=''" />
                   Bigger List
                 </label>
-                <!-- Terminal selections — apply immediately per D-277 -->
+                <!-- Terminal selections — staged only, query fires on Apply per S-011. Source: S-011. -->
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" name="personScopeRadio" [value]="'me_terminal'" [(ngModel)]="personScope"
-                         (change)="stagedAssignedPerson='me'; applyFilterPanel()" />
+                         (change)="stagedAssignedPerson='me'" />
                   Me
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" name="personScopeRadio" [value]="'unassigned_ds_terminal'" [(ngModel)]="personScope"
-                         (change)="stagedAssignedPerson='unassigned_ds'; applyFilterPanel()" />
+                         (change)="stagedAssignedPerson='unassigned_ds'" />
                   Unassigned DS
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" name="personScopeRadio" [value]="'unassigned_cb_terminal'" [(ngModel)]="personScope"
-                         (change)="stagedAssignedPerson='unassigned_cb'; applyFilterPanel()" />
+                         (change)="stagedAssignedPerson='unassigned_cb'" />
                   Unassigned CB
                 </label>
               </div>
@@ -805,10 +506,10 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
                          (change)="stagedWorkstream === '__none__' ? stagedWorkstream = '' : null" />
                   Bigger List
                 </label>
-                <!-- Terminal: No Workstream Assigned — applies immediately per D-272 -->
+                <!-- Terminal: No Workstream Assigned — staged only, query fires on Apply per S-011. Source: S-011. -->
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;font-style:italic;">
                   <input type="radio" name="wsScopeRadio" [value]="'none_terminal'" [(ngModel)]="wsScope"
-                         (change)="stagedWorkstream='__none__'; applyFilterPanel()" />
+                         (change)="stagedWorkstream='__none__'" />
                   No Workstream Assigned
                 </label>
               </div>
@@ -882,12 +583,14 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
       <!-- ── Column header row — D-196: 6 columns, always rendered ─────────────── -->
       <!-- Contract 4 2026-04-11: D-264 tier dot removed, D-265 TEAM column, D-267 Stage+Headline split. -->
       <!-- D-196: headers always shown even when no rows.                             -->
+      <!-- D-298: sticky top:0 — column labels stay visible on scroll. Source: D-298. -->
       <div *ngIf="!loading"
            style="display:grid;
                   grid-template-columns:88px 180px 1fr 130px 1fr 110px;
                   gap:8px;padding:8px 16px;
                   font-size:13px;font-weight:500;color:#fff;text-transform:uppercase;
-                  background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;">
+                  background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;
+                  position:sticky;top:0;z-index:3;margin-top:10px;">
         <span>Division</span>
         <span>Cycle Name</span>
         <span>Outcome</span>
@@ -1074,16 +777,40 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
     </div><!-- /left panel -->
 
     <!-- ── Right: Detail Panel — S-005/S-006 right panel on row tap ──────── -->
+    <!-- D-292: z-index elevated while edit scrim active. Source: D-292. -->
     <div *ngIf="selectedCycleId"
          style="width:60%;border-left:1px solid #E0E0E0;background:#fff;
-                position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;">
+                position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;"
+         [style.z-index]="showEditScrim ? '100' : ''">
       <app-delivery-cycle-detail
         [cycleId]="selectedCycleId"
-        (close)="closePanel()">
+        [cancelEditSignal]="cancelEditSignal"
+        (close)="closePanel()"
+        (editPanelOpened)="onEditPanelOpened()"
+        (editPanelClosed)="onEditPanelClosed()">
       </app-delivery-cycle-detail>
     </div>
 
+    <!-- D-290/D-292: Create Cycle right panel — replaces inline form. Source: D-290. -->
+    <div *ngIf="showCreatePanel"
+         style="width:60%;border-left:1px solid #E0E0E0;background:#fff;
+                position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;z-index:100;">
+      <app-delivery-cycle-create-panel
+        [divisions]="divisions"
+        [cancelSignal]="createCancelSignal"
+        (cycleCreated)="onCycleCreated($event)"
+        (panelClosed)="onCreatePanelClosed()">
+      </app-delivery-cycle-create-panel>
+    </div>
+
     </div><!-- /flex container -->
+
+    <!-- D-292: Modal scrim — covers grid when create or edit panel is open. Source: D-292. -->
+    <!-- Fix B-2: pointer-events:all explicit — prevents clicks passing through to list rows. Source: S-017. -->
+    <div *ngIf="showCreatePanel || showEditScrim"
+         style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.32);pointer-events:all;"
+         (click)="onScrimClick()">
+    </div>
   `
 })
 export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
@@ -1104,22 +831,15 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   hasDivision        = true;   // assumed true until division check completes
   divisionChecked    = false;
   canCreateCycle     = false;
-  showCreateForm     = false;
-  creating           = false;
-  createError        = '';
-  createForm!:       FormGroup;
 
-  // CC-004: Create form — workstream picker state
-  showWorkstreamPicker      = false;
-  createSelectedWorkstream: DeliveryWorkstream | null = null;
-
-  // CC-006: DS auto-assignment — pre-populate if current user is DS role
-  autoAssignedDsUserId:       string | null = null;
-  autoAssignedDsDisplayName:  string | null = null;
-
-  // D-194: CB auto-assignment — pre-populate if current user is CB role
-  autoAssignedCbUserId:       string | null = null;
-  autoAssignedCbDisplayName:  string | null = null;
+  // D-290: Create Cycle right panel — replaces inline form. Source: D-290.
+  showCreatePanel    = false;
+  // D-292: Incremented to signal create panel to check dirty-state before closing. Source: D-292.
+  createCancelSignal = 0;
+  // D-292: True when edit panel is open in detail view — activates scrim. Source: D-292.
+  showEditScrim      = false;
+  // D-292: Incremented to signal detail component to cancel edit panel (e.g. scrim click). Source: D-292.
+  cancelEditSignal   = 0;
 
   // D-193: Workstream tab strip removed in view correction 2026-04-09-D per D-HubFilter-2026-04-06.
   // Variable kept for screen state backward-compat only.
@@ -1218,7 +938,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     private readonly delivery:     DeliveryService,
     private readonly mcp:          McpService,
     private readonly profile:      UserProfileService,
-    private readonly fb:           FormBuilder,
     private readonly route:        ActivatedRoute,
     private readonly router:       Router,
     private readonly screenState:  ScreenStateService,
@@ -1226,22 +945,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // CC-004: Rich create form — field order: Division → Title → Workstream → Tier → Outcome → Jira → Dates.
-    // workstream_id is stored separately in createSelectedWorkstream (not a form control — uses picker modal).
-    // assigned_ds_user_id comes from autoAssignedDsUserId (auto-populated, not a form field).
-    // D-165: workstream is optional at creation. CC-006: DS nullable at creation.
-    this.createForm = this.fb.group({
-      division_id:              ['', Validators.required],
-      cycle_title:              ['', Validators.required],
-      tier_classification:      ['', Validators.required],
-      outcome_statement:        [''],
-      jira_epic_key:            [''],
-      milestone_brief_review:   [''],
-      milestone_go_to_build:    [''],
-      milestone_go_to_deploy:   [''],
-      milestone_go_to_release:  [''],
-      milestone_close_review:   ['']
-    });
     // D-175: read query params from summary view drill-down and apply as initial filters.
     // Item 5: set drillDownFromQp so the visual confirmation banner renders.
     const qp = this.route.snapshot.queryParams;
@@ -1270,19 +973,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         const role = p?.system_role;
         // S8: CE is read-only — can view cycles but not create them (enforced at MCP layer too).
         this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin' || role === 'cb';
-
-        // CC-006: Pre-populate DS if caller is DS role.
-        if (role === 'ds' && p?.id && p?.display_name) {
-          this.autoAssignedDsUserId      = p.id;
-          this.autoAssignedDsDisplayName = p.display_name;
-        }
-
-        // D-194: Pre-populate CB if caller is CB role.
-        if (role === 'cb' && p?.id && p?.display_name) {
-          this.autoAssignedCbUserId      = p.id;
-          this.autoAssignedCbDisplayName = p.display_name;
-        }
-
         this.checkUserDivisions();
         this.cdr.markForCheck();
       });
@@ -1919,106 +1609,53 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return labels[this.sortField] ?? this.sortField;
   }
 
-  toggleCreateForm(): void {
-    this.showCreateForm = !this.showCreateForm;
-    this.createError    = '';
-    if (this.showCreateForm) {
-      this.createForm.reset();
-      this.createSelectedWorkstream = null;
-      this.showWorkstreamPicker     = false;
+  // D-290: Toggle create panel in right column. Source: D-290.
+  toggleCreatePanel(): void {
+    this.showCreatePanel = !this.showCreatePanel;
+    if (this.showCreatePanel) {
+      // Close detail panel when create panel opens — only one right panel at a time
+      this.selectedCycleId = null;
     }
     this.cdr.markForCheck();
   }
 
-  // CC-002: Workstream picker — open/close/select/clear
-  openWorkstreamPicker(): void {
-    this.showWorkstreamPicker = true;
-    this.cdr.markForCheck();
-  }
-
-  onWorkstreamSelected(ws: DeliveryWorkstream | null): void {
-    this.showWorkstreamPicker = false;
-    if (ws) {
-      this.createSelectedWorkstream = ws;
+  // D-290: Handle cycleCreated event from create panel. Source: D-290.
+  onCycleCreated(cycle: DeliveryCycle): void {
+    this.showCreatePanel = false;
+    this.loadCycles();
+    // Open the new cycle in the detail panel
+    if (cycle?.delivery_cycle_id) {
+      this.selectedCycleId = cycle.delivery_cycle_id;
     }
     this.cdr.markForCheck();
   }
 
-  clearCreateWorkstream(): void {
-    this.createSelectedWorkstream = null;
+  // D-292: Handle panelClosed event from create panel (user cancelled or dirty-state discarded). Source: D-292.
+  onCreatePanelClosed(): void {
+    this.showCreatePanel = false;
     this.cdr.markForCheck();
   }
 
-  // Called when the Division dropdown changes in the create form.
-  // Clears the workstream selection since it was scoped to the previous division.
-  onCreateDivisionChange(): void {
-    this.createSelectedWorkstream = null;
+  // D-292: Detail component emits this when edit panel opens — activate scrim. Source: D-292.
+  onEditPanelOpened(): void {
+    this.showEditScrim = true;
     this.cdr.markForCheck();
   }
 
-  /**
-   * D-195: Returns true when the selected create-form division is a Trust (depth=1).
-   * Trust is identified by checking if the division has no parent — i.e., it IS the top of the tree.
-   * Divisions loaded via list_divisions include a parent_division_id field.
-   * When parent_division_id is null, the division is a Trust-level node.
-   */
-  get createDivisionIsTrustLevel(): boolean {
-    const divId = this.createForm?.get('division_id')?.value as string | undefined;
-    if (!divId) { return false; }
-    const div = this.divisions.find(d => d.id === divId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Division type may not carry parent_id in current typedef
-    return div ? !(div as any).parent_division_id : false;
+  // D-292: Detail component emits this when edit panel closes — deactivate scrim. Source: D-292.
+  onEditPanelClosed(): void {
+    this.showEditScrim = false;
+    this.cdr.markForCheck();
   }
 
-  submitCreate(): void {
-    if (this.createForm.invalid) { return; }
-    this.creating    = true;
-    this.createError = '';
+  // D-292: Scrim click — signal whichever panel is open to check dirty-state. Source: D-292.
+  onScrimClick(): void {
+    if (this.showCreatePanel) {
+      this.createCancelSignal++;
+    } else if (this.showEditScrim) {
+      this.cancelEditSignal++;
+    }
     this.cdr.markForCheck();
-
-    const v = this.createForm.value;
-
-    // Build milestone_target_dates object — only include gates where a date was entered
-    const milestone_target_dates: Record<string, string> = {};
-    if (v.milestone_brief_review)  { milestone_target_dates['brief_review']  = v.milestone_brief_review  as string; }
-    if (v.milestone_go_to_build)   { milestone_target_dates['go_to_build']   = v.milestone_go_to_build   as string; }
-    if (v.milestone_go_to_deploy)  { milestone_target_dates['go_to_deploy']  = v.milestone_go_to_deploy  as string; }
-    if (v.milestone_go_to_release) { milestone_target_dates['go_to_release'] = v.milestone_go_to_release as string; }
-    if (v.milestone_close_review)  { milestone_target_dates['close_review']  = v.milestone_close_review  as string; }
-
-    this.delivery.createCycle({
-      cycle_title:         v.cycle_title         as string,
-      tier_classification: v.tier_classification as TierClassification,
-      division_id:         v.division_id         as string,
-      // D-165: workstream optional — only include if user selected one via picker
-      ...(this.createSelectedWorkstream ? { workstream_id: this.createSelectedWorkstream.workstream_id } : {}),
-      // CC-006: DS auto-assignment — only include if auto-populated (caller is DS role)
-      ...(this.autoAssignedDsUserId ? { assigned_ds_user_id: this.autoAssignedDsUserId } : {}),
-      // D-194: CB auto-assignment — only include if auto-populated (caller is CB role)
-      ...(this.autoAssignedCbUserId ? { assigned_cb_user_id: this.autoAssignedCbUserId } : {}),
-      // Optional fields — only send if non-empty
-      ...(v.outcome_statement?.trim() ? { outcome_statement: v.outcome_statement.trim() as string } : {}),
-      ...(v.jira_epic_key?.trim()     ? { jira_epic_key:     v.jira_epic_key.trim()     as string } : {}),
-      ...(Object.keys(milestone_target_dates).length > 0 ? { milestone_target_dates } : {})
-    }).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.showCreateForm           = false;
-          this.createSelectedWorkstream = null;
-          this.createForm.reset();
-          this.loadCycles();
-        } else {
-          this.createError = res.error ?? 'Create failed.';
-        }
-        this.creating = false;
-        this.cdr.markForCheck();
-      },
-      error: (err: { error?: string }) => {
-        this.createError = err.error ?? 'Create failed. Check permissions and try again.';
-        this.creating    = false;
-        this.cdr.markForCheck();
-      }
-    });
   }
 
   // ── Presentation helpers ───────────────────────────────────────────────────
