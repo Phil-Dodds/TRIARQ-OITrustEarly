@@ -7,13 +7,15 @@ import { NgModule }             from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { LoginComponent }        from './features/login/login.component';
 import { AuthCallbackComponent } from './features/login/auth-callback.component';
+import { SetPasswordComponent }  from './features/login/set-password.component';
 import { authGuard }             from './core/guards/auth.guard';
 
 const routes: Routes = [
-  { path: 'login',         component: LoginComponent },
-  // No authGuard — Supabase redirects here with tokens in the URL hash.
-  // AuthCallbackComponent waits for session then navigates to /home or /login.
-  { path: 'auth/callback', component: AuthCallbackComponent },
+  { path: 'login',              component: LoginComponent },
+  // No authGuard — Supabase redirects here with a token_hash for invite or recovery flows.
+  { path: 'auth/set-password',  component: SetPasswordComponent },
+  // No authGuard — Supabase redirects here with PKCE code for magic-link (legacy/re-enable path).
+  { path: 'auth/callback',      component: AuthCallbackComponent },
 
   {
     path: 'home',

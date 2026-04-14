@@ -47,14 +47,11 @@ export class McpService {
         map(response => response),
         catchError((err: HttpErrorResponse) => {
           // 401 from MCP — pass through the server's actual error message so the user
-          // sees the real reason (e.g. missing DEV_BYPASS_TOKEN on the Render service)
-          // rather than a generic "session expired" message that is usually wrong.
+          // sees the real reason rather than a generic "session expired" message.
           if (err.status === 401) {
             const serverMsg: string =
               err.error?.error ??
-              'Server authentication failed (401). ' +
-              'If you are in dev mode, confirm DEV_BYPASS_TOKEN is set on every MCP ' +
-              'server in Render and redeploy.';
+              'Your session has expired. Please sign in again.';
             return throwError(() => ({ success: false, error: serverMsg }));
           }
           // MCP returned a 400 with { success: false, error: string }

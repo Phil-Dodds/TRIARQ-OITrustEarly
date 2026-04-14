@@ -2,6 +2,7 @@
 // Resolves and caches the authenticated user's public.users profile.
 // system_role from this profile drives role-aware UI (home screen cards, D-150).
 // Called once after login; cached for the session.
+// Matches profile by Supabase user ID (D-248 — email+password auth, no dev bypass).
 
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, firstValueFrom } from 'rxjs';
@@ -24,11 +25,8 @@ export class UserProfileService {
 
   /** Loads the current user's public.users profile via division-mcp. */
   async loadProfile(): Promise<User | null> {
-    const devEmail = this.auth.getDevEmail();
     const authUser = this.auth.getCurrentUser();
-
-    // Require either a dev bypass email or a real Supabase session
-    if (!devEmail && !authUser) return null;
+    if (!authUser) return null;
 
     this._loading$.next(true);
     try {
@@ -37,10 +35,8 @@ export class UserProfileService {
       );
       if (!response.success || !response.data) return null;
 
-      // Dev bypass: match by email. Magic link: match by Supabase user ID.
-      const profile = devEmail
-        ? (response.data.find(u => u.email?.toLowerCase() === devEmail) ?? null)
-        : (response.data.find(u => u.id === authUser!.id) ?? null);
+      // Match by Supabase user ID — the public.users.id is the Supabase auth UUID (D-248).
+      const profile = response.data.find(u => u.id === authUser.id) ?? null;
 
       this._profile$.next(profile);
       return profile;
