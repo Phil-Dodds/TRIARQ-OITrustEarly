@@ -200,6 +200,27 @@ Success is confirmed by the hash range in output (e.g. `376940b..682b338 master 
 
 ---
 
+### D-302 — Generic Login Error (No Email Enumeration)
+
+All failed login attempts return the same message: **"Invalid email or password."**
+This applies regardless of the failure reason — wrong password, unrecognized email, locked account (account lockout has its own additional message but leads with the generic text), or any other authentication failure.
+
+**Why:** Prevents email enumeration attacks. A distinct "email not found" vs "wrong password" response tells an attacker which emails are registered.
+
+**Governed by:** D-248 (Production Auth). Source: Auth Contract spec 2026-04-13, registered 2026-04-14.
+
+---
+
+### D-303 — Forgot Password Link as Universal Recovery Path
+
+The "Forgot password?" link is present on the login screen at all times. It is the single recovery path for all password-related blocked states: user has never set a password (invited but not onboarded), password has expired (90-day policy), and forgotten password.
+
+**Why:** Eliminates the need for scenario-specific entry points (e.g., a separate "resend invite" link on the login screen). One link handles all cases — the reset flow lands on `/auth/set-password` which handles both invite-token and reset-token scenarios.
+
+**Governed by:** D-248 (Production Auth), D-140 (Blocked Action UX). Source: Auth Contract spec 2026-04-13, registered 2026-04-14.
+
+---
+
 ## What Comes Next — Build B / D Context
 
 These are NOT Build C scope but are decisions that Build B/D must honour:

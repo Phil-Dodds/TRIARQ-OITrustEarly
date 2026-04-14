@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-299**
+**Next available: D-310**
 
 Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
 sequential number. Claude Code updates this field in the same commit that writes the decision.
@@ -132,6 +132,8 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-284 | Zone explanatory text styling — PLACEHOLDER, text deferred pending UAT | Claude Code | 2026-04-12 | Active |
 | D-285 | Workstream filter: wsScope state variable and peer options model implementation | Claude Code | 2026-04-12 | Active |
 | D-286 | Assigned person filter: personScope state, cycle-data person list, my_cycles→me migration | Claude Code | 2026-04-12 | Active |
+| D-302 | Generic login error — all failed login attempts return "Invalid email or password" regardless of reason; no email enumeration | Claude Code | 2026-04-14 | Active |
+| D-303 | Forgot Password link as universal recovery path — present at all times; covers no-password, expired-password, and forgotten-password states | Claude Code | 2026-04-14 | Active |
 
 ---
 
@@ -165,6 +167,10 @@ D-273 through D-274: Allocated by Claude Code in Contract 4 build session April 
 D-275 through D-286: Allocated by Claude Code / Claude Chat in Contract 4 and Contract 5 sessions April 2026 — content exists in decisions-active.md (committed 2026-04-12).
 D-287 through D-296: Allocated by Claude Code / Claude Chat in Contract 5 UAT and Contract 6 design sessions April 2026 — content committed to decisions-active.md 2026-04-12 Contract 6.
 D-297 through D-298: Allocated by Claude Chat in Contract 7 design session April 2026 — content committed to decisions-active.md 2026-04-13 Contract 7 merge.
+D-299: Allocated by Claude Code in Contract 8 build session April 2026 (picker enhancement) — content committed to decisions-active.md 2026-04-14 Contract 8 merge.
+D-300 through D-301: Allocated by Claude Chat in auth design session April 2026 (D-248 production auth amendment, D-301 persistent session) — content in auth-contract-spec.md 2026-04-13.
+D-302 through D-303: Registered above (Auth Contract 2026-04-14).
+D-304 through D-309: Allocated by Claude Chat in design session April 2026 — not yet backfilled to this registry table.
 
 These gaps are not available for allocation — the numbers exist in decisions-active.md or
 decisions-archive.md. They are listed here to prevent accidental reuse. A future session
@@ -172,4 +178,4 @@ should back-fill these rows if the full registry is needed.
 
 ---
 
-TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | Last updated: 2026-04-13 Contract 7 merge
+TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | Last updated: 2026-04-14 Auth Contract

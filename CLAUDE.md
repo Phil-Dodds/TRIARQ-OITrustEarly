@@ -71,6 +71,19 @@ is added, a CLAUDE.md update instruction adds it to this list.
 
 ---
 
+## Auth and Security
+
+Before implementing any auth, session, or credential handling code:
+
+1. Read D-248 (Production Auth — Supabase Email+Password with Invite Flow) in full from `docs/decisions-active.md` or the session brief.
+2. Read D-301 (Persistent Session / Remember This Device) in full.
+3. Any implementation choice not explicitly covered by a locked decision must be surfaced as a CCode-decision before building.
+4. Do not infer auth behavior — declare it.
+
+This rule applies to: login flows, invite flows, password reset, session storage, token handling, JWT validation, MCP auth middleware, account lockout, and any other authentication or credential-adjacent code.
+
+---
+
 ## Session Type and Reading Order (D-235, D-236, D-238)
 
 Every session brief includes a SESSION TYPE declaration. Read it before opening
