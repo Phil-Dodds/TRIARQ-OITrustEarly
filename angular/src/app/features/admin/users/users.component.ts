@@ -151,21 +151,36 @@ interface UserDivisionsData {
               <span
                 *ngIf="inviteSuccess"
                 style="color:var(--triarq-color-success,#2e7d32);font-size:var(--triarq-text-small);"
-              >User created. They can sign in now with their &#64;triarqhealth.com email.</span>
+              >{{ inviteSuccessMsg }}</span>
             </div>
           </form>
         </div>
       </div>
 
+      <!-- Resend feedback (D-140 / D-248) ──────────────────────────────────── -->
+      <div *ngIf="resendSuccessMsg"
+           style="background:#e8f5e9;border:1px solid #81c784;border-radius:8px;
+                  padding:8px 12px;margin-bottom:var(--triarq-space-sm);
+                  font-size:var(--triarq-text-small);color:#2e7d32;">
+        {{ resendSuccessMsg }}
+      </div>
+      <div *ngIf="resendError"
+           style="background:#fff3f3;border:1px solid #f5a0a0;border-radius:8px;
+                  padding:8px 12px;margin-bottom:var(--triarq-space-sm);
+                  font-size:var(--triarq-text-small);color:#c0392b;">
+        {{ resendError }}
+      </div>
+
       <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
       <div *ngIf="loading">
         <div *ngFor="let _ of skeletonRows"
-             style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 130px;
+             style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 90px 130px;
                     gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
                     border-bottom:1px solid var(--triarq-color-border);align-items:center;">
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:20px;border-radius:999px;width:50px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:20px;border-radius:999px;width:60px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:20px;border-radius:999px;width:60px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
         </div>
@@ -198,7 +213,7 @@ interface UserDivisionsData {
 
         <!-- Column headers -->
         <div
-          style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 130px;
+          style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 90px 130px;
                  gap:var(--triarq-space-sm);padding:var(--triarq-space-xs) var(--triarq-space-sm);
                  font-size:var(--triarq-text-small);font-weight:500;
                  color:var(--triarq-color-text-secondary);
@@ -210,7 +225,8 @@ interface UserDivisionsData {
           >Name {{ nameSortDir === 'asc' ? '↑' : '↓' }}</span>
           <span>Email</span>
           <span>Role</span>
-          <span>Status</span>
+          <span>Active</span>
+          <span>Invite</span>
           <span></span>
         </div>
 
@@ -219,7 +235,7 @@ interface UserDivisionsData {
 
           <!-- Row -->
           <div
-            style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 130px;
+            style="display:grid;grid-template-columns:2fr 2fr 1fr 1fr 90px 130px;
                    gap:var(--triarq-space-sm);padding:var(--triarq-space-sm);
                    border-bottom:1px solid var(--triarq-color-border);
                    font-size:var(--triarq-text-small);align-items:center;"
@@ -235,6 +251,7 @@ interface UserDivisionsData {
                 [style.color]="rolePillColor(user.system_role)"
               >{{ user.system_role.toUpperCase() }}</span>
             </span>
+            <!-- Active/Inactive badge -->
             <span>
               <span
                 class="oi-pill"
@@ -246,13 +263,29 @@ interface UserDivisionsData {
                   : 'var(--triarq-color-error)'"
               >{{ user.is_active ? 'Active' : 'Inactive' }}</span>
             </span>
-            <!-- Action buttons: Edit | Assign -->
-            <span style="display:flex;gap:var(--triarq-space-sm);justify-content:flex-end;">
+            <!-- Invite status badge (D-248) -->
+            <span>
+              <span
+                *ngIf="inviteStatusFor(user.id) as status"
+                class="oi-pill"
+                [style.background]="inviteBadgeBg(status)"
+                [style.color]="inviteBadgeColor(status)"
+              >{{ inviteBadgeLabel(status) }}</span>
+            </span>
+            <!-- Action buttons: Edit | Assign | Resend -->
+            <span style="display:flex;gap:var(--triarq-space-sm);justify-content:flex-end;flex-wrap:wrap;">
               <button
                 (click)="editingUserId === user.id ? cancelEdit() : startEdit(user)"
                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                        background:none;border:none;cursor:pointer;padding:0;"
               >{{ editingUserId === user.id ? 'Cancel' : 'Edit' }}</button>
+              <button
+                *ngIf="inviteStatusFor(user.id) === 'invited' || inviteStatusFor(user.id) === 'expired'"
+                (click)="resendInvite(user.id)"
+                [disabled]="resendingUserId === user.id"
+                style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
+                       background:none;border:none;cursor:pointer;padding:0;"
+              >{{ resendingUserId === user.id ? '…' : 'Resend' }}</button>
               <button
                 (click)="divisionsUserId === user.id ? closeDivisions() : openDivisions(user)"
                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
@@ -479,9 +512,17 @@ export class UsersComponent implements OnInit {
   inviting         = false;
   inviteError      = '';
   inviteSuccess    = false;
+  inviteSuccessMsg = '';
   blockedMessage   = '';
   blockedHint      = '';
   inviteForm!:     FormGroup;
+
+  // ── Invite status state (D-248) ────────────────────────────────────────────
+  // Maps user_id → 'active' | 'invited' | 'expired'
+  inviteStatusMap: Map<string, string> = new Map();
+  resendingUserId: string | null = null;
+  resendError      = '';
+  resendSuccessMsg = '';
 
   // ── Sort / filter state ────────────────────────────────────────────────────
   roleFilter:   string       = 'all';
@@ -579,6 +620,8 @@ export class UsersComponent implements OnInit {
         next: (res) => {
           if (res.success && res.data) {
             this.users = Array.isArray(res.data) ? res.data : [];
+            // Load invite statuses after users load (D-248).
+            this.loadInviteStatuses();
           } else {
             this.setBlocked(
               res.error ?? 'Could not load users.',
@@ -594,6 +637,78 @@ export class UsersComponent implements OnInit {
             'Ensure you have admin access and your session is active.'
           );
           this.loading = false;
+          this.cdr.markForCheck();
+        }
+      });
+  }
+
+  private loadInviteStatuses(): void {
+    this.mcp
+      .call<Array<{ user_id: string; invite_status: string }>>(
+        'division', 'get_user_invite_statuses', {}
+      )
+      .subscribe({
+        next: (res) => {
+          if (res.success && Array.isArray(res.data)) {
+            const map = new Map<string, string>();
+            for (const entry of res.data) {
+              map.set(entry.user_id, entry.invite_status);
+            }
+            this.inviteStatusMap = map;
+            this.cdr.markForCheck();
+          }
+        },
+        error: () => {
+          // Non-fatal — invite status badges just won't show. Don't block the user list.
+        }
+      });
+  }
+
+  inviteStatusFor(userId: string): string {
+    return this.inviteStatusMap.get(userId) ?? '';
+  }
+
+  inviteBadgeBg(status: string): string {
+    if (status === 'active')  return '#e8f5e9';
+    if (status === 'invited') return '#fff8e1';
+    if (status === 'expired') return '#f5f5f5';
+    return 'transparent';
+  }
+  inviteBadgeColor(status: string): string {
+    if (status === 'active')  return '#2e7d32';
+    if (status === 'invited') return '#f57f17';
+    if (status === 'expired') return '#9e9e9e';
+    return 'transparent';
+  }
+  inviteBadgeLabel(status: string): string {
+    if (status === 'active')  return 'Active';
+    if (status === 'invited') return 'Invited';
+    if (status === 'expired') return 'Expired';
+    return '';
+  }
+
+  resendInvite(userId: string): void {
+    this.resendingUserId = userId;
+    this.resendError     = '';
+    this.resendSuccessMsg = '';
+    this.cdr.markForCheck();
+
+    this.mcp
+      .call<{ message?: string }>('division', 'resend_invite', { user_id: userId })
+      .subscribe({
+        next: (res) => {
+          if (res.success) {
+            this.resendSuccessMsg = (res.data as { message?: string })?.message ?? 'Invitation resent.';
+          } else {
+            this.resendError = res.error ?? 'Could not send invitation. Please try again.';
+          }
+          this.resendingUserId = null;
+          this.loadInviteStatuses();
+          this.cdr.markForCheck();
+        },
+        error: (err: { error?: string }) => {
+          this.resendError     = err.error ?? 'Could not send invitation. Please try again.';
+          this.resendingUserId = null;
           this.cdr.markForCheck();
         }
       });
@@ -623,8 +738,12 @@ export class UsersComponent implements OnInit {
       .subscribe({
         next: (res) => {
           if (res.success) {
-            this.inviteSuccess  = true;
-            this.showInviteForm = false;
+            const email = this.inviteForm.value.email as string;
+            this.inviteSuccess   = true;
+            // Use the MCP tool's message if present; fallback to standard message (D-248).
+            this.inviteSuccessMsg = (res as { message?: string }).message
+              ?? `User created and invitation sent to ${email}.`;
+            this.showInviteForm  = false;
             this.inviteForm.reset();
             this.loadUsers();
           } else {

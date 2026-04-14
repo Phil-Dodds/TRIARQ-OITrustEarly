@@ -1,19 +1,28 @@
 // auth.service.ts — Pathways OI Trust
-// Manages authentication state.
+// Manages authentication state via Supabase email+password with invite flow (D-248).
+// Persistent session via localStorage (D-301).
 // This is the ONLY file in the Angular app that imports @supabase/supabase-js.
 //
-// Current mode: DEV BYPASS — user enters TRIARQ email, no verification.
-// Magic link (D-142) is preserved below. Re-enable by:
-//   1. Calling sendMagicLink() from login.component.ts instead of devSignIn()
-//   2. Removing DEV_BYPASS_TOKEN from Render environment variables
+// CCode-decision CC-AUTH-001: Supabase password expiry error for signInWithPassword.
+//   Supabase does not publish a distinct "password_expired" error code from
+//   signInWithPassword in the JS SDK v2. Password expiry is a project-level setting.
+//   When triggered, Supabase likely returns an AuthApiError with a message substring
+//   matching "password" and "expir". The implementation below uses regex matching.
+//   This decision documents that the exact error code/message MUST be verified against
+//   the live Supabase project after 90-day expiry is enabled in the dashboard.
 
 import { Injectable } from '@angular/core';
 import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js';
 import { BehaviorSubject, Observable, filter, firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
-// localStorage key for the dev-bypass email.
-const DEV_EMAIL_KEY = 'oi_dev_email';
+// sessionStorage key: marks the session as transient (Remember Me was unchecked).
+// On beforeunload, sign out if this key is present.
+const SESSION_TRANSIENT_KEY = 'oi_session_transient';
+
+export type SignInResult =
+  | { success: true }
+  | { success: false; error: string; isLockout?: boolean; isExpired?: boolean };
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -21,8 +30,8 @@ export class AuthService {
 
   private _session$     = new BehaviorSubject<Session | null>(null);
   private _user$        = new BehaviorSubject<User | null>(null);
-  // Resolves to true once getSession() has returned — covers magic link token
-  // exchange on the first page load. Guards await this before checking session.
+  // Resolves to true once getSession() has returned.
+  // Guards await this before checking session so URL tokens are processed first.
   private _initialized$ = new BehaviorSubject<boolean>(false);
 
   session$:     Observable<Session | null> = this._session$.asObservable();
@@ -37,114 +46,170 @@ export class AuthService {
         auth: {
           persistSession:   true,
           autoRefreshToken: true,
-          // PKCE flow: Supabase sends ?code=xxx in the callback URL instead of
-          // #access_token=xxx in the hash. The code can only be exchanged by the
-          // browser that initiated the sign-in (code verifier in localStorage).
-          // This defeats Mimecast / Proofpoint link-scanning — they visit the URL
-          // but cannot complete the exchange without the verifier, so the code
-          // remains valid for the real user's click.
+          // PKCE flow: Supabase sends ?code=xxx in callback URL instead of
+          // #access_token=xxx in hash. Defeats Mimecast / Proofpoint link-scanning —
+          // link-scanners visit the URL but cannot complete the exchange without the
+          // PKCE code verifier stored in the originating browser.
           flowType: 'pkce'
         }
       }
     );
 
-    // getSession() resolves AFTER Supabase has processed any magic-link tokens
-    // in window.location.hash — so awaiting this guarantees the session is set
-    // before the auth guard makes its allow/deny decision.
+    // getSession() resolves after Supabase processes any URL tokens.
+    // Awaiting _initialized$ guarantees session is set before auth guards fire.
     this.supabase.auth.getSession().then(({ data }) => {
       this._session$.next(data.session);
       this._user$.next(data.session?.user ?? null);
       this._initialized$.next(true);
     });
 
-    // Keep in sync with Supabase auth state changes
+    // Stay in sync with Supabase auth state changes (token refresh, sign-out, etc.)
     this.supabase.auth.onAuthStateChange((_event, session) => {
       this._session$.next(session);
       this._user$.next(session?.user ?? null);
     });
+
+    // D-301: If Remember Me was not checked, sign out when the browser tab closes.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => {
+        if (sessionStorage.getItem(SESSION_TRANSIENT_KEY)) {
+          // Best-effort fire-and-forget on tab close.
+          void this.supabase.auth.signOut();
+        }
+      });
+    }
   }
 
   /**
    * Resolves once auth state is ready for the guard to check.
-   * Dev bypass: resolves immediately — no token exchange needed.
-   * Magic link: waits for getSession() to complete so any hash token is processed.
+   * Waits for getSession() to complete so URL tokens are processed first.
    */
   waitForInit(): Promise<boolean> {
-    if (localStorage.getItem(DEV_EMAIL_KEY)) {
-      return Promise.resolve(true);
-    }
     return firstValueFrom(this._initialized$.pipe(filter(v => v)));
   }
 
-  // ── Dev bypass ─────────────────────────────────────────────────────────────
+  // ── Sign in ──────────────────────────────────────────────────────────────────
 
   /**
-   * Dev-mode sign-in. Stores email in localStorage — no verification.
-   * Any @triarqhealth.com address is accepted.
-   * Replace with sendMagicLink() call in login.component.ts to re-enable magic link.
+   * Signs in with email + password (D-248).
+   * rememberMe=true (default): session persists in localStorage for up to 1 week via Supabase refresh token.
+   * rememberMe=false: session cleared when the browser tab closes.
    */
-  devSignIn(email: string): { error: string | null } {
-    const normalised = email.trim().toLowerCase();
-    if (!normalised.endsWith('@triarqhealth.com')) {
-      return { error: 'Use your @triarqhealth.com work email.' };
+  async signInWithPassword(email: string, password: string, rememberMe: boolean): Promise<SignInResult> {
+    const { data, error } = await this.supabase.auth.signInWithPassword({
+      email:    email.trim().toLowerCase(),
+      password: password
+    });
+
+    if (error) {
+      const msg = error.message ?? '';
+
+      // Password expiry (CC-AUTH-001 — exact error code TBC from live Supabase testing).
+      if (/password.*expir/i.test(msg) || (error as { code?: string }).code === 'password_expired') {
+        return { success: false, error: msg, isExpired: true };
+      }
+
+      // Account lockout after 3 failed attempts within 120 min (HITRUST / D-248).
+      // Supabase uses HTTP 429 or a rate-limit message for lockout.
+      if (
+        error.status === 429 ||
+        /too.?many.*(request|attempt)/i.test(msg) ||
+        /rate.?limit/i.test(msg) ||
+        /account.*lock/i.test(msg)
+      ) {
+        return { success: false, error: msg, isLockout: true };
+      }
+
+      // All other failures return 'generic' so the component shows the D-302 message.
+      return { success: false, error: 'generic' };
     }
-    localStorage.setItem(DEV_EMAIL_KEY, normalised);
-    return { error: null };
+
+    if (!data.session) {
+      return { success: false, error: 'generic' };
+    }
+
+    // D-301 Remember Me: mark as transient if unchecked → sign out on tab close.
+    if (!rememberMe) {
+      sessionStorage.setItem(SESSION_TRANSIENT_KEY, '1');
+    } else {
+      sessionStorage.removeItem(SESSION_TRANSIENT_KEY);
+    }
+
+    return { success: true };
   }
 
-  /** Returns the stored dev-bypass email, or null if not in dev mode. */
-  getDevEmail(): string | null {
-    return localStorage.getItem(DEV_EMAIL_KEY);
+  // ── Password reset ────────────────────────────────────────────────────────────
+
+  /**
+   * Sends a password reset email (D-248, D-303).
+   * Intentionally void — caller shows the same confirmation regardless of outcome (D-302).
+   */
+  async resetPasswordForEmail(email: string): Promise<void> {
+    await this.supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: environment.passwordSetUrl
+    });
   }
 
-  // ── Shared ─────────────────────────────────────────────────────────────────
+  /**
+   * Exchanges a token_hash from an invite or recovery link for a live session.
+   * Called by SetPasswordComponent on route load. type: 'invite' | 'recovery'.
+   */
+  async verifyToken(
+    tokenHash: string,
+    type: 'invite' | 'recovery'
+  ): Promise<{ error: string | null; isExpired: boolean; isUsed: boolean }> {
+    const { error } = await this.supabase.auth.verifyOtp({ token_hash: tokenHash, type });
 
-  /** Signs out — clears both Supabase session and dev bypass email. */
+    if (!error) return { error: null, isExpired: false, isUsed: false };
+
+    const msg = error.message ?? '';
+    if (/expir/i.test(msg) || (error as { code?: string }).code === 'otp_expired') {
+      return { error: msg, isExpired: true, isUsed: false };
+    }
+    if (/already.*used/i.test(msg) || /invalid.*token/i.test(msg)) {
+      return { error: msg, isExpired: false, isUsed: true };
+    }
+    return { error: msg, isExpired: false, isUsed: false };
+  }
+
+  /**
+   * Updates the current user's password after a successful verifyToken() exchange.
+   */
+  async updatePassword(password: string): Promise<{ error: string | null; isReuse: boolean }> {
+    const { error } = await this.supabase.auth.updateUser({ password });
+
+    if (!error) return { error: null, isReuse: false };
+
+    const msg = error.message ?? '';
+    if (/reuse/i.test(msg) || /same.*password/i.test(msg) || /password.*histor/i.test(msg)) {
+      return { error: msg, isReuse: true };
+    }
+    return { error: msg, isReuse: false };
+  }
+
+  // ── Session ───────────────────────────────────────────────────────────────────
+
+  /** Signs out — clears Supabase session and localStorage. */
   async signOut(): Promise<void> {
-    localStorage.removeItem(DEV_EMAIL_KEY);
+    sessionStorage.removeItem(SESSION_TRANSIENT_KEY);
     await this.supabase.auth.signOut();
   }
 
   /**
-   * Returns the token string for MCP Authorization headers.
-   * Real Supabase session (magic link) → returns the JWT directly.
-   * Dev bypass → returns devbypass::<token>::<email>, decoded by MCP middleware.
-   * McpService sends this as: Authorization: Bearer <value>.
+   * Returns the Supabase JWT access token for MCP Authorization headers.
+   * McpService sends this as: Authorization: Bearer <token>.
    */
   getAccessToken(): string | null {
-    // Real session takes precedence (magic link re-enable path)
-    if (this._session$.value?.access_token) {
-      return this._session$.value.access_token;
-    }
-    // Dev bypass — packed into the single token string so McpService needs no changes
-    const devEmail = localStorage.getItem(DEV_EMAIL_KEY);
-    if (devEmail) {
-      return `devbypass::${environment.devBypassToken}::${devEmail}`;
-    }
-    return null;
+    return this._session$.value?.access_token ?? null;
   }
 
-  /** Returns the current authenticated user (Supabase User or null). */
+  /** Returns the current authenticated Supabase User, or null. */
   getCurrentUser(): User | null {
     return this._user$.value;
   }
 
-  /** True if a valid Supabase session OR a dev bypass email is stored. */
+  /** True if a valid Supabase session exists in memory (or localStorage). */
   isAuthenticated(): boolean {
-    return !!this._session$.value || !!localStorage.getItem(DEV_EMAIL_KEY);
-  }
-
-  // ── Magic link (D-142) — preserved for re-enable ───────────────────────────
-
-  /** Sends a magic link to the given email (D-142). Re-enable in login.component.ts. */
-  async sendMagicLink(email: string): Promise<{ error: string | null }> {
-    const { error } = await this.supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo:  environment.appUrl
-      }
-    });
-    return { error: error?.message ?? null };
+    return !!this._session$.value;
   }
 }

@@ -18,7 +18,6 @@ import { BlockedActionComponent } from './shared/components/blocked-action/block
 @NgModule({
   declarations: [
     AppComponent,
-    LoginComponent,
     AuthCallbackComponent,
     SidebarComponent
   ],
@@ -28,7 +27,8 @@ import { BlockedActionComponent } from './shared/components/blocked-action/block
     ReactiveFormsModule,
     IonicModule.forRoot(),
     AppRoutingModule,
-    BlockedActionComponent      // standalone — imported, not declared
+    BlockedActionComponent,     // standalone — imported, not declared
+    LoginComponent              // standalone — imported, not declared
   ],
   bootstrap: [AppComponent]
 })
