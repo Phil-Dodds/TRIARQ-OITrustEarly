@@ -247,6 +247,7 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
     <app-workstream-picker
       *ngIf="showWorkstreamPicker"
       [cycleDivisionId]="form.get('division_id')?.value || null"
+      [isTrustLevelDivision]="isTrustLevelDivision"
       [currentWorkstreamId]="selectedWorkstream?.workstream_id ?? null"
       (workstreamSelected)="onWorkstreamSelected($event)">
     </app-workstream-picker>
@@ -431,6 +432,14 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
   private subs = new Subscription();
 
   get f() { return this.form.controls; }
+
+  // B-22: suppress Trust-scope pill when cycle Division is Trust-level. Source: Contract 9, D-206.
+  get isTrustLevelDivision(): boolean {
+    const divId = this.form?.get('division_id')?.value;
+    if (!divId) { return false; }
+    const div = this.divisions.find(d => d.id === divId);
+    return (div as any)?.division_level === 1;
+  }
 
   constructor(
     private readonly fb:       FormBuilder,

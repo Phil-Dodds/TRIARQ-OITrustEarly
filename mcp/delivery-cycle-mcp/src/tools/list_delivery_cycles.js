@@ -157,10 +157,30 @@ async function list_delivery_cycles(params, caller_user_id) {
     }
   }
 
+  // ── B-28 fix: Resolve division display names ──────────────────────────────
+  // division_name was not included in the response, leaving the DIVISION column blank in the grid.
+  // Source: D-203, Contract 9.
+  const divisionIdSet = new Set();
+  cycles.forEach(c => { if (c.division_id) { divisionIdSet.add(c.division_id); } });
+
+  let divisionMap = {};
+  if (divisionIdSet.size > 0) {
+    const { data: divRows } = await supabase
+      .from('divisions')
+      .select('id, division_name, display_name_short')
+      .in('id', Array.from(divisionIdSet))
+      .is('deleted_at', null);
+    if (divRows) {
+      divRows.forEach(d => { divisionMap[d.id] = { division_name: d.division_name, display_name_short: d.display_name_short }; });
+    }
+  }
+
   const enriched = cycles.map(c => ({
     ...c,
     assigned_ds_display_name: c.assigned_ds_user_id ? (userMap[c.assigned_ds_user_id] ?? null) : null,
-    assigned_cb_display_name: c.assigned_cb_user_id ? (userMap[c.assigned_cb_user_id] ?? null) : null
+    assigned_cb_display_name: c.assigned_cb_user_id ? (userMap[c.assigned_cb_user_id] ?? null) : null,
+    division_name:       c.division_id ? (divisionMap[c.division_id]?.division_name ?? null) : null,
+    display_name_short:  c.division_id ? (divisionMap[c.division_id]?.display_name_short ?? null) : null
   }));
 
   return { success: true, data: enriched };

@@ -16,11 +16,14 @@ async function list_users(params, caller_user_id) {
 
   if (division_id) {
     // Return users with active membership in this Division
+    // B-27 fix: specify explicit FK path to resolve Supabase relationship ambiguity.
+    // Error was: "Could not embed because more than one relationship was found for
+    // 'division_memberships' and 'users'". Source: Contract 9.
     const { data, error } = await supabase
       .from('division_memberships')
       .select(`
         assigned_at,
-        users (
+        users!division_memberships_user_id_fkey (
           id,
           email,
           display_name,

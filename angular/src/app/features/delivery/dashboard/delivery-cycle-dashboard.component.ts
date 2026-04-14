@@ -778,10 +778,12 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOM
 
     <!-- ── Right: Detail Panel — S-005/S-006 right panel on row tap ──────── -->
     <!-- D-292: z-index elevated while edit scrim active. Source: D-292. -->
+    <!-- B-18 fix: default z-index:5 keeps panel above grid sticky header (z-index:3 per D-298).
+         Elevated to 100 when edit scrim is active (above scrim at z-index:50). Source: D-298, S-005, Contract 9. -->
     <div *ngIf="selectedCycleId"
          style="width:60%;border-left:1px solid #E0E0E0;background:#fff;
                 position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;"
-         [style.z-index]="showEditScrim ? '100' : ''">
+         [style.z-index]="showEditScrim ? '100' : '5'">
       <app-delivery-cycle-detail
         [cycleId]="selectedCycleId"
         [cancelEditSignal]="cancelEditSignal"

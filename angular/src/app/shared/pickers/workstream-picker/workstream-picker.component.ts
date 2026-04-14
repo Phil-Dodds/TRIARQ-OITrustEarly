@@ -340,7 +340,9 @@ export class WorkstreamPickerComponent implements OnInit, OnDestroy {
       include_inactive: includeInactive
     };
 
-    // Scope division_tree requires scope_division_id
+    // Scope division_tree requires scope_division_id.
+    // B-21 fix: trust scope also passes scope_division_id so the MCP can walk up
+    // to the correct hierarchy root rather than querying by division_level. Source: Contract 9.
     if (scopeType === 'division_tree') {
       if (!this.cycleDivisionId) {
         // Fall back to Trust scope if no division is set on the cycle yet
@@ -348,6 +350,8 @@ export class WorkstreamPickerComponent implements OnInit, OnDestroy {
       } else {
         params.scope_division_id = this.cycleDivisionId;
       }
+    } else if (scopeType === 'trust' && this.cycleDivisionId) {
+      params.scope_division_id = this.cycleDivisionId;
     }
 
     this.deliveryService.listWorkstreams(params).subscribe({

@@ -8,9 +8,17 @@
 // Save: calls update_delivery_cycle (CC-Decision-2026-04-10-D), logs field_edit events (D-229).
 // Cancel: emits cancelled event — no save, no re-query.
 //
+// Contract 9 changes:
+//   B-23: ep-overlay overflow:hidden removed — sticky header now works against outer scroll container.
+//   B-24: Required indicators removed from Division and Tier in Edit — required at creation only (D-165).
+//   B-25: Division change no longer auto-clears Workstream. Shows amber inline warning instead (D-297).
+//   B-26: DS and CB replaced with UserPickerComponent (D-182). Select elements removed.
+//   B-22: isTrustLevelDivision getter added; passed to WorkstreamPickerComponent (D-206).
+//   B-17: Constraint violation error messages replaced with user-friendly text.
+//
 // Division change behavior (spec Section 2.4):
 //   - Re-scopes WorkstreamPickerComponent to new Division.
-//   - Clears Workstream if current Workstream unavailable in new Division.
+//   - B-25: Does NOT clear Workstream — shows amber warning if WS is from a different Division.
 //   - Approver comparison stubbed — get_division_gate_approvers not yet built (CC-Decision-2026-04-10-E).
 //
 // D-228: Amber non-blocking warning when Tier changes on a cycle with existing gate records.
@@ -35,22 +43,43 @@ import { DeliveryService }           from '../../../core/services/delivery.servi
 import { UserProfileService }        from '../../../core/services/user-profile.service';
 import { McpService }                from '../../../core/services/mcp.service';
 import { WorkstreamPickerComponent } from '../../../shared/pickers/workstream-picker/workstream-picker.component';
+import { UserPickerComponent }       from '../../../shared/pickers/user-picker/user-picker.component';
 import {
   DeliveryCycle, DeliveryWorkstream, Division, User,
   TierClassification, McpResponse
 } from '../../../core/types/database';
 
+// Utility helpers (mirrored from create-panel to keep component standalone)
+const AVATAR_COLORS_EP = [
+  '#257099', '#00274E', '#E96127', '#F2A620',
+  '#2E7D32', '#1565C0', '#6A1B9A', '#00695C'
+];
+function epNameInitials(name: string): string {
+  const parts = (name || '').trim().split(/\s+/);
+  if (parts.length >= 2) { return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase(); }
+  return (parts[0] || '?').substring(0, 2).toUpperCase();
+}
+function epAvatarColorFromName(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) { hash = name.charCodeAt(i) + ((hash << 5) - hash); }
+  return AVATAR_COLORS_EP[Math.abs(hash) % AVATAR_COLORS_EP.length];
+}
+
 @Component({
   selector: 'app-delivery-cycle-edit-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, IonicModule, WorkstreamPickerComponent],
+  imports: [CommonModule, ReactiveFormsModule, IonicModule, WorkstreamPickerComponent, UserPickerComponent],
   template: `
     <!-- S-006: Edit surface — pushes onto navigation stack, View remains below.
          Positioned as an absolute overlay within the detail panel container. -->
+    <!-- B-23: overflow:visible (was overflow:hidden) so position:sticky on ep-header
+         resolves to the outer scroll container (dashboard wrapper), not this element. Source: Contract 9. -->
     <div class="ep-overlay">
 
         <!-- Panel header: Deep Navy, Save + Cancel always visible (spec 2.2) -->
+        <!-- D-291: position:sticky;top:0 sticks to outer scroll container. B-23 fix: works now
+             because ep-overlay no longer has overflow:hidden. Source: D-291, Contract 9. -->
         <div class="ep-header">
           <h2 class="ep-title">Edit Delivery Cycle</h2>
           <div class="ep-header-actions">
@@ -86,10 +115,10 @@ import {
             </div>
 
             <!-- 2. Division -->
+            <!-- B-24 fix: required asterisk removed — Division is required at creation only.
+                 In Edit the cycle already has a Division; required indicator is misleading. Source: D-165, Contract 9. -->
             <div class="ep-field">
-              <label class="ep-label">
-                Division <span class="ep-required">*</span>
-              </label>
+              <label class="ep-label">Division</label>
               <select formControlName="division_id" class="ep-input"
                       (change)="onDivisionChange()">
                 <option value="">— Select Division —</option>
@@ -119,9 +148,10 @@ import {
                  and required validation. Gate-enforcement only (Brief Review gate). Source: D-165. -->
             <div class="ep-field">
               <label class="ep-label">Delivery Workstream</label>
-              <!-- Workstream cleared notice after division change -->
-              <div *ngIf="workstreamClearedNote" class="ep-amber-note">
-                {{ workstreamClearedNote }}
+              <!-- B-25 fix: Division change no longer auto-clears Workstream. Shows amber warning
+                   when WS belongs to a different Division. User saves freely. Source: D-165, D-297, D-228, Contract 9. -->
+              <div *ngIf="workstreamDivisionNote" class="ep-amber-note">
+                {{ workstreamDivisionNote }}
               </div>
               <button type="button" class="ep-picker-trigger"
                       (click)="openWorkstreamPicker()">
@@ -139,10 +169,10 @@ import {
             </div>
 
             <!-- 5. Tier Classification (dropdown in Edit — not option cards; spec 2.3 note 4) -->
+            <!-- B-24 fix: required asterisk removed — Tier is required at creation only.
+                 In Edit the cycle already has a Tier. Source: D-165, Contract 9. -->
             <div class="ep-field">
-              <label class="ep-label">
-                Tier Classification <span class="ep-required">*</span>
-              </label>
+              <label class="ep-label">Tier Classification</label>
               <select formControlName="tier_classification" class="ep-input"
                       (change)="onTierChange()">
                 <option value="">— Select Tier —</option>
@@ -158,23 +188,43 @@ import {
               </div>
             </div>
 
-            <!-- 6. Assigned Domain Strategist -->
+            <!-- 6. Assigned Domain Strategist — B-26: UserPickerComponent replaces <select>. Source: D-182, Contract 9. -->
             <div class="ep-field">
               <label class="ep-label">Assigned Domain Strategist</label>
-              <select formControlName="assigned_ds_user_id" class="ep-input">
-                <option value="">— Unassigned —</option>
-                <option *ngFor="let u of dsUsers" [value]="u.id">{{ u.display_name }}</option>
-              </select>
+              <div *ngIf="selectedDs; else noDsPicked" class="ep-user-chip-row">
+                <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
+                  <span class="ep-user-avatar" [style.background]="selectedDsColor">{{ selectedDsInitials }}</span>
+                  {{ selectedDs.display_name }}
+                </span>
+                <button type="button" class="ep-chip-remove" (click)="clearDs()">✕ Remove</button>
+              </div>
+              <ng-template #noDsPicked>
+                <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
+                        (click)="openDsPicker()">
+                  <span class="ep-picker-placeholder">— Unassigned —</span>
+                </button>
+              </ng-template>
+              <button *ngIf="!selectedDs" type="button" class="ep-picker-trigger"
+                      style="display:none;" (click)="openDsPicker()"></button>
               <div class="ep-hint">Required before Brief Review Gate.</div>
             </div>
 
-            <!-- 7. Assigned Capability Builder -->
+            <!-- 7. Assigned Capability Builder — B-26: UserPickerComponent replaces <select>. Source: D-182, Contract 9. -->
             <div class="ep-field">
               <label class="ep-label">Assigned Capability Builder</label>
-              <select formControlName="assigned_cb_user_id" class="ep-input">
-                <option value="">— Unassigned —</option>
-                <option *ngFor="let u of cbUsers" [value]="u.id">{{ u.display_name }}</option>
-              </select>
+              <div *ngIf="selectedCb; else noCbPicked" class="ep-user-chip-row">
+                <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
+                  <span class="ep-user-avatar" [style.background]="selectedCbColor">{{ selectedCbInitials }}</span>
+                  {{ selectedCb.display_name }}
+                </span>
+                <button type="button" class="ep-chip-remove" (click)="clearCb()">✕ Remove</button>
+              </div>
+              <ng-template #noCbPicked>
+                <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
+                        (click)="openCbPicker()">
+                  <span class="ep-picker-placeholder">— Unassigned —</span>
+                </button>
+              </ng-template>
               <div class="ep-hint">Required before Go to Build Gate.</div>
             </div>
 
@@ -224,25 +274,50 @@ import {
     </div>
 
     <!-- Workstream Picker modal (D-182, CC-002) -->
+    <!-- B-22: [isTrustLevelDivision] passed so Trust scope pill is suppressed when cycle
+         Division is Trust-level (D-206). Source: D-206, Contract 9. -->
     <app-workstream-picker
       *ngIf="showWorkstreamPicker"
       [cycleDivisionId]="form.get('division_id')?.value || null"
+      [isTrustLevelDivision]="isTrustLevelDivision"
       [currentWorkstreamId]="selectedWorkstream?.workstream_id ?? null"
       (workstreamSelected)="onWorkstreamSelected($event)">
     </app-workstream-picker>
+
+    <!-- DS User Picker modal — B-26: replaces <select>. Source: D-182, Contract 9. -->
+    <app-user-picker
+      *ngIf="showDsPicker"
+      userRole="ds"
+      [divisionId]="form.get('division_id')?.value || null"
+      [currentUserId]="selectedDs?.id ?? null"
+      (userSelected)="onDsSelected($event)">
+    </app-user-picker>
+
+    <!-- CB User Picker modal — B-26: replaces <select>. Source: D-182, Contract 9. -->
+    <app-user-picker
+      *ngIf="showCbPicker"
+      userRole="cb"
+      [divisionId]="form.get('division_id')?.value || null"
+      [currentUserId]="selectedCb?.id ?? null"
+      (userSelected)="onCbSelected($event)">
+    </app-user-picker>
   `,
   styles: [`
     /* Overlay — covers the detail panel content, View stays behind */
+    /* B-23 fix: overflow:visible (was overflow:hidden). Removes the scroll-container boundary
+       that blocked position:sticky on ep-header. The outer dashboard wrapper (overflow-y:auto)
+       now serves as the sticky scroll container. Source: D-291, Contract 9. */
     .ep-overlay {
       position: absolute; inset: 0;
       background: rgba(255,255,255,0.98);
       z-index: 10;
       display: flex; flex-direction: column;
-      overflow: hidden;
+      overflow: visible;
     }
 
     /* Header — Deep Navy, Save + Cancel always visible (spec 2.2) */
-    /* D-291: sticky so header stays visible when panel body scrolls. Source: D-291. */
+    /* D-291: position:sticky so header stays visible when outer scroll container scrolls.
+       B-23: now works because ep-overlay no longer has overflow:hidden. Source: D-291, Contract 9. */
     .ep-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 20px; height: 64px; flex-shrink: 0;
@@ -273,7 +348,7 @@ import {
 
     /* Body */
     .ep-body {
-      flex: 1; overflow-y: auto; padding: 24px;
+      flex: 1; padding: 24px;
     }
 
     /* Fields */
@@ -304,7 +379,7 @@ import {
       margin-top: 4px; font: 400 12px italic Roboto, sans-serif; color: #9E9E9E;
     }
 
-    /* Amber non-blocking note — D-228, Division change, Workstream cleared */
+    /* Amber non-blocking note — D-228, Division change, Workstream warning */
     .ep-amber-note {
       margin-top: 6px; background: #FFF8E1;
       border-left: 3px solid #F2A620; border-radius: 4px;
@@ -328,6 +403,14 @@ import {
     }
     .ep-chip-remove:hover { color: #C62828; }
 
+    /* User chip row — B-26 DS/CB entity picker chips */
+    .ep-user-chip-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .ep-user-avatar {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font: 600 9px Roboto, sans-serif; color: #fff; flex-shrink: 0;
+    }
+
     /* Save error */
     .ep-save-error {
       margin-top: 8px; padding: 10px 12px;
@@ -340,7 +423,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
 
   // The cycle to edit — passed from the View panel.
   @Input() cycle!: DeliveryCycle;
-  // All users accessible in the caller's context — used to filter DS/CB dropdowns.
+  // All users accessible in the caller's context — used to pre-populate DS/CB pickers.
   @Input() allUsers: User[] = [];
   // D-292: Dashboard/detail increments to signal cancel (scrim click). Source: D-292.
   // B-12 fix: cancelSignal routes through requestCancel() — dirty-state check fires correctly.
@@ -364,7 +447,9 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   // Workstream picker state.
   showWorkstreamPicker                    = false;
   selectedWorkstream: DeliveryWorkstream | null = null;
-  workstreamClearedNote                   = '';
+  // B-25: warning shown when Workstream belongs to a different Division after Division change.
+  // Does NOT clear the Workstream. Source: D-165, D-297, D-228, Contract 9.
+  workstreamDivisionNote                  = '';
 
   // Inline notes.
   approverChangeNote = ''; // Stubbed — CC-Decision-2026-04-10-E.
@@ -373,30 +458,29 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   showTierChangeWarning = false;
   private originalTier: TierClassification = '' as TierClassification;
 
-  // B-14 fix: workstreamRequired no longer used — Workstream is optional at edit per D-165.
-  // Kept as field (value always false) to avoid removing template references if any remain.
-  workstreamRequired = false;
+  // B-26: DS entity picker state. Source: D-182, Contract 9.
+  showDsPicker       = false;
+  selectedDs:        User | null = null;
+  selectedDsInitials = '';
+  selectedDsColor    = '#257099';
+
+  // B-26: CB entity picker state. Source: D-182, Contract 9.
+  showCbPicker       = false;
+  selectedCb:        User | null = null;
+  selectedCbInitials = '';
+  selectedCbColor    = '#257099';
 
   private subs = new Subscription();
 
   get f() { return this.form.controls; }
 
-  // DS users filtered to currently selected Division.
-  get dsUsers(): User[] {
-    const divId = this.form.get('division_id')?.value;
-    return this.allUsers.filter(u =>
-      u.system_role === 'ds' &&
-      (!divId || (u as unknown as { division_id?: string }).division_id === divId)
-    );
-  }
-
-  // CB users filtered to currently selected Division.
-  get cbUsers(): User[] {
-    const divId = this.form.get('division_id')?.value;
-    return this.allUsers.filter(u =>
-      u.system_role === 'cb' &&
-      (!divId || (u as unknown as { division_id?: string }).division_id === divId)
-    );
+  // B-22: true when the currently selected Division is Trust-level (D-206).
+  // Used to suppress the Trust scope pill in the Workstream Picker. Source: D-206, Contract 9.
+  get isTrustLevelDivision(): boolean {
+    const divId = this.form?.get('division_id')?.value;
+    if (!divId) { return false; }
+    const div = this.availableDivisions.find(d => d.id === divId);
+    return div?.division_level === 1;
   }
 
   // Whether the cycle has existing gate records — used for D-228 Tier change warning.
@@ -415,20 +499,19 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
 
   ngOnInit(): void {
     // Initialise form with current cycle values.
+    // B-24 fix: Division and Tier no longer required in the form since they're already set.
+    // Required validators kept so Save doesn't succeed if they're accidentally cleared,
+    // but the asterisk indicators are removed from the labels. Source: D-165, Contract 9.
     this.form = this.fb.group({
-      cycle_title:          [this.cycle.cycle_title,          [Validators.required, Validators.maxLength(120)]],
-      division_id:          [this.cycle.division_id,          Validators.required],
-      outcome_statement:    [this.cycle.outcome_statement ?? ''],
-      tier_classification:  [this.cycle.tier_classification,  Validators.required],
-      assigned_ds_user_id:  [this.cycle.assigned_ds_user_id  ?? ''],
-      assigned_cb_user_id:  [this.cycle.assigned_cb_user_id  ?? ''],
-      jira_epic_key:        [this.cycle.jira_epic_key        ?? '']
+      cycle_title:         [this.cycle.cycle_title,         [Validators.required, Validators.maxLength(120)]],
+      division_id:         [this.cycle.division_id,          Validators.required],
+      outcome_statement:   [this.cycle.outcome_statement ?? ''],
+      tier_classification: [this.cycle.tier_classification,  Validators.required],
+      jira_epic_key:       [this.cycle.jira_epic_key        ?? '']
     });
 
     // Pre-populate Workstream from cycle.
-    // Workstream is represented outside the form (entity picker pattern).
     if (this.cycle.workstream_id) {
-      // Build a minimal DeliveryWorkstream for display from cycle data.
       this.selectedWorkstream = {
         workstream_id:        this.cycle.workstream_id,
         workstream_name:      this.cycle.workstream?.workstream_name ?? '(Workstream)',
@@ -438,6 +521,31 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
         active_cycle_count:   null,
         lead_display_name:    null
       } as unknown as DeliveryWorkstream;
+    }
+
+    // B-26: Pre-populate DS from cycle data + allUsers.
+    if (this.cycle.assigned_ds_user_id) {
+      const dsUser = this.allUsers.find(u => u.id === this.cycle.assigned_ds_user_id);
+      if (dsUser) {
+        this.selectedDs = dsUser;
+        this.updateDsChip(dsUser);
+      } else {
+        // User not in allUsers (e.g. inactive or cross-division) — build minimal object
+        this.selectedDs = { id: this.cycle.assigned_ds_user_id, display_name: this.cycle.assigned_ds_display_name ?? 'Assigned DS' } as User;
+        this.updateDsChip(this.selectedDs);
+      }
+    }
+
+    // B-26: Pre-populate CB from cycle data + allUsers.
+    if (this.cycle.assigned_cb_user_id) {
+      const cbUser = this.allUsers.find(u => u.id === this.cycle.assigned_cb_user_id);
+      if (cbUser) {
+        this.selectedCb = cbUser;
+        this.updateCbChip(cbUser);
+      } else {
+        this.selectedCb = { id: this.cycle.assigned_cb_user_id, display_name: this.cycle.assigned_cb_display_name ?? 'Assigned CB' } as User;
+        this.updateCbChip(this.selectedCb);
+      }
     }
 
     // Store original Tier for D-228 comparison.
@@ -476,19 +584,20 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   }
 
   // ── Division change (spec 2.4) ────────────────────────────────────────────────
+  // B-25 fix: Do NOT auto-clear Workstream on Division change. Instead show amber warning
+  // when the WS belongs to a different Division. User saves freely. Source: D-165, D-297, D-228, Contract 9.
   onDivisionChange(): void {
     const newDivisionId = this.form.get('division_id')?.value;
-    this.workstreamClearedNote = '';
+    this.workstreamDivisionNote = '';
 
-    // Clear Workstream if it belongs to a different Division.
-    // CC-Decision-2026-04-10-E: approver comparison stubbed — tool not yet built.
     if (this.selectedWorkstream) {
       const wsHomeDivId = (this.selectedWorkstream as DeliveryWorkstream & { home_division_id?: string }).home_division_id;
       if (wsHomeDivId && wsHomeDivId !== newDivisionId) {
-        this.selectedWorkstream    = null;
-        this.workstreamClearedNote =
-          'Workstream cleared — the current Workstream is not available in the selected Division. ' +
-          'Please select a new Workstream.';
+        this.workstreamDivisionNote =
+          'The selected Workstream belongs to a different Division — confirm or select a new one.';
+        // B-25 fix: Workstream NOT cleared. Source: Contract 9.
+      } else {
+        this.workstreamDivisionNote = '';
       }
     }
 
@@ -513,21 +622,58 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
 
   onWorkstreamSelected(ws: DeliveryWorkstream | null): void {
     this.showWorkstreamPicker  = false;
-    this.workstreamClearedNote = '';
+    this.workstreamDivisionNote = '';
     if (ws) { this.selectedWorkstream = ws; }
     this.cdr.markForCheck();
   }
 
   clearWorkstream(): void {
     this.selectedWorkstream    = null;
-    this.workstreamClearedNote = '';
+    this.workstreamDivisionNote = '';
     this.cdr.markForCheck();
+  }
+
+  // ── DS picker — B-26 ─────────────────────────────────────────────────────────
+  openDsPicker(): void { this.showDsPicker = true; this.cdr.markForCheck(); }
+
+  onDsSelected(user: User | null): void {
+    this.showDsPicker = false;
+    if (user) {
+      this.selectedDs = user;
+      this.updateDsChip(user);
+    }
+    this.cdr.markForCheck();
+  }
+
+  clearDs(): void { this.selectedDs = null; this.cdr.markForCheck(); }
+
+  private updateDsChip(user: User): void {
+    this.selectedDsInitials = epNameInitials(user.display_name || '');
+    this.selectedDsColor    = epAvatarColorFromName(user.display_name || '');
+  }
+
+  // ── CB picker — B-26 ─────────────────────────────────────────────────────────
+  openCbPicker(): void { this.showCbPicker = true; this.cdr.markForCheck(); }
+
+  onCbSelected(user: User | null): void {
+    this.showCbPicker = false;
+    if (user) {
+      this.selectedCb = user;
+      this.updateCbChip(user);
+    }
+    this.cdr.markForCheck();
+  }
+
+  clearCb(): void { this.selectedCb = null; this.cdr.markForCheck(); }
+
+  private updateCbChip(user: User): void {
+    this.selectedCbInitials = epNameInitials(user.display_name || '');
+    this.selectedCbColor    = epAvatarColorFromName(user.display_name || '');
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────────
   onSave(): void {
     this.form.markAllAsTouched();
-    // B-14 fix: removed workstreamRequired = true. Workstream is optional per D-165.
 
     if (this.form.invalid || this.saving) { return; }
 
@@ -540,8 +686,6 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       division_id:         string;
       outcome_statement:   string;
       tier_classification: TierClassification;
-      assigned_ds_user_id: string;
-      assigned_cb_user_id: string;
       jira_epic_key:       string;
     };
 
@@ -567,11 +711,12 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     if (v.tier_classification !== this.cycle.tier_classification) {
       payload.tier_classification = v.tier_classification;
     }
-    const newDsId = v.assigned_ds_user_id || null;
+    // B-26: DS/CB from picker state (no longer form controls).
+    const newDsId = this.selectedDs?.id ?? null;
     if (newDsId !== (this.cycle.assigned_ds_user_id ?? null)) {
       payload.assigned_ds_user_id = newDsId;
     }
-    const newCbId = v.assigned_cb_user_id || null;
+    const newCbId = this.selectedCb?.id ?? null;
     if (newCbId !== (this.cycle.assigned_cb_user_id ?? null)) {
       payload.assigned_cb_user_id = newCbId;
     }
@@ -585,26 +730,39 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     if (changedKeys.length === 0) {
       this.saving = false;
       this.cdr.markForCheck();
-      this.cancelled.emit(); // No changes — behave like Cancel per spec intent.
+      this.cancelled.emit();
       return;
     }
 
     this.delivery.updateCycle(payload).subscribe({
       next: (res: McpResponse<DeliveryCycle>) => {
         if (res.success) {
-          this.saved.emit(); // View re-queries unconditionally per S-008.
+          this.saved.emit();
         } else {
-          this.saveError = res.error ?? 'Save failed. Please try again.';
+          this.saveError = this.friendlyError(res.error ?? 'Save failed. Please try again.');
         }
         this.saving = false;
         this.cdr.markForCheck();
       },
       error: (err: { error?: string }) => {
-        this.saveError = err?.error ?? 'Save failed. Please try again.';
+        this.saveError = this.friendlyError(err?.error ?? 'Save failed. Please try again.');
         this.saving    = false;
         this.cdr.markForCheck();
       }
     });
+  }
+
+  // B-17: Convert raw Supabase constraint errors to user-friendly messages. Source: Contract 9.
+  private friendlyError(raw: string): string {
+    if (!raw) { return 'Save failed. Please try again.'; }
+    const lower = raw.toLowerCase();
+    if (lower.includes('unique') || lower.includes('duplicate') || lower.includes('already exists')) {
+      return 'A Delivery Cycle with this title already exists in this Division. Use a different title.';
+    }
+    if (lower.includes('foreign key') || lower.includes('violates') || lower.includes('constraint')) {
+      return 'Save failed — one of the selected values is no longer valid. Refresh and try again.';
+    }
+    return raw;
   }
 
   // ── Cancel / dirty-state (D-292) ─────────────────────────────────────────────
@@ -624,7 +782,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     }
   }
 
-  // D-292: Any form field differs from original cycle value, or Workstream has changed.
+  // D-292: Any form field differs from original cycle value, or Workstream/DS/CB has changed.
   isDirty(): boolean {
     const f = this.form.value as Record<string, unknown>;
     return (
@@ -632,10 +790,10 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       f['division_id']         !== this.cycle.division_id ||
       f['outcome_statement']   !== (this.cycle.outcome_statement   ?? '') ||
       f['tier_classification'] !== this.cycle.tier_classification ||
-      f['assigned_ds_user_id'] !== (this.cycle.assigned_ds_user_id ?? '') ||
-      f['assigned_cb_user_id'] !== (this.cycle.assigned_cb_user_id ?? '') ||
       f['jira_epic_key']       !== (this.cycle.jira_epic_key       ?? '') ||
-      (this.selectedWorkstream?.workstream_id ?? null) !== (this.cycle.workstream_id ?? null)
+      (this.selectedWorkstream?.workstream_id ?? null) !== (this.cycle.workstream_id ?? null) ||
+      (this.selectedDs?.id ?? null) !== (this.cycle.assigned_ds_user_id ?? null) ||
+      (this.selectedCb?.id ?? null) !== (this.cycle.assigned_cb_user_id ?? null)
     );
   }
 

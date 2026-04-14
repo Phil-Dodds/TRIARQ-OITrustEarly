@@ -705,6 +705,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                         style="font-size:11px;font-weight:500;">
                     {{ milestoneStatusLabel(effectiveDateStatus(m)) }}
                   </span>
+                  <!-- B-19 / D-205: alert when Behind is set but no target date exists. Source: D-205, Contract 9. -->
+                  <span *ngIf="m.date_status === 'behind' && !m.target_date"
+                        style="font-size:11px;color:var(--triarq-color-sunray,#f5a623);"
+                        title="Behind is set but no target date exists">⚠</span>
                 </div>
               </ng-template>
             </div>
@@ -1592,11 +1596,16 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   }
 
   // D-292: ESC key in panel mode — close edit panel if open, otherwise close the detail panel. Source: D-292.
+  // B-20/B-12 fix: was calling onEditCancelled() directly, which set showEditPanel=false immediately,
+  // destroying the edit panel before its own onEscKey handler could show the dirty-state confirm overlay.
+  // Fix: increment cancelEditSignal so ESC routes through the same signal path as scrim click, letting
+  // the edit panel's requestCancel() perform the dirty-state check. Source: Contract 9.
   @HostListener('document:keydown.escape')
   onEscKey(): void {
     if (!this.panelMode) { return; }
     if (this.showEditPanel) {
-      this.onEditCancelled();
+      this.cancelEditSignal++;
+      this.cdr.markForCheck();
     } else {
       this.close.emit();
     }
@@ -1739,11 +1748,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return nextGate;
   }
 
-  // Contract 3 Block 4 Fix 4: "Behind" requires target date set AND today > target date.
-  // When no target date is set, raw server value may be 'behind' — treat as 'not_started'.
-  // All template calls for milestone status dot/label go through this wrapper. Source: contract-3-spec.md Block 4 FIX 4.
+  // B-19 fix: D-205 — user sets all five statuses freely at any time regardless of target date.
+  // Previous logic overrode 'behind' to 'not_started' when no target date, making Behind appear blocked.
+  // Now returns raw date_status always. Alert icon shown separately when behind + no target date.
+  // Source: D-205, Contract 9.
   effectiveDateStatus(m: { target_date?: string | null; date_status: DateStatus }): DateStatus {
-    if (!m.target_date && m.date_status === 'behind') { return 'not_started'; }
     return m.date_status;
   }
 

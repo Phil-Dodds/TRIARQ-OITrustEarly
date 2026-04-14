@@ -66,19 +66,33 @@ async function list_delivery_workstreams(params, caller_user_id) {
       }
 
       case 'trust': {
-        // Trust = all Divisions under a Trust node (division_level = 1).
-        // Fetch all division IDs (the Trust itself + all descendants).
-        const { data: trustNodes } = await supabase
-          .from('divisions')
-          .select('id')
-          .eq('division_level', 1)
-          .is('deleted_at', null);
+        // B-21 fix: Trust scope should return all workstreams under the Trust ancestor
+        // of the cycle's division. The previous implementation fetched ALL divisions
+        // with division_level=1 across the system — if division_level is not consistently
+        // populated, this returned empty. New approach: if scope_division_id is provided,
+        // walk UP the hierarchy to find the root division (parent_division_id IS NULL),
+        // then return all workstreams under that root. If no scope_division_id provided,
+        // fall back to all root-level divisions. Source: D-206, Contract 9.
+        let trustRootIds;
 
-        if (!trustNodes || trustNodes.length === 0) {
+        if (scope_division_id) {
+          // Walk up from the cycle's division to find the hierarchy root.
+          const rootId = await findHierarchyRoot(scope_division_id);
+          trustRootIds = rootId ? [rootId] : [scope_division_id];
+        } else {
+          // No division context — return workstreams from all root divisions (no parent).
+          const { data: rootNodes } = await supabase
+            .from('divisions')
+            .select('id')
+            .is('parent_division_id', null)
+            .is('deleted_at', null);
+          trustRootIds = (rootNodes || []).map(n => n.id);
+        }
+
+        if (trustRootIds.length === 0) {
           return { success: true, data: [] };
         }
 
-        const trustRootIds = trustNodes.map(n => n.id);
         const allIds = new Set(trustRootIds);
         await collectDescendants(trustRootIds, allIds);
         divisionIdFilter = Array.from(allIds);
@@ -227,6 +241,27 @@ async function list_delivery_workstreams(params, caller_user_id) {
   }));
 
   return { success: true, data: enriched };
+}
+
+/**
+ * B-21 fix: Walk up the division hierarchy from startId to find the root
+ * (first division with parent_division_id IS NULL). Returns the root ID.
+ * Guards against cycles (max 20 levels). Source: Contract 9.
+ */
+async function findHierarchyRoot(startId) {
+  let currentId = startId;
+  for (let depth = 0; depth < 20; depth++) {
+    const { data: div } = await supabase
+      .from('divisions')
+      .select('id, parent_division_id')
+      .eq('id', currentId)
+      .is('deleted_at', null)
+      .single();
+    if (!div) { return currentId; } // not found — return what we have
+    if (!div.parent_division_id) { return div.id; } // this IS the root
+    currentId = div.parent_division_id;
+  }
+  return currentId; // safety fallback
 }
 
 /**
