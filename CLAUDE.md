@@ -146,7 +146,7 @@ All database calls go through MCP servers. No direct Supabase client calls from 
 **Rule 2 — UI as Presentation Layer Only.**
 Angular components render data. They contain no prompts, no business logic, and no SQL. Skill files own prompt logic. MCP servers own business logic and data access. Components own display.
 
-**Rule 3 — Workflow Entry Point Completeness (D-163).**
+**Rule 3 — Workflow Entry Point Completeness (D-310) (Was: D-163).**
 A feature is not done until its entry point is declared and wired. Before writing any component, identify which entry point type the feature uses and implement it in the same commit:
 
 - **Sidebar nav item** → add to `NAV_ITEMS` in `sidebar.component.ts` with correct `roles` array
@@ -366,8 +366,8 @@ Decisions are locked in `decisions-active.md`. Do not re-litigate locked decisio
 | D-144 | MCP server pattern |
 | D-151 | Design token rules (h2=60px critical fix) |
 | D-155 | On-demand MCP tool loading |
-| D-163 | Workflow Entry Point Completeness — every feature needs a wired entry point |
-| D-164 | Admin Hub Consolidation — all admin functions under /admin, never loose sidebar links |
+| D-310 | Workflow Entry Point Completeness — every feature needs a wired entry point (Was: D-163) |
+| D-311 | Admin Hub Route and Card Structure — all admin functions under /admin, never loose sidebar links (Was: D-164) |
 
 **Build C specific:**
 
@@ -391,11 +391,11 @@ Decisions are locked in `decisions-active.md`. Do not re-litigate locked decisio
 | Session 2026-03-24-P | Build sequence revised to A→C→B→D→E→F |
 | Session 2026-03-25-F | Full artifact slot seed set (26 rows) |
 | Session 2026-03-25-G | MSO365 → OI Library pointer transition model |
-| D-165 | Workstream optional at cycle creation; required before Brief Review gate |
-| D-166 | Division filter on dashboard; include child divisions toggle |
-| D-167 | Workstream filter: no-workstream and inactive shown as separate options |
-| D-168 | Claude Code must debate/question before building — silent conflict resolution is a build error |
-| D-169 | Decision source tagging + registry protocol — read docs/decision-registry.md before allocating any D-number |
+| D-312 | Workstream Field Requirement Model — workstream_id nullable at creation, required at Brief Review gate (Was: D-165) |
+| D-313 | Division Filter Drill-in — My Divisions default, All Divisions, Select single (Was: D-166) |
+| D-314 | Workstream Filter Options Model — no-workstream and inactive as separate options (Was: D-167) |
+| D-315 | Claude Code Debate Before Building — raise question before implementing anything unspecified (Was: D-168) |
+| D-201 | Decision registry as twelfth canonical document — read registry to look up existing decisions only; do not allocate numbers (Was: D-169 — source tagging now governed by D-201; allocation now governed by D-317) |
 
 ---
 

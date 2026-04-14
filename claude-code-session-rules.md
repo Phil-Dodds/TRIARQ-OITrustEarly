@@ -324,7 +324,7 @@ writing any code or calling any tool:
 1. `CLAUDE.md` — architectural rules and non-negotiables
 2. `claude-code-session-rules.md` — this file
 3. `docs/design-principles.md` — UX and navigation constraints
-4. `docs/decision-registry.md` — current next-available D-number
+4. `docs/decision-registry.md` — look up existing decision content only. Do not read for next-available number — D-number assignment is Design Session only (D-317).
 5. Current build specification (e.g. `docs/build-c-spec.md`)
 
 ---

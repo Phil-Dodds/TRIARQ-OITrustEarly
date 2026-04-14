@@ -1,32 +1,29 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.0 | April 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.9 | April 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
-# Claude Code reads this file before allocating any new D-number.
+# Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
 
 ---
 
 ## Next Available Decision Number
 
-**Next available: D-310**
+**Next available: D-320**
 
-Before claiming a number — Claude Code or Claude Chat — confirm this field and claim the next
-sequential number. Claude Code updates this field in the same commit that writes the decision.
-Claude Chat states the number it is claiming; Phil asks Claude Code to commit and update in the
-next code session.
+Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
+number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
+does not claim numbers. Claude Chat states the number it is claiming in the Session Output File
+Section A. The Document Author adds the registry row and updates this field via Section F
+instructions.
 
 ---
 
 ## Collision Protocol
 
-If Claude Code opens this registry and finds that the next-available number is already claimed
-in decisions-active.md by a different decision, it must:
-1. Take the next unclaimed number
-2. Add a `COLLISION` note to the registry row for the conflicting number
-3. Surface the collision to Phil before committing
-
-Collisions are expected (Claude Chat operates outside the repo). They are resolved by
-renumbering the lower-priority entry and updating any cross-references.
+Retired per D-317. Claude Code no longer claims D-numbers. Collisions cannot occur if only
+one session type (Claude Chat / Design Session) assigns numbers. If a collision is ever
+discovered from the pre-D-317 era, the resolution is: assign a new number to the
+late-arriving decision; never renumber an existing entry (D-316).
 
 ---
 
@@ -71,13 +68,13 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-151 | Design token rules (h2=60px critical fix) | Claude Chat | March 2026 | Active |
 | D-154 | Five named gates | Claude Chat | Pre-April 2026 | Active |
 | D-155 | On-demand MCP tool loading | Claude Chat | March 2026 | Active |
-| D-163 | Workflow Entry Point Completeness | Claude Chat | April 2026 | Active |
-| D-164 | Admin Hub Consolidation | Claude Chat | April 2026 | Active |
-| D-165 | Workstream optional at creation; required at Brief Review gate | Claude Code | April 2026 | Active |
-| D-166 | Division filter on dashboard with include-child-divisions toggle | Claude Code | April 2026 | Active |
-| D-167 | Workstream filter: no-workstream and inactive as separate options | Claude Code | April 2026 | Active |
-| D-168 | Claude Code mandatory debate/question before building | Claude Code | April 2026 | Active |
-| D-169 | Decision source tagging and registry protocol | Claude Code | April 2026 | Active |
+| D-163 | AI Production Governance Board name — see decisions-active.md | Claude Chat | March 2026 | Active |
+| D-164 | Delivery Cycle Build Report name — see decisions-active.md | Claude Chat | March 2026 | Active |
+| D-165 | Universal Entity Detail Panel — see decisions-active.md | Claude Chat | April 2026 | Active |
+| D-166 | User Activity Event Infrastructure — see decisions-active.md | Claude Chat | April 2026 | Active |
+| D-167 | User Activity / Accomplishments Build Assignment — see decisions-active.md | Claude Chat | April 2026 | Active |
+| D-168 | Accomplishments Card Role-Sectioned Display — see decisions-active.md | Claude Chat | April 2026 | Active |
+| D-169 | User Self-Service Boundary — see decisions-active.md. Registry entry superseded by D-201 for source-tagging protocol. | Claude Chat | April 2026 | Active |
 | D-170 | Phil and Admin have implicit access to all Divisions | Claude Code | April 2026 | Active |
 | D-171 | Delivery hub page at /delivery — four option cards, no data on load | Claude Code | April 2026 | Active |
 | D-172 | Dashboard Column Set — 11 columns, 4 always visible | Claude Chat | April 2026 | Active |
@@ -109,31 +106,125 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-198 | Primary Workflow Clarity — secondary controls visually recessed | Claude Chat | April 2026 | Active |
 | D-199 | Sidebar-Only Navigation — no top nav; section headers at 7+ items | Claude Chat | April 2026 | Active |
 | D-200 | UI Feedback Standard — three patterns only (Guidance/Warning/Error) | Claude Chat | April 2026 | Active |
-| D-219 | Pre-Build Component Verification — read before creating any new component | Claude Chat | April 2026 | Active |
-| D-222 | Dependency Sequencing — schema → MCP → service → component order | Claude Chat | April 2026 | Active |
-| D-223 | Naming Standard — five binary-testable rules for files, methods, exports | Claude Chat | April 2026 | Active |
-| D-224 | Behavior Protection During Code Changes | Claude Chat | April 2026 | Active |
-| D-225 | Triggered Structural Read — structural files read before editing | Claude Chat | April 2026 | Active |
-| D-226 | Responsibility Declaration — required first-comment in all new files | Claude Chat | April 2026 | Active |
-| D-227 | Required File Verification at Session Start | Claude Chat | April 2026 | Active |
-| D-228 | Tier Classification Edit Behavior on Existing Cycles — amber non-blocking warning | Claude Chat | April 2026 | Active |
-| D-229 | Delivery Cycle Field Edit Audit Log — structured event log entry on every update_delivery_cycle call | Claude Chat | April 2026 | Active |
-| D-230 | Cancelled Item Visibility Philosophy — hidden by default, explicit reveal control, no persist (S-009 operative) | Claude Chat | April 2026 | Active |
-| D-275 | Gate Record Inline Edit in Cycle View — gate rows are nested sub-surface; editable fields scoped to gate_records only | Session 2026-04-11 | April 2026 | Active |
-| D-276 | Outcome Statement Display in Cycle View — display-only; plain italic or gray guidance text; no inline Add/Edit link | Session 2026-04-11 | April 2026 | Active |
-| D-272 | Workstream Filter peer options model with terminal selection exception (amended 2026-04-12) | Claude Code | April 2026 | Active |
-| D-277 | Assigned Person Filter peer options with immediate terminal selections | Claude Chat | April 2026 | Active |
-| D-278 | No-Filter Default — absence of selection equals no filter applied; no named "All"/"Anyone" options | Claude Chat | April 2026 | Active |
-| D-279 | Workstream short name display standard: display_name_short ?? workstream_name fallback | Claude Chat | April 2026 | Active |
-| D-280 | Contract 5 session classification and regression protection checkpoint | Claude Chat | April 2026 | Active |
-| D-281 | Tier badge pill restored to grid Cycle Name cell — partial amendment to D-264 | Claude Code | 2026-04-12 | Active |
-| D-282 | Gate status initialization: not_started seed on new cycles | Claude Code | 2026-04-12 | Active |
-| D-283 | Migration 027: display_name_short column on delivery_workstreams | Claude Code | 2026-04-12 | Active |
-| D-284 | Zone explanatory text styling — PLACEHOLDER, text deferred pending UAT | Claude Code | 2026-04-12 | Active |
-| D-285 | Workstream filter: wsScope state variable and peer options model implementation | Claude Code | 2026-04-12 | Active |
-| D-286 | Assigned person filter: personScope state, cycle-data person list, my_cycles→me migration | Claude Code | 2026-04-12 | Active |
-| D-302 | Generic login error — all failed login attempts return "Invalid email or password" regardless of reason; no email enumeration | Claude Code | 2026-04-14 | Active |
-| D-303 | Forgot Password link as universal recovery path — present at all times; covers no-password, expired-password, and forgotten-password states | Claude Code | 2026-04-14 | Active |
+| D-201 | decision-registry.md as twelfth canonical document | Claude Chat | April 2026 | Active |
+| D-202 | Spec Staleness Standing Rule (Rule D) | Claude Chat | April 2026 | Active |
+| D-203 | Short Display Name for Divisions and Workstreams | Claude Chat | April 2026 | Active |
+| D-204 | CB Defaults from Workstream Lead | Claude Chat | April 2026 | Active |
+| D-205 | User-Controlled Milestone Status Philosophy | Claude Chat | April 2026 | Active |
+| D-206 | Workstream Picker Scope Radio Sequence | Claude Chat | April 2026 | Active |
+| D-207 | App UI Uses QPathways Design Tokens Exclusively | Claude Chat | April 2026 | Active |
+| D-208 | Standards Layer Concept | Claude Chat | April 2026 | Active |
+| D-209 | Artifact Conflict Check — Session Open | Claude Chat | April 2026 | Active |
+| D-210 | Artifact Conflict Check — Session Close (Prevention) | Claude Chat | April 2026 | Active |
+| D-211 | Amend D-185: Governing Context Block extended | Claude Chat | April 2026 | Active |
+| D-212 | impl_status Sweep at Session Close | Claude Chat | April 2026 | Active |
+| D-213 | Session Retro Instruction | Claude Chat | April 2026 | Active |
+| D-214 | Standards Document Structure | Claude Chat | April 2026 | Active |
+| D-215 | Standard Lifecycle | Claude Chat | April 2026 | Active |
+| D-216 | Standards Propagation to Claude Code | Claude Chat | April 2026 | Active |
+| D-217 | Drift Detection Model | Claude Chat | April 2026 | Active |
+| D-218 | Resolution of design-communication-principles.md | Claude Chat | April 2026 | Active |
+| D-219 | Pre-Build Component Verification | Claude Code → Claude Chat | 2026-04-09 | Active |
+| D-220 | Orchestration Automation and OI Library Integration Design Session | Claude Chat | 2026-04-09 | Deferred |
+| D-221 | Starter CI/CD Pipeline Before Build B | Claude Chat | 2026-04-09 | Active |
+| D-222 | Dependency Sequencing Rule | Claude Chat | 2026-04-09 | Active |
+| D-223 | Self-Documenting Naming Standard | Claude Chat | 2026-04-09 | Active |
+| D-224 | Behavior Protection During Code Changes | Claude Chat | 2026-04-09 | Active |
+| D-225 | Triggered Structural Read | Claude Chat | 2026-04-09 | Active |
+| D-226 | Responsibility Declaration on New Files | Claude Chat | 2026-04-09 | Active |
+| D-227 | Required File Verification at Session Start | Claude Chat | 2026-04-09 | Active |
+| D-228 | Tier Classification Edit Behavior on Existing Cycles | Claude Chat | 2026-04-09 | Active |
+| D-229 | Delivery Cycle Field Edit Audit Log | Claude Chat | 2026-04-09 | Active |
+| D-230 | Cancelled Item Visibility Philosophy (superseded by S-009) | Claude Chat | 2026-04-09 | Superseded |
+| D-231 | Standards Govern Design Output | Claude Chat | 2026-04-09 | Active |
+| D-232 | Standards Propagation Mechanism | Claude Chat | 2026-04-09 | Active |
+| D-233 | Standards Summary Maintenance Rule | Claude Chat | 2026-04-09 | Active |
+| D-234 | Permanent Reference Documents in CLAUDE.md | Claude Chat | 2026-04-09 | Active |
+| D-235 | Session Type Declaration and Reading Order Rule | Claude Chat | 2026-04-09 | Active |
+| D-236 | Delta Instruction Format for Modification Sessions | Claude Chat | 2026-04-09 | Active |
+| D-237 | Build Configuration Change Requires CC-Decision | Claude Chat | 2026-04-09 | Active |
+| D-238 | Redesigned Surface Reading Order | Claude Chat | 2026-04-09 | Active |
+| D-239 | Thin Contract Standard | Claude Chat | April 2026 | Active |
+| D-240 | Plan-Mode Checkpoint | Claude Chat | April 2026 | Active |
+| D-241 | As-Built Document | Claude Chat | April 2026 | Active |
+| D-242 | Field Completeness Check at Spec Production | Claude Chat | April 2026 | Active |
+| D-243 | Spec Completeness Standard | Claude Chat | April 2026 | Active |
+| D-244 | Gate Display Treatment — Current Build | Claude Chat | April 2026 | Active |
+| D-245 | Gate Approval Status Display | Claude Chat | April 2026 | Active |
+| D-246 | Build Sequence Split for Infrastructure Priority | Claude Chat | April 2026 | Active |
+| D-247 | CLAUDE.md Candidates Field in CodeClose Output | Claude Chat | 2026-04-10 | Active |
+| D-248 | Production Auth — Supabase Email+Password Invite Flow | Claude Chat | 2026-04-10 | Active |
+| D-249 | update_delivery_cycle MCP Tool (net-new Contract 2) | Claude Code | 2026-04-10 | Active |
+| D-250 | Workstream Picker Label Shortened | Claude Code | 2026-04-10 | Active |
+| D-251 | Code Effort Level High — Standing Instruction | Claude Chat | 2026-04-10 | Active |
+| D-252 | Greenfield vs. Modification Execution Model | Claude Chat | 2026-04-11 | Active |
+| D-253 | Angular Template Performance: No Object-Returning Methods in *ngFor | Claude Code | 2026-04-11 | Active |
+| D-254 | Angular CLI Analytics Flag Auto-Written to angular.json | Claude Code | 2026-04-11 | Active |
+| D-255 | GDA — Framework Concept | Claude Chat | 2026-04-11 | Active |
+| D-256 | GDA — Execution Memory as a Category | Claude Chat | 2026-04-11 | Active |
+| D-257 | GDA — Four Question Names | Claude Chat | 2026-04-11 | Active |
+| D-258 | GDA — CCode-Decision Naming Convention | Claude Chat | 2026-04-11 | Active |
+| D-259 | GDA — Two Maintained Layers Plus Constitution | Claude Chat | 2026-04-11 | Active |
+| D-260 | GDA — Governance Constitution | Claude Chat | 2026-04-11 | Active |
+| D-261 | GDA — Governance Health Signals | Claude Chat | 2026-04-11 | Active |
+| D-262 | Section H Routing: Validator-Only for-ClaudeCode.zip | Claude Chat | 2026-04-11 | specced |
+| D-263 | OI Trust Port-Time Compatibility Requirement | Claude Chat | 2026-04-11 | not-specced |
+| D-264 | Grid Row Tier Display Removed | Claude Chat | 2026-04-11 | not-specced |
+| D-265 | Grid Row Team Cell | Claude Chat | 2026-04-11 | not-specced |
+| D-266 | Grid Row Title and Outcome Wrapping | Claude Chat | 2026-04-11 | not-specced |
+| D-267 | Grid Row Stage and Headline as Separate Columns | Claude Chat | 2026-04-11 | not-specced |
+| D-268 | S-010: Filter Panel Structure | Claude Chat | 2026-04-11 | not-specced |
+| D-269 | S-011: Filter Panel Commit Model | Claude Chat | 2026-04-11 | not-specced |
+| D-270 | S-012: Active Filter Chips | Claude Chat | 2026-04-11 | not-specced |
+| D-271 | S-013: Filter Drill-in Pattern | Claude Chat | 2026-04-11 | not-specced |
+| D-272 | Workstream Filter Drill-in | Claude Chat | 2026-04-11 | not-specced |
+| D-273 | Delivery Cycle Detail Panel — View Surface | Claude Chat | 2026-04-11 | not-specced |
+| D-274 | Component Library Baseline: Angular Material (MD3) | Claude Chat | 2026-04-11 | not-specced |
+| D-275 | Gate Record Inline Edit in Cycle View | Claude Chat | 2026-04-12 | built |
+| D-276 | Outcome Statement Display in Cycle View | Claude Chat | 2026-04-12 | built |
+| D-277 | Assigned Person Filter Drill-in | Claude Chat | 2026-04-12 | not-specced |
+| D-278 | No-Filter Default Pattern | Claude Chat | 2026-04-12 | not-specced |
+| D-279 | Workstream Filter Display Corrections | Claude Chat | 2026-04-12 | not-specced |
+| D-280 | Contract Regression Protection | Claude Chat | 2026-04-12 | not-specced |
+| D-281 | Tier Badge Pill Restored to Grid Cycle Name Cell | Claude Code | 2026-04-12 | Active |
+| D-282 | Gate Status Initialization: `not_started` Seed on New Cycles | Claude Code | 2026-04-12 | Active |
+| D-283 | Migration 027: `display_name_short` on `delivery_workstreams` | Claude Code | 2026-04-12 | Active |
+| D-284 | Zone Explanatory Text: 11px Italic #5A5A5A | Claude Code | 2026-04-12 | Active |
+| D-285 | Workstream Filter: `wsScope` State Variable and Peer Options Model | Claude Code | 2026-04-12 | Active |
+| D-286 | Assigned Person Filter: `personScope` State Variable | Claude Code | 2026-04-12 | Active |
+| D-287 | Memoization of Person and Workstream List Getters | Claude Code | 2026-04-12 | Active |
+| D-288 | S-015: Secondary Orienting Text Style (Active Standard) | Claude Chat | 2026-04-12 | Active |
+| D-289 | Migration 028: `gate_records_gate_status_check` Constraint Updated | Claude Code | 2026-04-12 | Active |
+| D-290 | Create Surface Panel Behavior | Claude Chat | 2026-04-12 | Active |
+| D-291 | Panel Header Sticky Behavior | Claude Chat | 2026-04-12 | Active |
+| D-292 | Panel Modality by Surface Type | Claude Chat | 2026-04-12 | Active |
+| D-293 | CC-Decision Sequence Completeness Check at Code Close | Claude Chat | 2026-04-12 | Active |
+| D-294 | Worktree Merge Check Before Deploy Prompt | Claude Chat | 2026-04-12 | Active |
+| D-295 | Supabase Migration Execution Pattern | Claude Chat | 2026-04-12 | Active |
+| D-296 | Outcome Statement Display Style in Cycle View | Claude Chat | 2026-04-12 | Amends D-276 |
+| D-297 | Inform Don't Hide or Disable | Claude Chat | 2026-04-12 | Active |
+| D-298 | All Delivery Cycles Header Zone Layout | Claude Chat | 2026-04-12 | Active |
+| D-299 | DS/CB Picker Default Scope When No Division Set | Claude Chat | 2026-04-13 | Active |
+| D-300 | Gate Date Text Color | Claude Chat | 2026-04-13 | Active |
+| D-301 | Persistent Session / Remember This Device | Claude Chat | 2026-04-13 | Active |
+| D-302 | Unknown User Login Error Message | Claude Chat | 2026-04-14 | Active |
+| D-303 | Forgot Password as Universal No-Password Recovery Path | Claude Chat | 2026-04-14 | Active |
+| D-304 | Rationale-First Reasoning on Decision Extensions | Claude Chat | 2026-04-14 | Active |
+| D-305 | Search Deferred Items When Rationale Is Missing | Claude Chat | 2026-04-14 | Active |
+| D-306 | Document Author Self-Correct Classification | Claude Chat | 2026-04-14 | Active |
+| D-307 | build-c-supplement-spec.md Reference Retirement | Claude Chat | 2026-04-14 | Active |
+| D-308 | List → View Navigation Pattern | Claude Chat | 2026-04-14 | Active |
+| D-309 | Bidirectional Entity Traversal Requirement | Claude Chat | 2026-04-14 | Active |
+| D-310 | Workflow Entry Point Completeness | Claude Chat | 2026-04-14 | Active |
+| D-311 | Admin Hub Route and Card Structure | Claude Chat | 2026-04-14 | Active |
+| D-312 | Workstream Field Requirement Model | Claude Code | 2026-04-14 | Active |
+| D-313 | Division Filter Drill-in | Claude Code | 2026-04-14 | Active |
+| D-314 | Workstream Filter Options Model | Claude Code | 2026-04-14 | Active |
+| D-315 | Claude Code Debate Before Building | Claude Chat | 2026-04-14 | Active |
+| D-316 | Title-First Citation Standard and Permanent Number Stability | Claude Chat | 2026-04-14 | Active |
+| D-317 | D-Number Assignment Authority Restricted to Design Session | Claude Chat | 2026-04-14 | Active |
+| D-318 | Decision Registry Always Travels in for-ClaudeCode.zip | Claude Chat | 2026-04-14 | Active |
+| D-319 | Solution Completeness Check (Rule 22) | Claude Chat | 2026-04-14 | Active |
 
 ---
 
@@ -159,18 +250,8 @@ D-145 through D-147: Pre-existing decisions not yet entered in this registry.
 D-149 through D-150: Pre-existing decisions not yet entered in this registry.
 D-152 through D-153: Pre-existing decisions not yet entered in this registry.
 D-156 through D-162: Pre-existing or open decisions not yet entered in this registry.
-D-201 through D-218: Allocated by Claude Chat / Claude Code in worktree sessions April 2026 — content exists in session outputs and worktree code but not yet backfilled to this registry table.
-D-220 through D-221: Allocated by Claude Chat April 2026 — content not yet backfilled.
-D-231 through D-271: Allocated by Claude Chat / Claude Code in design and build sessions April 2026 — content exists in session outputs and worktree code but not yet backfilled to this registry table.
-D-272: Registered above (Contract 5 backfill 2026-04-12).
-D-273 through D-274: Allocated by Claude Code in Contract 4 build session April 2026 — content exists in session output 2026-04-11-C but not yet backfilled to this registry table.
-D-275 through D-286: Allocated by Claude Code / Claude Chat in Contract 4 and Contract 5 sessions April 2026 — content exists in decisions-active.md (committed 2026-04-12).
-D-287 through D-296: Allocated by Claude Code / Claude Chat in Contract 5 UAT and Contract 6 design sessions April 2026 — content committed to decisions-active.md 2026-04-12 Contract 6.
-D-297 through D-298: Allocated by Claude Chat in Contract 7 design session April 2026 — content committed to decisions-active.md 2026-04-13 Contract 7 merge.
-D-299: Allocated by Claude Code in Contract 8 build session April 2026 (picker enhancement) — content committed to decisions-active.md 2026-04-14 Contract 8 merge.
-D-300 through D-301: Allocated by Claude Chat in auth design session April 2026 (D-248 production auth amendment, D-301 persistent session) — content in auth-contract-spec.md 2026-04-13.
-D-302 through D-303: Registered above (Auth Contract 2026-04-14).
-D-304 through D-309: Allocated by Claude Chat in design session April 2026 — not yet backfilled to this registry table.
+
+D-163 through D-169: Numbers occupied in decisions-active.md by pre-existing decisions. Registry rows corrected 2026-04-14 to reflect decisions-active content. Prior registry entries for these numbers (Workflow Entry Point Completeness, Admin Hub Consolidation, Workstream optional, Division filter, Workstream filter, Claude Code debate, source tagging) are now registered as D-310 through D-315 and D-201.
 
 These gaps are not available for allocation — the numbers exist in decisions-active.md or
 decisions-archive.md. They are listed here to prevent accidental reuse. A future session
@@ -178,4 +259,4 @@ should back-fill these rows if the full registry is needed.
 
 ---
 
-TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | Last updated: 2026-04-14 Auth Contract
+TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026
