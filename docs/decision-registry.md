@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.9 | April 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.12 | April 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-320**
+**Next available: D-328**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -225,6 +225,14 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-317 | D-Number Assignment Authority Restricted to Design Session | Claude Chat | 2026-04-14 | Active |
 | D-318 | Decision Registry Always Travels in for-ClaudeCode.zip | Claude Chat | 2026-04-14 | Active |
 | D-319 | Solution Completeness Check (Rule 22) | Claude Chat | 2026-04-14 | Active |
+| D-320 | Document Author Session Quality Rules (str_replace uniqueness, risk review, citation scan) | Claude Chat | 2026-04-14 | Active |
+| D-321 | Design Session Type System (Spec / Governance / Planning, loading table, inference) | Claude Chat | 2026-04-14 | Active |
+| D-322 | Document Author Optimized Loading (on-demand per instruction, load-once) | Claude Chat | 2026-04-14 | Active |
+| D-323 | Validator Optimized Loading (by check group batch) | Claude Chat | 2026-04-14 | Active |
+| D-324 | D-213 Amendment: Decision Referencing Error Tracking (DECISION-REF-ERROR, TYPE-MISS) | Claude Chat | 2026-04-14 | Active |
+| D-325 | Caveman Mode: Always-On Prose Compression | Claude Chat | 2026-04-14 | Active |
+| D-326 | CLAUDE.md Update Authority and Review Triggers | Claude Chat | 2026-04-15 | Active |
+| D-327 | Merge CLAUDE.md and claude-code-session-rules.md | Claude Chat | 2026-04-15 | Active |
 
 ---
 
