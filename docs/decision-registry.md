@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.12 | April 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.13 | April 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-328**
+**Next available: D-334**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -233,6 +233,12 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-325 | Caveman Mode: Always-On Prose Compression | Claude Chat | 2026-04-14 | Active |
 | D-326 | CLAUDE.md Update Authority and Review Triggers | Claude Chat | 2026-04-15 | Active |
 | D-327 | Merge CLAUDE.md and claude-code-session-rules.md | Claude Chat | 2026-04-15 | Active |
+| D-328 | Non-conformance Handling: Standards Violations Discovered Mid-Session | Claude Chat | 2026-04-15 | Active |
+| D-329 | Exception Convention for Active Standards | Claude Chat | 2026-04-15 | Active — final lock pending GDA-IMPLEMENT |
+| D-330 | Governing References Move to HTML Comments in Code-Read Files | Claude Chat | 2026-04-15 | Active |
+| D-331 | Rationale Required in HTML for All Instructions in Code-Read Files | Claude Chat | 2026-04-15 | Active |
+| D-332 | Improvement Proposal Routing | Claude Chat | 2026-04-15 | Active |
+| D-333 | Instruction Template Standard | Claude Chat | 2026-04-15 | Active |
 
 ---
 
