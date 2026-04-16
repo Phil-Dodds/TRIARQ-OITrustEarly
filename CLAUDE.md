@@ -1,7 +1,10 @@
-<!-- CLAUDE.md — Pathways OI Trust | v2.0 | April 2026 -->
+<!-- CLAUDE.md — Pathways OI Trust | v2.1 | April 2026 -->
 <!-- Version history:
   v1.0 March 2026: Initial file. Design Session A. Arch rules, security, coding standards, design tokens. Source: D-93, D-130–D-153.
   v1.1 2026-04-14: Added Output Style — Caveman Mode. Source: D-325.
+  v2.1 2026-04-15: Rationale block labels updated per D-334 and D-335.
+    Question/Root → Why. Balance/Dirt → Considered/Downsides.
+    Source: Governance session 2026-04-15.
   v2.0 2026-04-15: Merged claude-code-session-rules.md into CLAUDE.md (D-327). 598 → 243 lines.
     Removed: Security Requirements (→ Build B spec), What You Are Building, What This File Does NOT Contain,
     Session Close Checklist (consolidated into rules), Rule 10 trigger phrase duplicate, Blocked Action UX
@@ -12,7 +15,7 @@
     Governance: reviewed against Boris Cherny, HumanLayer/Dex Horthy best practices. Known deliberate divergences documented in D-327.
 -->
 
-# CLAUDE.md — Pathways OI Trust | v2.0 | April 2026 | CONFIDENTIAL
+# CLAUDE.md — Pathways OI Trust | v2.1 | April 2026 | CONFIDENTIAL
 
 ---
 
@@ -21,10 +24,8 @@
 Read these documents in order before writing any code or calling any tool. Verify each exists at the expected path — if any are missing, stop and report before proceeding.
 
 1. `docs/standards-summary.md`
-2. `docs/design-principles.md`
-3. `docs/decision-registry.md`
-4. `docs/visual-layout-standards.md`
-5. Current build spec (e.g. `docs/build-c-spec.md`)
+2. `docs/decision-registry.md`
+3. Current build spec (e.g. `docs/build-c-spec.md`)
 
 Read decision-registry.md for content lookup only. Never claim or assign a D-number — D-number assignment happens outside Code sessions.
 
@@ -330,4 +331,4 @@ Binary test: every migration followed write → display → confirm? Yes = compl
 
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | v2.0*
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | v2.1*

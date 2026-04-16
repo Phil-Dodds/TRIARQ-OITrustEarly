@@ -1,4 +1,4 @@
-<!-- standards-summary.md — Pathways OI Trust | v1.1 | April 2026 | CONFIDENTIAL
+<!-- standards-summary.md — Pathways OI Trust | v1.2 | April 2026 | CONFIDENTIAL
      Version history:
        v1.0 April 2026: Initial file. S-001 through S-014.
        v1.1 April 2026: Added S-015 through S-019. Removed standards.md reference (wrong
@@ -7,10 +7,17 @@
             Applied D-330 (governing references to HTML), D-331 (rationale in HTML,
             Question/Root format), D-333 template (Rule, Conformance test, Exceptions,
             Non-conformance handling). Rule reference updated: Rule 4 → Rule 2.
-            Source: Governance session 2026-04-15. -->
+            Source: Governance session 2026-04-15.
+       v1.2 April 2026: Added S-020 through S-027. Migrated from docs/design-principles.md
+            (now retired): S-020 Feature Stage Advancement Check, S-021 Tappable Entity Chips,
+            S-022 Entity Picker Pattern, S-023 Destructive Action Confirmation, S-024 Entity
+            Name Capitalization, S-025 UI Feedback Patterns, S-026 Sidebar-Only Navigation,
+            S-027 Implementation Status Updates. Applied D-335 rationale template
+            (Why/Considered/Downsides) to all new standards. Source: Governance session
+            2026-04-15. -->
 
 # Standards Summary — Pathways OI Trust
-docs/standards-summary.md | v1.1 | April 2026 | CONFIDENTIAL
+docs/standards-summary.md | v1.2 | April 2026 | CONFIDENTIAL
 
 Read this file at every session start. Active Standards carry the same force as
 Non-Negotiable Architectural Rules. A spec element that conflicts with an Active
@@ -586,5 +593,363 @@ Edit open in the same slot as View without navigation? (Yes = pass.) Is a scrim 
 while Edit is open? (Yes = pass.) Does ESC/Cancel with unsaved changes trigger the
 dirty-state prompt? (Yes = pass.) Does successful save return to View state? (Yes =
 pass.) Any failure = violation.
+
+**Exceptions:** None.
+---
+
+<!-- RATIONALE:
+Why: Without an explicit check at session close, dev status labels silently become stale.
+  A feature showing "Not Started" that is actually in UAT misleads Phil and any session
+  that reads sidebar state.
+Considered: Enforce via automated test (not feasible without persistent state); rely on
+  spec authoring to keep status current (fails between spec and build); explicit Code
+  obligation at session close (chosen — lowest friction, matches existing CodeClose pattern).
+Downsides: Check is only as reliable as Code's compliance. A rushed session close may
+  skip it. Watch for: CodeClose outputs that contain no stage check entry when features
+  were modified — that is a compliance gap, not a clean session.
+-->
+<!-- GOVERNING: D-208 -->
+### S-020 — Feature Stage Advancement Check
+
+**Rule:** At the end of every session where features have been built or modified, review
+`devStatus` in `NAV_ITEMS` and flag any feature that appears ready to advance. Do not
+advance `devStatus` without explicit confirmation. Format the flag as:
+`"Stage check: [Feature] may be ready to advance from [current] to [next]. Reason:
+[one sentence]. Want me to update it?"`
+
+Advancement signals:
+- `not-started` → `pilot`: Route, component, and MCP tool exist and are deployed.
+  Basic happy path works.
+- `pilot` → `uat`: Feature used with real data. Core flows work end-to-end.
+  Blocked states handled.
+- `uat` → `live`: Phil has reviewed. Acceptance criteria from Build Spec are met.
+  No known blockers.
+
+**Conformance test:** Does every session close where features were built or modified
+include a stage check entry in CodeClose? Yes = pass. Absent = violation.
+
+**Exceptions:** None.
+
+---
+
+<!-- RATIONALE:
+Why: Plain text entity references cannot fulfill the right-panel navigation contract
+  (S-005, S-018). A user seeing "Dave Chen" as plain text has no signal that it is
+  actionable. Chips are the visual contract that a reference opens detail.
+Considered: Underline-on-hover (insufficient signal, accessibility concern);
+  icon-only tap target (not scannable); chip with full entity name and avatar (chosen —
+  matches MD3 chip pattern, visually distinct from data text).
+Downsides: Chip rendering adds layout complexity — multiple chips in a single cell
+  require wrapping logic. Inactive entity chips still render, which may confuse users
+  who expect inactive items to be invisible. Governed by Rule 3.
+-->
+<!-- GOVERNING: D-181, S-005, S-018 -->
+### S-021 — Tappable Entity Chips
+
+**Rule:** Every named entity reference in a list row, detail panel, or form renders as
+a tappable chip — never plain text. An entity reference is any field value that names
+a specific system record: Division, Workstream, user (DS, CB, approver, actor), Gate,
+or OI Library artifact.
+
+Visual treatment: pill shape (`border-radius: var(--radius-pill)`), muted background
+(`--triarq-color-fog` at low opacity), initials avatar or type icon on left, Roboto
+body size. Hover: background darkens, cursor pointer.
+
+Tap behavior: opens referenced entity's detail in the right panel per S-018. Does not
+navigate away from the current screen.
+
+Inactive or inaccessible entities: chip still renders. Tap shows read-only summary
+only — no action buttons. Never hide a chip because the entity is inactive.
+
+Multiple references in one field: render as separate chips inline. Do not concatenate
+to plain text.
+
+Picker selections: after selection via picker, selected value renders as chip (with
+remove ✕ for editable fields), not as plain text in an input.
+
+**Conformance test:** Does any named entity reference render as plain text in a list
+row, detail panel, or form? Yes = violation. All entity references as chips = pass.
+
+**Exceptions:** None.
+
+---
+
+<!-- RATIONALE:
+Why: A plain dropdown for entity selection hides attributes the user needs to make
+  the correct choice — status, ownership, capacity. Selecting the wrong DS or Workstream
+  because the dropdown showed only names produces downstream gate failures.
+Considered: Augmented dropdown with subtitle (too constrained for search, scope, inactive
+  handling); full modal picker (breaks right-panel spatial model); inline expandable
+  picker in the form (chosen — stays in context, supports scope, search, inactive rows).
+Downsides: EntityPickerComponent is a complex shared component. Misconfigured inputs
+  produce subtle bugs (wrong scope, wrong search behavior). The reference implementation
+  (WorkstreamPickerComponent) must be consulted before building any new picker instance.
+  Watch for: new picker built as standalone component instead of configuring
+  EntityPickerComponent — that is a violation.
+-->
+<!-- GOVERNING: D-182 -->
+### S-022 — Entity Picker Pattern
+
+**Rule:** When a form field requires selection of a named entity with attributes
+relevant to the correct choice, use an entity picker — not a plain dropdown. Use a
+dropdown only for short flat lists of scalar values (under ~8 items, all valid,
+unambiguous without context).
+
+Picker structure (sections omitted when not applicable):
+```
+┌──────────────────────────────────────────┐
+│ Select [Entity Type]           [✕ Close] │
+├──────────────────────────────────────────┤
+│ Scope: ○ [Tightest — default]            │
+│        ○ [Wider]  ○ [Widest]             │
+├──────────────────────────────────────────┤
+│ 🔍 Search…                               │
+├──────────────────────────────────────────┤
+│ [Avatar · Name · Attr · Status]          │
+│ [Inactive row: dimmed, ⊘ badge]          │
+├──────────────────────────────────────────┤
+│ Selected: [chip with key attributes]     │
+├──────────────────────────────────────────┤
+│                      [Cancel] [Confirm]  │
+└──────────────────────────────────────────┘
+```
+
+Scope rules: default is tightest relevant scope. Picker never auto-expands on no
+results — show "No results in this scope" with scope radio visible. Scope radio always
+visible when multiple scopes exist.
+
+Search rules: always present. Client-side filtering for lists under ~100 records.
+Debounced server query for larger scopes: `PICKER_SEARCH_DEBOUNCE_MS = 600` — defined
+once as a shared constant, never hardcoded. Loading state during query: skeleton rows
+in list area; search field stays active.
+
+Entity rows: `[Avatar] [Name] [Key attr 1] [Key attr 2] [Status badge]`. Active first,
+inactive dimmed at bottom. Tapping inactive: blocked message inline, picker stays open.
+
+Echo section: selected entity as chip with key attributes. Tapping a row updates
+echo — does not close picker. Confirm commits. Cancel discards.
+
+Implementation: `EntityPickerComponent` is implemented once as a shared configurable
+component. Never reimplemented per entity type. `WorkstreamPickerComponent` is the
+reference implementation.
+
+**Conformance test:** Does every entity picker use `EntityPickerComponent`? Is
+`PICKER_SEARCH_DEBOUNCE_MS` referenced as a constant rather than hardcoded? Does the
+picker default to tightest scope? Does scope expansion require deliberate user action?
+All yes = pass. Any no = violation.
+
+**Exceptions:** None.
+
+---
+
+<!-- RATIONALE:
+Why: Irreversible actions executed without computing downstream impact first produce
+  cascading failures the user did not understand they were triggering. A generic
+  "Are you sure?" gives no actionable information.
+Considered: Modal confirmation dialog (breaks inline spatial model, D-183 Rule 3);
+  inline preview then confirm (chosen — user sees impact before committing, cancel
+  remains available); undo after execution (not feasible for gate approvals and
+  stage regressions — impact is immediate on downstream records).
+Downsides: Two-call pattern adds one MCP round-trip before execution. For large
+  Workstream inactivations this may take a moment. Skeleton loading in the preview
+  area covers this. Watch for: operations that skip the preview call and execute
+  directly — that is a violation regardless of how small the impact seems.
+-->
+<!-- GOVERNING: D-183 -->
+### S-023 — Destructive Action Confirmation
+
+**Rule:** Any action that cannot be automatically reversed requires explicit two-step
+confirmation stating what will change before the user commits.
+
+Confirmation message must state the specific effect, not just "are you sure":
+- Gate approval: "Approving this Gate will advance the Delivery Cycle to [NEXT STAGE].
+  This cannot be undone without a stage regression."
+- Stage regression: "Regressing to [STAGE] will reset Gates: [list]. Each must be
+  resubmitted."
+- Workstream inactivation: "Inactivating will block Gate advancement on [N] active
+  Cycles. Each must be reassigned before its next Gate can be approved."
+
+Two-call pattern for operations with computed downstream effects: first MCP call
+returns a preview of what will change; second call with `confirmed: true` executes.
+UI renders preview before showing the confirm button.
+
+Confirmation renders inline within the current form or panel — never a modal dialog.
+Cancel is available until the Tier 3 loading overlay takes over on the second call.
+
+"Cannot be undone" means no automatic rollback — not permanent impossibility. Use
+"This cannot be undone without [correction path]." Never say "permanent."
+
+**Conformance test:** Does every irreversible action state the specific effect before
+asking for confirmation? Does confirmation render inline (not as a modal)? Do
+operations with downstream effects use the two-call preview pattern? All yes = pass.
+Any no = violation.
+
+**Exceptions:** None.
+
+---
+
+<!-- RATIONALE:
+Why: Inconsistent capitalization breaks the visual contract between UI labels and
+  system entity names. "No delivery cycles found" reads as generic description;
+  "No Delivery Cycles found" reads as a named system entity. The distinction matters
+  for comprehension and for Code knowing what is a system entity vs. a noun.
+Considered: All-caps entity names (too heavy, conflicts with MD3 typography);
+  lowercase everywhere (loses entity identity signal); capitalized in UI labels only
+  (chosen — applies to every user-facing text surface; TypeScript identifiers exempt).
+Downsides: Rule requires judgment about whether a usage is a UI label or conceptual
+  explanation. The test ("could you substitute it as a UI label?") handles most cases
+  but edge cases exist. Watch for: inconsistent application in MCP error messages,
+  which are easy to overlook.
+-->
+<!-- GOVERNING: D-184 -->
+### S-024 — Entity Name Capitalization
+
+**Rule:** Named system entities are capitalized in all user-facing text. General-purpose
+nouns describing the same concept are not.
+
+Test: if you could substitute the entity name as a UI label ("View all Delivery
+Cycles"), capitalize it. If it appears in a conceptual explanation where any instance
+could be substituted ("a delivery cycle is a unit of work"), use lowercase.
+
+Capitalized entities: Division, Workstream, Delivery Cycle, Gate, Artifact, OI Library,
+Delivery Workstream, Context Brief, Build Report, Action Queue, Stage Track, Trust,
+Milestone.
+
+Applies to: Angular component templates, error messages, empty states, loading state
+labels, hub card descriptions, MCP error messages returned to the UI, form field
+labels, table column headers.
+
+Does not apply to: TypeScript variable names, database column names, MCP parameter
+names, schema identifiers.
+
+**Conformance test:** Does every user-facing reference to a named system entity use
+capitalized form in UI labels and error messages? Does any UI label use lowercase for
+a named entity? All capitalized = pass. Any lowercase UI label for a named entity =
+violation.
+
+**Exceptions:** TypeScript identifiers, schema column names, MCP parameter names.
+
+---
+
+<!-- RATIONALE:
+Why: Without a named standard, Code invents a fourth feedback pattern for each new
+  edge case encountered. Over time this produces visually inconsistent surfaces where
+  users cannot reliably interpret whether a signal is informational, a warning, or
+  an error.
+Considered: Single-pattern system (insufficient — guidance, warning, and error have
+  meaningfully different visual weights and user responses); per-surface ad hoc
+  patterns (produces drift); three named patterns with locked visual treatments
+  (chosen — covers the full range, enforced by "no fourth pattern without a decision").
+Downsides: Three patterns requires Code to make a classification judgment for each
+  new feedback element. Classification errors (guidance styled as warning) are
+  invisible to a conformance test — only UAT catches them. Watch for: amber treatment
+  on informational content, or gray treatment on blocking errors.
+-->
+<!-- GOVERNING: D-200 -->
+### S-025 — UI Feedback Patterns
+
+**Rule:** Every form, panel, and screen uses exactly three visual feedback patterns.
+No new patterns without a locked design decision.
+
+**Pattern 1 — Field Guidance (gray sub-text)**
+For: helpful context about when or why a field matters. Not a warning. Not an error.
+- Color: `--triarq-color-stone`
+- Size: one step below field label
+- Position: directly below input field, above next field
+- No icon, no background, no border
+
+**Pattern 2 — Warning (amber)**
+For: condition requiring attention that does not block the current action.
+- Left border: 3px solid `--triarq-color-sunray`
+- Background: `--triarq-color-sunray` at 8% opacity
+- Text: standard body color (not amber)
+- Icon: ⚠ amber, left-aligned
+- Position: inline where condition exists — never a floating overlay
+
+**Pattern 3 — Error (red)**
+For: validation failure that blocks the current action.
+- Field border: 2px solid system error color
+- Error message: system error color, below the field
+- Icon: ✕ or ⚠ in error color
+- Position: adjacent to the field that failed validation
+
+Before adding any new feedback element, identify which pattern applies. If none fits,
+surface as a new design decision — do not invent inline.
+
+**Conformance test:** Does every feedback element use one of the three named patterns?
+Is there any feedback element that does not map to Pattern 1, 2, or 3? Any unmapped
+element = violation. All mapped = pass.
+
+**Exceptions:** None.
+
+---
+
+<!-- RATIONALE:
+Why: Without a declared navigation authority, builds add top nav bars, breadcrumbs,
+  and secondary navigation surfaces that conflict with the port-time host shell.
+  At port time, OI Trust loads into QPathways as a Native Federation remote — the host
+  shell provides outer chrome. Internal navigation must be self-contained and
+  non-conflicting.
+Considered: Top nav bar + sidebar (two authorities, conflicts at port); breadcrumbs
+  (redundant with right-panel stack model, adds visual noise); sidebar only (chosen —
+  single authority, collapses cleanly into host shell at port time).
+Downsides: Sidebar grows as builds add surfaces. Section headers are the scaling
+  mechanism — but grouping decisions require Design judgment. Watch for: primary
+  actions (+ New Cycle) added to the sidebar — they belong in the content area header.
+-->
+<!-- GOVERNING: D-199 -->
+### S-026 — Sidebar-Only Navigation
+
+**Rule:** OI Trust uses sidebar-only navigation. No top navigation bar. The sidebar
+is the single navigation authority for the application.
+
+All navigation lives in the left sidebar. As sidebar items grow, group under section
+headers — never move items to a top bar. Implement section headers at 7 or more items.
+Section headers use muted uppercase label styling and carry no navigation target.
+
+Current grouping model:
+- *(no header)* — Home, Action Queue, Notifications
+- **OI Library** — OI Library
+- **Delivery** — Delivery Cycle Tracking, Gates, Workstreams
+- **Admin** — User Management, System Health, Admin
+
+Primary actions (+ New Cycle and equivalents) live in the content area header — never
+in the sidebar.
+
+**Conformance test:** Is there any navigation element outside the left sidebar (top
+bar, secondary nav, breadcrumb trail)? Yes = violation. Are primary action buttons
+present in the sidebar? Yes = violation. All navigation in sidebar = pass.
+
+**Exceptions:** Port-time host shell provides outer chrome — OI Trust sidebar is
+internal to the remote and does not conflict with host-level navigation.
+
+---
+
+<!-- RATIONALE:
+Why: Without a Code-side obligation to update impl_status, the field drifts — decisions
+  remain "specced" after Code has built them, making coverage tracking unreliable.
+  Design cannot know what has been built without session archaeology.
+Considered: Design tracks impl_status entirely (Design cannot see what Code built
+  without CodeClose); Code tracks everything (Code cannot reliably set "verified" —
+  that requires Phil); shared obligation with clear role boundaries (chosen).
+Downsides: Code must remember to update impl_status in the same commit as
+  implementation. A missed update is invisible until the next Design session audits
+  coverage. Watch for: decisions stuck at "specced" after multiple Code sessions
+  have passed — likely a compliance gap.
+-->
+<!-- GOVERNING: D-186 -->
+### S-027 — Implementation Status Updates
+
+**Rule:** When Claude Code completes implementation of a decision's acceptance
+criteria, update `impl_status` from `specced` to `built` in `decisions-active.md`
+in the same commit. If no `impl_status` field exists on the decision, add it as
+`unspecced` before advancing.
+
+Do not set `impl_status: verified` speculatively. Phil confirms directly, or Code
+reports "acceptance criteria met" and Phil confirms in the next session.
+
+**Conformance test:** After implementing a decision, is `impl_status` updated to
+`built` in the same commit? Yes = pass. Any decision implemented without status
+update = violation.
 
 **Exceptions:** None.

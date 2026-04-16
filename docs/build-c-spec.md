@@ -386,7 +386,7 @@ DELIVERY     Delivery Cycle Tracking
 ADMIN        Admin
 ```
 
-`Delivery Cycle Tracking` visible to all roles (`roles: 'all'`) per build-c-decisions.md. `Admin` visible to phil and admin roles only (D-164).
+`Delivery Cycle Tracking` visible to all roles (`roles: 'all'`) per D-310. `Admin` visible to phil and admin roles only (D-311).
 
 ### 5.2 AppComponent — Bootstrap Sequence (D-MaintenanceMode)
 
