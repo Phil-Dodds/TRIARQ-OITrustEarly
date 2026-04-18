@@ -1,7 +1,8 @@
-<!-- CLAUDE.md — Pathways OI Trust | v2.1 | April 2026 -->
+<!-- CLAUDE.md — Pathways OI Trust | v2.2 | April 2026 -->
 <!-- Version history:
   v1.0 March 2026: Initial file. Design Session A. Arch rules, security, coding standards, design tokens. Source: D-93, D-130–D-153.
   v1.1 2026-04-14: Added Output Style — Caveman Mode. Source: D-325.
+  v2.2 2026-04-17: Added Rule 23 (D-333 Template Conformance Check). Source: D-336, Session 2026-04-17.
   v2.1 2026-04-15: Rationale block labels updated per D-334 and D-335.
     Question/Root → Why. Balance/Dirt → Considered/Downsides.
     Source: Governance session 2026-04-15.
@@ -15,7 +16,7 @@
     Governance: reviewed against Boris Cherny, HumanLayer/Dex Horthy best practices. Known deliberate divergences documented in D-327.
 -->
 
-# CLAUDE.md — Pathways OI Trust | v2.1 | April 2026 | CONFIDENTIAL
+# CLAUDE.md — Pathways OI Trust | v2.2 | April 2026 | CONFIDENTIAL
 
 ---
 
@@ -331,4 +332,45 @@ Binary test: every migration followed write → display → confirm? Yes = compl
 
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | v2.1*
+### Rule 23 — D-333 Template Conformance Check
+<!-- RATIONALE:
+     Why: Rules accumulate without required template sections when authoring is rushed
+       or the template standard postdates older rules. Code acting on a rule missing a
+       Conformance test or Exceptions declaration makes implicit assumptions that may
+       contradict Design intent. The check makes the gap visible before it becomes
+       silent compliance drift.
+     Considered: Session-start scan of all rules (rejected — burns instruction budget
+       on rules not applied that session, no protective value beyond triggered check);
+       verbatim default text per rule (rejected — ~45 boilerplate lines, diminishing
+       returns on instruction budget per research findings); hooks enforcement (not
+       applicable — judgment behavior, not deterministic).
+     Downsides: Cannot enforce itself — 80% compliance ceiling applies. Watch for:
+       HTML-only candidates that never surface to Design for retrofit; Conformance test
+       flags noted in CodeClose but not routed back.
+-->
+<!-- GOVERNING: D-333, D-328, D-329, D-330, D-331 -->
+
+When applying any rule in this file or in any file listed in the Session Initialization
+block above, verify the rule contains the required D-333 template sections before
+acting on it.
+
+Required sections — readable: Rule, Conformance test, Exceptions.
+Required sections — HTML: RATIONALE block (Why / Considered / Downsides), GOVERNING block.
+
+Tiered response when a section is missing:
+
+| Missing section | Response |
+|---|---|
+| RATIONALE or GOVERNING (HTML only) | Continue. Record as candidate in CodeClose. |
+| Conformance test | Flag before acting. State which test is absent. Surface to Design. |
+| Exceptions | Flag before acting. Same handling as missing Conformance test. |
+| Non-conformance handling | Continue. Apply Non-Conformance Handling Default. |
+
+Binary test: when applying a rule, were all four section types checked and findings
+handled per the tiered response above? Yes = compliant.
+
+Exceptions: None.
+
+---
+
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | v2.2*
