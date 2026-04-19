@@ -1,23 +1,4 @@
-<!-- standards-summary.md — Pathways OI Trust | v1.3 | April 2026 | CONFIDENTIAL
-     Version history:
-       v1.0 April 2026: Initial file. S-001 through S-014.
-       v1.1 April 2026: Added S-015 through S-019. Removed standards.md reference (wrong
-            audience — Code cannot access it). Removed S-004 (Design meta-standard, not
-            actionable by Code). Removed Maintenance Rule (Design instruction, wrong audience).
-            Applied D-330 (governing references to HTML), D-331 (rationale in HTML,
-            Question/Root format), D-333 template (Rule, Conformance test, Exceptions,
-            Non-conformance handling). Rule reference updated: Rule 4 → Rule 2.
-            Source: Governance session 2026-04-15.
-       v1.2 April 2026: Added S-020 through S-027. Migrated from docs/design-principles.md
-            (now retired): S-020 Feature Stage Advancement Check, S-021 Tappable Entity Chips,
-            S-022 Entity Picker Pattern, S-023 Destructive Action Confirmation, S-024 Entity
-            Name Capitalization, S-025 UI Feedback Patterns, S-026 Sidebar-Only Navigation,
-            S-027 Implementation Status Updates. Applied D-335 rationale template
-            (Why/Considered/Downsides) to all new standards. Source: Governance session
-            2026-04-15.
-       v1.3 April 2026: Rationale label retrofit on S-001 through S-019.
-            Question/Root → Why, Balance → Considered, Dirt → Downsides.
-            Source: D-334, D-335, Session 2026-04-18. -->
+
 
 # Standards Summary — Pathways OI Trust
 docs/standards-summary.md | v1.3 | April 2026 | CONFIDENTIAL
@@ -56,17 +37,6 @@ Before writing any component or interaction:
 
 ## Active Standards
 
-<!-- RATIONALE:
-     Why: Users arrive at surfaces from many entry points without carrying
-       context from where they came. A surface that doesn't declare what it is forces
-       the user to reconstruct context mentally.
-     Considered: Novice-first default serves all users at onboarding and remains harmless
-       to expert users. Cost of visible context to an expert is low; cost of absent
-       context to a novice is high.
-     Downsides: Does not define how much context is enough — a one-word label technically
-       complies. Content quality within the pattern is not governed here.
--->
-<!-- GOVERNING: D-140 -->
 ### S-001 — Visible Context on Every Surface
 
 **Rule:** Every screen shows: what this is (context), why it matters (purpose), and
@@ -83,17 +53,6 @@ blocked and what must change? All yes = pass. Any no = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Delivery Cycles have a 12-stage lifecycle with 5 named gates.
-       A text status field answers "where are we now" but not "how far along" or
-       "what's next."
-     Considered: Visual lifecycle component takes horizontal space and has a minimum
-       legible width. Graceful degradation on narrow viewports preserves orientation
-       while sacrificing gate-level detail.
-     Downsides: Component is presentation-only. Answers "where" but not "what to do next."
-       That gap is intentional — a different surface owns next actions.
--->
-<!-- GOVERNING: ARCH-25 -->
 ### S-002 — Stage Track UI Pattern
 
 **Rule:** Apply StageTrackComponent when: (1) the record has a defined lifecycle with
@@ -117,18 +76,6 @@ no = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Bare generic nouns create ambiguity at every level. A field called
-       "date" in a schema leaves every reader guessing which date. In a system with many
-       entities and many dates, statuses, and IDs, bare nouns accumulate into a
-       maintenance and comprehension burden.
-     Considered: Rule applies universally including to identifiers that seem unambiguous
-       in context — a table called "gate_records" with a column called "status" seems
-       readable in context but loses that context in a JOIN result.
-     Downsides: Governs form (every identifier must be qualified) but not quality — a field
-       called "approval_date" when it records submission time technically complies but
-       misleads.
--->
 ### S-003 — No Bare Generic Nouns
 
 **Rule:** Field names, column headers, UI labels, and schema identifiers must never be
@@ -147,18 +94,6 @@ violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Without a universal pattern, each entity surface gets designed
-       independently — producing inconsistent information architecture, inconsistent
-       action placement, and inconsistent edit behavior. Users build no transferable
-       mental model.
-     Considered: A universal pattern constrains entity-specific design freedom. Exceptions
-       can be declared with a decision number — the pattern is the default, exceptions
-       require justification.
-     Downsides: Defines structure but not content — field selection, grouping, and ordering
-       within View and Edit are entity-specific and must be specced per entity.
--->
-<!-- GOVERNING: ARCH-27, D-183 -->
 ### S-005 — Universal Entity Detail Pattern
 
 **Rule:** Every named entity has exactly one canonical View surface and one canonical
@@ -185,17 +120,6 @@ row tappable = pass. Any failure = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: When entity detail surfaces open in disconnected or replacement
-       states, users lose their place and have no reliable return path. Especially
-       damaging on mobile.
-     Considered: Strict stack means users navigate back through every level they opened —
-       no jump-to-top shortcut. Deep stacks signal that information architecture needs
-       simplification — the standard creates useful design pressure.
-     Downsides: Maximum stack depth is not defined. A user drilling four or five levels deep
-       has four or five back-taps to return. Known cost accepted at adoption.
--->
-<!-- GOVERNING: D-199, ARCH-27 -->
 ### S-006 — Entity Detail Navigation Stack
 
 **Rule:** Entity detail navigation uses a push/pop stack. Every drill-in pushes; back
@@ -224,19 +148,6 @@ All yes (and no to last) = pass. Any failure = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Without an explicit reuse rule, each new context where an entity
-       appears becomes an opportunity to build a slightly different view — tuned for
-       that context but diverging from the canonical surface. Over time this produces
-       multiple views that drift apart.
-     Considered: Strict reuse means the canonical surface must serve all contexts, creating
-       pressure to design it well upfront. Context-specific exceptions require a decision
-       number.
-     Downsides: Canonical surface must handle permission-driven variation — same View shows
-       different actions to different roles. Adds complexity that a context-specific
-       surface would avoid. Accepted cost of reuse.
--->
-<!-- GOVERNING: ARCH-27, S-005 -->
 ### S-007 — Reuse Before Build
 
 **Rule:** When an entity already has a canonical View or Edit surface, that surface is
@@ -252,17 +163,6 @@ pass.
 
 ---
 
-<!-- RATIONALE:
-     Why: A parent surface that doesn't refresh after a child session may
-       display stale data — a cycle that was just cancelled still showing as active.
-       Stale state erodes trust in the system.
-     Considered: Unconditional refresh means every back navigation triggers a re-query
-       including cancels where nothing changed. Query load and potential flicker
-       accepted at the scale this system operates.
-     Downsides: Requires re-query but does not specify scope — full list, affected row only,
-       or something in between. Implementation detail left to per-surface spec.
--->
-<!-- GOVERNING: S-005, S-006 -->
 ### S-008 — Parent Refresh on Return
 
 **Rule:** Every stack pop (Edit → View, View → list, sub-surface → parent) triggers an
@@ -281,19 +181,6 @@ navigation returns? All refresh = pass. Any stale state = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: A cancelled item is operationally gone from the user's perspective.
-       Showing cancelled items by default pollutes the working surface with noise the
-       user has explicitly decided to retire.
-     Considered: Hide-by-default means users who regularly investigate cancelled items must
-       toggle the reveal on every visit — no sticky option. Population of users who want
-       a clean active-only view is everyone; population who regularly investigate
-       cancelled items is small.
-     Downsides: Governs list and grid surfaces but not summary counts and aggregate metrics —
-       those are explicitly out of scope. Two adjacent surfaces could give inconsistent
-       impressions.
--->
-<!-- GOVERNING: D-183, D-171 -->
 ### S-009 — Cancelled Item Visibility
 
 **Rule:** Cancelled items are excluded from all list and grid surfaces by default,
@@ -315,16 +202,6 @@ prior session state? Is there any surface writing the cancelled reveal state to
 
 ---
 
-<!-- RATIONALE:
-     Why: A persistent filter bar consumes vertical space on every screen load
-       even when filters are not in use.
-     Considered: Slide-in panel adds one tap to open filters vs. always-visible controls.
-       Majority of screen loads do not require filtering — clean default is more valuable
-       than saving one tap for the minority that do filter.
-     Downsides: Surfaces where filtering is the primary activity may warrant always-visible
-       controls. Any such exception requires a named decision.
--->
-<!-- GOVERNING: D-HubFilter-2026-04-06 -->
 ### S-010 — Filter Panel Structure
 
 **Rule:** Every filterable list or grid surface uses a slide-in filter panel, collapsed
@@ -339,17 +216,6 @@ panel? All yes = pass. Any no = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Real-time filtering fires a server query on every selection change.
-       With six filters and multiple options per filter, a user building a compound
-       filter set would trigger 5–10 queries before reaching their intended state.
-     Considered: Batch filtering requires an explicit Apply tap. Users accustomed to
-       real-time behavior may expect immediate results — Apply button must be prominent.
-     Downsides: Clear all resets but does not query — grid continues showing previously
-       filtered result until Apply is tapped. Deliberate choice but can feel
-       inconsistent.
--->
-<!-- GOVERNING: D-HubFilter-2026-04-06, D-171 -->
 ### S-011 — Filter Panel Commit Model
 
 **Rule:** Filter selections do not trigger queries in real time. Panel has two action
@@ -366,17 +232,6 @@ Any failure = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Active filters that are only visible inside the closed filter panel
-       are invisible — users forget what filters are set and cannot tell why the grid
-       shows fewer rows.
-     Considered: "Name: Value" chip label adds width vs. value-only chips. Accepted —
-       value-only chips are ambiguous when multiple filters are active simultaneously.
-     Downsides: Chips use display_name_short for Division and Workstream values. If
-       display_name_short is not yet populated, chip falls back to full name and may
-       be wider than the design assumes.
--->
-<!-- GOVERNING: D-HubFilter-2026-04-06, D-203 -->
 ### S-012 — Active Filter Chips
 
 **Rule:** Active filters render as dismissible chips in a bar below the grid header,
@@ -392,17 +247,6 @@ bar absent when no filters are active? All yes = pass. Any no = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Showing all filter options expanded simultaneously produces a long
-       panel requiring scroll before the user can see all available filters.
-     Considered: Drill-in requires two taps to change a filter vs. one tap on a visible
-       checkbox. Compact overview of all filters judged more valuable than saving one
-       tap per filter change.
-     Downsides: One-at-a-time expansion means a user setting three filters must open and
-       close each drill-in separately. Revisit if UAT shows users struggling with this
-       constraint.
--->
-<!-- GOVERNING: D-HubFilter-2026-04-06, D-HubFilter-Division, D-HubFilter-AssignedPerson, D-HubFilter-Tier -->
 ### S-013 — Filter Drill-in Pattern
 
 **Rule:** Each filter row shows name and current value, collapsed. Tapping expands
@@ -418,20 +262,6 @@ All correct = pass. Any failure = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Without a named component library, Code makes component-level
-       judgment calls on every new surface — input field heights, focus rings, motion
-       timing, disabled states. These accumulate invisibly and produce visual
-       inconsistency.
-     Considered: Adopting a component library means accepting its defaults where OI Trust
-       hasn't specified differently. Some MD3 defaults may not match TRIARQ brand
-       standards — OI Trust decisions and Active Standards override; MD3 fills what
-       they don't cover.
-     Downsides: Angular Material's component API may constrain some OI Trust design choices.
-       When it does, Code surfaces as a CC-decision rather than working around it
-       silently.
--->
-<!-- GOVERNING: D-274 -->
 ### S-014 — Component Library Baseline: Angular Material (Material Design 3)
 
 **Rule:** OI Trust uses Angular Material (MD3) as the default component library. Where
@@ -448,17 +278,6 @@ candidate? Yes to either = pass. Any silent invention = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Orienting text — surface descriptions and zone explanations —
-       serves a supporting role. When it renders at the same size and weight as data and
-       field labels, it competes visually and adds noise.
-     Considered: 11px italic at #5A5A5A (Stone) on white meets minimum contrast for
-       supplementary text — readable but clearly secondary. Going smaller or lighter
-       sacrifices legibility; going larger or darker undermines visual hierarchy.
-     Downsides: Governs style, not content quality. An orienting text block can conform while
-       being unhelpful or misleading.
--->
-<!-- GOVERNING: D-284, D-288 -->
 ### S-015 — Secondary Orienting Text Style
 
 **Rule:** Text that orients the user to a surface or zone without being data renders at
@@ -480,17 +299,6 @@ Any failure = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Without a standard, Create forms are candidates for modal dialogs
-       or page replacements. OI Trust uses the right panel for View and Edit — a Create
-       form that opens differently breaks the spatial model users have learned.
-     Considered: Right-panel Create means the user can see the list behind while creating,
-       providing context. The panel covers part of the list — context benefit judged
-       higher than coverage cost.
-     Downsides: Governs where the form opens, not its internal layout or field order. Content
-       quality of Create forms is governed by entity-specific specs.
--->
-<!-- GOVERNING: D-290, D-180, S-005 -->
 ### S-016 — Create Surface Panel Behavior
 
 **Rule:** New entity creation forms open in the right panel with the originating list
@@ -506,19 +314,6 @@ failure = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: View panels are read-only orientation surfaces — allowing list
-       navigation while in View reduces friction for comparing records. Edit and Create
-       panels involve in-progress data entry — allowing list navigation while editing
-       creates disorientation and data loss risk.
-     Considered: Scrim on Edit/Create adds visual weight and blocks list access. Accepted —
-       users cannot accidentally navigate away from unsaved work, and the dirty-state
-       check gives a clean escape path.
-     Downsides: Dirty-state check requires each Edit and Create panel to implement isDirty()
-       comparing form state against loaded values. A panel that always returns
-       isDirty() = false technically complies but defeats the purpose.
--->
-<!-- GOVERNING: D-292, D-291, S-005, S-006 -->
 ### S-017 — Panel Modality by Surface Type
 
 **Rule:** View panels are non-modal — the originating list remains visible and
@@ -537,18 +332,6 @@ Any failure = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Without a named pattern, every spec must re-derive where tapping a
-       row goes and what state the panel opens in. Two failure modes observed: Code
-       inventing panel behavior not in the spec, and specs specifying the same behavior
-       redundantly across surfaces.
-     Considered: Making View non-modal keeps the list accessible while reading entity
-       detail — aids comparison and orientation. On narrow viewports this requires
-       layout adaptation — orientation benefit judged higher than layout cost.
-     Downsides: Governs entry and modality, not panel content. Field set, zone layout, and
-       entity-specific display rules are per-entity specs.
--->
-<!-- GOVERNING: D-308, D-180, S-005, S-006 -->
 ### S-018 — List → View Pattern
 
 **Rule:** Tapping any entity row or entity chip in a list opens that entity's detail in
@@ -567,19 +350,6 @@ button? (Yes = fail — View is read-only.) Any failure = violation.
 
 ---
 
-<!-- RATIONALE:
-     Why: Edit surfaces require a distinct entry point from View — users
-       should not accidentally trigger edit mode by browsing. The Edit button in the
-       View header is the single explicit entry point.
-     Considered: Opening Edit in-place means the user cannot reference View state while
-       editing. Accepted — the list (visible in non-edit states) provides ambient
-       context, and most edit operations on admin entities are intentional corrections
-       rather than comparative reviews.
-     Downsides: Governs pattern structure — slot reuse, modality, dirty-state check,
-       post-save return. Does not govern the Edit form's field set, which fields are
-       editable, or validation behavior. Those are per-entity concerns.
--->
-<!-- GOVERNING: D-291, D-292, S-016, S-017, S-018 -->
 ### S-019 — View → Edit Pattern
 
 **Rule:** From any View panel opened via S-018, an Edit button in the sticky panel
@@ -600,18 +370,6 @@ pass.) Any failure = violation.
 **Exceptions:** None.
 ---
 
-<!-- RATIONALE:
-Why: Without an explicit check at session close, dev status labels silently become stale.
-  A feature showing "Not Started" that is actually in UAT misleads Phil and any session
-  that reads sidebar state.
-Considered: Enforce via automated test (not feasible without persistent state); rely on
-  spec authoring to keep status current (fails between spec and build); explicit Code
-  obligation at session close (chosen — lowest friction, matches existing CodeClose pattern).
-Downsides: Check is only as reliable as Code's compliance. A rushed session close may
-  skip it. Watch for: CodeClose outputs that contain no stage check entry when features
-  were modified — that is a compliance gap, not a clean session.
--->
-<!-- GOVERNING: D-208 -->
 ### S-020 — Feature Stage Advancement Check
 
 **Rule:** At the end of every session where features have been built or modified, review
@@ -635,18 +393,6 @@ include a stage check entry in CodeClose? Yes = pass. Absent = violation.
 
 ---
 
-<!-- RATIONALE:
-Why: Plain text entity references cannot fulfill the right-panel navigation contract
-  (S-005, S-018). A user seeing "Dave Chen" as plain text has no signal that it is
-  actionable. Chips are the visual contract that a reference opens detail.
-Considered: Underline-on-hover (insufficient signal, accessibility concern);
-  icon-only tap target (not scannable); chip with full entity name and avatar (chosen —
-  matches MD3 chip pattern, visually distinct from data text).
-Downsides: Chip rendering adds layout complexity — multiple chips in a single cell
-  require wrapping logic. Inactive entity chips still render, which may confuse users
-  who expect inactive items to be invisible. Governed by Rule 3.
--->
-<!-- GOVERNING: D-181, S-005, S-018 -->
 ### S-021 — Tappable Entity Chips
 
 **Rule:** Every named entity reference in a list row, detail panel, or form renders as
@@ -677,20 +423,6 @@ row, detail panel, or form? Yes = violation. All entity references as chips = pa
 
 ---
 
-<!-- RATIONALE:
-Why: A plain dropdown for entity selection hides attributes the user needs to make
-  the correct choice — status, ownership, capacity. Selecting the wrong DS or Workstream
-  because the dropdown showed only names produces downstream gate failures.
-Considered: Augmented dropdown with subtitle (too constrained for search, scope, inactive
-  handling); full modal picker (breaks right-panel spatial model); inline expandable
-  picker in the form (chosen — stays in context, supports scope, search, inactive rows).
-Downsides: EntityPickerComponent is a complex shared component. Misconfigured inputs
-  produce subtle bugs (wrong scope, wrong search behavior). The reference implementation
-  (WorkstreamPickerComponent) must be consulted before building any new picker instance.
-  Watch for: new picker built as standalone component instead of configuring
-  EntityPickerComponent — that is a violation.
--->
-<!-- GOVERNING: D-182 -->
 ### S-022 — Entity Picker Pattern
 
 **Rule:** When a form field requires selection of a named entity with attributes
@@ -745,20 +477,6 @@ All yes = pass. Any no = violation.
 
 ---
 
-<!-- RATIONALE:
-Why: Irreversible actions executed without computing downstream impact first produce
-  cascading failures the user did not understand they were triggering. A generic
-  "Are you sure?" gives no actionable information.
-Considered: Modal confirmation dialog (breaks inline spatial model, D-183 Rule 3);
-  inline preview then confirm (chosen — user sees impact before committing, cancel
-  remains available); undo after execution (not feasible for gate approvals and
-  stage regressions — impact is immediate on downstream records).
-Downsides: Two-call pattern adds one MCP round-trip before execution. For large
-  Workstream inactivations this may take a moment. Skeleton loading in the preview
-  area covers this. Watch for: operations that skip the preview call and execute
-  directly — that is a violation regardless of how small the impact seems.
--->
-<!-- GOVERNING: D-183 -->
 ### S-023 — Destructive Action Confirmation
 
 **Rule:** Any action that cannot be automatically reversed requires explicit two-step
@@ -791,20 +509,6 @@ Any no = violation.
 
 ---
 
-<!-- RATIONALE:
-Why: Inconsistent capitalization breaks the visual contract between UI labels and
-  system entity names. "No delivery cycles found" reads as generic description;
-  "No Delivery Cycles found" reads as a named system entity. The distinction matters
-  for comprehension and for Code knowing what is a system entity vs. a noun.
-Considered: All-caps entity names (too heavy, conflicts with MD3 typography);
-  lowercase everywhere (loses entity identity signal); capitalized in UI labels only
-  (chosen — applies to every user-facing text surface; TypeScript identifiers exempt).
-Downsides: Rule requires judgment about whether a usage is a UI label or conceptual
-  explanation. The test ("could you substitute it as a UI label?") handles most cases
-  but edge cases exist. Watch for: inconsistent application in MCP error messages,
-  which are easy to overlook.
--->
-<!-- GOVERNING: D-184 -->
 ### S-024 — Entity Name Capitalization
 
 **Rule:** Named system entities are capitalized in all user-facing text. General-purpose
@@ -834,21 +538,6 @@ violation.
 
 ---
 
-<!-- RATIONALE:
-Why: Without a named standard, Code invents a fourth feedback pattern for each new
-  edge case encountered. Over time this produces visually inconsistent surfaces where
-  users cannot reliably interpret whether a signal is informational, a warning, or
-  an error.
-Considered: Single-pattern system (insufficient — guidance, warning, and error have
-  meaningfully different visual weights and user responses); per-surface ad hoc
-  patterns (produces drift); three named patterns with locked visual treatments
-  (chosen — covers the full range, enforced by "no fourth pattern without a decision").
-Downsides: Three patterns requires Code to make a classification judgment for each
-  new feedback element. Classification errors (guidance styled as warning) are
-  invisible to a conformance test — only UAT catches them. Watch for: amber treatment
-  on informational content, or gray treatment on blocking errors.
--->
-<!-- GOVERNING: D-200 -->
 ### S-025 — UI Feedback Patterns
 
 **Rule:** Every form, panel, and screen uses exactly three visual feedback patterns.
@@ -887,20 +576,6 @@ element = violation. All mapped = pass.
 
 ---
 
-<!-- RATIONALE:
-Why: Without a declared navigation authority, builds add top nav bars, breadcrumbs,
-  and secondary navigation surfaces that conflict with the port-time host shell.
-  At port time, OI Trust loads into QPathways as a Native Federation remote — the host
-  shell provides outer chrome. Internal navigation must be self-contained and
-  non-conflicting.
-Considered: Top nav bar + sidebar (two authorities, conflicts at port); breadcrumbs
-  (redundant with right-panel stack model, adds visual noise); sidebar only (chosen —
-  single authority, collapses cleanly into host shell at port time).
-Downsides: Sidebar grows as builds add surfaces. Section headers are the scaling
-  mechanism — but grouping decisions require Design judgment. Watch for: primary
-  actions (+ New Cycle) added to the sidebar — they belong in the content area header.
--->
-<!-- GOVERNING: D-199 -->
 ### S-026 — Sidebar-Only Navigation
 
 **Rule:** OI Trust uses sidebar-only navigation. No top navigation bar. The sidebar
@@ -928,19 +603,6 @@ internal to the remote and does not conflict with host-level navigation.
 
 ---
 
-<!-- RATIONALE:
-Why: Without a Code-side obligation to update impl_status, the field drifts — decisions
-  remain "specced" after Code has built them, making coverage tracking unreliable.
-  Design cannot know what has been built without session archaeology.
-Considered: Design tracks impl_status entirely (Design cannot see what Code built
-  without CodeClose); Code tracks everything (Code cannot reliably set "verified" —
-  that requires Phil); shared obligation with clear role boundaries (chosen).
-Downsides: Code must remember to update impl_status in the same commit as
-  implementation. A missed update is invisible until the next Design session audits
-  coverage. Watch for: decisions stuck at "specced" after multiple Code sessions
-  have passed — likely a compliance gap.
--->
-<!-- GOVERNING: D-186 -->
 ### S-027 — Implementation Status Updates
 
 **Rule:** When Claude Code completes implementation of a decision's acceptance
