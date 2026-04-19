@@ -1,4 +1,4 @@
-<!-- standards-summary.md — Pathways OI Trust | v1.2 | April 2026 | CONFIDENTIAL
+<!-- standards-summary.md — Pathways OI Trust | v1.3 | April 2026 | CONFIDENTIAL
      Version history:
        v1.0 April 2026: Initial file. S-001 through S-014.
        v1.1 April 2026: Added S-015 through S-019. Removed standards.md reference (wrong
@@ -14,10 +14,13 @@
             Name Capitalization, S-025 UI Feedback Patterns, S-026 Sidebar-Only Navigation,
             S-027 Implementation Status Updates. Applied D-335 rationale template
             (Why/Considered/Downsides) to all new standards. Source: Governance session
-            2026-04-15. -->
+            2026-04-15.
+       v1.3 April 2026: Rationale label retrofit on S-001 through S-019.
+            Question/Root → Why, Balance → Considered, Dirt → Downsides.
+            Source: D-334, D-335, Session 2026-04-18. -->
 
 # Standards Summary — Pathways OI Trust
-docs/standards-summary.md | v1.2 | April 2026 | CONFIDENTIAL
+docs/standards-summary.md | v1.3 | April 2026 | CONFIDENTIAL
 
 Read this file at every session start. Active Standards carry the same force as
 Non-Negotiable Architectural Rules. A spec element that conflicts with an Active
@@ -54,13 +57,13 @@ Before writing any component or interaction:
 ## Active Standards
 
 <!-- RATIONALE:
-     Question/Root: Users arrive at surfaces from many entry points without carrying
+     Why: Users arrive at surfaces from many entry points without carrying
        context from where they came. A surface that doesn't declare what it is forces
        the user to reconstruct context mentally.
-     Balance: Novice-first default serves all users at onboarding and remains harmless
+     Considered: Novice-first default serves all users at onboarding and remains harmless
        to expert users. Cost of visible context to an expert is low; cost of absent
        context to a novice is high.
-     Dirt: Does not define how much context is enough — a one-word label technically
+     Downsides: Does not define how much context is enough — a one-word label technically
        complies. Content quality within the pattern is not governed here.
 -->
 <!-- GOVERNING: D-140 -->
@@ -81,13 +84,13 @@ blocked and what must change? All yes = pass. Any no = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Delivery Cycles have a 12-stage lifecycle with 5 named gates.
+     Why: Delivery Cycles have a 12-stage lifecycle with 5 named gates.
        A text status field answers "where are we now" but not "how far along" or
        "what's next."
-     Balance: Visual lifecycle component takes horizontal space and has a minimum
+     Considered: Visual lifecycle component takes horizontal space and has a minimum
        legible width. Graceful degradation on narrow viewports preserves orientation
        while sacrificing gate-level detail.
-     Dirt: Component is presentation-only. Answers "where" but not "what to do next."
+     Downsides: Component is presentation-only. Answers "where" but not "what to do next."
        That gap is intentional — a different surface owns next actions.
 -->
 <!-- GOVERNING: ARCH-25 -->
@@ -115,14 +118,14 @@ no = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Bare generic nouns create ambiguity at every level. A field called
+     Why: Bare generic nouns create ambiguity at every level. A field called
        "date" in a schema leaves every reader guessing which date. In a system with many
        entities and many dates, statuses, and IDs, bare nouns accumulate into a
        maintenance and comprehension burden.
-     Balance: Rule applies universally including to identifiers that seem unambiguous
+     Considered: Rule applies universally including to identifiers that seem unambiguous
        in context — a table called "gate_records" with a column called "status" seems
        readable in context but loses that context in a JOIN result.
-     Dirt: Governs form (every identifier must be qualified) but not quality — a field
+     Downsides: Governs form (every identifier must be qualified) but not quality — a field
        called "approval_date" when it records submission time technically complies but
        misleads.
 -->
@@ -145,14 +148,14 @@ violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Without a universal pattern, each entity surface gets designed
+     Why: Without a universal pattern, each entity surface gets designed
        independently — producing inconsistent information architecture, inconsistent
        action placement, and inconsistent edit behavior. Users build no transferable
        mental model.
-     Balance: A universal pattern constrains entity-specific design freedom. Exceptions
+     Considered: A universal pattern constrains entity-specific design freedom. Exceptions
        can be declared with a decision number — the pattern is the default, exceptions
        require justification.
-     Dirt: Defines structure but not content — field selection, grouping, and ordering
+     Downsides: Defines structure but not content — field selection, grouping, and ordering
        within View and Edit are entity-specific and must be specced per entity.
 -->
 <!-- GOVERNING: ARCH-27, D-183 -->
@@ -183,13 +186,13 @@ row tappable = pass. Any failure = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: When entity detail surfaces open in disconnected or replacement
+     Why: When entity detail surfaces open in disconnected or replacement
        states, users lose their place and have no reliable return path. Especially
        damaging on mobile.
-     Balance: Strict stack means users navigate back through every level they opened —
+     Considered: Strict stack means users navigate back through every level they opened —
        no jump-to-top shortcut. Deep stacks signal that information architecture needs
        simplification — the standard creates useful design pressure.
-     Dirt: Maximum stack depth is not defined. A user drilling four or five levels deep
+     Downsides: Maximum stack depth is not defined. A user drilling four or five levels deep
        has four or five back-taps to return. Known cost accepted at adoption.
 -->
 <!-- GOVERNING: D-199, ARCH-27 -->
@@ -222,14 +225,14 @@ All yes (and no to last) = pass. Any failure = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Without an explicit reuse rule, each new context where an entity
+     Why: Without an explicit reuse rule, each new context where an entity
        appears becomes an opportunity to build a slightly different view — tuned for
        that context but diverging from the canonical surface. Over time this produces
        multiple views that drift apart.
-     Balance: Strict reuse means the canonical surface must serve all contexts, creating
+     Considered: Strict reuse means the canonical surface must serve all contexts, creating
        pressure to design it well upfront. Context-specific exceptions require a decision
        number.
-     Dirt: Canonical surface must handle permission-driven variation — same View shows
+     Downsides: Canonical surface must handle permission-driven variation — same View shows
        different actions to different roles. Adds complexity that a context-specific
        surface would avoid. Accepted cost of reuse.
 -->
@@ -250,13 +253,13 @@ pass.
 ---
 
 <!-- RATIONALE:
-     Question/Root: A parent surface that doesn't refresh after a child session may
+     Why: A parent surface that doesn't refresh after a child session may
        display stale data — a cycle that was just cancelled still showing as active.
        Stale state erodes trust in the system.
-     Balance: Unconditional refresh means every back navigation triggers a re-query
+     Considered: Unconditional refresh means every back navigation triggers a re-query
        including cancels where nothing changed. Query load and potential flicker
        accepted at the scale this system operates.
-     Dirt: Requires re-query but does not specify scope — full list, affected row only,
+     Downsides: Requires re-query but does not specify scope — full list, affected row only,
        or something in between. Implementation detail left to per-surface spec.
 -->
 <!-- GOVERNING: S-005, S-006 -->
@@ -279,14 +282,14 @@ navigation returns? All refresh = pass. Any stale state = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: A cancelled item is operationally gone from the user's perspective.
+     Why: A cancelled item is operationally gone from the user's perspective.
        Showing cancelled items by default pollutes the working surface with noise the
        user has explicitly decided to retire.
-     Balance: Hide-by-default means users who regularly investigate cancelled items must
+     Considered: Hide-by-default means users who regularly investigate cancelled items must
        toggle the reveal on every visit — no sticky option. Population of users who want
        a clean active-only view is everyone; population who regularly investigate
        cancelled items is small.
-     Dirt: Governs list and grid surfaces but not summary counts and aggregate metrics —
+     Downsides: Governs list and grid surfaces but not summary counts and aggregate metrics —
        those are explicitly out of scope. Two adjacent surfaces could give inconsistent
        impressions.
 -->
@@ -313,12 +316,12 @@ prior session state? Is there any surface writing the cancelled reveal state to
 ---
 
 <!-- RATIONALE:
-     Question/Root: A persistent filter bar consumes vertical space on every screen load
+     Why: A persistent filter bar consumes vertical space on every screen load
        even when filters are not in use.
-     Balance: Slide-in panel adds one tap to open filters vs. always-visible controls.
+     Considered: Slide-in panel adds one tap to open filters vs. always-visible controls.
        Majority of screen loads do not require filtering — clean default is more valuable
        than saving one tap for the minority that do filter.
-     Dirt: Surfaces where filtering is the primary activity may warrant always-visible
+     Downsides: Surfaces where filtering is the primary activity may warrant always-visible
        controls. Any such exception requires a named decision.
 -->
 <!-- GOVERNING: D-HubFilter-2026-04-06 -->
@@ -337,12 +340,12 @@ panel? All yes = pass. Any no = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Real-time filtering fires a server query on every selection change.
+     Why: Real-time filtering fires a server query on every selection change.
        With six filters and multiple options per filter, a user building a compound
        filter set would trigger 5–10 queries before reaching their intended state.
-     Balance: Batch filtering requires an explicit Apply tap. Users accustomed to
+     Considered: Batch filtering requires an explicit Apply tap. Users accustomed to
        real-time behavior may expect immediate results — Apply button must be prominent.
-     Dirt: Clear all resets but does not query — grid continues showing previously
+     Downsides: Clear all resets but does not query — grid continues showing previously
        filtered result until Apply is tapped. Deliberate choice but can feel
        inconsistent.
 -->
@@ -364,12 +367,12 @@ Any failure = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Active filters that are only visible inside the closed filter panel
+     Why: Active filters that are only visible inside the closed filter panel
        are invisible — users forget what filters are set and cannot tell why the grid
        shows fewer rows.
-     Balance: "Name: Value" chip label adds width vs. value-only chips. Accepted —
+     Considered: "Name: Value" chip label adds width vs. value-only chips. Accepted —
        value-only chips are ambiguous when multiple filters are active simultaneously.
-     Dirt: Chips use display_name_short for Division and Workstream values. If
+     Downsides: Chips use display_name_short for Division and Workstream values. If
        display_name_short is not yet populated, chip falls back to full name and may
        be wider than the design assumes.
 -->
@@ -390,12 +393,12 @@ bar absent when no filters are active? All yes = pass. Any no = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Showing all filter options expanded simultaneously produces a long
+     Why: Showing all filter options expanded simultaneously produces a long
        panel requiring scroll before the user can see all available filters.
-     Balance: Drill-in requires two taps to change a filter vs. one tap on a visible
+     Considered: Drill-in requires two taps to change a filter vs. one tap on a visible
        checkbox. Compact overview of all filters judged more valuable than saving one
        tap per filter change.
-     Dirt: One-at-a-time expansion means a user setting three filters must open and
+     Downsides: One-at-a-time expansion means a user setting three filters must open and
        close each drill-in separately. Revisit if UAT shows users struggling with this
        constraint.
 -->
@@ -416,15 +419,15 @@ All correct = pass. Any failure = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Without a named component library, Code makes component-level
+     Why: Without a named component library, Code makes component-level
        judgment calls on every new surface — input field heights, focus rings, motion
        timing, disabled states. These accumulate invisibly and produce visual
        inconsistency.
-     Balance: Adopting a component library means accepting its defaults where OI Trust
+     Considered: Adopting a component library means accepting its defaults where OI Trust
        hasn't specified differently. Some MD3 defaults may not match TRIARQ brand
        standards — OI Trust decisions and Active Standards override; MD3 fills what
        they don't cover.
-     Dirt: Angular Material's component API may constrain some OI Trust design choices.
+     Downsides: Angular Material's component API may constrain some OI Trust design choices.
        When it does, Code surfaces as a CC-decision rather than working around it
        silently.
 -->
@@ -446,13 +449,13 @@ candidate? Yes to either = pass. Any silent invention = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Orienting text — surface descriptions and zone explanations —
+     Why: Orienting text — surface descriptions and zone explanations —
        serves a supporting role. When it renders at the same size and weight as data and
        field labels, it competes visually and adds noise.
-     Balance: 11px italic at #5A5A5A (Stone) on white meets minimum contrast for
+     Considered: 11px italic at #5A5A5A (Stone) on white meets minimum contrast for
        supplementary text — readable but clearly secondary. Going smaller or lighter
        sacrifices legibility; going larger or darker undermines visual hierarchy.
-     Dirt: Governs style, not content quality. An orienting text block can conform while
+     Downsides: Governs style, not content quality. An orienting text block can conform while
        being unhelpful or misleading.
 -->
 <!-- GOVERNING: D-284, D-288 -->
@@ -478,13 +481,13 @@ Any failure = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Without a standard, Create forms are candidates for modal dialogs
+     Why: Without a standard, Create forms are candidates for modal dialogs
        or page replacements. OI Trust uses the right panel for View and Edit — a Create
        form that opens differently breaks the spatial model users have learned.
-     Balance: Right-panel Create means the user can see the list behind while creating,
+     Considered: Right-panel Create means the user can see the list behind while creating,
        providing context. The panel covers part of the list — context benefit judged
        higher than coverage cost.
-     Dirt: Governs where the form opens, not its internal layout or field order. Content
+     Downsides: Governs where the form opens, not its internal layout or field order. Content
        quality of Create forms is governed by entity-specific specs.
 -->
 <!-- GOVERNING: D-290, D-180, S-005 -->
@@ -504,14 +507,14 @@ failure = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: View panels are read-only orientation surfaces — allowing list
+     Why: View panels are read-only orientation surfaces — allowing list
        navigation while in View reduces friction for comparing records. Edit and Create
        panels involve in-progress data entry — allowing list navigation while editing
        creates disorientation and data loss risk.
-     Balance: Scrim on Edit/Create adds visual weight and blocks list access. Accepted —
+     Considered: Scrim on Edit/Create adds visual weight and blocks list access. Accepted —
        users cannot accidentally navigate away from unsaved work, and the dirty-state
        check gives a clean escape path.
-     Dirt: Dirty-state check requires each Edit and Create panel to implement isDirty()
+     Downsides: Dirty-state check requires each Edit and Create panel to implement isDirty()
        comparing form state against loaded values. A panel that always returns
        isDirty() = false technically complies but defeats the purpose.
 -->
@@ -535,14 +538,14 @@ Any failure = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Without a named pattern, every spec must re-derive where tapping a
+     Why: Without a named pattern, every spec must re-derive where tapping a
        row goes and what state the panel opens in. Two failure modes observed: Code
        inventing panel behavior not in the spec, and specs specifying the same behavior
        redundantly across surfaces.
-     Balance: Making View non-modal keeps the list accessible while reading entity
+     Considered: Making View non-modal keeps the list accessible while reading entity
        detail — aids comparison and orientation. On narrow viewports this requires
        layout adaptation — orientation benefit judged higher than layout cost.
-     Dirt: Governs entry and modality, not panel content. Field set, zone layout, and
+     Downsides: Governs entry and modality, not panel content. Field set, zone layout, and
        entity-specific display rules are per-entity specs.
 -->
 <!-- GOVERNING: D-308, D-180, S-005, S-006 -->
@@ -565,14 +568,14 @@ button? (Yes = fail — View is read-only.) Any failure = violation.
 ---
 
 <!-- RATIONALE:
-     Question/Root: Edit surfaces require a distinct entry point from View — users
+     Why: Edit surfaces require a distinct entry point from View — users
        should not accidentally trigger edit mode by browsing. The Edit button in the
        View header is the single explicit entry point.
-     Balance: Opening Edit in-place means the user cannot reference View state while
+     Considered: Opening Edit in-place means the user cannot reference View state while
        editing. Accepted — the list (visible in non-edit states) provides ambient
        context, and most edit operations on admin entities are intentional corrections
        rather than comparative reviews.
-     Dirt: Governs pattern structure — slot reuse, modality, dirty-state check,
+     Downsides: Governs pattern structure — slot reuse, modality, dirty-state check,
        post-save return. Does not govern the Edit form's field set, which fields are
        editable, or validation behavior. Those are per-entity concerns.
 -->

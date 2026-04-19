@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.13 | April 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.16 | April 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-334**
+**Next available: D-338**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -239,6 +239,10 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-331 | Rationale Required in HTML for All Instructions in Code-Read Files | Claude Chat | 2026-04-15 | Active |
 | D-332 | Improvement Proposal Routing | Claude Chat | 2026-04-15 | Active |
 | D-333 | Instruction Template Standard | Claude Chat | 2026-04-15 | Active |
+| D-334 | Rationale Block Label Amendment: "Why" Replaces "Question/Root" | Claude Chat | 2026-04-15 | Active |
+| D-335 | Rationale Block Three-Field Template: Why / Considered / Downsides | Claude Chat | 2026-04-15 | Active |
+| D-336 | Rule 23: D-333 Template Conformance Check | Claude Chat | 2026-04-17 | Active |
+| D-337 | Rule Authoring Template: Three-Part Standard for Design Sessions | Claude Chat | 2026-04-18 | Active |
 
 ---
 
