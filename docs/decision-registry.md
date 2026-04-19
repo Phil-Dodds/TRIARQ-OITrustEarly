@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.16 | April 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.18 | April 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-338**
+**Next available: D-344**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -20,10 +20,7 @@ instructions.
 
 ## Collision Protocol
 
-Retired per D-317. Claude Code no longer claims D-numbers. Collisions cannot occur if only
-one session type (Claude Chat / Design Session) assigns numbers. If a collision is ever
-discovered from the pre-D-317 era, the resolution is: assign a new number to the
-late-arriving decision; never renumber an existing entry (D-316).
+Retired per D-317. Pre-D-317 collision resolution: assign a new number to the late-arriving decision; never renumber (D-316).
 
 ---
 
@@ -243,6 +240,12 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-335 | Rationale Block Three-Field Template: Why / Considered / Downsides | Claude Chat | 2026-04-15 | Active |
 | D-336 | Rule 23: D-333 Template Conformance Check | Claude Chat | 2026-04-17 | Active |
 | D-337 | Rule Authoring Template: Three-Part Standard for Design Sessions | Claude Chat | 2026-04-18 | Active |
+| D-338 | Source/Output Split for Code-Read Markdown Files | Claude Chat | 2026-04-19 | Active |
+| D-339 | Code-Read File Definition Amended: .src.md is operative source | Claude Chat | 2026-04-19 | Active |
+| D-340 | Rule 23 HTML Conformance Check Moves to Document Author | Claude Chat | 2026-04-19 | Active |
+| D-341 | Repo Cleanup Batch: Pending Deletions to Next Code Session | Claude Chat | 2026-04-19 | Active |
+| D-342 | REPLACE Instruction Target Confirmation: Design Session Rule 24 | Claude Chat | 2026-04-19 | Active |
+| D-343 | Last Updated Archive: Rolling Four-Day Window | Claude Chat | 2026-04-19 | Active |
 
 ---
 

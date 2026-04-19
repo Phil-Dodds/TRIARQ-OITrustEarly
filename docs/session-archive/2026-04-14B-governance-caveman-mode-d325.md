@@ -1,0 +1,3 @@
+# Session: 2026-04-14-B — Caveman Mode for Claude Code — D-325
+<!-- SECTION-H: passthrough to for-ClaudeCode.zip — do not edit -->
+**2026-04-14-B (Caveman Mode for Claude Code — D-325).** One decision locked: D-325 (Caveman Mode: Always-On Prose Compression — Code uses compressed caveman style for all prose; exception for any output produced in response to a standing instruction or rule, which is written in full; suspend for security warnings, irreversible actions, fragment-ambiguity sequences). CLAUDE.md update required — route via Section H to next Code session. decisions-active → v3.58-active. decision-registry → v3.11. project-briefing → v5.80.
