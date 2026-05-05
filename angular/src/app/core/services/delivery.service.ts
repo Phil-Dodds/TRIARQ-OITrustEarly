@@ -21,7 +21,8 @@ import {
   GateStatus,
   DateStatus,
   PointerStatus,
-  DeliverySummary
+  DeliverySummary,
+  PendingApprovalItem
 } from '../types/database';
 
 @Injectable({ providedIn: 'root' })
@@ -179,6 +180,25 @@ export class DeliveryService {
     approver_notes?:   string;
   }): Observable<McpResponse<GateRecord>> {
     return this.mcp.call<GateRecord>('delivery', 'record_gate_decision', params as Record<string, unknown>);
+  }
+
+  /**
+   * D-345: withdraw a gate that is awaiting approval. Resets to not_started.
+   * Caller must have submit authority on the cycle (DS, CB, or Phil).
+   */
+  withdrawGateSubmission(params: {
+    delivery_cycle_id: string;
+    gate_name:         GateName;
+  }): Observable<McpResponse<{ gate_record_id: string; gate_status: GateStatus }>> {
+    return this.mcp.call('delivery', 'withdraw_gate_submission', params as Record<string, unknown>);
+  }
+
+  /**
+   * D-345 §3.4: returns gate_records currently awaiting approval where the caller is the approver.
+   * Powers the Action Queue and the pending-approvals sidebar badge.
+   */
+  listPendingApprovals(): Observable<McpResponse<PendingApprovalItem[]>> {
+    return this.mcp.call<PendingApprovalItem[]>('delivery', 'list_pending_approvals', {});
   }
 
   // ── Milestone date tools ───────────────────────────────────────────────────

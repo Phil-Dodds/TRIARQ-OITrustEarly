@@ -117,14 +117,36 @@ async function get_delivery_cycle(params, caller_user_id) {
   // Caller can submit if they are Phil, the assigned DS, or the assigned CB
   const callerCanSubmitAny = isPhil || isAssignedDs || isAssignedCb;
 
+  // Resolve submitter display names for gate records that have submitted_by_user_id (D-345).
+  const submitterIds = (gate_records || [])
+    .map(gr => gr.submitted_by_user_id)
+    .filter(Boolean);
+  const submitterMap = {};
+  if (submitterIds.length > 0) {
+    const { data: submitterRows } = await supabase
+      .from('users')
+      .select('id, display_name')
+      .in('id', submitterIds)
+      .is('deleted_at', null);
+    (submitterRows || []).forEach(u => { submitterMap[u.id] = u.display_name; });
+  }
+
   const enrichedGateRecords = (gate_records || []).map(gr => ({
     ...gr,
+    submitted_by_display_name: gr.submitted_by_user_id
+      ? (submitterMap[gr.submitted_by_user_id] ?? null)
+      : null,
     current_user_gate_authority: {
-      // can_submit: gate is not yet approved and caller has submit authority
-      can_submit:  callerCanSubmitAny && gr.gate_status !== 'approved',
-      // can_approve: caller is Phil, or caller is the designated approver_user_id
+      // can_submit: gate not approved/awaiting_approval and caller has submit authority
+      can_submit: callerCanSubmitAny &&
+        gr.gate_status !== 'approved' &&
+        gr.gate_status !== 'awaiting_approval',
+      // can_approve: caller is Phil, or caller is the designated approver_user_id, AND gate is awaiting
       // When approver_user_id is null (Build C default), Phil is the fallback approver
-      can_approve: isPhil || gr.approver_user_id === caller_user_id
+      can_approve: gr.gate_status === 'awaiting_approval' &&
+        (isPhil || gr.approver_user_id === caller_user_id),
+      // can_withdraw: caller has submit authority and gate is awaiting_approval (D-345 §4)
+      can_withdraw: callerCanSubmitAny && gr.gate_status === 'awaiting_approval'
     }
   }));
 

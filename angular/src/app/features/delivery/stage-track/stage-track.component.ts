@@ -3,20 +3,31 @@
 // with 5 gate nodes in Full and Condensed display modes.
 //
 // Full mode:     All 10 stages + 5 gate nodes, labels shown, gate nodes interactive.
+//                Container scrolls horizontally when content overflows the panel —
+//                active stage scrolled into view on render (Contract 11 B-61, supersedes
+//                build-c-view-correction-spec-2026-04-09 §2.2 "no overflow scroll").
 // Condensed mode: 5 gate nodes only + "In [STAGE]" text adjacent — compact for dashboard rows.
 //                 Per design spec 5.1: "Gate nodes only on the dashboard row; stage name
 //                 displayed as text adjacent to the track, not as a node."
 //
+// gateStateMap accepts D-345 awaiting_approval state (sunray, same as pending) and
+// not_started (grey). complete (teal), blocked (red), upcoming (fog) unchanged.
+//
 // D-93: No MCP calls. Presentation only — renders what it receives.
 // D-140: Gate blocked state visible to user with tooltip explanation.
-// Source: ARCH-25, D-108, D-154, design-communication-principles Section 5.1
+// Source: ARCH-25, D-108, D-154, D-345, Contract 11 §B-61.
 
 import {
   Component,
   Input,
   Output,
   EventEmitter,
-  ChangeDetectionStrategy
+  ChangeDetectionStrategy,
+  ViewChild,
+  ElementRef,
+  AfterViewInit,
+  OnChanges,
+  SimpleChanges
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { GateName, GateDisplayState, GateStateMap, LifecycleTrackNode } from '../../../core/types/database';
@@ -52,24 +63,26 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
   imports: [CommonModule],
   template: `
     <!-- ── Full mode ──────────────────────────────────────────────────────── -->
-    <!-- 20px horizontal padding each side. No overflow scroll — track compresses
-         to fit panel width. Source: build-c-view-correction-spec-2026-04-09 Section 2.2 -->
+    <!-- Contract 11 B-61: horizontal scroll when content overflows; active stage
+         scrolled into view on render. Supersedes build-c-view-correction-spec-2026-04-09 §2.2. -->
     <div *ngIf="displayMode === 'full'"
-         style="padding:var(--triarq-space-sm) 20px;height:80px;overflow:hidden;">
-      <div style="display:flex;align-items:center;width:100%;gap:0;height:100%;">
+         #fullScroller
+         style="padding:var(--triarq-space-sm) 20px;height:90px;overflow-x:auto;overflow-y:hidden;">
+      <div style="display:flex;align-items:center;min-width:max-content;gap:0;height:100%;">
 
         <ng-container *ngFor="let node of fullTrack; let i = index">
 
-          <!-- Connector line — no min-width so track compresses to fit panel -->
+          <!-- Connector line — fixed minimum width so track is reachable when scrolling -->
           <div
             *ngIf="i > 0"
             [style.background]="connectorFilled(i) ? 'var(--triarq-color-primary)' : '#D0D0D0'"
-            style="height:2px;flex:1;"
+            style="height:2px;flex:0 0 32px;"
           ></div>
 
           <!-- Stage node -->
           <div *ngIf="node.type === 'stage'"
-               style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;">
+               [attr.data-stage-id]="node.id"
+               style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto;">
             <div
               [style.background]="stageCircleBg(node.id)"
               [style.outline]="isCurrent(node.id) ? '2px solid #fff' : 'none'"
@@ -84,16 +97,16 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
                     style="color:#fff;font-size:10px;font-weight:700;">●</span>
             </div>
             <span style="font-size:10px;color:#5A5A5A;text-align:center;
-                         max-width:40px;line-height:1.1;word-break:break-word;">
+                         max-width:48px;line-height:1.1;word-break:break-word;">
               {{ node.label }}
             </span>
           </div>
 
           <!-- Gate node — diamond, label above, interactive -->
           <div *ngIf="node.type === 'gate'"
-               style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;">
+               style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto;">
             <span style="font-size:10px;color:#5A5A5A;text-align:center;
-                         max-width:44px;line-height:1.1;word-break:break-word;margin-bottom:2px;">
+                         max-width:56px;line-height:1.1;word-break:break-word;margin-bottom:2px;">
               {{ node.label }}
             </span>
             <div
@@ -138,15 +151,40 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
     </div>
   `
 })
-export class StageTrackComponent {
+export class StageTrackComponent implements AfterViewInit, OnChanges {
   @Input() currentStageId: string     = 'BRIEF';
   @Input() gateStateMap:   GateStateMap = {} as GateStateMap;
   @Input() displayMode:    'full' | 'condensed' = 'full';
 
   @Output() gateClicked = new EventEmitter<GateName>();
 
+  @ViewChild('fullScroller') fullScroller?: ElementRef<HTMLDivElement>;
+
   readonly fullTrack  = LIFECYCLE_TRACK;
   readonly gateNodes  = GATE_NODES_ONLY;
+
+  ngAfterViewInit(): void {
+    this.scrollActiveStageIntoView();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['currentStageId'] && !changes['currentStageId'].firstChange) {
+      this.scrollActiveStageIntoView();
+    }
+  }
+
+  /** Contract 11 B-61: scroll the active stage into view when full track overflows. */
+  private scrollActiveStageIntoView(): void {
+    if (this.displayMode !== 'full' || !this.fullScroller) { return; }
+    const root = this.fullScroller.nativeElement;
+    const target = root.querySelector(`[data-stage-id="${this.currentStageId}"]`) as HTMLElement | null;
+    if (!target) { return; }
+    // Place active stage near the centre when there's overflow.
+    const containerWidth = root.clientWidth;
+    const targetCentre   = target.offsetLeft + target.offsetWidth / 2;
+    const desiredScroll  = Math.max(0, targetCentre - containerWidth / 2);
+    root.scrollTo({ left: desiredScroll, behavior: 'auto' });
+  }
 
   onGateClick(gateId: string): void {
     this.gateClicked.emit(gateId as GateName);
@@ -185,19 +223,23 @@ export class StageTrackComponent {
 
   gateColor(gateId: string): string {
     switch (this.gateDisplayState(gateId)) {
-      case 'complete':  return 'var(--triarq-color-primary)';
-      case 'pending':   return 'var(--triarq-color-sunray, #f5a623)';
-      case 'blocked':   return 'var(--triarq-color-error, #d32f2f)';
-      default:          return 'var(--triarq-color-fog, #e0e0e0)';
+      case 'complete':           return 'var(--triarq-color-primary)';
+      case 'pending':            return 'var(--triarq-color-sunray, #f5a623)';
+      case 'awaiting_approval':  return 'var(--triarq-color-sunray, #f5a623)';
+      case 'blocked':            return 'var(--triarq-color-error, #d32f2f)';
+      case 'not_started':        return 'var(--triarq-color-fog, #e0e0e0)';
+      default:                   return 'var(--triarq-color-fog, #e0e0e0)';
     }
   }
 
   gateTitle(gateId: string): string {
     const state  = this.gateDisplayState(gateId);
     const node   = this.fullTrack.find(n => n.id === gateId);
-    const hint   = state === 'blocked'  ? ' — workstream inactive, gate blocked'
-                 : state === 'pending'  ? ' — awaiting approval'
-                 : state === 'complete' ? ' — cleared'
+    const hint   = state === 'blocked'           ? ' — workstream inactive, gate blocked'
+                 : state === 'awaiting_approval' ? ' — awaiting approver decision'
+                 : state === 'pending'           ? ' — awaiting approval'
+                 : state === 'complete'          ? ' — cleared'
+                 : state === 'not_started'       ? ' — not yet submitted'
                  : ' — not yet reached';
     return `${node?.label ?? gateId}${hint}`;
   }

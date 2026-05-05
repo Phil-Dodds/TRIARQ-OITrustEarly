@@ -64,7 +64,7 @@ import {
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:   'Brief Review',
   go_to_build:    'Go to Build',
-  go_to_deploy:   'Go to Deploy (Pilot Start)',
+  go_to_deploy:   'Go to Deploy',
   go_to_release:  'Go to Release',
   close_review:   'Close Review'
 };
@@ -150,15 +150,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
            leaving × inaccessible. Now both are inside one sticky container. Source: D-291. -->
       <div style="position:sticky;top:0;z-index:5;background:#fff;">
 
-      <!-- Panel close button — only in panel mode (S-006) -->
-      <div *ngIf="panelMode"
-           style="display:flex;justify-content:flex-end;margin-bottom:var(--triarq-space-sm);">
-        <button (click)="close.emit()"
-                style="background:none;border:none;cursor:pointer;
-                       color:var(--triarq-color-text-secondary);font-size:20px;
-                       line-height:1;padding:4px 8px;"
-                title="Close panel">✕</button>
-      </div>
+      <!-- Close X moved into the cycle-header right cluster (B-76).
+           Previously rendered above the card on its own row, which placed it visually
+           higher than the title. Now sits inline with the action buttons in the card
+           header, vertically centred with the title. Source: Contract 12 §3 B-76. -->
 
       <!-- ── Cycle Header ───────────────────────────────────────────────── -->
       <!-- D-291: in sticky outer wrapper. Source: D-291. -->
@@ -196,9 +191,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
             <!-- DS/CB moved to Identity zone below Stage Track. D-273. -->
           </div>
-          <!-- ── Action Zone (5 actions per Contract 1 2026-04-10) ──────────── -->
-          <!-- Actions: Edit Cycle | Submit Gate | Regress Stage | Cancel | Un-cancel -->
-          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;">
+          <!-- ── Action Zone — D-348 Tier 2 + D-349 dual entry point + B-75/B-76 ──── -->
+          <!-- Single-row layout right-aligned with the cycle title. Close X lives at
+               the rightmost edge so it sits at the same vertical position as the
+               title. Source: Contract 12 §3 B-75, B-76; D-348; D-349. -->
+          <div style="display:flex;flex-direction:row;align-items:center;
+                      gap:var(--triarq-space-sm);flex-wrap:wrap;flex-shrink:0;">
 
             <!-- 1. Edit Cycle — opens Edit panel per S-006. Contract 2 2026-04-10. -->
             <button (click)="openEditPanel()"
@@ -207,22 +205,29 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               ✎ Edit Cycle
             </button>
 
-            <!-- 2. Submit Gate for Approval — when pending gate exists and caller can submit -->
-            <button *ngIf="pendingGateForSubmit && callerCanSubmitGates && !gateActionBusy"
-                    (click)="submitGate(pendingGateForSubmit)"
+            <!-- 2. D-349 dual entry point — submittable: opens gate sub-panel
+                    (the action zone). Submit confirmation happens inside the
+                    sub-panel; this button no longer fires the MCP submit
+                    directly. Source: Contract 12 D-349. -->
+            <button *ngIf="headerGate && headerGateState === 'submittable' && callerCanSubmitGates"
+                    (click)="openGatePanel(headerGate)"
                     style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
                            background:none;border:1px solid var(--triarq-color-primary);
                            border-radius:5px;padding:3px 8px;cursor:pointer;">
-              ↑ Submit Gate for Approval
+              ↑ Submit {{ GATE_NAME_DISPLAY[headerGate] }} for Approval
             </button>
-            <button *ngIf="pendingGateForSubmit && callerCanSubmitGates && gateActionBusy"
-                    disabled
-                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
-                           background:none;border:1px solid var(--triarq-color-primary);
-                           border-radius:5px;padding:3px 8px;
-                           display:flex;align-items:center;gap:4px;">
-              <ion-spinner name="crescent" style="width:10px;height:10px;"></ion-spinner>
-              Submitting…
+
+            <!-- 2b. D-297 awaiting_approval — non-interactive informs user the
+                     gate is already submitted. Clicking still opens the sub-panel
+                     so the approver/withdrawer can act on it. Source: D-297, D-349. -->
+            <button *ngIf="headerGate && headerGateState === 'awaiting_approval'"
+                    (click)="openGatePanel(headerGate)"
+                    style="white-space:nowrap;font-size:11px;
+                           color:var(--triarq-color-text-secondary);
+                           background:#f6f3e7;border:1px solid #e0d8b8;
+                           border-radius:5px;padding:3px 8px;cursor:pointer;"
+                    [title]="'Awaiting approval — open the gate record to act on it'">
+              Awaiting Approval
             </button>
 
             <!-- 3. Regress Stage — canRegress, D-179 two-call pattern preserved -->
@@ -254,6 +259,15 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                            border-radius:5px;padding:3px 8px;cursor:pointer;">
               ↺ Un-cancel Cycle
             </button>
+
+            <!-- B-76: Close X aligned within the panel header (was a separate row above). -->
+            <button *ngIf="panelMode"
+                    (click)="close.emit()"
+                    title="Close panel"
+                    aria-label="Close panel"
+                    style="background:none;border:none;cursor:pointer;
+                           color:var(--triarq-color-text-secondary);font-size:20px;
+                           line-height:1;padding:4px 8px;margin-left:var(--triarq-space-xs);">✕</button>
 
           </div>
         </div>
@@ -549,8 +563,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <span>Status</span>
         </div>
 
-        <!-- Gate rows — D-275: target date, actual date, and status editable in View -->
-        <div *ngFor="let m of cycle.milestone_dates; trackBy: trackByMilestoneId"
+        <!-- Gate rows — D-275: target date, actual date, and status editable in View.
+             B-60: sorted by gate sequence (Brief Review → Close Review). -->
+        <div *ngFor="let m of sortedMilestoneDates; trackBy: trackByMilestoneId"
              style="border-bottom:1px solid var(--triarq-color-border);">
 
           <div style="display:grid;grid-template-columns:2fr 1fr 1fr 120px;
@@ -600,7 +615,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                           [disabled]="savingMilestone"
                           style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
                                  color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                    {{ savingMilestone ? '…' : 'Save' }}
+                    {{ savingMilestone ? 'Saving…' : 'Save' }}
                   </button>
                   <button (click)="cancelMilestoneEdit()"
                           style="font-size:11px;padding:2px 8px;background:none;
@@ -640,7 +655,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                           [disabled]="savingActualDate"
                           style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
                                  color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                    {{ savingActualDate ? '…' : 'Save' }}
+                    {{ savingActualDate ? 'Saving…' : 'Save' }}
                   </button>
                   <button (click)="cancelActualDateEdit()"
                           style="font-size:11px;padding:2px 8px;background:none;
@@ -684,7 +699,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                           [disabled]="savingMilestoneStatus"
                           style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
                                  color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                    {{ savingMilestoneStatus ? '…' : 'Save' }}
+                    {{ savingMilestoneStatus ? 'Saving…' : 'Save' }}
                   </button>
                   <button (click)="cancelMilestoneStatusEdit()"
                           style="font-size:11px;padding:2px 8px;background:none;
@@ -928,77 +943,181 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <!-- Gate record exists — action buttons -->
             <div *ngIf="selectedGateRecord">
 
-              <!-- Submit / Resubmit -->
-              <div *ngIf="(selectedGateRecord.gate_status === 'returned' || selectedGateRecord.gate_status === 'pending')
-                          && selectedGateRecord.current_user_gate_authority?.can_submit !== false"
+              <!-- D-345: Submitted line (awaiting_approval) — "Submitted [time] by [name]" -->
+              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
+                          && selectedGateRecord.submitted_at"
+                   style="font-size:11px;color:var(--triarq-color-text-secondary);margin-bottom:var(--triarq-space-sm);"
+                   [title]="selectedGateRecord.submitted_at">
+                Submitted {{ submittedRelative(selectedGateRecord.submitted_at) }}
+                by {{ selectedGateRecord.submitted_by_display_name ?? 'Unknown' }}
+              </div>
+
+              <!-- D-345: Awaiting approval status text (DS/CB view) -->
+              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
+                          && !selectedGateRecord.current_user_gate_authority?.can_approve"
+                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                          margin-bottom:var(--triarq-space-sm);">
+                Awaiting {{ selectedGateApproverName }} approval.
+              </div>
+
+              <!-- D-345: Awaiting approval status text (approver view) -->
+              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
+                          && selectedGateRecord.current_user_gate_authority?.can_approve"
+                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
+                          margin-bottom:var(--triarq-space-sm);">
+                {{ GATE_NAME_DISPLAY[selectedGate!] }} submitted for your approval.
+              </div>
+
+              <!-- Submit / Resubmit (returned or not_started or legacy pending) — D-297 always-enabled -->
+              <div *ngIf="(selectedGateRecord.gate_status === 'returned'
+                            || selectedGateRecord.gate_status === 'pending'
+                            || selectedGateRecord.gate_status === 'not_started')
+                          && callerCanSubmitGates"
                    style="margin-bottom:var(--triarq-space-sm);">
                 <button class="oi-btn-primary"
                         (click)="submitGate(selectedGate!)"
                         [disabled]="gateActionBusy"
-                        style="font-size:var(--triarq-text-small);display:flex;align-items:center;gap:6px;">
-                  <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-                  <span>{{ selectedGateRecord.gate_status === 'returned' ? 'Resubmit for Approval' : 'Submit for Approval' }}</span>
+                        style="font-size:var(--triarq-text-small);">
+                  {{ gateActionBusy ? 'Submitting…'
+                     : (selectedGateRecord.gate_status === 'returned' ? 'Re-submit for Approval'
+                                                                       : 'Submit ' + GATE_NAME_DISPLAY[selectedGate!] + ' for Approval') }}
                 </button>
               </div>
 
-              <!-- Approver decision form — approve/return -->
-              <div *ngIf="selectedGateRecord.gate_status === 'pending'
-                          && selectedGateRecord.current_user_gate_authority?.can_approve">
-                <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;">
-                  Record Decision
-                </div>
-                <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                            margin-bottom:var(--triarq-space-xs);">
-                  Return notes are required when returning. Notes are optional for approval.
-                </div>
-                <form [formGroup]="gateDecisionForm" (ngSubmit)="recordDecision(selectedGate!)">
-                  <textarea formControlName="approver_notes" class="oi-input" rows="2"
-                            placeholder="Approver notes (required if returning)"
-                            style="width:100%;resize:none;font-size:var(--triarq-text-small);">
-                  </textarea>
-                  <div style="display:flex;gap:var(--triarq-space-sm);margin-top:var(--triarq-space-xs);
-                              align-items:center;flex-wrap:wrap;">
-                    <ng-container *ngIf="!approveConfirming">
-                      <button type="button" class="oi-btn-primary"
-                              (click)="approveConfirming = true"
-                              [disabled]="gateActionBusy"
-                              style="font-size:var(--triarq-text-small);">✓ Approve</button>
-                    </ng-container>
-                    <ng-container *ngIf="approveConfirming">
-                      <span style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-                        Approve this Gate? This cannot be undone.
-                      </span>
-                      <button type="button" class="oi-btn-primary"
-                              (click)="recordDecisionWithValue(selectedGate!, 'approved')"
-                              [disabled]="gateActionBusy"
-                              style="font-size:var(--triarq-text-small);display:flex;align-items:center;gap:6px;">
-                        <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-                        <span>Confirm Approve</span>
-                      </button>
-                      <button type="button" (click)="approveConfirming = false"
-                              style="font-size:var(--triarq-text-small);background:none;border:none;
-                                     cursor:pointer;color:var(--triarq-color-text-secondary);">Cancel</button>
-                    </ng-container>
-                    <button type="button"
-                            (click)="recordDecisionWithValue(selectedGate!, 'returned')"
-                            [disabled]="gateActionBusy"
-                            style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);
-                                   background:none;border:1px solid var(--triarq-color-error);
-                                   border-radius:5px;padding:6px 12px;cursor:pointer;
-                                   display:flex;align-items:center;gap:6px;">
-                      <ion-spinner *ngIf="gateActionBusy" name="crescent"
-                                   style="width:14px;height:14px;color:var(--triarq-color-error);"></ion-spinner>
-                      <span>✗ Return</span>
+              <!-- D-345: Withdraw Submission — DS/CB while awaiting approval -->
+              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
+                          && selectedGateRecord.current_user_gate_authority?.can_withdraw"
+                   style="margin-bottom:var(--triarq-space-sm);">
+                <ng-container *ngIf="!withdrawConfirming">
+                  <button (click)="withdrawConfirming = true; gateActionError=''"
+                          [disabled]="gateActionBusy"
+                          style="font-size:var(--triarq-text-small);background:none;
+                                 border:1px solid var(--triarq-color-border);border-radius:5px;
+                                 padding:6px 12px;cursor:pointer;color:var(--triarq-color-text-primary);">
+                    Withdraw Submission
+                  </button>
+                </ng-container>
+                <ng-container *ngIf="withdrawConfirming">
+                  <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:6px;">
+                    Withdrawing will cancel this submission. The approver will see the gate is no longer awaiting review.
+                  </div>
+                  <div style="display:flex;gap:var(--triarq-space-sm);align-items:center;">
+                    <button class="oi-btn-primary"
+                            (click)="withdrawGate(selectedGate!)"
+                            [disabled]="withdrawBusy"
+                            style="font-size:var(--triarq-text-small);">
+                      {{ withdrawBusy ? 'Confirming…' : 'Confirm Withdrawal' }}
+                    </button>
+                    <button (click)="withdrawConfirming = false"
+                            style="font-size:var(--triarq-text-small);background:none;border:none;
+                                   cursor:pointer;color:var(--triarq-color-text-secondary);">
+                      Cancel
                     </button>
                   </div>
-                </form>
+                </ng-container>
               </div>
 
-              <!-- No approve authority — gate pending but caller can't approve — D-140 -->
-              <div *ngIf="selectedGateRecord.gate_status === 'pending'
-                          && !selectedGateRecord.current_user_gate_authority?.can_approve"
+              <!-- D-345: Approve / Return (approver while awaiting_approval) -->
+              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
+                          && selectedGateRecord.current_user_gate_authority?.can_approve">
+
+                <!-- Default state: Approve + Return buttons -->
+                <ng-container *ngIf="!approveConfirming && !returnFormOpen">
+                  <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;">
+                    <button class="oi-btn-primary"
+                            (click)="approveConfirming = true; gateActionError=''"
+                            [disabled]="gateActionBusy"
+                            style="font-size:var(--triarq-text-small);">
+                      Approve {{ GATE_NAME_DISPLAY[selectedGate!] }}
+                    </button>
+                    <button (click)="returnFormOpen = true; gateActionError=''"
+                            [disabled]="gateActionBusy"
+                            style="font-size:var(--triarq-text-small);background:none;
+                                   border:1px solid var(--triarq-color-border);border-radius:5px;
+                                   padding:6px 12px;cursor:pointer;color:var(--triarq-color-text-primary);">
+                      Return
+                    </button>
+                  </div>
+                </ng-container>
+
+                <!-- Confirm Approval — D-183 inline confirmation; D-346 Context A label transition -->
+                <ng-container *ngIf="approveConfirming">
+                  <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:6px;">
+                    Approving this gate will advance the Delivery Cycle.
+                    This cannot be undone without a stage regression.
+                  </div>
+                  <div style="display:flex;gap:var(--triarq-space-sm);align-items:center;">
+                    <button class="oi-btn-primary"
+                            (click)="recordDecisionWithValue(selectedGate!, 'approved')"
+                            [disabled]="gateActionBusy"
+                            style="font-size:var(--triarq-text-small);">
+                      {{ gateActionBusy ? 'Confirming…' : 'Confirm Approval' }}
+                    </button>
+                    <button (click)="approveConfirming = false"
+                            style="font-size:var(--triarq-text-small);background:none;border:none;
+                                   cursor:pointer;color:var(--triarq-color-text-secondary);">
+                      Cancel
+                    </button>
+                  </div>
+                </ng-container>
+
+                <!-- Return form — Pattern 3 inline error if notes empty on submit -->
+                <ng-container *ngIf="returnFormOpen">
+                  <form [formGroup]="gateDecisionForm" (ngSubmit)="recordDecisionWithValue(selectedGate!, 'returned')">
+                    <label style="display:block;font-size:var(--triarq-text-small);font-weight:500;
+                                  margin-bottom:4px;">Return notes <span style="color:var(--triarq-color-error);">*</span></label>
+                    <textarea formControlName="approver_notes" class="oi-input" rows="3"
+                              placeholder="Describe what needs to change before re-submission."
+                              style="width:100%;resize:vertical;min-height:80px;
+                                     font-size:var(--triarq-text-small);">
+                    </textarea>
+                    <div style="display:flex;gap:var(--triarq-space-sm);margin-top:var(--triarq-space-xs);align-items:center;">
+                      <button type="submit" class="oi-btn-primary"
+                              [disabled]="gateActionBusy"
+                              style="font-size:var(--triarq-text-small);">
+                        {{ gateActionBusy ? 'Confirming…' : 'Confirm Return' }}
+                      </button>
+                      <button type="button" (click)="returnFormOpen = false; gateActionError=''"
+                              style="font-size:var(--triarq-text-small);background:none;border:none;
+                                     cursor:pointer;color:var(--triarq-color-text-secondary);">
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </ng-container>
+              </div>
+
+              <!-- No approve authority — gate awaiting but caller can't approve — D-140 -->
+              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
+                          && !selectedGateRecord.current_user_gate_authority?.can_approve
+                          && !selectedGateRecord.current_user_gate_authority?.can_withdraw"
                    style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-                This Gate is awaiting approval. Only the designated approver or Phil can record a decision.
+                Only the designated approver or Phil can record a decision on this gate.
+              </div>
+
+              <!-- Legacy pending gate with approver authority (pre-Migration 029 records) -->
+              <div *ngIf="selectedGateRecord.gate_status === 'pending'
+                          && selectedGateRecord.current_user_gate_authority?.can_approve">
+                <!-- B-74: replace internal "Legacy gate record" wording with user-facing
+                     copy per D-297 (inform-don't-hide). Source: Contract 12 §3 B-74. -->
+                <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-bottom:6px;font-style:italic;">
+                  This gate was not submitted through the standard approval flow. You can approve or return it directly.
+                </div>
+                <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;">
+                  <button class="oi-btn-primary"
+                          (click)="recordDecisionWithValue(selectedGate!, 'approved')"
+                          [disabled]="gateActionBusy"
+                          style="font-size:var(--triarq-text-small);">
+                    {{ gateActionBusy ? 'Approving…' : 'Approve' }}
+                  </button>
+                  <button (click)="recordDecisionWithValue(selectedGate!, 'returned')"
+                          [disabled]="gateActionBusy"
+                          style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);
+                                 background:none;border:1px solid var(--triarq-color-error);
+                                 border-radius:5px;padding:6px 12px;cursor:pointer;">
+                    Return
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1453,6 +1572,10 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   /** D-292: Dashboard increments to signal cancel to edit panel when scrim is clicked. Source: D-292. */
   @Input() cancelEditSignal = 0;
 
+  /** D-345 §8: when set, auto-expand the named gate sub-panel after data load.
+   *  Used by ActionQueueComponent — user lands at approval controls without extra tap. */
+  @Input() autoExpandGate?: GateName;
+
   /** True when component is embedded as a right panel (cycleId provided via @Input). */
   get panelMode(): boolean { return !!this.cycleId; }
 
@@ -1509,6 +1632,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   // Gate approve confirmation step
   approveConfirming = false;
+  // D-345: gate withdrawal — DS/CB withdrawing an awaiting_approval submission.
+  withdrawConfirming = false;
+  withdrawBusy       = false;
+  // D-345: gate return — inline form replaces approve/return buttons until cancelled.
+  returnFormOpen     = false;
+  returnBusy         = false;
 
   // ON_HOLD
   holdBusy        = false;
@@ -1632,6 +1761,17 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           this.cycle = res.data;
           this.initExpandedStages(); // Item 2: expand current + past stages by default
           this.loadEvents(cycleId);
+          // B-69: Stage Track scrollIntoView (B-61) and panel mount sometimes leave
+          // an ambient text selection on Gate Record content. Clear it once on load.
+          if (typeof window !== 'undefined') {
+            window.getSelection()?.removeAllRanges();
+          }
+          // D-345 §8: open the requested gate sub-panel after data loads.
+          if (this.autoExpandGate) {
+            const gateToOpen = this.autoExpandGate;
+            // Defer to next tick so view binds first.
+            setTimeout(() => this.openGatePanel(gateToOpen), 0);
+          }
         } else {
           this.loadError = res.error ?? 'Could not load this cycle.';
         }
@@ -1671,9 +1811,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     const map: Partial<GateStateMap> = {};
     for (const gate of gates) {
       const record = this.cycle?.gate_records?.find(g => g.gate_name === gate);
-      if (!record)                           { map[gate] = 'upcoming'; continue; }
-      if (record.gate_status === 'approved') { map[gate] = 'complete'; continue; }
-      if (record.gate_status === 'blocked')  { map[gate] = 'blocked';  continue; }
+      if (!record)                                     { map[gate] = 'upcoming';          continue; }
+      if (record.gate_status === 'approved')           { map[gate] = 'complete';          continue; }
+      if (record.gate_status === 'blocked')            { map[gate] = 'blocked';           continue; }
+      if (record.gate_status === 'awaiting_approval')  { map[gate] = 'awaiting_approval'; continue; }
+      if (record.gate_status === 'not_started')        { map[gate] = 'not_started';       continue; }
+      // 'pending' (legacy) and 'returned' surface as pending (sunray).
       map[gate] = 'pending';
     }
     return map as GateStateMap;
@@ -1739,13 +1882,76 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   // Contract 1: Submit Gate for Approval shortcut — next pending gate for current stage.
   // Returns null when no gate is pending or gate is already submitted/approved.
+  // D-345: 'awaiting_approval' is the new submitted state (was 'pending' pre-Migration 029).
   get pendingGateForSubmit(): GateName | null {
     if (!this.cycle) { return null; }
     const nextGate = NEXT_GATE_BY_STAGE[this.cycle.current_lifecycle_stage as LifecycleStage];
     if (!nextGate) { return null; }
     const record = this.cycle.gate_records?.find(r => r.gate_name === nextGate);
-    if (record?.gate_status === 'pending' || record?.gate_status === 'approved') { return null; }
+    if (record?.gate_status === 'awaiting_approval') { return null; }
+    if (record?.gate_status === 'pending')           { return null; }
+    if (record?.gate_status === 'approved')          { return null; }
     return nextGate;
+  }
+
+  /**
+   * D-349: header gate slot for the dual entry point. Returns the next gate for
+   * the current stage regardless of its status — the header label and
+   * interactivity is decided by headerGateState below.
+   */
+  get headerGate(): GateName | null {
+    if (!this.cycle) { return null; }
+    return NEXT_GATE_BY_STAGE[this.cycle.current_lifecycle_stage as LifecycleStage] ?? null;
+  }
+
+  /**
+   * D-349 + D-297: drives the header button.
+   *   'submittable'        → "Submit {Gate} for Approval", click opens sub-panel.
+   *   'awaiting_approval'  → "Awaiting Approval", non-interactive (informs user).
+   *   'absent'             → button hidden (no submittable gate exists).
+   */
+  get headerGateState(): 'submittable' | 'awaiting_approval' | 'absent' {
+    const gate = this.headerGate;
+    if (!gate) { return 'absent'; }
+    const record = this.cycle?.gate_records?.find(r => r.gate_name === gate);
+    if (record?.gate_status === 'awaiting_approval') { return 'awaiting_approval'; }
+    if (record?.gate_status === 'approved')          { return 'absent'; }
+    return 'submittable';
+  }
+
+  /** D-345: gate name display strings for sub-panel UI text. */
+  readonly GATE_NAME_DISPLAY: Record<GateName, string> = {
+    brief_review:  'Brief Review',
+    go_to_build:   'Go to Build',
+    go_to_deploy:  'Go to Deploy',
+    go_to_release: 'Go to Release',
+    close_review:  'Close Review'
+  };
+
+  /** D-345: gate records sorted by lifecycle gate order. Defensive sort for B-60. */
+  get sortedMilestoneDates(): CycleMilestoneDate[] {
+    const order: GateName[] = ['brief_review','go_to_build','go_to_deploy','go_to_release','close_review'];
+    const list = this.cycle?.milestone_dates ?? [];
+    return [...list].sort((a, b) => order.indexOf(a.gate_name) - order.indexOf(b.gate_name));
+  }
+
+  /** Approver display name for the selected gate's awaiting state. */
+  get selectedGateApproverName(): string {
+    const id = this.selectedGateRecord?.approver_user_id;
+    if (id) { return this.approverDisplayName(id); }
+    return 'Phil (escalation default)';
+  }
+
+  /** Relative time string for the "Submitted [time] by [name]" line. */
+  submittedRelative(at: string | null | undefined): string {
+    if (!at) { return ''; }
+    const ms = Date.now() - Date.parse(at);
+    if (Number.isNaN(ms) || ms < 0) { return new Date(at).toLocaleDateString(); }
+    const days = Math.floor(ms / 86400000);
+    if (days === 0) { return 'Today'; }
+    if (days === 1) { return 'Yesterday'; }
+    if (days < 14)  { return `${days} days ago`; }
+    return new Date(at).toLocaleDateString();
   }
 
   // B-19 fix: D-205 — user sets all five statuses freely at any time regardless of target date.
@@ -1768,18 +1974,24 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return map[dateStatus ?? 'not_started'] ?? '#9E9E9E';
   }
 
-  // D-245: Gate Approval Status as contextual narrative text.
+  // D-245 + D-345: Gate Approval Status as contextual narrative text.
   // Contract 3 Block 4 Fix 3: "Under Review" only shown for the CURRENT gate (the gate this
   // cycle's lifecycle stage is heading toward). Gates not yet reached show nothing when pending.
-  // Source: contract-3-spec.md Block 4 FIX 3.
+  // Returned: short form "↩ [first 60 chars of approver_notes]…" — gate-flow-spec §5.
   gateApprovalNarrative(gateName: GateName): string {
     const record = this.cycle?.gate_records?.find(r => r.gate_name === gateName);
     if (!record) { return ''; }
     const currentGate = this.cycle ? NEXT_GATE_BY_STAGE[this.cycle.current_lifecycle_stage] : null;
     switch (record.gate_status) {
-      case 'pending':  return gateName === currentGate ? 'Under Review — awaiting decision' : '';
-      case 'approved': return 'Approved';
-      case 'returned': return 'Returned for revision';
+      case 'awaiting_approval': return 'Awaiting approval';
+      case 'pending':           return gateName === currentGate ? 'Under Review — awaiting decision' : '';
+      case 'approved':          return 'Approved';
+      case 'returned': {
+        const notes = (record.approver_notes ?? '').trim();
+        if (!notes) { return '↩ Returned for revision'; }
+        const shortNotes = notes.length > 60 ? `${notes.slice(0, 60)}…` : notes;
+        return `↩ ${shortNotes}`;
+      }
       case 'blocked':  return 'Blocked — workstream inactive';
       default:         return '';
     }
@@ -1789,11 +2001,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   gateApprovalNarrativeColor(gateName: GateName): string {
     const record = this.cycle?.gate_records?.find(r => r.gate_name === gateName);
     switch (record?.gate_status) {
-      case 'approved': return 'var(--triarq-color-primary)';
-      case 'returned': return 'var(--triarq-color-error)';
-      case 'blocked':  return 'var(--triarq-color-error)';
-      case 'pending':  return 'var(--triarq-color-sunray,#F2A620)';
-      default:         return 'var(--triarq-color-text-secondary)';
+      case 'approved':          return 'var(--triarq-color-primary)';
+      case 'returned':          return '#E96127'; // Oravive per gate-flow-spec §5
+      case 'blocked':           return 'var(--triarq-color-error)';
+      case 'awaiting_approval': return 'var(--triarq-color-sunray,#F2A620)';
+      case 'pending':           return 'var(--triarq-color-sunray,#F2A620)';
+      default:                  return 'var(--triarq-color-text-secondary)';
     }
   }
 
@@ -2220,12 +2433,19 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.gateActionError    = '';
     this.gateActionHint     = '';
     this.approveConfirming  = false;
+    this.withdrawConfirming = false;
+    this.returnFormOpen     = false;
     this.gateDecisionForm.reset();
     this.cdr.markForCheck();
   }
 
   submitGate(gate: GateName): void {
     if (!this.cycle) { return; }
+    // Auto-open the gate sub-panel so prereq errors / submission status surface in context
+    // (B-34/35: button-tap with unmet prereqs renders inline Pattern 3 next to the gate).
+    if (this.selectedGate !== gate) {
+      this.openGatePanel(gate);
+    }
     this.gateActionBusy  = true;
     this.gateActionError = '';
     this.gateActionHint  = '';
@@ -2239,16 +2459,17 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
         if (res.success) {
           this.loadCycle(this.cycle!.delivery_cycle_id);
         } else {
-          this.gateActionError = res.error ?? 'Submit failed.';
-          this.gateActionHint  = 'Check that the Workstream is active. '
-            + 'If it has been deactivated, an admin must reactivate it before gates can be submitted.';
+          // Pattern 3 inline error — MCP returns specific prereq message
+          // (e.g. "no Delivery Specialist is assigned to this cycle.").
+          this.gateActionError = res.error ?? 'Submission failed. Please try again.';
+          this.gateActionHint  = '';
         }
         this.gateActionBusy = false;
         this.cdr.markForCheck();
       },
       error: (err: { error?: string }) => {
-        this.gateActionError = err.error ?? 'Submit failed.';
-        this.gateActionHint  = 'Check that the Workstream is active before submitting for approval.';
+        this.gateActionError = err.error ?? 'Submission failed. Please try again.';
+        this.gateActionHint  = '';
         this.gateActionBusy  = false;
         this.cdr.markForCheck();
       }
@@ -2262,10 +2483,10 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     if (!this.cycle) { return; }
     const notes = (this.gateDecisionForm.value.approver_notes as string) ?? '';
 
-    // D-140: Return requires notes so the team can act on the feedback
+    // D-140 + D-345 §3.2: Return requires notes so the team can act on the feedback
     if (decision === 'returned' && !notes.trim()) {
-      this.gateActionError = 'Approver Return Notes are required when returning a gate.';
-      this.gateActionHint  = 'Add notes explaining what must be resolved before resubmission.';
+      this.gateActionError = 'Return notes are required. Describe what needs to change before re-submission.';
+      this.gateActionHint  = '';
       this.cdr.markForCheck();
       return;
     }
@@ -2283,8 +2504,15 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     }).subscribe({
       next: (res) => {
         if (res.success) {
-          this.selectedGate       = null;
-          this.selectedGateRecord = null;
+          this.approveConfirming  = false;
+          this.returnFormOpen     = false;
+          this.gateDecisionForm.reset();
+          // Approval: full reload (stage advance + actual_date + artifact reorganization).
+          // Return: re-render sub-panel; reload cycle to refresh gate_record state.
+          if (decision === 'approved') {
+            this.selectedGate       = null;
+            this.selectedGateRecord = null;
+          }
           this.loadCycle(this.cycle!.delivery_cycle_id);
         } else {
           this.gateActionError = res.error ?? 'Decision record failed.';
@@ -2298,6 +2526,36 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       error: (err: { error?: string }) => {
         this.gateActionError = err.error ?? 'Decision record failed.';
         this.gateActionBusy  = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  /** D-345 §3.3: withdraw a gate awaiting approval. Resets to not_started. */
+  withdrawGate(gate: GateName): void {
+    if (!this.cycle) { return; }
+    this.withdrawBusy    = true;
+    this.gateActionError = '';
+    this.gateActionHint  = '';
+    this.cdr.markForCheck();
+
+    this.delivery.withdrawGateSubmission({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      gate_name:         gate
+    }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.withdrawConfirming = false;
+          this.loadCycle(this.cycle!.delivery_cycle_id);
+        } else {
+          this.gateActionError = res.error ?? 'Withdrawal failed. Please try again.';
+        }
+        this.withdrawBusy = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.gateActionError = err.error ?? 'Withdrawal failed. Please try again.';
+        this.withdrawBusy    = false;
         this.cdr.markForCheck();
       }
     });
@@ -2579,20 +2837,26 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.gateActionError    = '';
     this.gateActionHint     = '';
     this.approveConfirming  = false;
+    this.withdrawConfirming = false;
+    this.returnFormOpen     = false;
+    this.gateDecisionForm.reset();
     this.cdr.markForCheck();
   }
 
-  /** Compute the display status label for the gate — Section 2.3 of Part 2 spec */
-  // CC-Decision-2026-04-12-B: 'not_started' is the seed status for new gate records.
-  // 'pending' now means submitted for review. Source: Contract 5 Block 2.2.
+  /** Compute the display status label for the gate — Section 2.3 of Part 2 spec.
+   *  CC-Decision-2026-04-12-B: 'not_started' is the seed status for new gate records.
+   *  D-345: 'awaiting_approval' is the post-submission state.
+   *  'pending' is legacy seed (pre-D-282) and now treated as Under Review.
+   *  Source: Contract 5 Block 2.2, gate-submission-flow-spec-2026-04-19. */
   gateDetailStatus(gate: GateName): string {
     const record = this.cycle?.gate_records?.find(g => g.gate_name === gate);
-    if (record?.gate_status === 'approved')    { return 'Approved'; }
-    if (record?.gate_status === 'blocked')     { return 'Blocked'; }
-    if (record?.gate_status === 'returned')    { return 'Returned'; }
-    if (record?.gate_status === 'pending')     { return 'Under Review'; }
-    if (record?.gate_status === 'not_started') { return 'Not Started'; }
-    if (this.isGateNotYetActive(gate))         { return 'Not Yet Active'; }
+    if (record?.gate_status === 'approved')          { return 'Approved'; }
+    if (record?.gate_status === 'blocked')           { return 'Blocked'; }
+    if (record?.gate_status === 'returned')          { return 'Returned'; }
+    if (record?.gate_status === 'awaiting_approval') { return 'Awaiting Approval'; }
+    if (record?.gate_status === 'pending')           { return 'Under Review'; }
+    if (record?.gate_status === 'not_started')       { return 'Not Started'; }
+    if (this.isGateNotYetActive(gate))               { return 'Not Yet Active'; }
     const nextGate = NEXT_GATE_BY_STAGE[this.cycle?.current_lifecycle_stage as LifecycleStage ?? 'BRIEF'];
     if (nextGate === gate) { return 'Pending'; }
     return 'Upcoming';
@@ -2600,22 +2864,24 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   gateDetailStatusBg(gate: GateName): string {
     const s = this.gateDetailStatus(gate);
-    if (s === 'Approved')       { return '#e8f5e9'; }
-    if (s === 'Blocked')        { return '#fdecea'; }
-    if (s === 'Returned')       { return '#fff8e1'; }
-    if (s === 'Under Review')   { return '#e3f2fd'; }
-    if (s === 'Pending')        { return 'var(--triarq-color-background-subtle)'; }
-    if (s === 'Not Started')    { return '#f5f5f5'; }
+    if (s === 'Approved')           { return '#e8f5e9'; }
+    if (s === 'Blocked')            { return '#fdecea'; }
+    if (s === 'Returned')           { return '#fff8e1'; }
+    if (s === 'Awaiting Approval')  { return '#fff3e0'; } // sunray tint
+    if (s === 'Under Review')       { return '#e3f2fd'; }
+    if (s === 'Pending')            { return 'var(--triarq-color-background-subtle)'; }
+    if (s === 'Not Started')        { return '#f5f5f5'; }
     return '#f5f5f5';
   }
 
   gateDetailStatusColor(gate: GateName): string {
     const s = this.gateDetailStatus(gate);
-    if (s === 'Approved')       { return '#2e7d32'; }
-    if (s === 'Blocked')        { return 'var(--triarq-color-error)'; }
-    if (s === 'Returned')       { return '#e65100'; }
-    if (s === 'Under Review')   { return 'var(--triarq-color-primary)'; }
-    if (s === 'Not Started')    { return '#9E9E9E'; }
+    if (s === 'Approved')           { return '#2e7d32'; }
+    if (s === 'Blocked')            { return 'var(--triarq-color-error)'; }
+    if (s === 'Returned')           { return '#E96127'; } // Oravive per gate-flow-spec §5
+    if (s === 'Awaiting Approval')  { return '#E65100'; }
+    if (s === 'Under Review')       { return 'var(--triarq-color-primary)'; }
+    if (s === 'Not Started')        { return '#9E9E9E'; }
     return 'var(--triarq-color-text-secondary)';
   }
 

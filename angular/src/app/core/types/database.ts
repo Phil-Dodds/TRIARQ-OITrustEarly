@@ -28,6 +28,9 @@ export interface Division {
   id:                 string;
   parent_division_id: string | null;
   division_name:      string;
+  // ARCH-29 / D-203 — short display name (max 10 chars at MCP/UI layer). Falls back to division_name when null.
+  // Migration 030 added this column to divisions. Source: Contract 10 §6 B-48.
+  display_name_short: string | null;
   division_level:     number;
   division_type_label: string | null;
   owner_user_id:      string | null;
@@ -175,11 +178,17 @@ export interface McpResponse<T = unknown> {
 export type TierClassification  = 'tier_1' | 'tier_2' | 'tier_3';
 export type LifecycleStage      = 'BRIEF' | 'DESIGN' | 'SPEC' | 'BUILD' | 'VALIDATE' | 'PILOT' | 'UAT' | 'RELEASE' | 'OUTCOME' | 'COMPLETE' | 'CANCELLED' | 'ON_HOLD';
 export type GateName            = 'brief_review' | 'go_to_build' | 'go_to_deploy' | 'go_to_release' | 'close_review';
-export type GateStatus          = 'pending' | 'approved' | 'returned' | 'blocked';
+// gate_status: not_started (D-282 seed) | pending (legacy seed) | awaiting_approval (D-345)
+//   | approved | returned | blocked. Migration 029 added 'awaiting_approval'.
+export type GateStatus          = 'not_started' | 'pending' | 'awaiting_approval' | 'approved' | 'returned' | 'blocked';
 export type DateStatus          = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'complete';
 export type PointerStatus       = 'external_only' | 'promoted' | 'oi_only';
 export type JiraSyncStatus      = 'unsynced' | 'synced' | 'error';
-export type GateDisplayState    = 'pending' | 'blocked' | 'complete' | 'upcoming';
+// GateDisplayState: stage-track + gate sub-panel rendering vocabulary.
+// 'not_started' = grey diamond, no submission yet. 'pending' = legacy. 'awaiting_approval' = sunray, submitted.
+// 'blocked' = system error. 'complete' = teal approved. 'upcoming' = dim future gate.
+// Source: D-345, gate-submission-flow-spec §2.
+export type GateDisplayState    = 'not_started' | 'pending' | 'awaiting_approval' | 'blocked' | 'complete' | 'upcoming';
 
 export interface DeliveryWorkstream {
   workstream_id:           string;
@@ -250,13 +259,19 @@ export interface GateRecord {
   approver_decision_at:        string | null;
   approver_notes:              string | null;
   workstream_active_at_clearance: boolean | null;
+  // D-345: submission tracking. Set on submit_gate_for_approval, cleared on withdraw_gate_submission.
+  submitted_at:                string | null;
+  submitted_by_user_id:        string | null;
   created_at:                  string;
   updated_at:                  string;
   // Supplement Section 1: populated by get_delivery_cycle for the calling user
   current_user_gate_authority?: {
-    can_submit:  boolean;
-    can_approve: boolean;
+    can_submit:   boolean;
+    can_approve:  boolean;
+    can_withdraw: boolean;
   };
+  // Joined — display name of submitter for the "Submitted by" line in sub-panel
+  submitted_by_display_name?:  string | null;
 }
 
 export interface CycleEventLogEntry {
@@ -320,6 +335,20 @@ export interface LifecycleTrackNode {
 
 /** Per-gate display state map passed into StageTrackComponent */
 export type GateStateMap = Record<GateName, GateDisplayState>;
+
+// ── D-345 — Action Queue / list_pending_approvals response item ──────────────
+export interface PendingApprovalItem {
+  gate_record_id:                string;
+  delivery_cycle_id:             string;
+  cycle_title:                   string;
+  division_display_name_short:   string;  // falls back to division_name when display_name_short null
+  workstream_display_name_short: string;  // falls back to workstream_name
+  gate_name:                     GateName;
+  gate_name_display:             string;  // human-readable e.g. "Brief Review"
+  submitted_at:                  string;
+  submitted_by_display_name:     string;
+  tier_classification:           TierClassification;
+}
 
 // ── Build C — Dashboard summary types (D-171–D-176) ──────────────────────────
 

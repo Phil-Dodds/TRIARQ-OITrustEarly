@@ -28,8 +28,10 @@
 
 import {
   Component, OnInit, OnDestroy, OnChanges, SimpleChanges,
+  AfterViewInit,
   Input, Output, EventEmitter,
-  ChangeDetectionStrategy, ChangeDetectorRef, HostListener
+  ChangeDetectionStrategy, ChangeDetectorRef, HostListener,
+  ElementRef, ViewChild
 } from '@angular/core';
 import {
   FormBuilder, FormGroup, Validators, ReactiveFormsModule
@@ -75,7 +77,7 @@ function epAvatarColorFromName(name: string): string {
          Positioned as an absolute overlay within the detail panel container. -->
     <!-- B-23: overflow:visible (was overflow:hidden) so position:sticky on ep-header
          resolves to the outer scroll container (dashboard wrapper), not this element. Source: Contract 9. -->
-    <div class="ep-overlay">
+    <div class="ep-overlay" #epOverlay>
 
         <!-- Panel header: Deep Navy, Save + Cancel always visible (spec 2.2) -->
         <!-- D-291: position:sticky;top:0 sticks to outer scroll container. B-23 fix: works now
@@ -100,7 +102,8 @@ function epAvatarColorFromName(name: string): string {
         </div>
 
         <!-- Panel body: 8 fields in spec order -->
-        <div class="ep-body">
+        <!-- B-36: scrolled to top on open (ngAfterViewInit). Source: Contract 10 §3 B-36. -->
+        <div class="ep-body" #epBody>
           <form [formGroup]="form" novalidate>
 
             <!-- 1. Delivery Cycle Title -->
@@ -110,6 +113,8 @@ function epAvatarColorFromName(name: string): string {
               </label>
               <input formControlName="cycle_title" class="ep-input"
                      type="text" maxlength="120" />
+              <!-- B-38: S-025 Pattern 1 guidance text. Source: Contract 10 §3 B-38. -->
+              <div class="ep-hint">The name used across all views and reports.</div>
               <div *ngIf="f['cycle_title'].invalid && f['cycle_title'].touched"
                    class="ep-field-error">Delivery Cycle Title is required.</div>
             </div>
@@ -126,6 +131,8 @@ function epAvatarColorFromName(name: string): string {
                   {{ d.division_name }}
                 </option>
               </select>
+              <!-- B-38: S-025 Pattern 1 guidance text. Source: Contract 10 §3 B-38. -->
+              <div class="ep-hint">The Division that owns this Delivery Cycle.</div>
               <div *ngIf="f['division_id'].invalid && f['division_id'].touched"
                    class="ep-field-error">Division is required.</div>
               <!-- Approver change note — stubbed per CC-Decision-2026-04-10-E -->
@@ -180,6 +187,10 @@ function epAvatarColorFromName(name: string): string {
                 <option value="tier_2">Tier 2 — Structured</option>
                 <option value="tier_3">Tier 3 — Governed</option>
               </select>
+              <!-- B-38: S-025 Pattern 1 guidance text. Source: Contract 10 §3 B-38. -->
+              <div class="ep-hint">
+                Tier 1: workflow changes. Tier 2: platform changes. Tier 3: agent deployments or compliance scope changes.
+              </div>
               <div *ngIf="f['tier_classification'].invalid && f['tier_classification'].touched"
                    class="ep-field-error">Tier Classification is required.</div>
               <!-- D-228: amber non-blocking warning when Tier changed on cycle with gate records -->
@@ -244,12 +255,16 @@ function epAvatarColorFromName(name: string): string {
           </form>
         </div>
 
-        <!-- D-292: Discard unsaved changes confirm panel. Source: D-292. -->
+        <!-- D-292: Discard unsaved changes confirm panel. Source: D-292.
+             B-70 (Contract 12): scoped to the edit panel via position:absolute on the
+             ep-overlay containing block, instead of position:fixed which spilled
+             across the full viewport. Maintains spatial relationship with the panel
+             it belongs to. Source: Contract 12 §3 B-70. -->
         <div *ngIf="showDiscardConfirm"
-             style="position:absolute;inset:0;z-index:20;background:rgba(255,255,255,0.97);
+             style="position:absolute;inset:0;z-index:1000;background:rgba(255,255,255,0.97);
                     display:flex;flex-direction:column;align-items:center;justify-content:center;
                     padding:32px;">
-          <div style="max-width:320px;text-align:center;">
+          <div style="max-width:360px;text-align:center;">
             <div style="font:600 16px Roboto,sans-serif;color:#1E1E1E;margin-bottom:8px;">
               Discard unsaved changes?
             </div>
@@ -419,7 +434,11 @@ function epAvatarColorFromName(name: string): string {
     }
   `]
 })
-export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnChanges {
+export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnChanges, AfterViewInit {
+
+  // B-36: ep-body scroll container reference for scrollTop=0 on open. Source: Contract 10 §3 B-36.
+  @ViewChild('epBody')    epBody?:    ElementRef<HTMLDivElement>;
+  @ViewChild('epOverlay') epOverlay?: ElementRef<HTMLDivElement>;
 
   // The cycle to edit — passed from the View panel.
   @Input() cycle!: DeliveryCycle;
@@ -556,6 +575,29 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   }
 
   ngOnDestroy(): void { this.subs.unsubscribe(); }
+
+  /** B-36: scroll edit panel form to top on open. Source: Contract 10 §3 B-36. */
+  ngAfterViewInit(): void {
+    // Scroll the inner form body to the top.
+    if (this.epBody?.nativeElement) {
+      this.epBody.nativeElement.scrollTop = 0;
+    }
+    // Also scroll the outer host element (the page/panel scroll container) so the
+    // overlay header is in view — needed when user opened Edit while detail view was scrolled.
+    if (this.epOverlay?.nativeElement) {
+      const host = this.epOverlay.nativeElement;
+      // Find the scrollable ancestor and scroll it so this panel's top is in view.
+      let parent: HTMLElement | null = host.parentElement;
+      while (parent && parent !== document.body) {
+        const overflowY = window.getComputedStyle(parent).overflowY;
+        if (overflowY === 'auto' || overflowY === 'scroll') {
+          parent.scrollTop = 0;
+          break;
+        }
+        parent = parent.parentElement;
+      }
+    }
+  }
 
   // D-292: cancelSignal from detail component (proxied from dashboard scrim click). Source: D-292.
   // B-12 fix: route through requestCancel() so dirty-state check fires before closing.
@@ -802,8 +844,25 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     this.cancelled.emit();
   }
 
+  /** B-42: After "Keep Editing", scroll the form back to the top so the user can resume from
+   *  a known position. The dirty trigger field is not tracked individually — top is the safe
+   *  default (matches Contract 10 §3 B-42 fallback). Source: Contract 10 §3 B-42. */
   keepEditing(): void {
     this.showDiscardConfirm = false;
     this.cdr.markForCheck();
+    if (this.epBody?.nativeElement) {
+      this.epBody.nativeElement.scrollTop = 0;
+    }
+    if (this.epOverlay?.nativeElement) {
+      let parent: HTMLElement | null = this.epOverlay.nativeElement.parentElement;
+      while (parent && parent !== document.body) {
+        const overflowY = window.getComputedStyle(parent).overflowY;
+        if (overflowY === 'auto' || overflowY === 'scroll') {
+          parent.scrollTop = 0;
+          break;
+        }
+        parent = parent.parentElement;
+      }
+    }
   }
 }

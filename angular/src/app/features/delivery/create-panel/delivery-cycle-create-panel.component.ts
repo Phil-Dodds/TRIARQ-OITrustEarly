@@ -558,15 +558,27 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
       if (!this.form.get('division_id')?.value && ws.home_division_id) {
         this.form.patchValue({ division_id: ws.home_division_id });
       }
-      // D-204: Pre-populate CB from workstream lead if CB is not already set. Source: D-204.
+      // D-204 (B-68 / Contract 12): pre-populate CB from workstream lead when CB
+      // is not already set. CC-C11-001 retired this rule; Design Session 2026-05-03
+      // rejected CC-C11-001, reinstating D-204. Field remains user-editable.
       if (!this.selectedCb && ws.workstream_lead_user_id && ws.lead_display_name) {
-        this.selectedCb = {
-          id: ws.workstream_lead_user_id,
-          display_name: ws.lead_display_name,
-          system_role: 'cb',
-          email: ''
-        } as User;
-        this.updateCbChip(this.selectedCb);
+        // The picker enriches each workstream with lead_display_name via
+        // list_delivery_workstreams. id + display_name are the only fields the
+        // CB chip and submit path read; remaining User fields are filled with
+        // safe defaults to keep the type honest without an extra MCP round-trip.
+        const leadUser: User = {
+          id:                                    ws.workstream_lead_user_id,
+          display_name:                          ws.lead_display_name,
+          email:                                 '',
+          system_role:                           'cb',
+          allow_both_admin_and_functional_roles: false,
+          is_active:                             true,
+          created_at:                            '',
+          updated_at:                            '',
+          deleted_at:                            null
+        };
+        this.selectedCb = leadUser;
+        this.updateCbChip(leadUser);
       }
     }
     this.cdr.markForCheck();

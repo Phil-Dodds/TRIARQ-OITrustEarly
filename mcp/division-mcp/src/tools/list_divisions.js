@@ -16,7 +16,7 @@ async function list_divisions(params, caller_user_id) {
 
   let query = supabase
     .from('divisions')
-    .select('id, division_name, division_level, division_type_label, owner_user_id, parent_division_id, created_at, updated_at')
+    .select('id, division_name, display_name_short, division_level, division_type_label, owner_user_id, parent_division_id, created_at, updated_at')
     .is('deleted_at', null)
     .order('division_name');
 

@@ -15,14 +15,27 @@
 //
 // ARCH-23: If workstream inactive at gate time: gate_status = 'blocked',
 //   workstream_active_at_clearance = false recorded.
-// If workstream active: workstream_active_at_clearance = true, gate stays 'pending'
-//   until record_gate_decision is called.
+// If workstream active: gate transitions to 'awaiting_approval' (D-345).
+//   submitted_at = now() and submitted_by_user_id = JWT identity recorded.
+//   workstream_active_at_clearance = true recorded.
 // Appends event log entry in all cases.
-// Source: D-140, D-165, ARCH-23, CC-006, build-c-spec Section 4.1–4.2, supplement Section 1
+// Source: D-140, D-165, D-345, ARCH-23, CC-006,
+//   build-c-spec Section 4.1–4.2, supplement Section 1,
+//   gate-submission-flow-spec-2026-04-19 §3.1.
 
 'use strict';
 
 const { supabase } = require('../db');
+
+// Gate-name display strings — used in event_description and surfaced to UI text.
+// Source: gate-submission-flow-spec-2026-04-19 §3.1.
+const GATE_NAME_DISPLAY = {
+  brief_review:  'Brief Review',
+  go_to_build:   'Go to Build',
+  go_to_deploy:  'Go to Deploy',
+  go_to_release: 'Go to Release',
+  close_review:  'Close Review'
+};
 
 /**
  * @param {object} params
@@ -61,14 +74,17 @@ async function submit_gate_for_approval(params, caller_user_id) {
   }
 
   // ── Supplement Section 1: caller must be Phil, the assigned DS, or the assigned CB ──
+  // Also fetch display_name for event_description (gate-submission-flow-spec §3.1).
   const { data: caller } = await supabase
     .from('users')
-    .select('system_role')
+    .select('system_role, display_name')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
-  const callerRole   = caller?.system_role ?? '';
+  const callerRole         = caller?.system_role ?? '';
+  const callerDisplayName  = caller?.display_name ?? 'A user';
+  const gateNameDisplay    = GATE_NAME_DISPLAY[gate_name] ?? gate_name;
   const isPhil       = callerRole === 'phil';
   const isAssignedDs = cycle.assigned_ds_user_id === caller_user_id;
   const isAssignedCb = cycle.assigned_cb_user_id === caller_user_id;
@@ -215,10 +231,15 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
-  // ── Workstream active — record the check, gate remains pending ───────────
+  // ── Workstream active — gate transitions to awaiting_approval (D-345) ────
   const { data: updated_gate, error: updateErr } = await supabase
     .from('gate_records')
-    .update({ workstream_active_at_clearance: true })
+    .update({
+      gate_status:                    'awaiting_approval',
+      submitted_at:                   new Date().toISOString(),
+      submitted_by_user_id:           caller_user_id,
+      workstream_active_at_clearance: true
+    })
     .eq('gate_record_id', gate_record.gate_record_id)
     .select()
     .single();
@@ -232,9 +253,9 @@ async function submit_gate_for_approval(params, caller_user_id) {
     .insert({
       delivery_cycle_id,
       event_type:        'gate_submitted',
-      event_description: `Gate '${gate_name}' submitted for approval. Workstream active at submission.`,
+      event_description: `${callerDisplayName} submitted ${gateNameDisplay} for approval.`,
       actor_user_id:     caller_user_id,
-      event_metadata:    { gate_name, workstream_active_at_clearance: true }
+      event_metadata:    { gate_name }
     });
 
   return { success: true, data: updated_gate };

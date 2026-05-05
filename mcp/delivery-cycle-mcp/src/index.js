@@ -34,6 +34,8 @@ const { set_outcome_statement }          = require('./tools/set_outcome_statemen
 
 const { submit_gate_for_approval }       = require('./tools/submit_gate_for_approval');
 const { record_gate_decision }           = require('./tools/record_gate_decision');
+const { withdraw_gate_submission }       = require('./tools/withdraw_gate_submission');
+const { list_pending_approvals }         = require('./tools/list_pending_approvals');
 
 const { set_milestone_target_date }      = require('./tools/set_milestone_target_date');
 const { set_milestone_actual_date }      = require('./tools/set_milestone_actual_date');
@@ -68,9 +70,11 @@ const TOOLS = {
   assign_ds_cb_to_cycle,
   set_outcome_statement,
 
-  // Gate workflow
+  // Gate workflow (D-345)
   submit_gate_for_approval,
   record_gate_decision,
+  withdraw_gate_submission,
+  list_pending_approvals,
 
   // Milestone date management
   set_milestone_target_date,

@@ -2,24 +2,49 @@
 // Pathways OI Trust — delivery-cycle-mcp
 // Records an approver decision (approved or returned) on a gate_record.
 // On approval:
-//   - Sets gate_status = 'approved'
+//   - Sets gate_status = 'approved' and approver_decision_at
 //   - Sets actual_date on the corresponding cycle_milestone_dates row to today
 //   - Sets date_status = 'complete' on that milestone
 //   - Advances the cycle to the next stage (same logic as advance_cycle_stage)
-//   - Appends event log entry
+//   - Appends TWO event log entries (D-345 §3.2):
+//       1. 'gate_approved' with approver as actor
+//       2. 'stage_advanced' with actor null (system) — only when stage actually advanced
 // On return:
 //   - Sets gate_status = 'returned'
-//   - Requires approver_notes
-//   - Appends event log entry
+//   - Requires approver_notes — stored on gate_record only, never in event log metadata (D-345)
+//   - Appends one 'gate_returned' event log entry — description does NOT include note text
 // Build C: approver defaults to Phil's user_id (see spec Section 4.2). RACI-configured
 // approver assignment is Build B.
 // Supplement Section 1: caller must be Phil or the gate's designated approver_user_id.
-// Source: D-154, ARCH-12, build-c-spec Section 4.1, supplement Section 1
+// Source: D-154, D-345, ARCH-12, build-c-spec Section 4.1,
+//   gate-submission-flow-spec-2026-04-19 §3.2, supplement Section 1.
 
 'use strict';
 
 const { supabase }  = require('../db');
 const { GATE_REQUIRED_TO_ENTER, nextStage } = require('../lifecycle');
+
+// Display strings for event_description (D-345 §3.1, §3.2).
+const GATE_NAME_DISPLAY = {
+  brief_review:  'Brief Review',
+  go_to_build:   'Go to Build',
+  go_to_deploy:  'Go to Deploy',
+  go_to_release: 'Go to Release',
+  close_review:  'Close Review'
+};
+
+const STAGE_DISPLAY = {
+  BRIEF:    'Brief',
+  DESIGN:   'Design',
+  SPEC:     'Spec',
+  BUILD:    'Build',
+  VALIDATE: 'Validate',
+  UAT:      'UAT',
+  PILOT:    'Pilot',
+  RELEASE:  'Release',
+  OUTCOME:  'Outcome',
+  COMPLETE: 'Complete'
+};
 
 /**
  * @param {object} params
@@ -87,13 +112,15 @@ async function record_gate_decision(params, caller_user_id) {
   // Build C: approver_user_id is null → Phil approves. Build B wires RACI-configured approvers.
   const { data: caller } = await supabase
     .from('users')
-    .select('system_role')
+    .select('system_role, display_name')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
   const isPhil              = caller?.system_role === 'phil';
   const isDesignatedApprover = gate_record.approver_user_id === caller_user_id;
+  const callerDisplayName    = caller?.display_name ?? 'Approver';
+  const gateNameDisplay      = GATE_NAME_DISPLAY[gate_name] ?? gate_name;
   // When no approver configured, Phil is the fallback (Build C default)
   const approverUnconfigured = !gate_record.approver_user_id;
 
@@ -125,15 +152,16 @@ async function record_gate_decision(params, caller_user_id) {
   }
 
   // ── On return: append event and exit ─────────────────────────────────────
+  // D-345 §3.2: approver_notes lives on gate_record only — never duplicated into event log.
   if (decision === 'returned') {
     await supabase
       .from('cycle_event_log')
       .insert({
         delivery_cycle_id,
         event_type:        'gate_returned',
-        event_description: `Gate '${gate_name}' returned by approver. Reason: ${approver_notes.trim()}`,
+        event_description: `${callerDisplayName} returned ${gateNameDisplay} for revision.`,
         actor_user_id:     caller_user_id,
-        event_metadata:    { gate_name, approver_notes }
+        event_metadata:    { gate_name, approver_user_id: caller_user_id }
       });
 
     return { success: true, data: { gate_record: updated_gate, stage_advanced: false } };
@@ -182,22 +210,33 @@ async function record_gate_decision(params, caller_user_id) {
     }
   }
 
-  // ── Append approval event ─────────────────────────────────────────────────
+  // ── Append approval event(s) — D-345 §3.2: two entries on approval ───────
   await supabase
     .from('cycle_event_log')
     .insert({
       delivery_cycle_id,
       event_type:        'gate_approved',
-      event_description: `Gate '${gate_name}' approved.${stage_advanced ? ` Cycle advanced to ${new_stage}.` : ''}`,
+      event_description: `${callerDisplayName} approved ${gateNameDisplay}.`,
       actor_user_id:     caller_user_id,
-      event_metadata: {
-        gate_name,
-        actual_date:   today,
-        stage_advanced,
-        prior_stage:   cycle.current_lifecycle_stage,
-        new_stage
-      }
+      event_metadata:    { gate_name, approver_user_id: caller_user_id }
     });
+
+  if (stage_advanced) {
+    const newStageDisplay = STAGE_DISPLAY[new_stage] ?? new_stage;
+    await supabase
+      .from('cycle_event_log')
+      .insert({
+        delivery_cycle_id,
+        event_type:        'stage_advanced',
+        event_description: `Delivery Cycle advanced to ${newStageDisplay}.`,
+        actor_user_id:     null, // system entry
+        event_metadata:    {
+          prior_stage: cycle.current_lifecycle_stage,
+          new_stage,
+          gate_name
+        }
+      });
+  }
 
   return {
     success: true,

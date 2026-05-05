@@ -49,6 +49,16 @@ type ForgotState = 'hidden' | 'form' | 'sending' | 'sent';
           <p class="oi-notice-primary">{{ successBanner }}</p>
         </div>
 
+        <!-- B-66: Forgot Password confirmation rendered above the Sign In button so
+             user sees feedback without scrolling. The compose form stays below the
+             sign-in form (CC-AUTH-002 inline pattern). -->
+        <div *ngIf="forgotState === 'sent'" class="oi-success-notice">
+          <p class="oi-notice-primary">Check your inbox</p>
+          <p class="oi-notice-secondary">
+            If an account exists for this email, you'll receive a password reset link shortly.
+          </p>
+        </div>
+
         <!-- Sign in form -->
         <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
 
@@ -103,15 +113,10 @@ type ForgotState = 'hidden' | 'form' | 'sending' | 'sent';
 
         </form>
 
-        <!-- Forgot Password inline form (CC-AUTH-002) -->
-        <div *ngIf="forgotState !== 'hidden'" class="forgot-panel">
-
-          <div *ngIf="forgotState === 'sent'" class="oi-success-notice">
-            <p class="oi-notice-primary">Check your inbox</p>
-            <p class="oi-notice-secondary">
-              If an account exists for this email, you'll receive a password reset link shortly.
-            </p>
-          </div>
+        <!-- Forgot Password inline form (CC-AUTH-002).
+             B-66: the "sent" confirmation banner is rendered above the Sign In
+             button instead of here so it stays above the fold. -->
+        <div *ngIf="forgotState === 'form' || forgotState === 'sending'" class="forgot-panel">
 
           <form *ngIf="forgotState === 'form' || forgotState === 'sending'"
                 [formGroup]="forgotForm" (ngSubmit)="onForgotSubmit()" novalidate>

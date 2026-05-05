@@ -80,14 +80,15 @@ const TYPE_LABELS: Record<number, string> = {
           </nav>
         </div>
         <div style="display:flex;gap:var(--triarq-space-sm);align-items:center;">
+          <!-- B-50: "Edit" entry remains in header. Cancel during edit moves to form body. -->
           <button
-            *ngIf="!isAtRoot"
+            *ngIf="!isAtRoot && !showEditForm"
             (click)="toggleEditForm()"
             style="font-size:var(--triarq-text-small);white-space:nowrap;
                    background:none;border:1px solid var(--triarq-color-border);
                    border-radius:5px;padding:6px 12px;cursor:pointer;
                    color:var(--triarq-color-text-primary);"
-          >{{ showEditForm ? 'Cancel Edit' : 'Edit ' + editLabel }}</button>
+          >Edit {{ editLabel }}</button>
           <button
             *ngIf="showCreateForm || canCreate"
             class="oi-btn-primary"
@@ -113,9 +114,11 @@ const TYPE_LABELS: Record<number, string> = {
                  margin-bottom:var(--triarq-space-md);"
         >
           <h4 style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-body);">
-            Rename {{ editLabel }}
+            Edit {{ editLabel }}
           </h4>
           <form [formGroup]="editDivisionForm" (ngSubmit)="submitEditDivision()">
+
+            <!-- Full Name -->
             <div>
               <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
                 {{ editLabel }} Name *
@@ -126,13 +129,50 @@ const TYPE_LABELS: Record<number, string> = {
                 style="width:100%;max-width:420px;"
               />
               <div
-                *ngIf="editDivisionForm.get('division_name')?.invalid && editDivisionForm.get('division_name')?.touched"
+                *ngIf="(editAttempted || editDivisionForm.get('division_name')?.touched)
+                       && editDivisionForm.get('division_name')?.invalid"
                 style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
               >Name is required.</div>
             </div>
-            <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-              <!-- D-178 Tier 2: button spinner while saving -->
-              <button type="submit" class="oi-btn-primary" [disabled]="editDivisionForm.invalid || savingDivision">
+
+            <!-- B-48: Short Name (max 10) — Contract 10 §6 B-48. -->
+            <div style="margin-top:var(--triarq-space-sm);">
+              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                Short Name *
+              </label>
+              <input
+                formControlName="display_name_short"
+                class="oi-input"
+                maxlength="10"
+                style="width:100%;max-width:420px;"
+              />
+              <!-- N/10 counter -->
+              <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:2px;">
+                {{ displayNameShortCount }}/10
+              </div>
+              <!-- S-025 Pattern 1 hint -->
+              <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:2px;font-style:italic;">
+                10 characters max. Used in grids and filter chips.
+              </div>
+              <!-- B-63: Pattern 3 inline error only on submit attempt — never disable Save (D-297). -->
+              <div
+                *ngIf="editAttempted && editDivisionForm.get('display_name_short')?.invalid"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
+              >Short name is required.</div>
+            </div>
+
+            <!-- B-49 + B-50: Cancel and Save at the bottom of the form, Cancel left of Save. -->
+            <div style="margin-top:var(--triarq-space-md);display:flex;gap:var(--triarq-space-sm);align-items:center;">
+              <button type="button"
+                      (click)="closeEditForm()"
+                      [disabled]="savingDivision"
+                      style="font-size:var(--triarq-text-small);background:none;
+                             border:1px solid var(--triarq-color-border);border-radius:5px;
+                             padding:8px 16px;cursor:pointer;color:var(--triarq-color-text-primary);">
+                Cancel
+              </button>
+              <!-- B-49: filled primary button. B-63: D-297 — Save NOT disabled by form.invalid; only by saving state. -->
+              <button type="submit" class="oi-btn-primary" [disabled]="savingDivision">
                 <ion-spinner *ngIf="savingDivision" name="crescent"
                              style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
                 </ion-spinner>
@@ -266,7 +306,10 @@ export class DivisionsComponent implements OnInit {
   createSuccess       = false;
   showEditForm        = false;
   editDivisionError   = '';
+  editAttempted       = false; // B-63: track submit attempt to drive inline validation per D-297
   savingDivision      = false;
+  /** Division we navigated INTO (the one being edited via Edit form). Set on navigateTo. */
+  currentParent: Division | null = null;
   blockedMessage      = '';
   blockedHint         = '';
   createForm!:        FormGroup;
@@ -286,7 +329,9 @@ export class DivisionsComponent implements OnInit {
       division_name: ['', [Validators.required, Validators.maxLength(120)]]
     });
     this.editDivisionForm = this.fb.group({
-      division_name: ['', [Validators.required, Validators.maxLength(120)]]
+      division_name:      ['', [Validators.required, Validators.maxLength(120)]],
+      // B-48 / Migration 030: Short Name max 10 chars, required at edit time. Source: Contract 10 §6 B-48.
+      display_name_short: ['', [Validators.required, Validators.maxLength(10)]]
     });
     this.loadDivisions(null);
   }
@@ -351,6 +396,7 @@ export class DivisionsComponent implements OnInit {
   // ── Navigation ─────────────────────────────────────────────────────────────
   navigateTo(division: Division): void {
     this.breadcrumb.push({ id: division.id, name: division.division_name });
+    this.currentParent     = division;
     this.showCreateForm    = false;
     this.showEditForm      = false;
     this.createSuccess     = false;
@@ -360,6 +406,7 @@ export class DivisionsComponent implements OnInit {
 
   navigateBreadcrumb(index: number): void {
     this.breadcrumb        = this.breadcrumb.slice(0, index + 1);
+    this.currentParent     = null; // Re-fetched if user opens Edit at this level.
     this.showCreateForm    = false;
     this.showEditForm      = false;
     this.editDivisionError = '';
@@ -437,13 +484,16 @@ export class DivisionsComponent implements OnInit {
             this.createForm.reset();
             this.loadDivisions(this.currentParentId);
           } else {
-            this.createError = res.error ?? 'Create failed.';
+            // B-80: never expose MCP field names or raw tool errors in the UI.
+            console.warn('[divisions] create_division failed:', res.error);
+            this.createError = 'Unable to save changes. Please try again.';
           }
           this.creating = false;
           this.cdr.markForCheck();
         },
         error: (err: { error?: string }) => {
-          this.createError = err.error ?? 'Create failed. Check permissions and try again.';
+          console.warn('[divisions] create_division HTTP error:', err);
+          this.createError = 'Unable to save changes. Please try again.';
           this.creating    = false;
           this.cdr.markForCheck();
         }
@@ -454,39 +504,88 @@ export class DivisionsComponent implements OnInit {
   toggleEditForm(): void {
     this.showEditForm      = !this.showEditForm;
     this.editDivisionError = '';
+    this.editAttempted     = false;
     if (this.showEditForm) {
       this.showCreateForm = false;
-      this.editDivisionForm.setValue({ division_name: this.currentParentName });
+      this.editDivisionForm.reset();
+      // Pre-populate with current values. If currentParent isn't cached (entered via breadcrumb),
+      // fetch it via get_division to populate display_name_short correctly. CC-C11-003.
+      if (this.currentParent) {
+        this.editDivisionForm.patchValue({
+          division_name:      this.currentParent.division_name,
+          display_name_short: this.currentParent.display_name_short ?? ''
+        });
+      } else if (this.currentParentId) {
+        this.mcp.call<Division>('division', 'get_division', { division_id: this.currentParentId })
+          .subscribe(res => {
+            if (res.success && res.data) {
+              this.currentParent = res.data;
+              this.editDivisionForm.patchValue({
+                division_name:      res.data.division_name,
+                display_name_short: res.data.display_name_short ?? ''
+              });
+              this.cdr.markForCheck();
+            }
+          });
+      }
     }
   }
 
+  /** B-50: Cancel button at the form bottom. Same effect as toggleEditForm when open. */
+  closeEditForm(): void {
+    this.showEditForm      = false;
+    this.editDivisionError = '';
+    this.editAttempted     = false;
+    this.editDivisionForm.reset();
+    this.cdr.markForCheck();
+  }
+
+  /** B-63 helper: char count for "N/10" counter. */
+  get displayNameShortCount(): number {
+    return ((this.editDivisionForm?.get('display_name_short')?.value as string) ?? '').length;
+  }
+
   submitEditDivision(): void {
-    if (this.editDivisionForm.invalid || !this.currentParentId) { return; }
+    // B-63: D-297 — never disable Save. Show inline validation errors only on submit attempt.
+    this.editAttempted = true;
+    if (this.editDivisionForm.invalid || !this.currentParentId) {
+      this.cdr.markForCheck();
+      return;
+    }
     this.savingDivision    = true;
     this.editDivisionError = '';
     this.cdr.markForCheck();
 
+    const v = this.editDivisionForm.value as { division_name: string; display_name_short: string };
+
     this.mcp
       .call<Division>('division', 'update_division', {
         division_id: this.currentParentId,
-        updates: { division_name: this.editDivisionForm.value.division_name as string }
+        updates: {
+          division_name:      v.division_name,
+          display_name_short: v.display_name_short.trim()
+        }
       })
       .subscribe({
         next: (res) => {
-          if (res.success) {
+          if (res.success && res.data) {
             // Update breadcrumb name immediately — no reload needed.
-            this.breadcrumb[this.breadcrumb.length - 1].name =
-              this.editDivisionForm.value.division_name as string;
-            this.showEditForm = false;
+            this.breadcrumb[this.breadcrumb.length - 1].name = v.division_name;
+            this.currentParent = res.data;
+            this.showEditForm  = false;
+            this.editAttempted = false;
             this.editDivisionForm.reset();
           } else {
-            this.editDivisionError = res.error ?? 'Save failed.';
+            // B-80: never expose MCP field names or raw tool errors in the UI.
+            console.warn('[divisions] update_division failed:', res.error);
+            this.editDivisionError = 'Unable to save changes. Please try again.';
           }
           this.savingDivision = false;
           this.cdr.markForCheck();
         },
         error: (err: { error?: string }) => {
-          this.editDivisionError = err.error ?? 'Save failed. Check permissions and try again.';
+          console.warn('[divisions] update_division HTTP error:', err);
+          this.editDivisionError = 'Unable to save changes. Please try again.';
           this.savingDivision    = false;
           this.cdr.markForCheck();
         }

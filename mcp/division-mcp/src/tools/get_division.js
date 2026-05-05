@@ -32,7 +32,7 @@ async function get_division(params, caller_user_id) {
   // Fetch direct child Divisions
   const { data: children, error: childErr } = await supabase
     .from('divisions')
-    .select('id, division_name, division_level, division_type_label, owner_user_id, created_at')
+    .select('id, division_name, display_name_short, division_level, division_type_label, owner_user_id, created_at')
     .eq('parent_division_id', division_id)
     .is('deleted_at', null)
     .order('division_name');

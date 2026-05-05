@@ -194,8 +194,9 @@ interface UserDivisionsData {
       >
         <span style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
                      margin-right:4px;">Role:</span>
+        <!-- B-53: tabs generated dynamically from roles present in user list. Contract 10 §7 B-53. -->
         <span
-          *ngFor="let f of roleFilters"
+          *ngFor="let f of visibleRoleFilters"
           class="oi-pill"
           (click)="setRoleFilter(f.value)"
           [style.background]="roleFilter === f.value
@@ -245,11 +246,12 @@ interface UserDivisionsData {
             </span>
             <span style="color:var(--triarq-color-text-secondary);">{{ user.email }}</span>
             <span>
+              <!-- B-51: Phil role displays as "Admin"; styling matches DS/CB pattern. Source: Contract 10 §7 B-51. -->
               <span
                 class="oi-pill"
                 [style.background]="rolePillBg(user.system_role)"
                 [style.color]="rolePillColor(user.system_role)"
-              >{{ user.system_role.toUpperCase() }}</span>
+              >{{ roleDisplayLabel(user.system_role) }}</span>
             </span>
             <!-- Active/Inactive badge -->
             <span>
@@ -263,29 +265,38 @@ interface UserDivisionsData {
                   : 'var(--triarq-color-error)'"
               >{{ user.is_active ? 'Active' : 'Inactive' }}</span>
             </span>
-            <!-- Invite status badge (D-248) -->
+            <!-- B-52 + B-64: Invite badge always present. Resolves to one of:
+                 Active / Invited — awaiting password set / Invite expired / Not Yet Invited.
+                 Source: D-248, Contract 10 §7 B-52, Contract 11 §B-64. -->
             <span>
               <span
-                *ngIf="inviteStatusFor(user.id) as status"
                 class="oi-pill"
-                [style.background]="inviteBadgeBg(status)"
-                [style.color]="inviteBadgeColor(status)"
-              >{{ inviteBadgeLabel(status) }}</span>
+                [style.background]="inviteBadgeBg(inviteStatusFor(user.id))"
+                [style.color]="inviteBadgeColor(inviteStatusFor(user.id))"
+              >{{ inviteBadgeLabel(inviteStatusFor(user.id)) }}</span>
             </span>
-            <!-- Action buttons: Edit | Assign | Resend -->
+            <!-- Action buttons: Edit | Invite/Resend | Assign. B-65: Invite for Not Yet Invited. -->
             <span style="display:flex;gap:var(--triarq-space-sm);justify-content:flex-end;flex-wrap:wrap;">
               <button
                 (click)="editingUserId === user.id ? cancelEdit() : startEdit(user)"
                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                        background:none;border:none;cursor:pointer;padding:0;"
               >{{ editingUserId === user.id ? 'Cancel' : 'Edit' }}</button>
+              <!-- B-65: Invite for Not Yet Invited; D-346 Context A label transition. CC-C11-002: reuse resend_invite. -->
+              <button
+                *ngIf="inviteStatusFor(user.id) === 'not_yet_invited'"
+                (click)="resendInvite(user.id)"
+                [disabled]="resendingUserId === user.id"
+                style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
+                       background:none;border:none;cursor:pointer;padding:0;"
+              >{{ resendingUserId === user.id ? 'Inviting…' : 'Invite' }}</button>
               <button
                 *ngIf="inviteStatusFor(user.id) === 'invited' || inviteStatusFor(user.id) === 'expired'"
                 (click)="resendInvite(user.id)"
                 [disabled]="resendingUserId === user.id"
                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                        background:none;border:none;cursor:pointer;padding:0;"
-              >{{ resendingUserId === user.id ? '…' : 'Resend' }}</button>
+              >{{ resendingUserId === user.id ? 'Sending…' : 'Resend' }}</button>
               <button
                 (click)="divisionsUserId === user.id ? closeDivisions() : openDivisions(user)"
                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
@@ -664,26 +675,31 @@ export class UsersComponent implements OnInit {
       });
   }
 
+  /** B-52 + B-64: every row resolves to a non-empty status. Null → 'not_yet_invited'.
+   *  Source: Contract 10 §7 B-52, Contract 11 §B-64. */
   inviteStatusFor(userId: string): string {
-    return this.inviteStatusMap.get(userId) ?? '';
+    return this.inviteStatusMap.get(userId) ?? 'not_yet_invited';
   }
 
   inviteBadgeBg(status: string): string {
-    if (status === 'active')  return '#e8f5e9';
-    if (status === 'invited') return '#fff8e1';
-    if (status === 'expired') return '#f5f5f5';
+    if (status === 'active')          return '#e8f5e9';
+    if (status === 'invited')         return '#fff8e1';
+    if (status === 'expired')         return '#fdecea';
+    if (status === 'not_yet_invited') return 'var(--triarq-color-background-subtle)';
     return 'transparent';
   }
   inviteBadgeColor(status: string): string {
-    if (status === 'active')  return '#2e7d32';
-    if (status === 'invited') return '#f57f17';
-    if (status === 'expired') return '#9e9e9e';
+    if (status === 'active')          return '#2e7d32';
+    if (status === 'invited')         return '#f57f17';
+    if (status === 'expired')         return 'var(--triarq-color-error)';
+    if (status === 'not_yet_invited') return 'var(--triarq-color-text-secondary)';
     return 'transparent';
   }
   inviteBadgeLabel(status: string): string {
-    if (status === 'active')  return 'Active';
-    if (status === 'invited') return 'Invited';
-    if (status === 'expired') return 'Expired';
+    if (status === 'active')          return 'Active';
+    if (status === 'invited')         return 'Invited — awaiting password set';
+    if (status === 'expired')         return 'Invite expired';
+    if (status === 'not_yet_invited') return 'Not Yet Invited';
     return '';
   }
 
@@ -942,9 +958,11 @@ export class UsersComponent implements OnInit {
   }
 
   // ── Presentation helpers ───────────────────────────────────────────────────
+  // B-51: Phil role displays as "Admin" with text-only badge (no solid fill).
+  // The DB role value remains 'phil' — display layer only. Source: Contract 10 §7 B-51.
   rolePillBg(role: SystemRole): string {
     const map: Record<SystemRole, string> = {
-      phil:  'var(--triarq-color-primary)',
+      phil:  '#e8f0f7',       // light Deep Navy tint (text-color badge, no solid fill)
       admin: '#e3f2fd',
       ds:    '#f3e5f5',
       cb:    '#e8f5e9',
@@ -955,13 +973,45 @@ export class UsersComponent implements OnInit {
 
   rolePillColor(role: SystemRole): string {
     const map: Record<SystemRole, string> = {
-      phil:  '#ffffff',
+      phil:  '#12274A',       // Deep Navy text — distinct from DS/CB but consistent pattern
       admin: '#1565c0',
       ds:    '#6a1b9a',
       cb:    '#2e7d32',
       ce:    '#e65100'
     };
     return map[role] ?? 'var(--triarq-color-text-secondary)';
+  }
+
+  /** B-51: display label override — 'phil' role renders as "Admin". */
+  roleDisplayLabel(role: SystemRole): string {
+    if (role === 'phil') { return 'Admin'; }
+    return role.toUpperCase();
+  }
+
+  /** B-53: dynamic role-filter tabs — only render tabs for roles with at least one user.
+   *  "All" tab always present. Source: Contract 10 §7 B-53. */
+  get visibleRoleFilters(): { value: string; label: string }[] {
+    const visible: { value: string; label: string }[] = [{ value: 'all', label: 'All' }];
+    const presentRoles = new Set(this.users.map(u => u.system_role));
+    // Order matters: DS, CB, CE, Admin, Phil — match prior layout.
+    const order: { value: SystemRole; label: string }[] = [
+      { value: 'ds',    label: 'DS' },
+      { value: 'cb',    label: 'CB' },
+      { value: 'ce',    label: 'CE' },
+      { value: 'admin', label: 'Admin' },
+      { value: 'phil',  label: 'Admin' } // B-51: 'phil' filter still valid; label "Admin" matches badge label
+    ];
+    for (const opt of order) {
+      if (presentRoles.has(opt.value)) {
+        // Avoid duplicate "Admin" label when both 'admin' and 'phil' exist — disambiguate.
+        if (opt.value === 'phil' && presentRoles.has('admin')) {
+          visible.push({ value: 'phil', label: 'Admin (Phil)' });
+        } else {
+          visible.push({ value: opt.value, label: opt.label });
+        }
+      }
+    }
+    return visible;
   }
 
   private setBlocked(primary: string, hint: string): void {

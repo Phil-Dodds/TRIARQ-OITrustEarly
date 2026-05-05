@@ -1,12 +1,16 @@
 // update_division.js
 // Updates mutable fields on a Division. Admin-only.
 // division_level and parent_division_id are not mutable after creation.
+// display_name_short added Migration 030 + Contract 10 §6 B-48 / Contract 11 §B-48.
 
 'use strict';
 
 const { supabase } = require('../db');
 
-const MUTABLE_FIELDS = ['division_name', 'division_type_label', 'owner_user_id'];
+const MUTABLE_FIELDS = ['division_name', 'display_name_short', 'division_type_label', 'owner_user_id'];
+
+// Contract 10 §6 B-48: max 10 chars on display_name_short.
+const DISPLAY_NAME_SHORT_MAX = 10;
 
 /**
  * @param {object} params
@@ -31,6 +35,24 @@ async function update_division(params, caller_user_id) {
       success: false,
       error: `The following fields cannot be updated: ${immutableAttempts.join(', ')}. Mutable fields: ${MUTABLE_FIELDS.join(', ')}.`
     };
+  }
+
+  // Validate display_name_short — non-empty string ≤ 10 chars (Contract 10 §6 B-48).
+  if (updates.display_name_short !== undefined && updates.display_name_short !== null) {
+    if (typeof updates.display_name_short !== 'string') {
+      return { success: false, error: 'display_name_short must be a string.' };
+    }
+    const trimmed = updates.display_name_short.trim();
+    if (trimmed.length === 0) {
+      return { success: false, error: 'Short Name is required and cannot be empty.' };
+    }
+    if (trimmed.length > DISPLAY_NAME_SHORT_MAX) {
+      return {
+        success: false,
+        error: `Short Name must be ${DISPLAY_NAME_SHORT_MAX} characters or fewer.`
+      };
+    }
+    updates.display_name_short = trimmed;
   }
 
   // Verify caller is admin
