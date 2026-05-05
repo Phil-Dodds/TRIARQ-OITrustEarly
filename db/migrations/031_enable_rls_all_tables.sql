@@ -7,16 +7,21 @@
 -- =============================================================================
 --
 -- AMENDMENTS TO sec-01-rls-spec-2026-05-04.md (Phil + Code, 2026-05-04):
---   1. auth.user_is_admin() predicate: role IN ('phil','admin') →
+--   1. public.user_is_admin() predicate: role IN ('phil','admin') →
 --      system_role = 'phil'. Schema rename (role → system_role) AND admin
 --      model truth: admin not implemented at the data layer; only 'phil' is
 --      super-admin today. Per session option (c).
---   2. auth.user_division_ids() filter: AND revoked_at IS NULL added alongside
+--   2. public.user_division_ids() filter: AND revoked_at IS NULL added alongside
 --      AND deleted_at IS NULL. division_memberships is soft-revocable; revoked
 --      memberships must not grant access.
 --   3. users-table policies use id (PK) not user_id. Spec assumed user_id which
 --      does not exist on public.users.
--- All three deviations are CodeClose candidates per D-332.
+--   4. Helper functions live in public schema, not auth schema. Supabase
+--      restricts the auth schema to supabase_auth_admin; SQL-editor sessions
+--      get "permission denied for schema auth" on CREATE FUNCTION auth.*.
+--      SECURITY DEFINER semantics are unchanged in public schema. Discovered
+--      on first apply attempt (2026-05-04), atomic rollback caught it cleanly.
+-- All four deviations are CodeClose candidates per D-332.
 --
 -- DEFERRED FROM SPEC (this migration):
 --   user_screen_state — table does not exist in public schema. Spec §4
@@ -35,8 +40,9 @@ BEGIN;
 
 -- True iff the calling user holds the 'phil' system_role.
 -- Function name retained for spec continuity; semantically: super-admin check.
+-- Lives in public (not auth) per amendment 4: Supabase restricts auth schema.
 -- SECURITY DEFINER prevents RLS recursion when other tables' policies call it.
-CREATE OR REPLACE FUNCTION auth.user_is_admin()
+CREATE OR REPLACE FUNCTION public.user_is_admin()
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT EXISTS (
@@ -49,8 +55,9 @@ $$;
 
 -- Division ids the calling user is a current member of.
 -- revoked_at IS NULL excludes soft-revoked memberships.
+-- Lives in public (not auth) per amendment 4: Supabase restricts auth schema.
 -- SECURITY DEFINER prevents RLS recursion via division_memberships policy.
-CREATE OR REPLACE FUNCTION auth.user_division_ids()
+CREATE OR REPLACE FUNCTION public.user_division_ids()
 RETURNS SETOF uuid
 LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT division_id
@@ -69,19 +76,19 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users_select"
   ON public.users FOR SELECT
-  USING (id = auth.uid() OR auth.user_is_admin());
+  USING (id = auth.uid() OR public.user_is_admin());
 
 CREATE POLICY "users_insert"
   ON public.users FOR INSERT
-  WITH CHECK (auth.user_is_admin());
+  WITH CHECK (public.user_is_admin());
 
 CREATE POLICY "users_update"
   ON public.users FOR UPDATE
-  USING (id = auth.uid() OR auth.user_is_admin());
+  USING (id = auth.uid() OR public.user_is_admin());
 
 CREATE POLICY "users_delete"
   ON public.users FOR DELETE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 -- divisions
 ALTER TABLE public.divisions ENABLE ROW LEVEL SECURITY;
@@ -92,34 +99,34 @@ CREATE POLICY "divisions_select"
 
 CREATE POLICY "divisions_insert"
   ON public.divisions FOR INSERT
-  WITH CHECK (auth.user_is_admin());
+  WITH CHECK (public.user_is_admin());
 
 CREATE POLICY "divisions_update"
   ON public.divisions FOR UPDATE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 CREATE POLICY "divisions_delete"
   ON public.divisions FOR DELETE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 -- division_memberships
 ALTER TABLE public.division_memberships ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "division_memberships_select"
   ON public.division_memberships FOR SELECT
-  USING (user_id = auth.uid() OR auth.user_is_admin());
+  USING (user_id = auth.uid() OR public.user_is_admin());
 
 CREATE POLICY "division_memberships_insert"
   ON public.division_memberships FOR INSERT
-  WITH CHECK (auth.user_is_admin());
+  WITH CHECK (public.user_is_admin());
 
 CREATE POLICY "division_memberships_update"
   ON public.division_memberships FOR UPDATE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 CREATE POLICY "division_memberships_delete"
   ON public.division_memberships FOR DELETE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 -- artifacts (Build B will refine; this is restrictive baseline)
 ALTER TABLE public.artifacts ENABLE ROW LEVEL SECURITY;
@@ -127,8 +134,8 @@ ALTER TABLE public.artifacts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "artifacts_select"
   ON public.artifacts FOR SELECT
   USING (
-    division_id IN (SELECT auth.user_division_ids())
-    OR auth.user_is_admin()
+    division_id IN (SELECT public.user_division_ids())
+    OR public.user_is_admin()
   );
 
 CREATE POLICY "artifacts_insert"
@@ -137,11 +144,11 @@ CREATE POLICY "artifacts_insert"
 
 CREATE POLICY "artifacts_update"
   ON public.artifacts FOR UPDATE
-  USING (submitted_by = auth.uid() OR auth.user_is_admin());
+  USING (submitted_by = auth.uid() OR public.user_is_admin());
 
 CREATE POLICY "artifacts_delete"
   ON public.artifacts FOR DELETE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 -- ---------------------------------------------------------------------------
 -- BUILD C TABLES
@@ -156,15 +163,15 @@ CREATE POLICY "delivery_workstreams_select"
 
 CREATE POLICY "delivery_workstreams_insert"
   ON public.delivery_workstreams FOR INSERT
-  WITH CHECK (auth.user_is_admin());
+  WITH CHECK (public.user_is_admin());
 
 CREATE POLICY "delivery_workstreams_update"
   ON public.delivery_workstreams FOR UPDATE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 CREATE POLICY "delivery_workstreams_delete"
   ON public.delivery_workstreams FOR DELETE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 -- workstream_members
 ALTER TABLE public.workstream_members ENABLE ROW LEVEL SECURITY;
@@ -175,15 +182,15 @@ CREATE POLICY "workstream_members_select"
 
 CREATE POLICY "workstream_members_insert"
   ON public.workstream_members FOR INSERT
-  WITH CHECK (auth.user_is_admin());
+  WITH CHECK (public.user_is_admin());
 
 CREATE POLICY "workstream_members_update"
   ON public.workstream_members FOR UPDATE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 CREATE POLICY "workstream_members_delete"
   ON public.workstream_members FOR DELETE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 -- delivery_cycles
 ALTER TABLE public.delivery_cycles ENABLE ROW LEVEL SECURITY;
@@ -191,8 +198,8 @@ ALTER TABLE public.delivery_cycles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "delivery_cycles_select"
   ON public.delivery_cycles FOR SELECT
   USING (
-    division_id IN (SELECT auth.user_division_ids())
-    OR auth.user_is_admin()
+    division_id IN (SELECT public.user_division_ids())
+    OR public.user_is_admin()
   );
 
 CREATE POLICY "delivery_cycles_insert"
@@ -205,7 +212,7 @@ CREATE POLICY "delivery_cycles_update"
 
 CREATE POLICY "delivery_cycles_delete"
   ON public.delivery_cycles FOR DELETE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 -- cycle_milestone_dates
 ALTER TABLE public.cycle_milestone_dates ENABLE ROW LEVEL SECURITY;
@@ -215,10 +222,10 @@ CREATE POLICY "cycle_milestone_dates_select"
   USING (
     delivery_cycle_id IN (
       SELECT delivery_cycle_id FROM public.delivery_cycles
-      WHERE division_id IN (SELECT auth.user_division_ids())
+      WHERE division_id IN (SELECT public.user_division_ids())
         AND deleted_at IS NULL
     )
-    OR auth.user_is_admin()
+    OR public.user_is_admin()
   );
 -- No INSERT/UPDATE policy — service role bypasses RLS; MCP writes these rows.
 
@@ -230,10 +237,10 @@ CREATE POLICY "gate_records_select"
   USING (
     delivery_cycle_id IN (
       SELECT delivery_cycle_id FROM public.delivery_cycles
-      WHERE division_id IN (SELECT auth.user_division_ids())
+      WHERE division_id IN (SELECT public.user_division_ids())
         AND deleted_at IS NULL
     )
-    OR auth.user_is_admin()
+    OR public.user_is_admin()
   );
 -- No INSERT/UPDATE policy — service role bypasses RLS; MCP writes these rows.
 
@@ -245,10 +252,10 @@ CREATE POLICY "cycle_event_log_select"
   USING (
     delivery_cycle_id IN (
       SELECT delivery_cycle_id FROM public.delivery_cycles
-      WHERE division_id IN (SELECT auth.user_division_ids())
+      WHERE division_id IN (SELECT public.user_division_ids())
         AND deleted_at IS NULL
     )
-    OR auth.user_is_admin()
+    OR public.user_is_admin()
   );
 -- No INSERT policy — MCP service role appends all events.
 
@@ -267,10 +274,10 @@ CREATE POLICY "cycle_artifacts_select"
   USING (
     delivery_cycle_id IN (
       SELECT delivery_cycle_id FROM public.delivery_cycles
-      WHERE division_id IN (SELECT auth.user_division_ids())
+      WHERE division_id IN (SELECT public.user_division_ids())
         AND deleted_at IS NULL
     )
-    OR auth.user_is_admin()
+    OR public.user_is_admin()
   );
 
 CREATE POLICY "cycle_artifacts_insert"
@@ -279,11 +286,11 @@ CREATE POLICY "cycle_artifacts_insert"
 
 CREATE POLICY "cycle_artifacts_update"
   ON public.cycle_artifacts FOR UPDATE
-  USING (attached_by_user_id = auth.uid() OR auth.user_is_admin());
+  USING (attached_by_user_id = auth.uid() OR public.user_is_admin());
 
 CREATE POLICY "cycle_artifacts_delete"
   ON public.cycle_artifacts FOR DELETE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 -- jira_links
 ALTER TABLE public.jira_links ENABLE ROW LEVEL SECURITY;
@@ -293,10 +300,10 @@ CREATE POLICY "jira_links_select"
   USING (
     delivery_cycle_id IN (
       SELECT delivery_cycle_id FROM public.delivery_cycles
-      WHERE division_id IN (SELECT auth.user_division_ids())
+      WHERE division_id IN (SELECT public.user_division_ids())
         AND deleted_at IS NULL
     )
-    OR auth.user_is_admin()
+    OR public.user_is_admin()
   );
 -- No INSERT/UPDATE policy — MCP writes these rows.
 
@@ -316,15 +323,15 @@ CREATE POLICY "division_gate_approvers_select"
 
 CREATE POLICY "division_gate_approvers_insert"
   ON public.division_gate_approvers FOR INSERT
-  WITH CHECK (auth.user_is_admin());
+  WITH CHECK (public.user_is_admin());
 
 CREATE POLICY "division_gate_approvers_update"
   ON public.division_gate_approvers FOR UPDATE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 CREATE POLICY "division_gate_approvers_delete"
   ON public.division_gate_approvers FOR DELETE
-  USING (auth.user_is_admin());
+  USING (public.user_is_admin());
 
 -- system_config
 -- D-MaintenanceMode exception: SELECT TRUE so Angular bootstrap reads
