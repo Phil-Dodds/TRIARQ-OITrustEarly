@@ -5,7 +5,13 @@
 
 import { NgModule }                  from '@angular/core';
 import { BrowserModule }             from '@angular/platform-browser';
-import { BrowserAnimationsModule }   from '@angular/platform-browser/animations';
+// NoopAnimationsModule (not BrowserAnimationsModule) — the federation config at
+// federation.config.js skips '@angular/animations/browser' from the import map
+// because of a known esbuild conditional-import resolution issue with that
+// package. NoopAnimationsModule provides the AnimationsModule contract that
+// MatDialog (S-014, D-355) requires without pulling in the browser animation
+// engine. Modal behaviour is identical; transitions are instant.
+import { NoopAnimationsModule }       from '@angular/platform-browser/animations';
 import { HttpClientModule }          from '@angular/common/http';
 import { ReactiveFormsModule }       from '@angular/forms';
 import { IonicModule }               from '@ionic/angular';
@@ -22,8 +28,7 @@ import { BlockedActionComponent }    from './shared/components/blocked-action/bl
   ],
   imports: [
     BrowserModule,
-    // Required by @angular/material — MatDialog uses Angular animations (S-014, D-355).
-    BrowserAnimationsModule,
+    NoopAnimationsModule,
     HttpClientModule,
     ReactiveFormsModule,
     IonicModule.forRoot(),
