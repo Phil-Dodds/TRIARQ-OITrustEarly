@@ -112,26 +112,34 @@ const NEXT_GATE_BY_STAGE = {
   ON_HOLD:   null
 };
 
-// WIP category for each lifecycle stage (D-190).
-// Prep = BRIEF/DESIGN/SPEC. Build = BUILD/VALIDATE. Outcome = PILOT/UAT/RELEASE/OUTCOME.
-// COMPLETE, CANCELLED, ON_HOLD are excluded from WIP counting (null).
+// WIP category for each lifecycle stage (D-WIPLimit-2026-04-06, supersedes D-190).
+//   pre_build  = DESIGN, SPEC                (BRIEF excluded — pre-design)
+//   build      = BUILD, VALIDATE, UAT
+//   post_deploy = PILOT, RELEASE, OUTCOME
+// COMPLETE, CANCELLED, ON_HOLD, BRIEF excluded from WIP counting (null).
 const WIP_CATEGORY_BY_STAGE = {
-  BRIEF:    'prep',
-  DESIGN:   'prep',
-  SPEC:     'prep',
-  BUILD:    'build',
-  VALIDATE: 'build',
-  PILOT:    'outcome',
-  UAT:      'outcome',
-  RELEASE:  'outcome',
-  OUTCOME:  'outcome',
+  BRIEF:     null,
+  DESIGN:    'pre_build',
+  SPEC:      'pre_build',
+  BUILD:     'build',
+  VALIDATE:  'build',
+  UAT:       'build',
+  PILOT:     'post_deploy',
+  RELEASE:   'post_deploy',
+  OUTCOME:   'post_deploy',
   COMPLETE:  null,
   CANCELLED: null,
   ON_HOLD:   null
 };
 
-// WIP limit per category per workstream (D-190).
-const WIP_LIMIT = 4;
+// WIP limit per zone per workstream — default 3/3/3 (D-WIPLimit-2026-04-06).
+// Per-workstream override via wip_limit_* columns is a future enhancement;
+// no migration in Contract 13 — defaults applied at MCP layer.
+const WIP_LIMIT_PRE_BUILD  = 3;
+const WIP_LIMIT_BUILD      = 3;
+const WIP_LIMIT_POST_DEPLOY = 3;
+// Legacy alias retained for compatibility with any caller still importing WIP_LIMIT.
+const WIP_LIMIT = 3;
 
 module.exports = {
   STAGE_SEQUENCE,
@@ -142,6 +150,9 @@ module.exports = {
   NEXT_GATE_BY_STAGE,
   WIP_CATEGORY_BY_STAGE,
   WIP_LIMIT,
+  WIP_LIMIT_PRE_BUILD,
+  WIP_LIMIT_BUILD,
+  WIP_LIMIT_POST_DEPLOY,
   nextStage,
   prevStage,
   gatesResetOnRegressionTo

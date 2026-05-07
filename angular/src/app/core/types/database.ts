@@ -352,22 +352,28 @@ export interface PendingApprovalItem {
 
 // ── Build C — Dashboard summary types (D-171–D-176) ──────────────────────────
 
-/** WIP category counts per workstream. Prep = BRIEF/DESIGN/SPEC; Build = BUILD/VALIDATE;
- *  Outcome = PILOT/UAT/RELEASE/OUTCOME. Limit = 4 each (D-190). */
+/** WIP zone counts per workstream (D-WIPLimit-2026-04-06).
+ *  pre_build  = DESIGN, SPEC
+ *  build      = BUILD, VALIDATE, UAT
+ *  post_deploy = PILOT, RELEASE, OUTCOME
+ *  Default limit is 3 per zone per workstream. Future: per-workstream override. */
 export interface WorkstreamSummaryItem {
-  workstream_id:          string | null;  // null = cycles with no workstream assigned
-  workstream_name:        string;
-  home_division_id:       string | null;
-  home_division_name:     string;
-  active_status:          boolean;
-  total_active_cycles:    number;
-  wip_prep:               number;
-  wip_build:              number;
-  wip_outcome:            number;
-  wip_prep_exceeded:      boolean;
-  wip_build_exceeded:     boolean;
-  wip_outcome_exceeded:   boolean;
-  cycles_by_next_gate:    Record<GateName | 'none', number>;
+  workstream_id:             string | null;  // null = cycles with no workstream assigned
+  workstream_name:           string;
+  home_division_id:          string | null;
+  home_division_name:        string;
+  active_status:             boolean;
+  total_active_cycles:       number;
+  wip_pre_build:             number;
+  wip_build:                 number;
+  wip_post_deploy:           number;
+  wip_pre_build_limit:       number;
+  wip_build_limit:           number;
+  wip_post_deploy_limit:     number;
+  wip_pre_build_exceeded:    boolean;
+  wip_build_exceeded:        boolean;
+  wip_post_deploy_exceeded:  boolean;
+  cycles_by_next_gate:       Record<GateName | 'none', number>;
 }
 
 /** Gate-level pending/upcoming/overdue summary for the Gate Summary view. */

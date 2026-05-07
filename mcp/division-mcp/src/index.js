@@ -25,6 +25,7 @@ const { revoke_division_membership } = require('./tools/revoke_division_membersh
 const { get_user_divisions }       = require('./tools/get_user_divisions');
 const { create_user }              = require('./tools/create_user');
 const { update_user }              = require('./tools/update_user');
+const { update_user_email }        = require('./tools/update_user_email');
 const { list_users }               = require('./tools/list_users');
 const { get_user_invite_statuses } = require('./tools/get_user_invite_statuses');
 const { resend_invite }            = require('./tools/resend_invite');
@@ -65,6 +66,7 @@ app.post('/tools/:toolName', async (req, res) => {
     get_user_divisions,
     create_user,
     update_user,
+    update_user_email,
     list_users,
     get_user_invite_statuses,
     resend_invite
@@ -129,6 +131,7 @@ app.get('/tools', (req, res) => {
       { name: 'get_user_divisions',       method: 'POST', path: '/tools/get_user_divisions' },
       { name: 'create_user',              method: 'POST', path: '/tools/create_user' },
       { name: 'update_user',              method: 'POST', path: '/tools/update_user' },
+      { name: 'update_user_email',        method: 'POST', path: '/tools/update_user_email' },
       { name: 'list_users',               method: 'POST', path: '/tools/list_users' },
       { name: 'get_user_invite_statuses', method: 'POST', path: '/tools/get_user_invite_statuses' },
       { name: 'resend_invite',            method: 'POST', path: '/tools/resend_invite' }

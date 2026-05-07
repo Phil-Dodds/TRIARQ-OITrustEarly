@@ -16,7 +16,9 @@ const { supabase } = require('../db');
 const {
   NEXT_GATE_BY_STAGE,
   WIP_CATEGORY_BY_STAGE,
-  WIP_LIMIT,
+  WIP_LIMIT_PRE_BUILD,
+  WIP_LIMIT_BUILD,
+  WIP_LIMIT_POST_DEPLOY,
   ALL_GATES
 } = require('../lifecycle');
 
@@ -138,41 +140,34 @@ async function get_delivery_summary(params, caller_id) {
   const UNASSIGNED_KEY = '__none__';
   const workstreamMap  = new Map();
 
-  for (const ws of (workstreams ?? [])) {
-    const homeDivName = ws.home_division?.division_name ?? '';
-    workstreamMap.set(ws.workstream_id, {
-      workstream_id:          ws.workstream_id,
-      workstream_name:        ws.workstream_name,
-      home_division_id:       ws.home_division_id,
-      home_division_name:     homeDivName,
-      active_status:          ws.active_status,
-      total_active_cycles:    0,
-      wip_prep:               0,
-      wip_build:              0,
-      wip_outcome:            0,
-      wip_prep_exceeded:      false,
-      wip_build_exceeded:     false,
-      wip_outcome_exceeded:   false,
-      cycles_by_next_gate:    buildEmptyGateCountMap()
-    });
+  function newWorkstreamRow(ws) {
+    return {
+      workstream_id:           ws?.workstream_id ?? null,
+      workstream_name:         ws?.workstream_name ?? '(No workstream assigned)',
+      home_division_id:        ws?.home_division_id ?? null,
+      home_division_name:      ws?.home_division?.division_name ?? '',
+      active_status:           ws ? ws.active_status : true,
+      total_active_cycles:     0,
+      // D-WIPLimit-2026-04-06 zone names + per-workstream limits.
+      wip_pre_build:           0,
+      wip_build:               0,
+      wip_post_deploy:         0,
+      wip_pre_build_limit:     WIP_LIMIT_PRE_BUILD,
+      wip_build_limit:         WIP_LIMIT_BUILD,
+      wip_post_deploy_limit:   WIP_LIMIT_POST_DEPLOY,
+      wip_pre_build_exceeded:  false,
+      wip_build_exceeded:      false,
+      wip_post_deploy_exceeded: false,
+      cycles_by_next_gate:     buildEmptyGateCountMap()
+    };
   }
 
-  // Bucket for cycles with no workstream assigned (D-165: optional at creation)
-  workstreamMap.set(UNASSIGNED_KEY, {
-    workstream_id:          null,
-    workstream_name:        '(No workstream assigned)',
-    home_division_id:       null,
-    home_division_name:     '',
-    active_status:          true,
-    total_active_cycles:    0,
-    wip_prep:               0,
-    wip_build:              0,
-    wip_outcome:            0,
-    wip_prep_exceeded:      false,
-    wip_build_exceeded:     false,
-    wip_outcome_exceeded:   false,
-    cycles_by_next_gate:    buildEmptyGateCountMap()
-  });
+  for (const ws of (workstreams ?? [])) {
+    workstreamMap.set(ws.workstream_id, newWorkstreamRow(ws));
+  }
+
+  // Bucket for cycles with no workstream assigned (D-165: optional at creation).
+  workstreamMap.set(UNASSIGNED_KEY, newWorkstreamRow(null));
 
   for (const cycle of (cycles ?? [])) {
     const wsKey = cycle.workstream_id ?? UNASSIGNED_KEY;
@@ -181,10 +176,10 @@ async function get_delivery_summary(params, caller_id) {
 
     entry.total_active_cycles++;
 
-    const wipCat  = WIP_CATEGORY_BY_STAGE[cycle.current_lifecycle_stage];
-    if (wipCat === 'prep')    { entry.wip_prep++;    }
-    if (wipCat === 'build')   { entry.wip_build++;   }
-    if (wipCat === 'outcome') { entry.wip_outcome++; }
+    const wipCat = WIP_CATEGORY_BY_STAGE[cycle.current_lifecycle_stage];
+    if (wipCat === 'pre_build')   { entry.wip_pre_build++;   }
+    if (wipCat === 'build')       { entry.wip_build++;       }
+    if (wipCat === 'post_deploy') { entry.wip_post_deploy++; }
 
     const nextGate = NEXT_GATE_BY_STAGE[cycle.current_lifecycle_stage] ?? 'none';
     if (nextGate in entry.cycles_by_next_gate) {
@@ -192,12 +187,12 @@ async function get_delivery_summary(params, caller_id) {
     }
   }
 
-  // Mark exceeded flags; convert map to array (only entries with cycles or real workstreams)
+  // D-WIPLimit-2026-04-06: zone is "exceeded" when count is at or over the limit.
   const workstream_summaries = [];
   for (const [key, entry] of workstreamMap) {
-    entry.wip_prep_exceeded    = entry.wip_prep    > WIP_LIMIT;
-    entry.wip_build_exceeded   = entry.wip_build   > WIP_LIMIT;
-    entry.wip_outcome_exceeded = entry.wip_outcome > WIP_LIMIT;
+    entry.wip_pre_build_exceeded   = entry.wip_pre_build   >= entry.wip_pre_build_limit;
+    entry.wip_build_exceeded       = entry.wip_build       >= entry.wip_build_limit;
+    entry.wip_post_deploy_exceeded = entry.wip_post_deploy >= entry.wip_post_deploy_limit;
 
     // Include real workstreams always; include unassigned bucket only when it has cycles
     if (key !== UNASSIGNED_KEY || entry.total_active_cycles > 0) {

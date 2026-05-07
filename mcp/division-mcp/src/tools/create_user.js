@@ -2,7 +2,12 @@
 // Creates a user: sends Supabase Auth invite and inserts public.users record.
 // Admin-only. Enforces allow_both_admin_and_functional_roles = false default (D-139).
 // Invite fires automatically on user creation — no separate "Send Invite" button (D-248).
-// Dev bypass removed (Auth Contract 2026-04-14).
+//
+// D-354: invite email contains a 6-digit OTP, not a magic link. The Supabase
+// email template uses {{ .Token }} (configured in Auth dashboard). User goes to
+// /login, enters their email, then enters the OTP at /auth/verify-otp. The
+// redirectTo URL is unused by the OTP-only template but Supabase requires it —
+// we point it at the app root.
 
 'use strict';
 
@@ -10,11 +15,12 @@ const { supabase } = require('../db');
 
 const VALID_ROLES = ['phil', 'ds', 'cb', 'ce', 'admin'];
 
-// Redirect target for invite emails — user lands on set-password screen (D-248).
-// Set APP_PASSWORD_SET_URL env var on Render. Falls back to GitHub Pages URL.
+// Inert redirect URL — see header comment. Override with APP_INVITE_REDIRECT_URL
+// if a Supabase template variant ever needs it.
 const INVITE_REDIRECT_URL =
+  process.env.APP_INVITE_REDIRECT_URL ||
   process.env.APP_PASSWORD_SET_URL ||
-  'https://phil-dodds.github.io/TRIARQ-OITrustEarly/auth/set-password';
+  'https://phil-dodds.github.io/TRIARQ-OITrustEarly/login';
 
 /**
  * @param {object} params
@@ -87,7 +93,7 @@ async function create_user(params, caller_user_id) {
   // If the above check is insufficient, the inviteUserByEmail call will return an error
   // for already-confirmed emails, which we surface as a distinct user-facing error.
 
-  // Send Supabase Auth invite — creates auth.users record and emails the set-password link.
+  // Send Supabase Auth invite — creates auth.users record and emails the OTP (D-354).
   const normalizedEmail = email.toLowerCase().trim();
   const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
     normalizedEmail,

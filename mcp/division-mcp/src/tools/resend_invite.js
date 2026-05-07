@@ -7,9 +7,12 @@
 
 const { supabase } = require('../db');
 
+// D-354: invite email contains a 6-digit OTP, not a magic link. redirectTo is
+// unused by the OTP template but Supabase requires it — point at the app root.
 const INVITE_REDIRECT_URL =
+  process.env.APP_INVITE_REDIRECT_URL ||
   process.env.APP_PASSWORD_SET_URL ||
-  'https://phil-dodds.github.io/TRIARQ-OITrustEarly/auth/set-password';
+  'https://phil-dodds.github.io/TRIARQ-OITrustEarly/login';
 
 /**
  * @param {object} params
@@ -61,7 +64,7 @@ async function resend_invite(params, caller_user_id) {
   if (authUser.user.email_confirmed_at) {
     return {
       success: false,
-      error: 'This user has already confirmed their email and set a password. Invite cannot be resent.'
+      error: 'This user has already confirmed their email. Invite cannot be resent.'
     };
   }
 

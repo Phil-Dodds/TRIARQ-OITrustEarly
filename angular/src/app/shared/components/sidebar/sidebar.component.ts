@@ -125,7 +125,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
       case 'new':         return '** New';
       case 'uat':         return '** UAT';
       case 'pilot':       return '** Pilot';
-      case 'not-started': return '** Not Started';
+      // D-356 (Contract 13): unbuilt nav surfaces use "Coming Soon" wording.
+      case 'not-started': return '** Coming Soon';
     }
   }
 

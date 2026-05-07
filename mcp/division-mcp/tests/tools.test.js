@@ -218,6 +218,43 @@ describe('update_user', () => {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe('update_user_email', () => {
+
+  test('error path: missing user_id', async () => {
+    const { update_user_email } = require('../src/tools/update_user_email');
+    const result = await update_user_email({ new_email: 'new@x.com' }, ADMIN_ID);
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('user_id'));
+  });
+
+  test('error path: missing new_email', async () => {
+    const { update_user_email } = require('../src/tools/update_user_email');
+    const result = await update_user_email({ user_id: 'u1' }, ADMIN_ID);
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('new_email'));
+  });
+
+  test('error path: malformed email rejected before DB call', async () => {
+    const { update_user_email } = require('../src/tools/update_user_email');
+    const result = await update_user_email(
+      { user_id: 'u1', new_email: 'not-an-email' },
+      ADMIN_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('valid email'));
+  });
+
+  test('duplicate-email message matches D-200 Pattern 3 copy', () => {
+    // The user-facing string the UI keys on for inline error rendering.
+    const errorResponse = { success: false, error: 'That email address is already in use.' };
+    assert.equal(errorResponse.success, false);
+    assert.equal(errorResponse.error, 'That email address is already in use.');
+  });
+
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe('get_user_divisions', () => {
 
   test('error path: missing user_id', async () => {

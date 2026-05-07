@@ -164,6 +164,13 @@ interface UserDivisionsData {
                   font-size:var(--triarq-text-small);color:#2e7d32;">
         {{ resendSuccessMsg }}
       </div>
+      <!-- Edit success snackbar (D-354 §4) ─────────────────────────────────── -->
+      <div *ngIf="editSuccessMsg"
+           style="background:#e8f5e9;border:1px solid #81c784;border-radius:8px;
+                  padding:8px 12px;margin-bottom:var(--triarq-space-sm);
+                  font-size:var(--triarq-text-small);color:#2e7d32;">
+        {{ editSuccessMsg }}
+      </div>
       <div *ngIf="resendError"
            style="background:#fff3f3;border:1px solid #f5a0a0;border-radius:8px;
                   padding:8px 12px;margin-bottom:var(--triarq-space-sm);
@@ -317,13 +324,36 @@ interface UserDivisionsData {
                      border-bottom:1px solid var(--triarq-color-border);"
             >
               <form [formGroup]="editForm" (ngSubmit)="submitEdit()">
-                <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:2fr 1fr 1fr auto;
+                <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:2fr 2fr 1fr 1fr auto;
                             align-items:end;">
                   <div>
                     <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
                       Display Name *
                     </label>
                     <input formControlName="display_name" class="oi-input" style="width:100%;" />
+                  </div>
+                  <!-- D-354 §4 / D-169: Email Address — admin-only edit -->
+                  <div>
+                    <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                      Email Address *
+                    </label>
+                    <input
+                      formControlName="email"
+                      type="email"
+                      autocomplete="email"
+                      class="oi-input"
+                      style="width:100%;"
+                      [class.oi-input-error]="emailFieldInvalid"
+                    />
+                    <!-- D-200 Pattern 3: inline error directly under the field -->
+                    <div
+                      *ngIf="emailFieldInvalid"
+                      style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
+                    >Enter a valid email address.</div>
+                    <div
+                      *ngIf="emailDuplicateError"
+                      style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
+                    >That email address is already in use.</div>
                   </div>
                   <div>
                     <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
@@ -549,10 +579,13 @@ export class UsersComponent implements OnInit {
   ];
 
   // ── Edit user state ────────────────────────────────────────────────────────
-  editingUserId:   string | null = null;
-  editForm!:       FormGroup;
-  saving           = false;
-  editError        = '';
+  editingUserId:    string | null = null;
+  editingUserOriginalEmail = '';
+  editForm!:        FormGroup;
+  saving            = false;
+  editError         = '';
+  emailDuplicateError = false;
+  editSuccessMsg    = '';
 
   // ── Division assignment state ──────────────────────────────────────────────
   divisionsUserId:       string | null = null;
@@ -584,6 +617,7 @@ export class UsersComponent implements OnInit {
     });
     this.editForm = this.fb.group({
       display_name: ['', Validators.required],
+      email:        ['', [Validators.required, Validators.email]],
       system_role:  ['', Validators.required],
       is_active:    [true]
     });
@@ -696,8 +730,9 @@ export class UsersComponent implements OnInit {
     return 'transparent';
   }
   inviteBadgeLabel(status: string): string {
+    // D-354: labels updated for OTP flow (no password set step).
     if (status === 'active')          return 'Active';
-    if (status === 'invited')         return 'Invited — awaiting password set';
+    if (status === 'invited')         return 'Invited — awaiting code entry';
     if (status === 'expired')         return 'Invite expired';
     if (status === 'not_yet_invited') return 'Not Yet Invited';
     return '';
@@ -777,12 +812,20 @@ export class UsersComponent implements OnInit {
   }
 
   // ── Edit user ───────────────────────────────────────────────────────────────
+  get emailFieldInvalid(): boolean {
+    const c = this.editForm?.get('email');
+    return !!(c?.invalid && c?.touched);
+  }
+
   startEdit(user: User): void {
-    this.editingUserId  = user.id;
-    this.editError      = '';
-    this.divisionsUserId = null;  // close division panel if open
+    this.editingUserId            = user.id;
+    this.editingUserOriginalEmail = user.email;
+    this.editError                = '';
+    this.emailDuplicateError      = false;
+    this.divisionsUserId          = null;  // close division panel if open
     this.editForm.setValue({
       display_name: user.display_name,
+      email:        user.email,
       system_role:  user.system_role,
       is_active:    user.is_active
     });
@@ -790,40 +833,96 @@ export class UsersComponent implements OnInit {
   }
 
   cancelEdit(): void {
-    this.editingUserId = null;
-    this.editError     = '';
+    this.editingUserId            = null;
+    this.editingUserOriginalEmail = '';
+    this.editError                = '';
+    this.emailDuplicateError      = false;
     this.cdr.markForCheck();
   }
 
+  /**
+   * D-354 §4: when the email field changes, run update_user_email first via the
+   * dedicated MCP tool (which calls supabase.auth.admin.updateUserById). Other
+   * field updates flow through update_user as before. Email is intentionally
+   * NOT a mutable field on update_user — D-169 admin-only, plus the auth-side
+   * update is the source of truth.
+   */
   submitEdit(): void {
     if (this.editForm.invalid || !this.editingUserId) { return; }
-    this.saving    = true;
-    this.editError = '';
+    this.saving              = true;
+    this.editError           = '';
+    this.emailDuplicateError = false;
     this.cdr.markForCheck();
 
+    const userId      = this.editingUserId;
+    const newEmail    = (this.editForm.value.email as string).trim().toLowerCase();
+    const emailChanged = newEmail !== this.editingUserOriginalEmail.toLowerCase();
+
+    const updateOtherFields = (): void => {
+      this.mcp
+        .call<User>('division', 'update_user', {
+          user_id: userId,
+          updates: {
+            display_name: this.editForm.value.display_name as string,
+            system_role:  this.editForm.value.system_role  as SystemRole,
+            is_active:    this.editForm.value.is_active    as boolean
+          }
+        })
+        .subscribe({
+          next: (res) => {
+            if (res.success) {
+              this.editingUserId            = null;
+              this.editingUserOriginalEmail = '';
+              this.editSuccessMsg           = 'User updated.';
+              this.loadUsers();
+              setTimeout(() => { this.editSuccessMsg = ''; this.cdr.markForCheck(); }, 4000);
+            } else {
+              this.editError = res.error ?? 'Save failed.';
+            }
+            this.saving = false;
+            this.cdr.markForCheck();
+          },
+          error: (err: { error?: string }) => {
+            this.editError = err.error ?? 'Save failed. Check permissions and try again.';
+            this.saving    = false;
+            this.cdr.markForCheck();
+          }
+        });
+    };
+
+    if (!emailChanged) {
+      updateOtherFields();
+      return;
+    }
+
     this.mcp
-      .call<User>('division', 'update_user', {
-        user_id: this.editingUserId,
-        updates: {
-          display_name: this.editForm.value.display_name as string,
-          system_role:  this.editForm.value.system_role  as SystemRole,
-          is_active:    this.editForm.value.is_active    as boolean
-        }
+      .call<User>('division', 'update_user_email', {
+        user_id:   userId,
+        new_email: newEmail
       })
       .subscribe({
         next: (res) => {
           if (res.success) {
-            this.editingUserId = null;
-            this.loadUsers();
+            updateOtherFields();
           } else {
-            this.editError = res.error ?? 'Save failed.';
+            const msg = res.error ?? 'Could not update email.';
+            if (/already.*in use/i.test(msg)) {
+              this.emailDuplicateError = true;
+            } else {
+              this.editError = msg;
+            }
+            this.saving = false;
+            this.cdr.markForCheck();
           }
-          this.saving = false;
-          this.cdr.markForCheck();
         },
         error: (err: { error?: string }) => {
-          this.editError = err.error ?? 'Save failed. Check permissions and try again.';
-          this.saving    = false;
+          const msg = err.error ?? 'Could not update email.';
+          if (/already.*in use/i.test(msg)) {
+            this.emailDuplicateError = true;
+          } else {
+            this.editError = msg;
+          }
+          this.saving = false;
           this.cdr.markForCheck();
         }
       });

@@ -40,16 +40,21 @@ import {
   Validators
 } from '@angular/forms';
 import { IonicModule }         from '@ionic/angular';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DeliveryService }         from '../../../core/services/delivery.service';
 import { UserProfileService }      from '../../../core/services/user-profile.service';
 import { StageTrackComponent }              from '../stage-track/stage-track.component';
 import { LoadingOverlayComponent }          from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DeliveryCycleEditPanelComponent }  from '../edit-panel/delivery-cycle-edit-panel.component';
+import {
+  GateRecordModalComponent,
+  GateRecordModalData,
+  GateRecordModalResult
+} from '../gate-record-modal/gate-record-modal.component';
 import { User }                    from '../../../core/types/database';
 import {
   DeliveryCycle,
   CycleMilestoneDate,
-  GateRecord,
   CycleArtifact,
   CycleEventLogEntry,
   JiraLink,
@@ -92,7 +97,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent],
   template: `
     <!-- D-178 Tier 1: Skeleton screen for initial cycle load -->
     <div *ngIf="loading" style="max-width:1100px;margin:var(--triarq-space-xl) auto;
@@ -743,395 +748,13 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </div>
 
 
-        <!-- ── Gate Detail Sub-Panel ─────────────────────────────────────── -->
-        <!-- D-273: below the gate table in the same card. Opens on gate row click.  -->
-        <!-- S2 (Part 2 Supplement): Structured gate detail layout.                  -->
-        <!-- Principle 10: right-panel, no route change, dismissible.                -->
-        <!-- D-178 Tier 3: position:relative required for loading overlay.           -->
-        <div style="position:relative;margin-top:var(--triarq-space-sm);">
-          <app-loading-overlay [visible]="gateActionBusy" message="Processing gate…"></app-loading-overlay>
-
-          <!-- Panel header: gate name + breadcrumb + close button -->
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;
-                      margin-bottom:var(--triarq-space-sm);">
-            <div>
-              <div style="font-weight:500;">
-                Gate Record
-                <span *ngIf="selectedGate" style="font-weight:400;color:var(--triarq-color-text-secondary);">
-                  — {{ GATE_LABELS[selectedGate] }}
-                </span>
-              </div>
-              <div *ngIf="cycle && selectedGate"
-                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                          margin-top:2px;">
-                {{ cycle.cycle_title }} · Tier {{ tierShortLabel(cycle.tier_classification) }}
-              </div>
-            </div>
-            <button *ngIf="selectedGate"
-                    (click)="closeGatePanel()"
-                    aria-label="Close Gate panel"
-                    style="background:none;border:none;cursor:pointer;
-                           color:var(--triarq-color-text-secondary);font-size:18px;
-                           line-height:1;padding:2px 4px;flex-shrink:0;">✕</button>
-          </div>
-
-          <!-- Empty state — no gate selected -->
-          <!-- CC-Decision-2026-04-12-D: Zone explanatory text 11px italic #5A5A5A. Source: Contract 5 Block 2.5. -->
-          <div *ngIf="!selectedGate"
-               style="font-size:11px;font-style:italic;color:#5A5A5A;">
-            <p style="margin:0 0 8px 0;">
-              Gates are formal checkpoints in the lifecycle. Each Gate must be approved
-              before the Delivery Cycle can advance past it.
-            </p>
-            <p style="margin:0;">
-              Click a gate diamond on the Lifecycle Track above to view the Gate record,
-              submit for approval, or record an Approve or Return decision.
-            </p>
-          </div>
-
-          <!-- Gate selected — structured layout (Principle 10 / S2 spec) -->
-          <ng-container *ngIf="selectedGate">
-
-            <!-- ── GATE STATUS ─────────────────────────────────────────── -->
-            <div style="margin-bottom:var(--triarq-space-sm);">
-              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
-                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
-                          margin-bottom:4px;">Gate Status</div>
-              <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);flex-wrap:wrap;">
-                <span class="oi-pill"
-                      [style.background]="gateDetailStatusBg(selectedGate)"
-                      [style.color]="gateDetailStatusColor(selectedGate)"
-                      style="font-size:11px;">
-                  {{ gateDetailStatus(selectedGate) }}
-                </span>
-                <span *ngIf="gateDetailStatus(selectedGate) === 'Not Yet Active'"
-                      style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-                  Advance the Delivery Cycle through earlier stages to unlock this Gate.
-                </span>
-                <!-- D-140: blocked — what is blocked + how to resolve -->
-                <span *ngIf="selectedGateRecord?.workstream_active_at_clearance === false"
-                      style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);">
-                  Workstream was inactive at last clearance attempt.
-                  Reactivate the Workstream in Admin → Delivery Workstream Registry, then resubmit.
-                </span>
-              </div>
-            </div>
-
-            <!-- ── MILESTONE DATE ──────────────────────────────────────── -->
-            <div *ngIf="selectedGateMilestone" style="margin-bottom:var(--triarq-space-sm);">
-              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
-                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
-                          margin-bottom:4px;">Milestone Date</div>
-              <div style="display:flex;gap:var(--triarq-space-lg);font-size:var(--triarq-text-small);
-                          flex-wrap:wrap;align-items:center;">
-                <div>
-                  <span style="color:var(--triarq-color-text-secondary);">Target: </span>
-                  <span [style.color]="milestoneTargetColor(selectedGateMilestone)">
-                    {{ selectedGateMilestone.target_date ?? '—' }}
-                  </span>
-                </div>
-                <div>
-                  <span style="color:var(--triarq-color-text-secondary);">Actual: </span>
-                  <span>{{ selectedGateMilestone.actual_date ?? '—' }}</span>
-                </div>
-                <span class="oi-pill"
-                      [style.background]="dateStatusBg(selectedGateMilestone.date_status)"
-                      [style.color]="dateStatusColor(selectedGateMilestone.date_status)"
-                      style="font-size:10px;">
-                  {{ dateStatusLabel(selectedGateMilestone.date_status) }}
-                </span>
-              </div>
-            </div>
-
-            <!-- ── APPROVAL ROUTING ───────────────────────────────────── -->
-            <div style="margin-bottom:var(--triarq-space-sm);">
-              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
-                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
-                          margin-bottom:6px;">Approval Routing</div>
-              <!-- Accountable (A badge) -->
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;
-                          font-size:var(--triarq-text-small);">
-                <span style="width:18px;height:18px;border-radius:50%;
-                             background:var(--triarq-color-primary);color:#fff;
-                             font-size:9px;font-weight:700;display:inline-flex;
-                             align-items:center;justify-content:center;flex-shrink:0;">A</span>
-                <span style="color:var(--triarq-color-text-secondary);min-width:72px;">Accountable</span>
-                <span *ngIf="selectedGateRecord?.approver_user_id"
-                      style="padding:2px 10px;border-radius:999px;
-                             background:rgba(37,112,153,0.09);font-size:11px;">
-                  {{ approverDisplayName(selectedGateRecord!.approver_user_id!) }}
-                </span>
-                <span *ngIf="!selectedGateRecord?.approver_user_id"
-                      style="color:var(--triarq-color-text-secondary);font-style:italic;font-size:11px;">
-                  Phil (escalation default — no Accountable configured)
-                </span>
-              </div>
-              <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                          font-style:italic;">
-                Consulted and Informed routing configured in Build D (RACI Management module).
-              </div>
-            </div>
-
-            <!-- ── GATE CHECKLIST ─────────────────────────────────────── -->
-            <div style="margin-bottom:var(--triarq-space-sm);">
-              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
-                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
-                          margin-bottom:6px;">Gate Checklist</div>
-              <div *ngFor="let item of gateChecklist(selectedGate)"
-                   style="display:flex;align-items:center;gap:6px;margin-bottom:3px;
-                          font-size:var(--triarq-text-small);">
-                <span style="flex-shrink:0;"
-                      [style.color]="item.met ? 'var(--triarq-color-success,#2e7d32)' : 'var(--triarq-color-sunray,#f5a623)'">
-                  {{ item.met ? '✓' : '⚠' }}
-                </span>
-                <span [style.color]="item.met ? 'var(--triarq-color-text-primary)' : 'var(--triarq-color-text-secondary)'">
-                  {{ item.label }}
-                </span>
-              </div>
-              <div *ngIf="gateChecklist(selectedGate).length === 0"
-                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-                No checklist items defined for this Gate.
-              </div>
-            </div>
-
-            <!-- ── REVIEW NOTES ───────────────────────────────────────── -->
-            <div *ngIf="selectedGateRecord?.approver_notes"
-                 style="margin-bottom:var(--triarq-space-sm);">
-              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;
-                          text-transform:uppercase;color:var(--triarq-color-text-secondary);
-                          margin-bottom:4px;">Review Notes</div>
-              <div style="background:var(--triarq-color-background-subtle);border-radius:6px;
-                          padding:var(--triarq-space-xs);font-size:var(--triarq-text-small);">
-                {{ selectedGateRecord!.approver_notes }}
-              </div>
-            </div>
-
-            <!-- Divider above action buttons -->
-            <div style="border-top:1px solid var(--triarq-color-border);
-                        margin:var(--triarq-space-sm) 0;"></div>
-
-            <!-- ── ACTION AREA ────────────────────────────────────────── -->
-
-            <!-- Not yet active — explain advancement path -->
-            <div *ngIf="!selectedGateRecord && isGateNotYetActive(selectedGate)"
-                 style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-              Advance the Delivery Cycle through earlier stages to unlock this Gate.
-            </div>
-
-            <!-- No record yet, gate reachable -->
-            <div *ngIf="!selectedGateRecord && !isGateNotYetActive(selectedGate)"
-                 style="font-size:var(--triarq-text-small);">
-              <p style="margin:0 0 8px 0;color:var(--triarq-color-text-secondary);">
-                <strong>{{ GATE_LABELS[selectedGate] }}</strong> has not been submitted yet.
-                Use the button below when the Delivery Cycle is ready for Gate review.
-              </p>
-              <button *ngIf="callerCanSubmitGates"
-                      class="oi-btn-primary"
-                      style="font-size:var(--triarq-text-small);display:flex;align-items:center;gap:6px;"
-                      (click)="submitGate(selectedGate!)"
-                      [disabled]="gateActionBusy">
-                <ion-spinner *ngIf="gateActionBusy" name="crescent" style="width:14px;height:14px;"></ion-spinner>
-                <span>Submit for Approval</span>
-              </button>
-              <div *ngIf="!callerCanSubmitGates"
-                   style="color:var(--triarq-color-text-secondary);">
-                Only the assigned Domain Strategist, Capability Builder, or Phil can submit this Gate.
-                Contact the cycle owner or an Admin to submit for approval.
-              </div>
-            </div>
-
-            <!-- Gate record exists — action buttons -->
-            <div *ngIf="selectedGateRecord">
-
-              <!-- D-345: Submitted line (awaiting_approval) — "Submitted [time] by [name]" -->
-              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
-                          && selectedGateRecord.submitted_at"
-                   style="font-size:11px;color:var(--triarq-color-text-secondary);margin-bottom:var(--triarq-space-sm);"
-                   [title]="selectedGateRecord.submitted_at">
-                Submitted {{ submittedRelative(selectedGateRecord.submitted_at) }}
-                by {{ selectedGateRecord.submitted_by_display_name ?? 'Unknown' }}
-              </div>
-
-              <!-- D-345: Awaiting approval status text (DS/CB view) -->
-              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
-                          && !selectedGateRecord.current_user_gate_authority?.can_approve"
-                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                          margin-bottom:var(--triarq-space-sm);">
-                Awaiting {{ selectedGateApproverName }} approval.
-              </div>
-
-              <!-- D-345: Awaiting approval status text (approver view) -->
-              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
-                          && selectedGateRecord.current_user_gate_authority?.can_approve"
-                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
-                          margin-bottom:var(--triarq-space-sm);">
-                {{ GATE_NAME_DISPLAY[selectedGate!] }} submitted for your approval.
-              </div>
-
-              <!-- Submit / Resubmit (returned or not_started or legacy pending) — D-297 always-enabled -->
-              <div *ngIf="(selectedGateRecord.gate_status === 'returned'
-                            || selectedGateRecord.gate_status === 'pending'
-                            || selectedGateRecord.gate_status === 'not_started')
-                          && callerCanSubmitGates"
-                   style="margin-bottom:var(--triarq-space-sm);">
-                <button class="oi-btn-primary"
-                        (click)="submitGate(selectedGate!)"
-                        [disabled]="gateActionBusy"
-                        style="font-size:var(--triarq-text-small);">
-                  {{ gateActionBusy ? 'Submitting…'
-                     : (selectedGateRecord.gate_status === 'returned' ? 'Re-submit for Approval'
-                                                                       : 'Submit ' + GATE_NAME_DISPLAY[selectedGate!] + ' for Approval') }}
-                </button>
-              </div>
-
-              <!-- D-345: Withdraw Submission — DS/CB while awaiting approval -->
-              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
-                          && selectedGateRecord.current_user_gate_authority?.can_withdraw"
-                   style="margin-bottom:var(--triarq-space-sm);">
-                <ng-container *ngIf="!withdrawConfirming">
-                  <button (click)="withdrawConfirming = true; gateActionError=''"
-                          [disabled]="gateActionBusy"
-                          style="font-size:var(--triarq-text-small);background:none;
-                                 border:1px solid var(--triarq-color-border);border-radius:5px;
-                                 padding:6px 12px;cursor:pointer;color:var(--triarq-color-text-primary);">
-                    Withdraw Submission
-                  </button>
-                </ng-container>
-                <ng-container *ngIf="withdrawConfirming">
-                  <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:6px;">
-                    Withdrawing will cancel this submission. The approver will see the gate is no longer awaiting review.
-                  </div>
-                  <div style="display:flex;gap:var(--triarq-space-sm);align-items:center;">
-                    <button class="oi-btn-primary"
-                            (click)="withdrawGate(selectedGate!)"
-                            [disabled]="withdrawBusy"
-                            style="font-size:var(--triarq-text-small);">
-                      {{ withdrawBusy ? 'Confirming…' : 'Confirm Withdrawal' }}
-                    </button>
-                    <button (click)="withdrawConfirming = false"
-                            style="font-size:var(--triarq-text-small);background:none;border:none;
-                                   cursor:pointer;color:var(--triarq-color-text-secondary);">
-                      Cancel
-                    </button>
-                  </div>
-                </ng-container>
-              </div>
-
-              <!-- D-345: Approve / Return (approver while awaiting_approval) -->
-              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
-                          && selectedGateRecord.current_user_gate_authority?.can_approve">
-
-                <!-- Default state: Approve + Return buttons -->
-                <ng-container *ngIf="!approveConfirming && !returnFormOpen">
-                  <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;">
-                    <button class="oi-btn-primary"
-                            (click)="approveConfirming = true; gateActionError=''"
-                            [disabled]="gateActionBusy"
-                            style="font-size:var(--triarq-text-small);">
-                      Approve {{ GATE_NAME_DISPLAY[selectedGate!] }}
-                    </button>
-                    <button (click)="returnFormOpen = true; gateActionError=''"
-                            [disabled]="gateActionBusy"
-                            style="font-size:var(--triarq-text-small);background:none;
-                                   border:1px solid var(--triarq-color-border);border-radius:5px;
-                                   padding:6px 12px;cursor:pointer;color:var(--triarq-color-text-primary);">
-                      Return
-                    </button>
-                  </div>
-                </ng-container>
-
-                <!-- Confirm Approval — D-183 inline confirmation; D-346 Context A label transition -->
-                <ng-container *ngIf="approveConfirming">
-                  <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:6px;">
-                    Approving this gate will advance the Delivery Cycle.
-                    This cannot be undone without a stage regression.
-                  </div>
-                  <div style="display:flex;gap:var(--triarq-space-sm);align-items:center;">
-                    <button class="oi-btn-primary"
-                            (click)="recordDecisionWithValue(selectedGate!, 'approved')"
-                            [disabled]="gateActionBusy"
-                            style="font-size:var(--triarq-text-small);">
-                      {{ gateActionBusy ? 'Confirming…' : 'Confirm Approval' }}
-                    </button>
-                    <button (click)="approveConfirming = false"
-                            style="font-size:var(--triarq-text-small);background:none;border:none;
-                                   cursor:pointer;color:var(--triarq-color-text-secondary);">
-                      Cancel
-                    </button>
-                  </div>
-                </ng-container>
-
-                <!-- Return form — Pattern 3 inline error if notes empty on submit -->
-                <ng-container *ngIf="returnFormOpen">
-                  <form [formGroup]="gateDecisionForm" (ngSubmit)="recordDecisionWithValue(selectedGate!, 'returned')">
-                    <label style="display:block;font-size:var(--triarq-text-small);font-weight:500;
-                                  margin-bottom:4px;">Return notes <span style="color:var(--triarq-color-error);">*</span></label>
-                    <textarea formControlName="approver_notes" class="oi-input" rows="3"
-                              placeholder="Describe what needs to change before re-submission."
-                              style="width:100%;resize:vertical;min-height:80px;
-                                     font-size:var(--triarq-text-small);">
-                    </textarea>
-                    <div style="display:flex;gap:var(--triarq-space-sm);margin-top:var(--triarq-space-xs);align-items:center;">
-                      <button type="submit" class="oi-btn-primary"
-                              [disabled]="gateActionBusy"
-                              style="font-size:var(--triarq-text-small);">
-                        {{ gateActionBusy ? 'Confirming…' : 'Confirm Return' }}
-                      </button>
-                      <button type="button" (click)="returnFormOpen = false; gateActionError=''"
-                              style="font-size:var(--triarq-text-small);background:none;border:none;
-                                     cursor:pointer;color:var(--triarq-color-text-secondary);">
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                </ng-container>
-              </div>
-
-              <!-- No approve authority — gate awaiting but caller can't approve — D-140 -->
-              <div *ngIf="selectedGateRecord.gate_status === 'awaiting_approval'
-                          && !selectedGateRecord.current_user_gate_authority?.can_approve
-                          && !selectedGateRecord.current_user_gate_authority?.can_withdraw"
-                   style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-                Only the designated approver or Phil can record a decision on this gate.
-              </div>
-
-              <!-- Legacy pending gate with approver authority (pre-Migration 029 records) -->
-              <div *ngIf="selectedGateRecord.gate_status === 'pending'
-                          && selectedGateRecord.current_user_gate_authority?.can_approve">
-                <!-- B-74: replace internal "Legacy gate record" wording with user-facing
-                     copy per D-297 (inform-don't-hide). Source: Contract 12 §3 B-74. -->
-                <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-bottom:6px;font-style:italic;">
-                  This gate was not submitted through the standard approval flow. You can approve or return it directly.
-                </div>
-                <div style="display:flex;gap:var(--triarq-space-sm);flex-wrap:wrap;">
-                  <button class="oi-btn-primary"
-                          (click)="recordDecisionWithValue(selectedGate!, 'approved')"
-                          [disabled]="gateActionBusy"
-                          style="font-size:var(--triarq-text-small);">
-                    {{ gateActionBusy ? 'Approving…' : 'Approve' }}
-                  </button>
-                  <button (click)="recordDecisionWithValue(selectedGate!, 'returned')"
-                          [disabled]="gateActionBusy"
-                          style="font-size:var(--triarq-text-small);color:var(--triarq-color-error);
-                                 background:none;border:1px solid var(--triarq-color-error);
-                                 border-radius:5px;padding:6px 12px;cursor:pointer;">
-                    Return
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Gate action error feedback — D-140 -->
-            <div *ngIf="gateActionError"
-                 style="margin-top:var(--triarq-space-xs);font-size:var(--triarq-text-small);">
-              <span style="color:var(--triarq-color-error);font-weight:500;">{{ gateActionError }}</span>
-              <div *ngIf="gateActionHint"
-                   style="color:var(--triarq-color-text-secondary);margin-top:4px;">
-                {{ gateActionHint }}
-              </div>
-            </div>
-          </ng-container>
-        </div>
+        <!-- ── Gate Record entry instruction (D-355) ──────────────────────── -->
+        <!-- The inline gate sub-panel is retired in Contract 13. Clicking either
+             the small gate diamond or the large filled circle on the Stage Track
+             opens the Gate Record Modal (D-355, ARCH-25). -->
+        <p style="margin:var(--triarq-space-sm) 0 0 0;font-size:11px;font-style:italic;color:#5A5A5A;">
+          Click a gate diamond on the Stage Track to open its record.
+        </p>
       </div>
 
       <!-- ── Artifact Slots ────────────────────────────────────────────── -->
@@ -1598,14 +1221,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   advancing     = false;
   advanceError  = '';
 
-  // Gate panel
-  selectedGate:       GateName | null   = null;
-  selectedGateRecord: GateRecord | null = null;
-  gateActionBusy      = false;
-  gateActionError     = '';
-  gateActionHint      = '';
-  gateDecisionForm!:  FormGroup;
-
   // Milestone dates
   editingMilestoneGate: GateName | null = null;
   savingMilestone       = false;
@@ -1629,15 +1244,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   linkingJiraEpic   = false;   // API call in progress
   jiraEpicKeyCtrl   = new FormControl('', Validators.required);
   jiraLinkError     = '';
-
-  // Gate approve confirmation step
-  approveConfirming = false;
-  // D-345: gate withdrawal — DS/CB withdrawing an awaiting_approval submission.
-  withdrawConfirming = false;
-  withdrawBusy       = false;
-  // D-345: gate return — inline form replaces approve/return buttons until cancelled.
-  returnFormOpen     = false;
-  returnBusy         = false;
 
   // ON_HOLD
   holdBusy        = false;
@@ -1670,9 +1276,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   cbError     = '';
   cbControl   = new FormControl('');
 
-  // S2: Gate detail sub-panel — additional status edit state
-  // (selectedGate + selectedGateRecord already declared above)
-
   // Item 1: Milestone status edit — status dropdown per row
   editingMilestoneStatus:  GateName | null = null;
   milestoneStatusValue:    string          = '';
@@ -1702,11 +1305,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     private readonly delivery:       DeliveryService,
     private readonly profileService: UserProfileService,
     private readonly fb:             FormBuilder,
-    private readonly cdr:            ChangeDetectorRef
+    private readonly cdr:            ChangeDetectorRef,
+    private readonly dialog:         MatDialog
   ) {}
 
   ngOnInit(): void {
-    this.gateDecisionForm = this.fb.group({ approver_notes: [''] });
     this.attachForm = this.fb.group({
       display_name: ['', Validators.required],
       external_url: ['', Validators.required]
@@ -1933,13 +1536,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     const order: GateName[] = ['brief_review','go_to_build','go_to_deploy','go_to_release','close_review'];
     const list = this.cycle?.milestone_dates ?? [];
     return [...list].sort((a, b) => order.indexOf(a.gate_name) - order.indexOf(b.gate_name));
-  }
-
-  /** Approver display name for the selected gate's awaiting state. */
-  get selectedGateApproverName(): string {
-    const id = this.selectedGateRecord?.approver_user_id;
-    if (id) { return this.approverDisplayName(id); }
-    return 'Phil (escalation default)';
   }
 
   /** Relative time string for the "Submitted [time] by [name]" line. */
@@ -2427,136 +2023,41 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   // ── Gate panel ─────────────────────────────────────────────────────────────
 
+  /**
+   * D-355: open the Gate Record Modal centered on the page. Replaces the
+   * retired inline gate sub-panel. The modal owns submit / approve / return /
+   * withdraw writes and closes with a refreshKind so the caller can reload the
+   * cycle in line with D-345 panel refresh rules.
+   */
   openGatePanel(gate: GateName): void {
-    this.selectedGate       = gate;
-    this.selectedGateRecord = this.cycle?.gate_records?.find(g => g.gate_name === gate) ?? null;
-    this.gateActionError    = '';
-    this.gateActionHint     = '';
-    this.approveConfirming  = false;
-    this.withdrawConfirming = false;
-    this.returnFormOpen     = false;
-    this.gateDecisionForm.reset();
-    this.cdr.markForCheck();
-  }
+    if (!this.cycle) return;
 
-  submitGate(gate: GateName): void {
-    if (!this.cycle) { return; }
-    // Auto-open the gate sub-panel so prereq errors / submission status surface in context
-    // (B-34/35: button-tap with unmet prereqs renders inline Pattern 3 next to the gate).
-    if (this.selectedGate !== gate) {
-      this.openGatePanel(gate);
-    }
-    this.gateActionBusy  = true;
-    this.gateActionError = '';
-    this.gateActionHint  = '';
-    this.cdr.markForCheck();
+    const data: GateRecordModalData = {
+      cycle:                this.cycle,
+      gateName:             gate,
+      allUsers:             this.allUsers,
+      callerCanSubmitGates: this.callerCanSubmitGates,
+      checklist:            this.gateChecklist(gate)
+    };
 
-    this.delivery.submitGateForApproval({
-      delivery_cycle_id: this.cycle.delivery_cycle_id,
-      gate_name:         gate
-    }).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.loadCycle(this.cycle!.delivery_cycle_id);
-        } else {
-          // Pattern 3 inline error — MCP returns specific prereq message
-          // (e.g. "no Delivery Specialist is assigned to this cycle.").
-          this.gateActionError = res.error ?? 'Submission failed. Please try again.';
-          this.gateActionHint  = '';
-        }
-        this.gateActionBusy = false;
-        this.cdr.markForCheck();
-      },
-      error: (err: { error?: string }) => {
-        this.gateActionError = err.error ?? 'Submission failed. Please try again.';
-        this.gateActionHint  = '';
-        this.gateActionBusy  = false;
-        this.cdr.markForCheck();
+    const ref = this.dialog.open<GateRecordModalComponent, GateRecordModalData, GateRecordModalResult>(
+      GateRecordModalComponent,
+      {
+        data,
+        panelClass: 'oi-gate-record-modal-panel',
+        width: '640px',
+        maxWidth: '92vw',
+        autoFocus: 'first-tabbable',
+        restoreFocus: true
       }
-    });
-  }
+    );
 
-  /** No-op — decision submitted via recordDecisionWithValue buttons */
-  recordDecision(_gate: GateName): void { /* intentionally empty */ }
-
-  recordDecisionWithValue(gate: GateName, decision: 'approved' | 'returned'): void {
-    if (!this.cycle) { return; }
-    const notes = (this.gateDecisionForm.value.approver_notes as string) ?? '';
-
-    // D-140 + D-345 §3.2: Return requires notes so the team can act on the feedback
-    if (decision === 'returned' && !notes.trim()) {
-      this.gateActionError = 'Return notes are required. Describe what needs to change before re-submission.';
-      this.gateActionHint  = '';
-      this.cdr.markForCheck();
-      return;
-    }
-
-    this.gateActionBusy  = true;
-    this.gateActionError = '';
-    this.gateActionHint  = '';
-    this.cdr.markForCheck();
-
-    this.delivery.recordGateDecision({
-      delivery_cycle_id: this.cycle.delivery_cycle_id,
-      gate_name:         gate,
-      decision,
-      approver_notes:    notes.trim() || undefined
-    }).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.approveConfirming  = false;
-          this.returnFormOpen     = false;
-          this.gateDecisionForm.reset();
-          // Approval: full reload (stage advance + actual_date + artifact reorganization).
-          // Return: re-render sub-panel; reload cycle to refresh gate_record state.
-          if (decision === 'approved') {
-            this.selectedGate       = null;
-            this.selectedGateRecord = null;
-          }
-          this.loadCycle(this.cycle!.delivery_cycle_id);
-        } else {
-          this.gateActionError = res.error ?? 'Decision record failed.';
-          this.gateActionHint  = decision === 'returned'
-            ? 'Provide notes explaining the return reason so the team can act on it.'
-            : 'Check Workstream status and try again. If the Workstream is inactive, reactivate it first.';
-        }
-        this.gateActionBusy = false;
-        this.cdr.markForCheck();
-      },
-      error: (err: { error?: string }) => {
-        this.gateActionError = err.error ?? 'Decision record failed.';
-        this.gateActionBusy  = false;
-        this.cdr.markForCheck();
-      }
-    });
-  }
-
-  /** D-345 §3.3: withdraw a gate awaiting approval. Resets to not_started. */
-  withdrawGate(gate: GateName): void {
-    if (!this.cycle) { return; }
-    this.withdrawBusy    = true;
-    this.gateActionError = '';
-    this.gateActionHint  = '';
-    this.cdr.markForCheck();
-
-    this.delivery.withdrawGateSubmission({
-      delivery_cycle_id: this.cycle.delivery_cycle_id,
-      gate_name:         gate
-    }).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.withdrawConfirming = false;
-          this.loadCycle(this.cycle!.delivery_cycle_id);
-        } else {
-          this.gateActionError = res.error ?? 'Withdrawal failed. Please try again.';
-        }
-        this.withdrawBusy = false;
-        this.cdr.markForCheck();
-      },
-      error: (err: { error?: string }) => {
-        this.gateActionError = err.error ?? 'Withdrawal failed. Please try again.';
-        this.withdrawBusy    = false;
-        this.cdr.markForCheck();
+    ref.afterClosed().subscribe((result) => {
+      if (!result || result.refreshKind === 'none') return;
+      // D-345: full reload after approve/return (stage advance / state churn);
+      // partial in-place reload after submit/withdraw.
+      if (this.cycle?.delivery_cycle_id) {
+        this.loadCycle(this.cycle.delivery_cycle_id);
       }
     });
   }
@@ -2828,20 +2329,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return m.milestone_id;
   }
 
-  // ── S2: Gate detail sub-panel methods ─────────────────────────────────────
-
-  /** Close gate panel without navigating away — Principle 10 */
-  closeGatePanel(): void {
-    this.selectedGate       = null;
-    this.selectedGateRecord = null;
-    this.gateActionError    = '';
-    this.gateActionHint     = '';
-    this.approveConfirming  = false;
-    this.withdrawConfirming = false;
-    this.returnFormOpen     = false;
-    this.gateDecisionForm.reset();
-    this.cdr.markForCheck();
-  }
+  // ── Gate display helpers (used by gate rows + Gate Record Modal) ──────────
 
   /** Compute the display status label for the gate — Section 2.3 of Part 2 spec.
    *  CC-Decision-2026-04-12-B: 'not_started' is the seed status for new gate records.
@@ -2883,12 +2371,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     if (s === 'Under Review')       { return 'var(--triarq-color-primary)'; }
     if (s === 'Not Started')        { return '#9E9E9E'; }
     return 'var(--triarq-color-text-secondary)';
-  }
-
-  /** Milestone row matching the selected gate — shown in gate sub-panel MILESTONE DATE section */
-  get selectedGateMilestone(): CycleMilestoneDate | null {
-    if (!this.selectedGate || !this.cycle) { return null; }
-    return this.cycle.milestone_dates?.find(m => m.gate_name === this.selectedGate) ?? null;
   }
 
   /** Gate checklist — computed from cycle state per gate name. Section 2.2, Part 2 spec. */
@@ -2944,14 +2426,16 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
             { label: 'AI Production Governance Board compliance check (Tier 3)',   met: false },
           ] : []),
         ];
-      case 'close_review':
+      case 'close_review': {
+        const closeReviewRecord = c.gate_records?.find(r => r.gate_name === 'close_review');
         return [
           { label: 'Outcome measurement record attached',                          met: hasName(outcomeArts, 'outcome measurement') },
-          { label: 'Outcome Statement matches demonstrated result (confirm in notes)', met: !!this.selectedGateRecord?.approver_notes },
+          { label: 'Outcome Statement matches demonstrated result (confirm in notes)', met: !!closeReviewRecord?.approver_notes },
           ...(isTier3 ? [
             { label: 'Wiz continuous monitoring baseline attached (Tier 3)',       met: hasName(outcomeArts, 'wiz') },
           ] : []),
         ];
+      }
       default:
         return [];
     }

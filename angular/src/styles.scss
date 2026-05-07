@@ -3,6 +3,10 @@
 //   1. TRIARQ design tokens
 //   2. Ionic theme map (before Ionic defaults)
 //   3. Ionic core
+//   4. Angular Material baseline (S-014, D-355) — Material structural CSS for
+//      MatDialog. We override visual styling with TRIARQ tokens inside our own
+//      dialog component, so the prebuilt theme is purely for dialog backdrop +
+//      container layout primitives.
 
 @import 'styles/triarq.tokens.v1.css';
 @import 'styles/ionic.theme.map.scss';
@@ -10,6 +14,7 @@
 @import '@ionic/angular/css/normalize.css';
 @import '@ionic/angular/css/structure.css';
 @import '@ionic/angular/css/typography.css';
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
 
 // Google Fonts — Roboto (D-151: font is Roboto, not Gill Sans or Lato)
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
@@ -64,6 +69,41 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
   box-shadow:     var(--triarq-shadow-card);
   padding:        var(--triarq-space-lg);
   margin-bottom:  var(--triarq-space-md);
+}
+
+// ── D-200 Pattern 2: amber confirmation / warning block ──────────────────────
+//   Used for irreversible-action confirmations (D-183) and persistent advisory
+//   banners. Amber left border, 8% opacity sunray background, ⚠ icon.
+.oi-confirm-warn {
+  display: flex; gap: 10px;
+  background: rgba(245,166,35,0.08);
+  border-left: 4px solid var(--triarq-color-sunray, #f5a623);
+  border-radius: 0 6px 6px 0;
+  padding: 12px 14px;
+
+  .oi-confirm-icon {
+    font-size: 16px; color: var(--triarq-color-sunray, #f5a623);
+    line-height: 1; flex-shrink: 0;
+  }
+  .oi-confirm-body { flex: 1; }
+  .oi-confirm-text { font-size: 13px; margin-bottom: 10px; line-height: 1.4; }
+}
+
+// ── D-200 Pattern 3: inline error block + field error states ─────────────────
+.oi-inline-error {
+  background: #fff3f3; border: 1px solid #f5a0a0; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 12px;
+
+  .oi-inline-error-primary {
+    font-size: 12px; font-weight: 600; color: #c0392b; margin: 0 0 4px;
+  }
+  .oi-inline-error-secondary {
+    font-size: 12px; color: var(--triarq-color-text-secondary); margin: 0;
+  }
+}
+.oi-input-error { border-color: var(--triarq-color-error) !important; }
+.oi-field-error {
+  font-size: 11px; color: var(--triarq-color-error); margin-bottom: 8px;
 }
 
 // ── Blocked action UX (D-140) ─────────────────────────────────────────────────

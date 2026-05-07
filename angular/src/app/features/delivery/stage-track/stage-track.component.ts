@@ -79,7 +79,8 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
             style="height:2px;flex:0 0 32px;"
           ></div>
 
-          <!-- Stage node -->
+          <!-- Stage node — current stage circle is interactive (D-355, ARCH-25):
+               clicking it opens the Gate Record Modal for the next gate. -->
           <div *ngIf="node.type === 'stage'"
                [attr.data-stage-id]="node.id"
                style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto;">
@@ -87,6 +88,14 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
               [style.background]="stageCircleBg(node.id)"
               [style.outline]="isCurrent(node.id) ? '2px solid #fff' : 'none'"
               [style.outline-offset]="'2px'"
+              [style.cursor]="isCurrent(node.id) && nextGateAfterCurrent ? 'pointer' : 'default'"
+              [attr.role]="isCurrent(node.id) && nextGateAfterCurrent ? 'button' : null"
+              [attr.tabindex]="isCurrent(node.id) && nextGateAfterCurrent ? 0 : null"
+              [attr.aria-label]="isCurrent(node.id) && nextGateAfterCurrent ? 'Open ' + nextGateLabel + ' gate' : null"
+              [title]="isCurrent(node.id) && nextGateAfterCurrent ? 'Open ' + nextGateLabel : null"
+              (click)="isCurrent(node.id) && onCurrentStageClick()"
+              (keydown.enter)="isCurrent(node.id) && onCurrentStageClick()"
+              (keydown.space)="isCurrent(node.id) && onCurrentStageClick()"
               style="width:28px;height:28px;border-radius:50%;
                      display:flex;align-items:center;justify-content:center;
                      transition:background 0.2s;"
@@ -188,6 +197,32 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
 
   onGateClick(gateId: string): void {
     this.gateClicked.emit(gateId as GateName);
+  }
+
+  /**
+   * D-355 / ARCH-25: clicking the current stage's filled circle opens the Gate
+   * Record Modal for the next gate the cycle must pass. No-op if there is no
+   * next gate (e.g. cycle is at COMPLETE).
+   */
+  onCurrentStageClick(): void {
+    const nextGate = this.nextGateAfterCurrent;
+    if (nextGate) this.gateClicked.emit(nextGate as GateName);
+  }
+
+  /** Gate id of the first gate node following the current stage in the full track. */
+  get nextGateAfterCurrent(): string | null {
+    const idx = this.fullTrack.findIndex(n => n.type === 'stage' && n.id === this.currentStageId);
+    if (idx === -1) return null;
+    for (let i = idx + 1; i < this.fullTrack.length; i++) {
+      if (this.fullTrack[i].type === 'gate') return this.fullTrack[i].id;
+    }
+    return null;
+  }
+
+  get nextGateLabel(): string {
+    const id = this.nextGateAfterCurrent;
+    if (!id) return '';
+    return this.fullTrack.find(n => n.id === id)?.label ?? '';
   }
 
   gateDisplayState(gateId: string): GateDisplayState {

@@ -47,6 +47,12 @@ import { IonicModule }  from '@ionic/angular';
           import('./gates-summary/gates-summary.component')
             .then(c => c.GatesSummaryComponent)
       },
+      {
+        path: 'deploy-schedule',
+        loadComponent: () =>
+          import('./deploy-schedule/deploy-schedule.component')
+            .then(c => c.DeployScheduleComponent)
+      },
       // ── Full cycle list (moved from '' to 'cycles' — D-188) ───────────────
       {
         path: 'cycles',
