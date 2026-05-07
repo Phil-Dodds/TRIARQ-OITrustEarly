@@ -10,6 +10,14 @@
       "version": "17.3.12"
     },
     {
+      "packageName": "@angular/animations/browser",
+      "outFileName": "_angular_animations_browser-17_3_12.js",
+      "requiredVersion": "^17.3.12",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.12"
+    },
+    {
       "packageName": "@angular/cdk",
       "outFileName": "_angular_cdk-17_3_10.js",
       "requiredVersion": "^17.3.10",
