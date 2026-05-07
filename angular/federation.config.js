@@ -33,12 +33,17 @@ module.exports = withNativeFederation({
   // Skip packages that cause Native Federation bundler errors.
   // Ionic/Stencil use conditional Node.js imports that esbuild can't resolve
   // in a browser-only build context. RxJS sub-paths inflate the shared chunk.
+  //
+  // Contract 13: @angular/animations/browser is NOT skipped. Both
+  // BrowserAnimationsModule and NoopAnimationsModule (used by S-014
+  // MatDialog support) live in @angular/platform-browser/animations which
+  // imports @angular/animations/browser at runtime. Skipping it leaves the
+  // importmap missing that specifier and bootstrap fails with a blank page.
   skip: [
     'rxjs/ajax',
     'rxjs/fetch',
     'rxjs/testing',
     'rxjs/webSocket',
-    '@angular/animations/browser',
     '@stencil/core',
     '@ionic/core',
     '@ionic/angular',
