@@ -10,6 +10,190 @@
       "version": "17.3.12"
     },
     {
+      "packageName": "@angular/cdk",
+      "outFileName": "_angular_cdk-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/a11y",
+      "outFileName": "_angular_cdk_a11y-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/accordion",
+      "outFileName": "_angular_cdk_accordion-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/bidi",
+      "outFileName": "_angular_cdk_bidi-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/clipboard",
+      "outFileName": "_angular_cdk_clipboard-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/coercion",
+      "outFileName": "_angular_cdk_coercion-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/collections",
+      "outFileName": "_angular_cdk_collections-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/dialog",
+      "outFileName": "_angular_cdk_dialog-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/drag-drop",
+      "outFileName": "_angular_cdk_drag_drop-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/keycodes",
+      "outFileName": "_angular_cdk_keycodes-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/layout",
+      "outFileName": "_angular_cdk_layout-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/listbox",
+      "outFileName": "_angular_cdk_listbox-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/menu",
+      "outFileName": "_angular_cdk_menu-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/observers",
+      "outFileName": "_angular_cdk_observers-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/observers/private",
+      "outFileName": "_angular_cdk_observers_private-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/overlay",
+      "outFileName": "_angular_cdk_overlay-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/platform",
+      "outFileName": "_angular_cdk_platform-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/portal",
+      "outFileName": "_angular_cdk_portal-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/scrolling",
+      "outFileName": "_angular_cdk_scrolling-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/stepper",
+      "outFileName": "_angular_cdk_stepper-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/table",
+      "outFileName": "_angular_cdk_table-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/text-field",
+      "outFileName": "_angular_cdk_text_field-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/cdk/tree",
+      "outFileName": "_angular_cdk_tree-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
       "packageName": "@angular/common",
       "outFileName": "_angular_common-17_3_12.js",
       "requiredVersion": "^17.0.0",
@@ -64,6 +248,294 @@
       "singleton": true,
       "strictVersion": true,
       "version": "17.3.12"
+    },
+    {
+      "packageName": "@angular/material",
+      "outFileName": "_angular_material-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/autocomplete",
+      "outFileName": "_angular_material_autocomplete-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/badge",
+      "outFileName": "_angular_material_badge-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/bottom-sheet",
+      "outFileName": "_angular_material_bottom_sheet-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/button",
+      "outFileName": "_angular_material_button-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/button-toggle",
+      "outFileName": "_angular_material_button_toggle-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/card",
+      "outFileName": "_angular_material_card-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/checkbox",
+      "outFileName": "_angular_material_checkbox-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/chips",
+      "outFileName": "_angular_material_chips-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/core",
+      "outFileName": "_angular_material_core-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/datepicker",
+      "outFileName": "_angular_material_datepicker-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/dialog",
+      "outFileName": "_angular_material_dialog-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/divider",
+      "outFileName": "_angular_material_divider-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/expansion",
+      "outFileName": "_angular_material_expansion-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/form-field",
+      "outFileName": "_angular_material_form_field-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/grid-list",
+      "outFileName": "_angular_material_grid_list-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/icon",
+      "outFileName": "_angular_material_icon-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/input",
+      "outFileName": "_angular_material_input-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/list",
+      "outFileName": "_angular_material_list-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/menu",
+      "outFileName": "_angular_material_menu-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/paginator",
+      "outFileName": "_angular_material_paginator-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/progress-bar",
+      "outFileName": "_angular_material_progress_bar-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/progress-spinner",
+      "outFileName": "_angular_material_progress_spinner-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/radio",
+      "outFileName": "_angular_material_radio-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/select",
+      "outFileName": "_angular_material_select-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/sidenav",
+      "outFileName": "_angular_material_sidenav-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/slide-toggle",
+      "outFileName": "_angular_material_slide_toggle-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/slider",
+      "outFileName": "_angular_material_slider-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/snack-bar",
+      "outFileName": "_angular_material_snack_bar-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/sort",
+      "outFileName": "_angular_material_sort-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/stepper",
+      "outFileName": "_angular_material_stepper-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/table",
+      "outFileName": "_angular_material_table-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/tabs",
+      "outFileName": "_angular_material_tabs-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/toolbar",
+      "outFileName": "_angular_material_toolbar-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/tooltip",
+      "outFileName": "_angular_material_tooltip-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
+    },
+    {
+      "packageName": "@angular/material/tree",
+      "outFileName": "_angular_material_tree-17_3_10.js",
+      "requiredVersion": "^17.3.10",
+      "singleton": true,
+      "strictVersion": true,
+      "version": "17.3.10"
     },
     {
       "packageName": "@angular/platform-browser",
@@ -149,7 +621,7 @@
   "exposes": [
     {
       "key": "./AppModule",
-      "outFileName": "AppModule-7AWRSBIA.js"
+      "outFileName": "AppModule-XPVBU2HK.js"
     }
   ]
 }
