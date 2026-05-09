@@ -88,12 +88,12 @@ const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
 
 const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   BRIEF: 'Brief', DESIGN: 'Design', SPEC: 'Spec', BUILD: 'Build',
-  VALIDATE: 'Validate', PILOT: 'Pilot', UAT: 'UAT', RELEASE: 'Release',
+  VALIDATE: 'Validate', UAT: 'UAT', PILOT: 'Pilot', RELEASE: 'Release',
   OUTCOME: 'Outcome', COMPLETE: 'Complete', CANCELLED: 'Cancelled', ON_HOLD: 'On Hold'
 };
 
-/** Stages in lifecycle order — used for overdue detection */
-const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'UAT', 'RELEASE', 'OUTCOME'];
+/** Stages that occur after the go_to_deploy gate. UAT is pre-deploy and excluded. */
+const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
 
 @Component({
   selector: 'app-delivery-cycle-dashboard',
@@ -911,7 +911,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   readonly GATE_LABELS     = GATE_LABELS;
 
   readonly stages: LifecycleStage[] = [
-    'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE','ON_HOLD','CANCELLED'
+    'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE','ON_HOLD','CANCELLED'
   ];
 
   readonly gateNames: GateName[] = [
@@ -953,6 +953,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (qp['workstream_id']) { this.filterWorkstream = qp['workstream_id'] as string; this.drillDownFromQp = true; }
     if (qp['next_gate'])     { this.filterNextGate   = qp['next_gate']     as string; this.drillDownFromQp = true; }
     if (qp['division_id'])   { this.filterDivision   = qp['division_id']   as string; this.drillDownFromQp = true; }
+    // B-94: cycle drill-down from Gate Schedule / Deploy Schedule opens detail panel.
+    if (qp['selected_cycle_id']) { this.selectedCycleId = qp['selected_cycle_id'] as string; }
 
     // Item 4 (Part 3): Restore saved filter/sort state if no drill-down params present.
     // D-175 drill-down takes priority; restoreScreenState() skips if drillDownFromQp is set.

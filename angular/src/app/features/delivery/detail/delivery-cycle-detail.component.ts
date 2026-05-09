@@ -43,7 +43,7 @@ import { IonicModule }         from '@ionic/angular';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DeliveryService }         from '../../../core/services/delivery.service';
 import { UserProfileService }      from '../../../core/services/user-profile.service';
-import { StageTrackComponent }              from '../stage-track/stage-track.component';
+import { StageTrackComponent, LIFECYCLE_TRACK } from '../stage-track/stage-track.component';
 import { LoadingOverlayComponent }          from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DeliveryCycleEditPanelComponent }  from '../edit-panel/delivery-cycle-edit-panel.component';
 import {
@@ -89,7 +89,7 @@ const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
 
 const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   BRIEF: 'Brief', DESIGN: 'Design', SPEC: 'Spec', BUILD: 'Build',
-  VALIDATE: 'Validate', PILOT: 'Pilot', UAT: 'UAT', RELEASE: 'Release',
+  VALIDATE: 'Validate', UAT: 'UAT', PILOT: 'Pilot', RELEASE: 'Release',
   OUTCOME: 'Outcome', COMPLETE: 'Complete', CANCELLED: 'Cancelled', ON_HOLD: 'On Hold'
 };
 
@@ -387,18 +387,77 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
       <!-- ── Stage Track — Full mode (D-273: above Outcome) ────────────────────── -->
       <!-- Label fixed "Lifecycle Track" → "Stage Track" per S-002 and Contract 3 Block 4 Fix 1. -->
-      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);position:relative;">
         <div style="font-weight:500;margin-bottom:4px;">Stage Track</div>
         <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
                     margin-bottom:var(--triarq-space-sm);">
           Click a gate diamond to open its record and record a decision.
         </div>
+
+        <!-- D-360 Surface 1: Current State chip ────────────────────────────── -->
+        <div style="margin-bottom:var(--triarq-space-sm);">
+          <span [style.background]="currentStateChipBg"
+                [style.color]="currentStateChipColor"
+                style="display:inline-flex;align-items:center;padding:3px 12px;
+                       border-radius:999px;font-size:12px;font-weight:600;">
+            {{ currentStateChipLabel }}
+          </span>
+        </div>
+
         <app-stage-track
           [currentStageId]="cycle.current_lifecycle_stage"
           [gateStateMap]="gateStateMap"
           displayMode="full"
           (gateClicked)="openGatePanel($event)"
+          (stageAdvanceRequested)="requestStageAdvance($event)"
         ></app-stage-track>
+
+        <!-- D-360 Surface 3: inline two-step confirm (D-183 pattern) ────────── -->
+        <div *ngIf="pendingAdvanceTo"
+             style="margin-top:var(--triarq-space-md);padding:var(--triarq-space-sm) var(--triarq-space-md);
+                    background:rgba(37,112,153,0.06);border-left:3px solid var(--triarq-color-primary);
+                    border-radius:5px;">
+          <div style="font-size:13px;color:var(--triarq-color-text-primary);margin-bottom:var(--triarq-space-sm);">
+            Advance to <strong>{{ pendingAdvanceLabel }}</strong>?
+            This records that <strong>{{ currentStageLabel }}</strong> work is complete.
+          </div>
+          <div style="display:flex;gap:var(--triarq-space-sm);">
+            <button type="button"
+                    [disabled]="advancingStage"
+                    (click)="confirmStageAdvance()"
+                    style="background:var(--triarq-color-primary);color:#fff;border:none;border-radius:5px;
+                           padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">
+              {{ advancingStage ? 'Advancing…' : 'Advance to ' + pendingAdvanceLabel }}
+            </button>
+            <button type="button"
+                    [disabled]="advancingStage"
+                    (click)="cancelStageAdvance()"
+                    style="background:#fff;color:var(--triarq-color-text-primary);
+                           border:1px solid var(--triarq-color-border);border-radius:5px;
+                           padding:7px 14px;font-size:13px;cursor:pointer;">
+              Cancel
+            </button>
+          </div>
+
+          <!-- D-200 Pattern 3: error block, primary + secondary -->
+          <div *ngIf="advanceError"
+               style="margin-top:var(--triarq-space-sm);padding:8px 12px;
+                      background:#fdecea;border-left:3px solid var(--triarq-color-error, #c0392b);
+                      border-radius:5px;">
+            <div style="font-size:13px;color:var(--triarq-color-error, #c0392b);font-weight:500;">
+              {{ advanceError }}
+            </div>
+            <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:2px;">
+              Cancel to dismiss, or Advance again to retry.
+            </div>
+          </div>
+        </div>
+
+        <!-- D-346 panel overlay during MCP advance call -->
+        <div *ngIf="advancingStage"
+             aria-hidden="true"
+             style="position:absolute;inset:0;background:rgba(255,255,255,0.55);
+                    border-radius:10px;z-index:5;pointer-events:all;"></div>
       </div>
 
       <!-- ── Outcome Statement — display only (D-276: no inline Add/Edit link). ── -->
@@ -569,8 +628,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </div>
 
         <!-- Gate rows — D-275: target date, actual date, and status editable in View.
-             B-60: sorted by gate sequence (Brief Review → Close Review). -->
+             B-60: sorted by gate sequence (Brief Review → Close Review).
+             D-360 Surface 4: active gate row gets 3px primary left border + primary gate name. -->
         <div *ngFor="let m of sortedMilestoneDates; trackBy: trackByMilestoneId"
+             [style.border-left]="isActiveGate(m.gate_name) ? '3px solid var(--triarq-color-primary)' : '3px solid transparent'"
+             [style.padding-left]="'8px'"
              style="border-bottom:1px solid var(--triarq-color-border);">
 
           <div style="display:grid;grid-template-columns:2fr 1fr 1fr 120px;
@@ -591,17 +653,22 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 </svg>
               </span>
               <div>
-                <span style="font-weight:500;">{{ GATE_LABELS[m.gate_name] }}</span>
+                <span [style.color]="isActiveGate(m.gate_name) ? 'var(--triarq-color-primary)' : null"
+                      style="font-weight:500;">{{ GATE_LABELS[m.gate_name] }}</span>
                 <div *ngIf="gateApprovalNarrative(m.gate_name)"
                      [style.color]="gateApprovalNarrativeColor(m.gate_name)"
                      style="font-size:11px;margin-top:2px;">
                   {{ gateApprovalNarrative(m.gate_name) }}
                 </div>
-                <!-- Alert icon: status = Complete but no gate approval -->
-                <span *ngIf="effectiveDateStatus(m) === 'complete' && !isGateApproved(m.gate_name)"
+                <!-- B-103 (Contract 15) — D-205 Condition A: status = Complete AND
+                     (actual_date IS NULL OR gate not approved). Either side fires. -->
+                <span *ngIf="effectiveDateStatus(m) === 'complete' && (!m.actual_date || !isGateApproved(m.gate_name))"
                       style="font-size:11px;color:var(--triarq-color-sunray,#f5a623);"
-                      title="Status set to Complete but gate not yet approved">⚠</span>
-                <!-- Alert icon: today > target date and status not Behind or Complete -->
+                      [attr.title]="!m.actual_date
+                        ? 'Status set to Complete but actual date not set'
+                        : 'Status set to Complete but gate not yet approved'">⚠</span>
+                <!-- B-103 (Contract 15) — D-205 Condition B: target date past today AND
+                     status not in (complete, behind). Requires target_date IS NOT NULL. -->
                 <span *ngIf="isTargetDateOverdue(m) && effectiveDateStatus(m) !== 'behind' && effectiveDateStatus(m) !== 'complete'"
                       style="font-size:11px;color:var(--triarq-color-sunray,#f5a623);"
                       title="Target date has passed — consider updating the milestone status">⚠</span>
@@ -1217,10 +1284,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   outcomeError   = '';
   outcomeControl = new FormControl('', Validators.required);
 
-  // Stage advance
-  advancing     = false;
-  advanceError  = '';
-
   // Milestone dates
   editingMilestoneGate: GateName | null = null;
   savingMilestone       = false;
@@ -1264,6 +1327,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   uncancelConfirming = false;
   uncancelBusy       = false;
   uncancelError      = '';
+
+  // D-360 Surface 3: free stage advance inline confirmation
+  pendingAdvanceTo: LifecycleStage | null = null;
+  advancingStage    = false;
+  advanceError      = '';
 
   // DS / CB assignment
   allUsers:   User[] = [];
@@ -1332,9 +1400,15 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   // destroying the edit panel before its own onEscKey handler could show the dirty-state confirm overlay.
   // Fix: increment cancelEditSignal so ESC routes through the same signal path as scrim click, letting
   // the edit panel's requestCancel() perform the dirty-state check. Source: Contract 9.
+  //
+  // B-97 (Contract 15): when a MatDialog is open above the panel (Gate Record Modal),
+  // the dialog owns the Escape key. Without this guard, the document-level handler
+  // here would also fire — closing the panel and triggering a parent list reload —
+  // on top of the modal close. Source: Contract 15.
   @HostListener('document:keydown.escape')
   onEscKey(): void {
     if (!this.panelMode) { return; }
+    if (this.dialog.openDialogs.length > 0) { return; }
     if (this.showEditPanel) {
       this.cancelEditSignal++;
       this.cdr.markForCheck();
@@ -1454,7 +1528,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       close_review:  8   // OUTCOME (index 8)
     };
     const STAGE_ORDER: LifecycleStage[] = [
-      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE'
+      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE'
     ];
     const minIdx = GATE_MIN_STAGE_IDX[gateName];
     if (minIdx === undefined) { return false; } // brief_review is always reachable from BRIEF
@@ -1656,7 +1730,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     const artifacts = this.cycle?.artifacts;
     if (!artifacts?.length) { return []; }
     const STAGE_ORDER: string[] = [
-      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE'
+      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE'
     ];
     const currentIdx = STAGE_ORDER.indexOf(this.cycle?.current_lifecycle_stage as string ?? '');
     const stages = [...new Set(artifacts.map(a => a.lifecycle_stage ?? 'General'))];
@@ -1789,32 +1863,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       error: (err: { error?: string }) => {
         this.outcomeError  = err.error ?? 'Save failed. Check permissions and try again.';
         this.savingOutcome = false;
-        this.cdr.markForCheck();
-      }
-    });
-  }
-
-  // ── Stage advance ──────────────────────────────────────────────────────────
-
-  advanceStage(): void {
-    if (!this.cycle) { return; }
-    this.advancing    = true;
-    this.advanceError = '';
-    this.cdr.markForCheck();
-
-    this.delivery.advanceStage(this.cycle.delivery_cycle_id).subscribe({
-      next: (res) => {
-        if (res.success && res.data) {
-          this.loadCycle(this.cycle!.delivery_cycle_id);
-        } else {
-          this.advanceError = res.error ?? 'Advance failed.';
-        }
-        this.advancing = false;
-        this.cdr.markForCheck();
-      },
-      error: (err: { error?: string }) => {
-        this.advanceError = err.error ?? 'Advance failed. Check gate status and Workstream.';
-        this.advancing    = false;
         this.cdr.markForCheck();
       }
     });
@@ -1970,6 +2018,135 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   }
 
   // Cancel Cycle action — D-183 two-step pattern. State: cancelConfirming guards the button.
+  // ── D-360 Surface 3: free stage advance inline confirmation ───────────────
+
+  /** Surface 3 trigger — fired by StageTrackComponent when next-free stage is clicked. */
+  requestStageAdvance(stageId: string): void {
+    this.pendingAdvanceTo = stageId as LifecycleStage;
+    this.advanceError     = '';
+    this.cdr.markForCheck();
+  }
+
+  cancelStageAdvance(): void {
+    if (this.advancingStage) return;
+    this.pendingAdvanceTo = null;
+    this.advanceError     = '';
+    this.cdr.markForCheck();
+  }
+
+  confirmStageAdvance(): void {
+    if (!this.cycle || !this.pendingAdvanceTo) return;
+    this.advancingStage = true;
+    this.advanceError   = '';
+    this.cdr.markForCheck();
+
+    this.delivery.advanceStage(this.cycle.delivery_cycle_id).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.pendingAdvanceTo = null;
+          this.advancingStage   = false;
+          this.loadCycle(this.cycle!.delivery_cycle_id);
+        } else {
+          this.advancingStage = false;
+          this.advanceError   = res.error ?? 'Stage advance failed. Please try again.';
+          this.cdr.markForCheck();
+        }
+      },
+      error: (err: { error?: string }) => {
+        this.advancingStage = false;
+        this.advanceError   = err.error ?? 'Stage advance failed. Please try again.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  /** D-360 Surface 1 helpers + Surface 3 confirmation labels */
+
+  get currentStageLabel(): string {
+    return STAGE_LABEL_MAP[this.cycle?.current_lifecycle_stage as LifecycleStage] ?? '';
+  }
+
+  /** Stage id and gate id between the current stage and the next stage in LIFECYCLE_TRACK. */
+  private get nextStageInTrack(): { stageId: LifecycleStage | null; gateId: GateName | null; gateLabel: string } {
+    const currentId = this.cycle?.current_lifecycle_stage;
+    if (!currentId) return { stageId: null, gateId: null, gateLabel: '' };
+    const idx = LIFECYCLE_TRACK.findIndex(n => n.type === 'stage' && n.id === currentId);
+    if (idx === -1) return { stageId: null, gateId: null, gateLabel: '' };
+    let interveningGate: GateName | null = null;
+    let interveningGateLabel = '';
+    for (let i = idx + 1; i < LIFECYCLE_TRACK.length; i++) {
+      const node = LIFECYCLE_TRACK[i];
+      if (node.type === 'gate') {
+        interveningGate      = node.id as GateName;
+        interveningGateLabel = node.label;
+        continue;
+      }
+      if (node.type === 'stage') {
+        return { stageId: node.id as LifecycleStage, gateId: interveningGate, gateLabel: interveningGateLabel };
+      }
+    }
+    return { stageId: null, gateId: interveningGate, gateLabel: interveningGateLabel };
+  }
+
+  get pendingAdvanceLabel(): string {
+    return STAGE_LABEL_MAP[this.pendingAdvanceTo as LifecycleStage] ?? this.pendingAdvanceTo ?? '';
+  }
+
+  /** Surface 1: which gate (if any) currently determines the chip state. */
+  private get currentStateGate(): { gateId: GateName | null; gateLabel: string; status: GateStatus | null } {
+    const { gateId, gateLabel } = this.nextStageInTrack;
+    if (!gateId) return { gateId: null, gateLabel, status: null };
+    const record = this.cycle?.gate_records?.find(g => g.gate_name === gateId);
+    return { gateId, gateLabel, status: (record?.gate_status ?? null) as GateStatus | null };
+  }
+
+  /** Surface 1 chip label per D-360 logic. */
+  get currentStateChipLabel(): string {
+    const { gateLabel, status } = this.currentStateGate;
+    if (status === 'awaiting_approval' || status === 'pending') return `${gateLabel} — Awaiting Approval`;
+    if (status === 'returned')                                  return `${gateLabel} — Returned`;
+    return `In ${this.currentStageLabel}`;
+  }
+
+  /** Surface 1 chip background colour. */
+  get currentStateChipBg(): string {
+    const { status } = this.currentStateGate;
+    if (status === 'awaiting_approval' || status === 'pending') return 'rgba(242, 166, 32, 0.12)';
+    if (status === 'returned')                                  return 'rgba(233, 97, 39, 0.12)';
+    return 'rgba(37, 112, 153, 0.12)';
+  }
+
+  /** Surface 1 chip text colour. */
+  get currentStateChipColor(): string {
+    const { status } = this.currentStateGate;
+    if (status === 'awaiting_approval' || status === 'pending') return 'var(--triarq-color-sunray, #F2A620)';
+    if (status === 'returned')                                  return '#E96127';
+    return 'var(--triarq-color-primary, #257099)';
+  }
+
+  /**
+   * D-360 Surface 4: returns the single currently active gate, or null. Active =
+   * record status not_started / pending / awaiting_approval / returned. Approved
+   * gates are not active. Only one row highlighted at a time — first gate in
+   * lifecycle order whose status is in the active set.
+   */
+  get activeGateName(): GateName | null {
+    if (!this.cycle) return null;
+    const ACTIVE_STATUSES: GateStatus[] = ['not_started', 'pending', 'awaiting_approval', 'returned'];
+    const ORDERED_GATES: GateName[] = ['brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'];
+    for (const gateName of ORDERED_GATES) {
+      const record = this.cycle.gate_records?.find(g => g.gate_name === gateName);
+      if (record && ACTIVE_STATUSES.includes(record.gate_status)) return gateName;
+    }
+    return null;
+  }
+
+  isActiveGate(gateName: GateName): boolean {
+    return this.activeGateName === gateName;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   cancelCycleAction(): void {
     if (!this.cycle) { return; }
     this.cancelBusy  = true;
@@ -2646,7 +2823,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   private initExpandedStages(): void {
     if (!this.cycle) { return; }
     const STAGE_ORDER = [
-      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE'
+      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE'
     ];
     const currentIdx = STAGE_ORDER.indexOf(this.cycle.current_lifecycle_stage);
     this.expandedStages = new Set(

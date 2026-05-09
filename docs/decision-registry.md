@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.18 | April 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.27 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-344**
+**Next available: D-369**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -246,6 +246,31 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-341 | Repo Cleanup Batch: Pending Deletions to Next Code Session | Claude Chat | 2026-04-19 | Active |
 | D-342 | REPLACE Instruction Target Confirmation: Design Session Rule 24 | Claude Chat | 2026-04-19 | Active |
 | D-343 | Last Updated Archive: Rolling Four-Day Window | Claude Chat | 2026-04-19 | Active |
+| D-344 | Zip Manifest Verification — Session Close Standing Instruction | Claude Chat | April 2026 | Active |
+| D-345 | Gate Submission → Approval → Outcome Interaction Model | Claude Chat | 2026-04-19D | Active |
+| D-346 | General Processing Feedback Standard (S-028) | Claude Chat | 2026-04-19D | Active |
+| D-347 | Locked State Summary Update: Document Author Standing Instruction | 2026-05-02 | Active | project-instructions.md Rule 19 |
+| D-348 | Panel Action Button Placement Standard | 2026-05-03 | Active | D-297, D-345, D-346 |
+| D-349 | Rolling Archive Window: Four Active Session-Days | 2026-05-03 | Active | D-343 |
+| D-350 | Rule 2 Amendment: State a Position | 2026-05-03 | Active | Rule 2 |
+| D-351 | Hybrid Supabase Storage Adapter for Session Persistence | Claude Chat | 2026-05-04 | Active |
+| D-352 | Master Branch as Source of Truth; Worktree Commit Hygiene Rule | Claude Chat | 2026-05-04 | Active |
+| D-353 | Row Level Security Enabled for External User Access | Claude Chat | 2026-05-04 | Active |
+| D-354 | Email OTP Auth Replaces Email+Password (Pre-Port) | Claude Chat | 2026-05-06 | Active |
+| D-355 | Gate Record Modal Pattern | Claude Chat | 2026-05-06 | Active |
+| D-356 | "Coming Soon" Replaces "Not Started" as Unbuilt Surface Label | Claude Chat | 2026-05-06 | Active |
+| D-357 | UAT Checklist as Required CodeClose Deliverable | Claude Chat | 2026-05-06 | Active |
+| D-358 | Session Response Brevity Standard by Role | Claude Chat | 2026-05-06 | Active |
+| D-359 | Session Open Rule Compliance Confirmation | Claude Chat | 2026-05-06 | Active |
+| D-360 | Stage Track Free Transition Model and Active State Clarity | Claude Chat | 2026-05-07 | Active |
+| D-361 | TRIARQ Multi-Session Orchestration Framework Founded | Claude Chat | 2026-05-07 | Active |
+| D-362 | Template Artifacts Are Portable Uploadable .md Files | Claude Chat | 2026-05-07 | Active |
+| D-363 | Shared Session Vocabulary Across All Projects | Claude Chat | 2026-05-07 | Active |
+| D-364 | Universal Output File Naming Convention | Claude Chat | 2026-05-07 | Active |
+| D-365 | Collaborator Zip Is Self-Contained | Claude Chat | 2026-05-07 | Active |
+| D-366 | Template Version Recorded in Generated project-instructions.md | Claude Chat | 2026-05-07 | Active |
+| D-367 | Rule 27: Verify Inputs Before Executable Actions | Claude Chat | 2026-05-08 | Active |
+| D-368 | Rule 28: Cross-Project Instruction Propagation | Claude Chat | 2026-05-08 | Active |
 
 ---
 

@@ -1,10 +1,14 @@
 // update_user_email.js
-// Updates a user's email address in both Supabase Auth and public.users (D-354 §5).
+// Updates a user's email address.
 // Admin-only. Email change is admin-only by D-169 (no self-service email edit).
 //
-// Two-step write:
-//   1. supabase.auth.admin.updateUserById(user_id, { email: new_email })
-//   2. UPDATE public.users SET email = new_email WHERE id = user_id
+// B-92 (Contract 14 + 15): public.users update is fully independent of the
+// auth-account update. The auth path is best-effort — any failure is logged
+// to the console and the public.users update still runs.
+//   1. Attempt auth.users update if a Supabase Auth row exists for user_id
+//      (errors here are logged, not surfaced — except duplicate-email which
+//      is a hard failure)
+//   2. Always run public.users update — this is the source of truth for the UI
 //
 // Duplicate handling: surfaces a normalized error so the UI can render
 // "That email address is already in use." (D-200 Pattern 3).
@@ -80,20 +84,38 @@ async function update_user_email(params, caller_user_id) {
     return { success: false, error: 'That email address is already in use.' };
   }
 
-  // Update Supabase Auth first — single source of truth for credentials.
-  const { error: authErr } = await supabase.auth.admin.updateUserById(user_id, {
-    email: normalizedEmail
-  });
+  // B-92 (Contract 15): the auth lookup + update is best-effort and fully
+  // isolated from the public.users update below. Any throw or error here is
+  // swallowed — the only hard failure surfaced is the duplicate-email case.
+  // Seeded users with no auth row OR with a mismatched UUID still succeed.
+  let authUpdateAttempted = false;
+  try {
+    const { data: authLookup, error: lookupErr } =
+      await supabase.auth.admin.getUserById(user_id);
+    const hasAuthAccount = !lookupErr && !!authLookup?.user;
 
-  if (authErr) {
-    const msg = authErr.message ?? '';
-    if (/already.*registered/i.test(msg) || /email.*exist/i.test(msg) || /duplicate/i.test(msg)) {
-      return { success: false, error: 'That email address is already in use.' };
+    if (hasAuthAccount) {
+      authUpdateAttempted = true;
+      const { error: authErr } = await supabase.auth.admin.updateUserById(user_id, {
+        email: normalizedEmail
+      });
+
+      if (authErr) {
+        const msg = authErr.message ?? '';
+        if (/already.*registered/i.test(msg) || /email.*exist/i.test(msg) || /duplicate/i.test(msg)) {
+          return { success: false, error: 'That email address is already in use.' };
+        }
+        // Non-duplicate auth error — log and continue to public.users update.
+        console.warn(`[update_user_email] auth update failed for ${user_id}: ${msg}`);
+      }
     }
-    return { success: false, error: `Could not update email: ${msg}` };
+  } catch (e) {
+    // Auth API threw (network, SDK shape change, or seeded-user lookup edge).
+    // public.users update below still runs.
+    console.warn(`[update_user_email] auth lookup/update threw for ${user_id}:`, e?.message || e);
   }
 
-  // Mirror into public.users so the rest of the app sees the new email.
+  // Always run public.users update — source of truth for the UI.
   const { data: updated, error: updateErr } = await supabase
     .from('users')
     .update({ email: normalizedEmail })
@@ -102,13 +124,18 @@ async function update_user_email(params, caller_user_id) {
     .single();
 
   if (updateErr) {
-    // Auth has been updated but public.users failed — surface the error so the
-    // admin can retry. Auth-side update is idempotent on retry.
-    return {
-      success: false,
-      error: `Email updated in Auth but failed to sync to user record: ${updateErr.message}`
-    };
+    // PostgREST surfaces "JSON object requested, multiple (or no) rows" when
+    // RLS or a wrong UUID returns zero rows — translate to a user-readable
+    // message instead of leaking the raw PostgREST string.
+    const raw = updateErr.message || '';
+    if (/multiple.*rows/i.test(raw) || /no.*rows/i.test(raw) || /0 rows/i.test(raw)) {
+      return { success: false, error: 'User record could not be updated.' };
+    }
+    return { success: false, error: `Could not update user record: ${raw}` };
   }
+
+  // Suppress unused-warning on authUpdateAttempted — kept for future telemetry.
+  void authUpdateAttempted;
 
   return { success: true, data: updated };
 }

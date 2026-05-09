@@ -251,6 +251,86 @@ describe('update_user_email', () => {
     assert.equal(errorResponse.error, 'That email address is already in use.');
   });
 
+  test('B-92: tool conditionally updates auth based on auth-account existence', () => {
+    // Bug was: tool unconditionally called updateUserById, returning
+    // "User not found" for users with no auth.users row. Fix per spec:
+    // gate the auth-side update behind a getUserById existence check.
+    const fs   = require('node:fs');
+    const path = require('node:path');
+    const src  = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'tools', 'update_user_email.js'),
+      'utf8'
+    );
+    assert.ok(src.includes('hasAuthAccount'),       'update_user_email must branch on hasAuthAccount (B-92)');
+    assert.ok(src.includes('getUserById(user_id)'), 'update_user_email must call getUserById to detect auth account (B-92)');
+    assert.ok(/if\s*\(\s*hasAuthAccount\s*\)/.test(src), 'auth update must be gated by `if (hasAuthAccount)` (B-92)');
+  });
+
+  test('B-92 (Contract 15): public.users update is decoupled from auth update', () => {
+    // Regression: in C14 the auth lookup error path could still fail-stop
+    // before public.users update ran. Fix: wrap auth path in try/catch and
+    // make public.users update unconditional.
+    const fs   = require('node:fs');
+    const path = require('node:path');
+    const src  = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'tools', 'update_user_email.js'),
+      'utf8'
+    );
+    assert.ok(/try\s*\{[\s\S]*getUserById/.test(src),
+      'auth lookup must be wrapped in try/catch (B-92 C15)');
+    // public.users update must come AFTER the auth try/catch, not nested in it.
+    const tryStart  = src.indexOf('try {');
+    const catchEnd  = src.indexOf('} catch', tryStart);
+    const closeIdx  = src.indexOf('}', catchEnd + 1);
+    const publicUpdateIdx = src.indexOf("from('users')\n    .update", closeIdx);
+    assert.ok(publicUpdateIdx > closeIdx,
+      'public.users update must run after the auth try/catch block (B-92 C15)');
+  });
+
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('resend_invite', () => {
+
+  test('error path: missing user_id', async () => {
+    const { resend_invite } = require('../src/tools/resend_invite');
+    const result = await resend_invite({}, ADMIN_ID);
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('user_id'));
+  });
+
+  test('B-91: tool source contains no getUserById pre-check', () => {
+    // The bug was that getUserById blocked seeded users (no auth account).
+    // Fix per spec: drop the entire auth-account pre-check; call
+    // inviteUserByEmail directly. This test guards against regression.
+    const fs   = require('node:fs');
+    const path = require('node:path');
+    const src  = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'tools', 'resend_invite.js'),
+      'utf8'
+    );
+    assert.ok(!src.includes('getUserById'), 'resend_invite must not call auth.admin.getUserById (B-91)');
+  });
+
+  test('B-91/B-105 (Contract 15): invite call wrapped in try/catch + rate-limit branch', () => {
+    // Regression: a thrown supabase-js admin error escaped the {error} contract
+    // and crashed the request. Fix: try/catch + specific branches for
+    // rate-limit and already-registered.
+    const fs   = require('node:fs');
+    const path = require('node:path');
+    const src  = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'tools', 'resend_invite.js'),
+      'utf8'
+    );
+    assert.ok(/try\s*\{[\s\S]*inviteUserByEmail/.test(src),
+      'inviteUserByEmail must be wrapped in try/catch (B-91 C15)');
+    assert.ok(/rate.*limit/i.test(src),
+      'rate-limit error branch must be present (B-91 C15)');
+    assert.ok(/already.*registered/i.test(src),
+      'already-registered error branch must be present (B-91 C15)');
+  });
+
 });
 
 

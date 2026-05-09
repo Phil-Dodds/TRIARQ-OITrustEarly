@@ -42,6 +42,7 @@ import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { DeliveryService } from '../../../core/services/delivery.service';
+import { UserProfileService } from '../../../core/services/user-profile.service';
 import {
   DeliveryCycle,
   GateName,
@@ -93,7 +94,7 @@ const GATE_LABELS: Record<GateName, string> = {
                 type="button"
                 [disabled]="processing"
                 aria-label="Close Gate Record"
-                (click)="dismiss()">
+                (click)="onDismiss()">
           ×
         </button>
       </div>
@@ -151,11 +152,8 @@ const GATE_LABELS: Record<GateName, string> = {
               {{ approverDisplayName(record!.approver_user_id!) }}
             </span>
             <span *ngIf="!record?.approver_user_id" class="grm-raci-default">
-              Phil (escalation default — no Accountable configured)
+              {{ escalationDefaultLabel }}
             </span>
-          </div>
-          <div class="grm-routing-note">
-            Consulted and Informed routing configured in Build D (RACI Management module).
           </div>
         </section>
 
@@ -375,7 +373,7 @@ const GATE_LABELS: Record<GateName, string> = {
         <button type="button"
                 class="grm-btn-ghost"
                 [disabled]="processing"
-                (click)="dismiss()">
+                (click)="onDismiss()">
           Cancel
         </button>
       </div>
@@ -520,6 +518,7 @@ export class GateRecordModalComponent {
   constructor(
     private readonly fb:        FormBuilder,
     private readonly delivery:  DeliveryService,
+    private readonly profile:   UserProfileService,
     private readonly cdr:       ChangeDetectorRef,
     private readonly dialogRef: MatDialogRef<GateRecordModalComponent, GateRecordModalResult>,
     @Inject(MAT_DIALOG_DATA) public readonly data: GateRecordModalData
@@ -531,18 +530,15 @@ export class GateRecordModalComponent {
 
     this.returnForm = this.fb.group({ approver_notes: [''] });
 
-    // Block click-outside / Escape dismissal during processing — Context D
-    // requires that nothing be tappable while an MCP write is in flight.
+    // Default open: backdrop and Escape allowed (handled below). Toggled to
+    // disableClose=true during MCP writes per S-028 Context D.
     this.dialogRef.disableClose = false;
-    this.dialogRef.beforeClosed().subscribe(() => {
-      if (this.processing) {
-        // No-op — MatDialog respects disableClose only at construction; we toggle
-        // it dynamically when processing starts/stops.
-      }
-    });
   }
 
-  // ── ESC: only dismiss if not processing ─────────────────────────────────────
+  // B-97: ESC fires onDismiss only — never the action-complete refresh path.
+  // MatDialog's default Escape handler also closes (with `undefined` result);
+  // afterClosed in the parent treats `undefined` and `{refreshKind:'none'}`
+  // identically (no refresh), so duplicate closes are safe.
   @HostListener('document:keydown.escape', ['$event'])
   onEscape(ev: KeyboardEvent): void {
     if (this.processing) {
@@ -550,7 +546,7 @@ export class GateRecordModalComponent {
       ev.preventDefault();
       return;
     }
-    this.dismiss();
+    this.onDismiss();
   }
 
   // ── Computed flags driving action area ──────────────────────────────────────
@@ -559,11 +555,11 @@ export class GateRecordModalComponent {
     if (this.record) return false;
     const GATE_MIN_STAGE_IDX: Partial<Record<GateName, number>> = {
       go_to_build:   2,  // SPEC
-      go_to_deploy:  4,  // VALIDATE
-      go_to_release: 6,  // UAT
+      go_to_deploy:  5,  // UAT (gate gates UAT→PILOT)
+      go_to_release: 6,  // PILOT (gate gates PILOT→RELEASE)
       close_review:  8   // OUTCOME
     };
-    const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE'];
+    const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE'];
     const minIdx = GATE_MIN_STAGE_IDX[this.data.gateName];
     if (minIdx === undefined) return false;
     const currentIdx = STAGE_ORDER.indexOf(this.data.cycle.current_lifecycle_stage);
@@ -600,7 +596,20 @@ export class GateRecordModalComponent {
   get approverNameOrDefault(): string {
     const id = this.record?.approver_user_id;
     if (id) return this.approverDisplayName(id);
-    return 'Phil (escalation default)';
+    return `${this.currentUserDisplayName} (escalation default)`;
+  }
+
+  /**
+   * B-95: rendered when no Accountable is configured. Resolves the current
+   * user's display name from the auth session via UserProfileService —
+   * never a hardcoded "Phil" string.
+   */
+  get escalationDefaultLabel(): string {
+    return `${this.currentUserDisplayName} (escalation default — no Accountable configured)`;
+  }
+
+  private get currentUserDisplayName(): string {
+    return this.profile.getCurrentProfile()?.display_name ?? 'Phil';
   }
 
   // ── Status display (mirrors detail component logic) ─────────────────────────
@@ -664,10 +673,23 @@ export class GateRecordModalComponent {
     this.cdr.markForCheck();
   }
 
-  /** Dismiss without action — closes the dialog. Blocked while processing. */
-  dismiss(): void {
+  /**
+   * B-97: dismissal path. Used by Escape, backdrop click, Cancel button, and
+   * × button. Closes the modal with refreshKind:'none' — never triggers a
+   * panel refresh in the parent.
+   */
+  onDismiss(): void {
     if (this.processing) return;
     this.dialogRef.close({ refreshKind: 'none' });
+  }
+
+  /**
+   * B-97: action-complete path. Used only after a successful MCP write.
+   * Closes the modal with the correct refresh kind so the parent reloads
+   * the cycle per D-345.
+   */
+  private onGateActionComplete(refreshKind: 'full' | 'partial'): void {
+    this.dialogRef.close({ refreshKind });
   }
 
   /** Submit / Re-submit for Approval — partial refresh per D-345 panel rules. */
@@ -681,7 +703,7 @@ export class GateRecordModalComponent {
       next: (res) => {
         if (res.success) {
           this.endProcessing();
-          this.dialogRef.close({ refreshKind: 'partial' });
+          this.onGateActionComplete('partial');
         } else {
           this.endProcessing(res.error ?? 'Submission failed. Please try again.');
         }
@@ -704,7 +726,7 @@ export class GateRecordModalComponent {
         if (res.success) {
           this.endProcessing();
           // Approve advances stage → caller does full reload (D-345).
-          this.dialogRef.close({ refreshKind: 'full' });
+          this.onGateActionComplete('full');
         } else {
           this.endProcessing(
             res.error ?? 'Decision record failed.',
@@ -739,7 +761,7 @@ export class GateRecordModalComponent {
         if (res.success) {
           this.endProcessing();
           // Return resets gate to returned; caller refreshes cycle (D-345).
-          this.dialogRef.close({ refreshKind: 'full' });
+          this.onGateActionComplete('full');
         } else {
           this.endProcessing(
             res.error ?? 'Decision record failed.',
@@ -763,7 +785,7 @@ export class GateRecordModalComponent {
       next: (res) => {
         if (res.success) {
           this.endProcessing();
-          this.dialogRef.close({ refreshKind: 'partial' });
+          this.onGateActionComplete('partial');
         } else {
           this.endProcessing(res.error ?? 'Withdrawal failed. Please try again.');
         }
@@ -794,8 +816,13 @@ export class GateRecordModalComponent {
     this.cdr.markForCheck();
   }
 
+  /**
+   * B-95: resolve approver UUID → display_name. If the user is not present
+   * in the loaded allUsers list (e.g. not yet loaded or not in scope), fall
+   * back to a graceful placeholder rather than rendering the raw UUID.
+   */
   approverDisplayName(userId: string): string {
-    return this.data.allUsers.find(u => u.id === userId)?.display_name ?? userId;
+    return this.data.allUsers.find(u => u.id === userId)?.display_name ?? 'Unknown user';
   }
 
   tierShortLabel(tier: TierClassification): string {

@@ -32,7 +32,9 @@ import {
 import { CommonModule } from '@angular/common';
 import { GateName, GateDisplayState, GateStateMap, LifecycleTrackNode } from '../../../core/types/database';
 
-/** Full ordered lifecycle track — 10 stages + 5 gate nodes = 15 nodes */
+/** Full ordered lifecycle track — 10 stages + 5 gate nodes = 15 nodes.
+ *  Canonical order: VALIDATE → UAT → go_to_deploy → PILOT → go_to_release → RELEASE.
+ */
 export const LIFECYCLE_TRACK: LifecycleTrackNode[] = [
   { type: 'stage', id: 'BRIEF',        label: 'Brief' },
   { type: 'gate',  id: 'brief_review', label: 'Brief Review' },
@@ -41,9 +43,9 @@ export const LIFECYCLE_TRACK: LifecycleTrackNode[] = [
   { type: 'gate',  id: 'go_to_build',  label: 'Go to Build' },
   { type: 'stage', id: 'BUILD',        label: 'Build' },
   { type: 'stage', id: 'VALIDATE',     label: 'Validate' },
+  { type: 'stage', id: 'UAT',          label: 'UAT' },
   { type: 'gate',  id: 'go_to_deploy', label: 'Go to Deploy' },
   { type: 'stage', id: 'PILOT',        label: 'Pilot' },
-  { type: 'stage', id: 'UAT',          label: 'UAT' },
   { type: 'gate',  id: 'go_to_release', label: 'Go to Release' },
   { type: 'stage', id: 'RELEASE',      label: 'Release' },
   { type: 'stage', id: 'OUTCOME',      label: 'Outcome' },
@@ -54,7 +56,7 @@ export const LIFECYCLE_TRACK: LifecycleTrackNode[] = [
 /** Gate-only track — 5 nodes for condensed dashboard row (spec 5.1) */
 export const GATE_NODES_ONLY: LifecycleTrackNode[] = LIFECYCLE_TRACK.filter(n => n.type === 'gate');
 
-const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE'];
+const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE'];
 
 @Component({
   selector: 'app-stage-track',
@@ -79,26 +81,31 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
             style="height:2px;flex:0 0 32px;"
           ></div>
 
-          <!-- Stage node — current stage circle is interactive (D-355, ARCH-25):
-               clicking it opens the Gate Record Modal for the next gate. -->
+          <!-- Stage node — D-360 Surface 2 five interaction states:
+               completed (teal filled ✓, no cursor, no tooltip),
+               active (teal filled ●, no cursor, no tooltip),
+               next-free (outline, pointer, "Advance to X" tooltip, clickable),
+               next-gate-blocked (outline, default cursor, "Requires X approval" tooltip),
+               future (outline, default cursor, no tooltip).
+               Active stage no longer opens Gate Record Modal — gate diamond is the
+               sole trigger for the modal. (Supersedes ARCH-25 active-stage-click behavior.) -->
           <div *ngIf="node.type === 'stage'"
                [attr.data-stage-id]="node.id"
                style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto;">
             <div
               [style.background]="stageCircleBg(node.id)"
-              [style.outline]="isCurrent(node.id) ? '2px solid #fff' : 'none'"
-              [style.outline-offset]="'2px'"
-              [style.cursor]="isCurrent(node.id) && nextGateAfterCurrent ? 'pointer' : 'default'"
-              [attr.role]="isCurrent(node.id) && nextGateAfterCurrent ? 'button' : null"
-              [attr.tabindex]="isCurrent(node.id) && nextGateAfterCurrent ? 0 : null"
-              [attr.aria-label]="isCurrent(node.id) && nextGateAfterCurrent ? 'Open ' + nextGateLabel + ' gate' : null"
-              [title]="isCurrent(node.id) && nextGateAfterCurrent ? 'Open ' + nextGateLabel : null"
-              (click)="isCurrent(node.id) && onCurrentStageClick()"
-              (keydown.enter)="isCurrent(node.id) && onCurrentStageClick()"
-              (keydown.space)="isCurrent(node.id) && onCurrentStageClick()"
-              style="width:28px;height:28px;border-radius:50%;
+              [style.border]="stageCircleBorder(node.id)"
+              [style.cursor]="stageNodeState(node.id) === 'next-free' ? 'pointer' : 'default'"
+              [attr.role]="stageNodeState(node.id) === 'next-free' ? 'button' : null"
+              [attr.tabindex]="stageNodeState(node.id) === 'next-free' ? 0 : null"
+              [attr.aria-label]="stageNodeAriaLabel(node.id)"
+              [attr.title]="stageNodeTooltip(node.id)"
+              (click)="onStageClick(node.id)"
+              (keydown.enter)="onStageClick(node.id)"
+              (keydown.space)="onStageClick(node.id)"
+              style="width:28px;height:28px;border-radius:50%;box-sizing:border-box;
                      display:flex;align-items:center;justify-content:center;
-                     transition:background 0.2s;"
+                     transition:background 0.2s, border-color 0.2s;"
             >
               <span *ngIf="isComplete(node.id)"
                     style="color:#fff;font-size:12px;font-weight:700;">✓</span>
@@ -120,7 +127,7 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
             </span>
             <div
               [style.background]="gateColor(node.id)"
-              [title]="gateTitle(node.id)"
+              [attr.title]="gateTitle(node.id)"
               (click)="onGateClick(node.id)"
               style="width:24px;height:24px;border-radius:4px;transform:rotate(45deg);
                      cursor:pointer;transition:opacity 0.15s;"
@@ -151,7 +158,7 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','R
                style="height:1px;width:6px;flex-shrink:0;"></div>
           <div
             [style.background]="gateColor(gate.id)"
-            [title]="gate.label + ': ' + gateDisplayState(gate.id)"
+            [attr.title]="gate.label + ': ' + gateDisplayState(gate.id)"
             style="width:10px;height:10px;border-radius:2px;
                    transform:rotate(45deg);flex-shrink:0;"
           ></div>
@@ -166,6 +173,9 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
   @Input() displayMode:    'full' | 'condensed' = 'full';
 
   @Output() gateClicked = new EventEmitter<GateName>();
+  /** D-360 Surface 3: emitted when the user clicks the next free stage circle.
+   *  Parent renders the inline two-step confirmation and calls advance_cycle_stage. */
+  @Output() stageAdvanceRequested = new EventEmitter<string>();
 
   @ViewChild('fullScroller') fullScroller?: ElementRef<HTMLDivElement>;
 
@@ -200,29 +210,67 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
   }
 
   /**
-   * D-355 / ARCH-25: clicking the current stage's filled circle opens the Gate
-   * Record Modal for the next gate the cycle must pass. No-op if there is no
-   * next gate (e.g. cycle is at COMPLETE).
+   * D-360 Surface 2: stage circle click. Only the next free stage is clickable —
+   * any other state is a no-op. The parent renders the inline confirmation.
    */
-  onCurrentStageClick(): void {
-    const nextGate = this.nextGateAfterCurrent;
-    if (nextGate) this.gateClicked.emit(nextGate as GateName);
+  onStageClick(stageId: string): void {
+    if (this.stageNodeState(stageId) !== 'next-free') return;
+    this.stageAdvanceRequested.emit(stageId);
   }
 
-  /** Gate id of the first gate node following the current stage in the full track. */
-  get nextGateAfterCurrent(): string | null {
+  /**
+   * D-360 Surface 2 source-of-truth derivation: structural read of LIFECYCLE_TRACK.
+   * If the next stage is preceded by a gate node in the track, the transition is
+   * gate-blocked; otherwise free. Returns the gate id (when blocked) or null.
+   */
+  private nextStageGate(): { nextStageId: string | null; gateId: string | null } {
     const idx = this.fullTrack.findIndex(n => n.type === 'stage' && n.id === this.currentStageId);
-    if (idx === -1) return null;
+    if (idx === -1) return { nextStageId: null, gateId: null };
+    let interveningGate: string | null = null;
     for (let i = idx + 1; i < this.fullTrack.length; i++) {
-      if (this.fullTrack[i].type === 'gate') return this.fullTrack[i].id;
+      const node = this.fullTrack[i];
+      if (node.type === 'gate')  { interveningGate = node.id; continue; }
+      if (node.type === 'stage') { return { nextStageId: node.id, gateId: interveningGate }; }
+    }
+    return { nextStageId: null, gateId: null };
+  }
+
+  /** D-360 Surface 2: returns one of five interaction states for a stage circle. */
+  stageNodeState(stageId: string): 'completed' | 'active' | 'next-free' | 'next-gate-blocked' | 'future' {
+    if (this.isComplete(stageId)) return 'completed';
+    if (this.isCurrent(stageId))  return 'active';
+    const { nextStageId, gateId } = this.nextStageGate();
+    if (stageId === nextStageId) {
+      if (!gateId) return 'next-free';
+      // Gate-blocked unless the gate has already cleared (rare but possible — gate
+      // cleared without the cycle yet advancing). Cleared = display 'complete'.
+      return this.gateDisplayState(gateId) === 'complete' ? 'next-free' : 'next-gate-blocked';
+    }
+    return 'future';
+  }
+
+  /** D-360 Surface 2 + B-98 fix: tooltip resolves to a string or null — never the literal "null". */
+  stageNodeTooltip(stageId: string): string | null {
+    const state = this.stageNodeState(stageId);
+    if (state === 'next-free') {
+      const label = this.fullTrack.find(n => n.id === stageId)?.label ?? stageId;
+      return `Advance to ${label}`;
+    }
+    if (state === 'next-gate-blocked') {
+      const { gateId } = this.nextStageGate();
+      const gateLabel = gateId ? (this.fullTrack.find(n => n.id === gateId)?.label ?? gateId) : '';
+      return `Requires ${gateLabel} approval`;
     }
     return null;
   }
 
-  get nextGateLabel(): string {
-    const id = this.nextGateAfterCurrent;
-    if (!id) return '';
-    return this.fullTrack.find(n => n.id === id)?.label ?? '';
+  stageNodeAriaLabel(stageId: string): string | null {
+    const state = this.stageNodeState(stageId);
+    if (state === 'next-free') {
+      const label = this.fullTrack.find(n => n.id === stageId)?.label ?? stageId;
+      return `Advance to ${label}`;
+    }
+    return null;
   }
 
   gateDisplayState(gateId: string): GateDisplayState {
@@ -253,7 +301,14 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
     if (this.isCurrent(stageId) || this.isComplete(stageId)) {
       return 'var(--triarq-color-primary)';
     }
-    return 'var(--triarq-color-fog, #e0e0e0)';
+    return 'transparent';
+  }
+
+  stageCircleBorder(stageId: string): string {
+    if (this.isCurrent(stageId) || this.isComplete(stageId)) {
+      return 'none';
+    }
+    return '2px solid var(--triarq-color-primary)';
   }
 
   gateColor(gateId: string): string {

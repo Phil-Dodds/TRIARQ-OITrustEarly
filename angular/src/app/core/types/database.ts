@@ -176,7 +176,7 @@ export interface McpResponse<T = unknown> {
 // ── Build C — Delivery Cycle types ────────────────────────────────────────────
 
 export type TierClassification  = 'tier_1' | 'tier_2' | 'tier_3';
-export type LifecycleStage      = 'BRIEF' | 'DESIGN' | 'SPEC' | 'BUILD' | 'VALIDATE' | 'PILOT' | 'UAT' | 'RELEASE' | 'OUTCOME' | 'COMPLETE' | 'CANCELLED' | 'ON_HOLD';
+export type LifecycleStage      = 'BRIEF' | 'DESIGN' | 'SPEC' | 'BUILD' | 'VALIDATE' | 'UAT' | 'PILOT' | 'RELEASE' | 'OUTCOME' | 'COMPLETE' | 'CANCELLED' | 'ON_HOLD';
 export type GateName            = 'brief_review' | 'go_to_build' | 'go_to_deploy' | 'go_to_release' | 'close_review';
 // gate_status: not_started (D-282 seed) | pending (legacy seed) | awaiting_approval (D-345)
 //   | approved | returned | blocked. Migration 029 added 'awaiting_approval'.

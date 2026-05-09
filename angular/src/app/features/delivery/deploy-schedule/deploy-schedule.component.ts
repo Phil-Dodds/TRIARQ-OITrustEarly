@@ -40,6 +40,7 @@ import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
+import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 import {
   DeliveryCycle,
   Division,
@@ -68,9 +69,12 @@ interface QuarterLabel {
   selector:        'app-deploy-schedule',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, RouterModule, FormsModule, IonicModule],
+  imports:         [CommonModule, RouterModule, FormsModule, IonicModule, DeliveryCycleDetailComponent],
   template: `
-    <div class="ds-shell">
+    <!-- D-308 / S-018 (Contract 15): flex container — list left, detail panel right. -->
+    <div style="display:flex;align-items:flex-start;min-height:100%;">
+
+    <div class="ds-shell" style="flex:1;min-width:0;">
 
       <!-- D-298 header -->
       <div class="ds-header">
@@ -237,6 +241,30 @@ interface QuarterLabel {
         </div>
 
       </ng-container>
+    </div><!-- /ds-shell -->
+
+    <!-- D-308 / S-005/S-006 / S-018 (Contract 15): Right Detail Panel slot.
+         Same component as on /delivery/cycles. Workstream expansion state
+         preserved while panel is open. -->
+    <div *ngIf="selectedCycleId"
+         style="width:60%;border-left:1px solid #E0E0E0;background:#fff;
+                position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;"
+         [style.z-index]="showEditScrim ? '100' : '5'">
+      <app-delivery-cycle-detail
+        [cycleId]="selectedCycleId"
+        [cancelEditSignal]="cancelEditSignal"
+        (close)="closePanel()"
+        (editPanelOpened)="onEditPanelOpened()"
+        (editPanelClosed)="onEditPanelClosed()">
+      </app-delivery-cycle-detail>
+    </div>
+
+    </div><!-- /flex container -->
+
+    <!-- D-292: Modal scrim — covers list when edit panel is open inside detail. -->
+    <div *ngIf="showEditScrim"
+         style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.32);pointer-events:all;"
+         (click)="onScrimClick()">
     </div>
   `,
   styles: [`
@@ -373,6 +401,11 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
   cycles:      DeliveryCycle[] = [];
   workstreams: { workstream_id: string; workstream_name: string }[] = [];
   expanded:    Set<string> = new Set();
+
+  // D-308 / S-018 (Contract 15): right-panel detail slot state.
+  selectedCycleId: string | null = null;
+  cancelEditSignal = 0;
+  showEditScrim    = false;
 
   readonly skeletonRows = [1, 2, 3, 4];
 
@@ -636,8 +669,40 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
+  // D-308 / S-018 (Contract 15): tap row opens detail in the right panel of
+  // *this* surface — no navigation to /delivery/cycles. Workstream expansion
+  // state is preserved while the panel is open. Supersedes the B-94 routing
+  // fix from Contract 14.
   openCycle(cycleId: string): void {
-    this.router.navigate(['/delivery/cycles', cycleId]);
+    if (this.selectedCycleId === cycleId) return; // tap same row → no-op
+    this.selectedCycleId = cycleId;
+    this.cdr.markForCheck();
+  }
+
+  /** D-308 / S-008 (Contract 15): close right panel. Workstream expansion
+   *  preserved. Workstream-level navigation unaffected. */
+  closePanel(): void {
+    this.selectedCycleId = null;
+    this.showEditScrim = false;
+    this.cdr.markForCheck();
+  }
+
+  /** D-292: detail emits when its inline Edit panel opens — activates scrim. */
+  onEditPanelOpened(): void {
+    this.showEditScrim = true;
+    this.cdr.markForCheck();
+  }
+
+  /** D-292: detail emits when its inline Edit panel closes — deactivates scrim. */
+  onEditPanelClosed(): void {
+    this.showEditScrim = false;
+    this.cdr.markForCheck();
+  }
+
+  /** D-292 / S-017: scrim click → signal detail to dirty-check + cancel edit. */
+  onScrimClick(): void {
+    this.cancelEditSignal++;
+    this.cdr.markForCheck();
   }
 
   openWorkstream(workstreamId: string | null): void {

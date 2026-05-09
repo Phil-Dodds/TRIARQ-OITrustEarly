@@ -6,14 +6,16 @@
 'use strict';
 
 // Sequential stage order — CANCELLED and ON_HOLD are not in this list (terminal/pause states).
+// Canonical order: VALIDATE → UAT → PILOT → RELEASE. UAT is user acceptance (pre-deploy);
+// PILOT is limited rollout (post-deploy).
 const STAGE_SEQUENCE = [
   'BRIEF',
   'DESIGN',
   'SPEC',
   'BUILD',
   'VALIDATE',
-  'PILOT',
   'UAT',
+  'PILOT',
   'RELEASE',
   'OUTCOME',
   'COMPLETE'
@@ -97,14 +99,15 @@ function gatesResetOnRegressionTo(target_stage, current_stage) {
 // Next gate that must be cleared from each current stage (D-189).
 // Used for summary views and filter labelling.
 // Returns null for terminal/pause stages.
+// Canonical order: VALIDATE → UAT → go_to_deploy → PILOT → go_to_release → RELEASE.
 const NEXT_GATE_BY_STAGE = {
   BRIEF:    'brief_review',
   DESIGN:   'go_to_build',
   SPEC:     'go_to_build',
   BUILD:    'go_to_deploy',
   VALIDATE: 'go_to_deploy',
+  UAT:      'go_to_deploy',
   PILOT:    'go_to_release',
-  UAT:      'go_to_release',
   RELEASE:  'close_review',
   OUTCOME:  'close_review',
   COMPLETE:  null,

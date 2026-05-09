@@ -54,33 +54,44 @@ async function resend_invite(params, caller_user_id) {
     return { success: false, error: 'Cannot resend invite to an inactive user.' };
   }
 
-  // Check the auth account status — do not resend to already-confirmed users
-  const { data: authUser, error: authLookupErr } = await supabase.auth.admin.getUserById(user_id);
-
-  if (authLookupErr || !authUser?.user) {
-    return { success: false, error: 'Could not retrieve auth account. Please try again.' };
+  // B-91 (Contract 14 + 15): no auth-account pre-check. inviteUserByEmail
+  // creates auth.users for seeded users and reissues the invite for existing
+  // accounts. Wrapped in try/catch — supabase-js throws on certain admin
+  // failures rather than returning {error}.
+  let inviteErr = null;
+  try {
+    const result = await supabase.auth.admin.inviteUserByEmail(
+      targetUser.email,
+      { redirectTo: INVITE_REDIRECT_URL }
+    );
+    inviteErr = result?.error ?? null;
+  } catch (e) {
+    inviteErr = e;
   }
-
-  if (authUser.user.email_confirmed_at) {
-    return {
-      success: false,
-      error: 'This user has already confirmed their email. Invite cannot be resent.'
-    };
-  }
-
-  // Resend invite — Supabase invalidates the prior link and issues a new one.
-  const { error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(
-    targetUser.email,
-    { redirectTo: INVITE_REDIRECT_URL }
-  );
 
   if (inviteErr) {
-    return { success: false, error: `Could not send invitation. Please try again.` };
+    const msg = inviteErr.message ?? String(inviteErr);
+    // Rate limit — friendlier message per Contract 15 §1.1.
+    if (/rate.*limit/i.test(msg) || /too.*many/i.test(msg)) {
+      return {
+        success: false,
+        error: 'Invite rate limit reached — please try again shortly.'
+      };
+    }
+    // "User already registered" can fire when an auth row already exists with
+    // the email but under a different UUID — treat as already-active.
+    if (/already.*registered/i.test(msg) || /already.*confirmed/i.test(msg)) {
+      return {
+        success: false,
+        error: 'This email is already registered. Ask the user to sign in instead.'
+      };
+    }
+    return { success: false, error: 'Could not send invitation. Please try again.' };
   }
 
   return {
     success: true,
-    message: `Invitation resent to ${targetUser.email}.`
+    message: `Invitation sent to ${targetUser.email}.`
   };
 }
 

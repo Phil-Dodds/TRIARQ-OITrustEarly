@@ -20,7 +20,7 @@ import { DeliveryCycle, LifecycleStage, GateName, TierClassification } from '../
 
 const STAGE_LABEL: Partial<Record<LifecycleStage, string>> = {
   BRIEF: 'Brief', DESIGN: 'Design', SPEC: 'Spec', BUILD: 'Build',
-  VALIDATE: 'Validate', PILOT: 'Pilot', UAT: 'UAT', RELEASE: 'Release',
+  VALIDATE: 'Validate', UAT: 'UAT', PILOT: 'Pilot', RELEASE: 'Release',
   OUTCOME: 'Outcome', COMPLETE: 'Complete', CANCELLED: 'Cancelled', ON_HOLD: 'On Hold'
 };
 
