@@ -32,6 +32,11 @@ import {
 import { IonicModule }                 from '@ionic/angular';
 import { McpService }                  from '../../../core/services/mcp.service';
 import { UserProfileService }          from '../../../core/services/user-profile.service';
+import { AuthService }                 from '../../../core/services/auth.service';
+import {
+  SCREEN_KEYS,
+  SCREEN_STATE_RECENCY_DAYS
+}                                       from '../../../core/services/screen-state.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { User, SystemRole, Division }  from '../../../core/types/database';
@@ -605,6 +610,7 @@ export class UsersComponent implements OnInit {
   constructor(
     private readonly mcp:     McpService,
     private readonly profile: UserProfileService,
+    private readonly auth:    AuthService,
     private readonly fb:      FormBuilder,
     private readonly cdr:     ChangeDetectorRef
   ) {}
@@ -622,6 +628,35 @@ export class UsersComponent implements OnInit {
       is_active:    [true]
     });
     this.loadUsers();
+    this.restoreScreenState();
+  }
+
+  // ── D-171 / D-370 screen-state persistence (Contract 16) ───────────────────
+  // First adopter of the user_screen_state table. Calls AuthService (which is
+  // the only file with a Supabase client — Arch-1 exception authorized by
+  // D-171 / build-c-contract16-spec.md §3.2). Search text is never persisted —
+  // only roleFilter and nameSortDir.
+
+  private async restoreScreenState(): Promise<void> {
+    const saved = await this.auth.restoreUserScreenState(SCREEN_KEYS.ADMIN_USERS);
+    if (!saved) { return; }
+
+    const ageDays = (Date.now() - new Date(saved.last_rendered_at).getTime()) / 86_400_000;
+    if (ageDays > SCREEN_STATE_RECENCY_DAYS) { return; }
+
+    const filter = saved.filter_state as { roleFilter?: string } | null;
+    const sort   = saved.sort_state   as { nameSortDir?: 'asc' | 'desc' } | null;
+    if (filter?.roleFilter)   { this.roleFilter  = filter.roleFilter; }
+    if (sort?.nameSortDir)    { this.nameSortDir = sort.nameSortDir; }
+    this.cdr.markForCheck();
+  }
+
+  private saveScreenState(): void {
+    void this.auth.upsertUserScreenState(
+      SCREEN_KEYS.ADMIN_USERS,
+      { roleFilter:  this.roleFilter },
+      { nameSortDir: this.nameSortDir }
+    );
   }
 
   // ── Sort / Filter ──────────────────────────────────────────────────────────
@@ -645,11 +680,13 @@ export class UsersComponent implements OnInit {
 
   setRoleFilter(role: string): void {
     this.roleFilter = role;
+    this.saveScreenState();
     this.cdr.markForCheck();
   }
 
   toggleNameSort(): void {
     this.nameSortDir = this.nameSortDir === 'asc' ? 'desc' : 'asc';
+    this.saveScreenState();
     this.cdr.markForCheck();
   }
 

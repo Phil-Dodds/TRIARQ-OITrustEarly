@@ -1278,6 +1278,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   // Edit Cycle panel — S-006 push/pop. Contract 2 2026-04-10.
   showEditPanel  = false;
 
+  // B-97 (Contract 16): tracked synchronously around dialog.open / afterClosed
+  // to guard onEscKey against firing close.emit while the Gate Record Modal is
+  // open. Replaces unreliable dialog.openDialogs.length check.
+  gateModalOpen = false;
+
   // Outcome
   editingOutcome = false;
   savingOutcome  = false;
@@ -1401,14 +1406,15 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   // Fix: increment cancelEditSignal so ESC routes through the same signal path as scrim click, letting
   // the edit panel's requestCancel() perform the dirty-state check. Source: Contract 9.
   //
-  // B-97 (Contract 15): when a MatDialog is open above the panel (Gate Record Modal),
-  // the dialog owns the Escape key. Without this guard, the document-level handler
-  // here would also fire — closing the panel and triggering a parent list reload —
-  // on top of the modal close. Source: Contract 15.
+  // B-97 (Contract 16): the Contract 15 guard `dialog.openDialogs.length > 0` is
+  // unreliable — CDK-internal array mutation races document keydown listeners
+  // depending on overlay registration order. Replaced with a self-tracked flag
+  // set synchronously in openGatePanel before dialog.open() and cleared in
+  // afterClosed (after exit animation, after all keydown handlers complete).
   @HostListener('document:keydown.escape')
   onEscKey(): void {
     if (!this.panelMode) { return; }
-    if (this.dialog.openDialogs.length > 0) { return; }
+    if (this.gateModalOpen) { return; }
     if (this.showEditPanel) {
       this.cancelEditSignal++;
       this.cdr.markForCheck();
@@ -2217,6 +2223,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       checklist:            this.gateChecklist(gate)
     };
 
+    this.gateModalOpen = true;
     const ref = this.dialog.open<GateRecordModalComponent, GateRecordModalData, GateRecordModalResult>(
       GateRecordModalComponent,
       {
@@ -2230,6 +2237,18 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     );
 
     ref.afterClosed().subscribe((result) => {
+      // B-97 (Contract 16 second pass): defer the flag clear via setTimeout
+      // so it lands AFTER all synchronous keydown listeners in the current
+      // event have completed. The app uses NoopAnimationsModule (federation
+      // compat) — exit animation is 0ms, so afterClosed fires synchronously
+      // inside dialogRef.close(). If the CDK OverlayKeyboardDispatcher is
+      // registered on the document before detail's @HostListener (any
+      // earlier overlay this session — tooltip, MatSelect — triggers that),
+      // CDK fires first → dialogRef.close → afterClosed sync → flag cleared
+      // → detail.onEscKey then fires with the flag false → close.emit fires
+      // → grid reload. Deferring the clear keeps the flag true through the
+      // entire keydown event, so detail's guard holds.
+      setTimeout(() => { this.gateModalOpen = false; }, 0);
       if (!result || result.refreshKind === 'none') return;
       // D-345: full reload after approve/return (stage advance / state churn);
       // partial in-place reload after submit/withdraw.
@@ -2790,8 +2809,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.delivery.setMilestoneActualDate({
       delivery_cycle_id: this.cycle.delivery_cycle_id,
       gate_name:         gate,
-      actual_date:       this.actualDateControl.value,
-      manually_entered:  true
+      actual_date:       this.actualDateControl.value
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
@@ -2802,15 +2820,18 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           this.editingActualDateGate = null;
           this.loadEvents(this.cycle!.delivery_cycle_id);
         } else {
-          // B-17 fix: translate raw DB constraint errors to plain language. Source: D-140.
-          this.actualDateError = translateMilestoneError(res.error ?? 'Save failed.');
+          // Contract 16 UAT fix: removed translateMilestoneError per D-205.
+          // The previous translation framed any save error as a status-block,
+          // contradicting D-205 (user sets statuses freely, no restriction on
+          // actual_date save). MCP tool now returns human-readable errors;
+          // surface them verbatim, fall back to neutral generic otherwise.
+          this.actualDateError = res.error ?? 'Save failed.';
         }
         this.savingActualDate = false;
         this.cdr.markForCheck();
       },
       error: (err: { error?: string }) => {
-        // B-17 fix: translate raw DB constraint errors to plain language. Source: D-140.
-        this.actualDateError  = translateMilestoneError(err?.error ?? 'Save failed. Try again.');
+        this.actualDateError  = err?.error ?? 'Save failed. Try again.';
         this.savingActualDate = false;
         this.cdr.markForCheck();
       }
@@ -2851,14 +2872,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   }
 }
 
-// ── B-17: Error translation helper ────────────────────────────────────────────
-// Translates raw DB constraint error messages to plain-language user messages.
-// Raw constraint names must never appear in the UI per D-140. Source: B-17.
-function translateMilestoneError(raw: string): string {
-  if (raw.includes('cycle_milestone_dates_date_status_check') ||
-      raw.includes('check constraint')) {
-    return 'Could not save date — the status value may be incompatible with this gate. ' +
-           'Try setting the status to \'Not Started\' and saving again.';
-  }
-  return raw;
-}
+// translateMilestoneError removed in Contract 16 UAT pass per D-205.
+// The function framed any check-constraint failure as a "status incompatible"
+// block, contradicting D-205 (user sets all statuses freely; no save block
+// based on status). The underlying constraint failures it caught are also
+// resolved upstream — the rewritten set_milestone_actual_date MCP tool writes
+// only date_status='complete' (a CHECK-valid value), so the constraint no
+// longer fires from this path. Raw DB errors are still constrained by the
+// MCP error format ({ success:false, error:<readable string> }), so D-140's
+// no-raw-DB-errors guarantee still holds at the MCP boundary.

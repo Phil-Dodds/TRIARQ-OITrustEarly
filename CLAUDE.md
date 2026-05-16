@@ -1,6 +1,6 @@
 
 
-# CLAUDE.md — Pathways OI Trust | v2.3 | April 2026 | CONFIDENTIAL
+# CLAUDE.md — Pathways OI Trust | v2.6 | May 2026 | CONFIDENTIAL
 
 ---
 
@@ -280,7 +280,13 @@ recover before closing.
 
 **Exceptions:** None.
 
-### Rule 18 — Supabase Migration Execution Pattern
+### Rule 19 — UAT Checklist (D-357)
+
+At every CodeClose for sessions touching user-facing surfaces, produce a UAT Checklist section. One subsection per surface touched, in execution order. Each subsection: surface name, what changed, numbered binary pass/fail steps Phil can run without Code present.
+
+**Conformance test:** Does every CodeClose for a session touching login/auth, new components, new views, MCP changes, or admin surfaces include a UAT Checklist? Yes = pass. Absent = violation.
+
+**Exceptions:** Single-bug fix sessions — checklist optional at Code's discretion.
 
 Never execute migrations directly against Supabase. Required pattern: (1) write
 migration file to repo, (2) display full SQL content, (3) stop — Phil executes
@@ -319,4 +325,38 @@ Exceptions: None.
 
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | April 2026 | v2.3*
+### Rule 29 — CodeClose Verification Pass
+
+Before producing the CodeClose output, run a mandatory verification pass. Report results explicitly under a "CodeClose Verification" section in the CodeClose output. All seven declarations are required — absence of any section is a violation.
+
+**(1) Spec coverage** — for every acceptance criterion in the spec, state PASS or FAIL with evidence.
+
+**(2) Regression check** — for every surface touched, confirm no behavior present before the contract was removed or broken. State how verified (test result or manual UAT note).
+
+**(3) Test ratchet** — list every logic-touching change and the test protecting it. If no test exists for a logic-touching change, state why and flag it explicitly as a CLAUDE.md candidate.
+
+**(4) Pattern sweep** — if a shared pattern was modified this contract, list components searched and findings. If no shared pattern was modified, state: "Pattern sweep: no shared pattern modified this contract."
+
+**(5) Standards conformance** — for each Active Standard flagged as CodeClose-applicable in standards-summary.md, state PASS or the specific finding.
+
+**(6) CC-decision completeness** — all CC-decisions are sequential with no gaps.
+
+**(7) Structural health** — all components exceeding the 300-line threshold are declared with current line count.
+
+**(8) Deployment** — before producing a UAT Checklist, run the deployment
+sequence per build-c-spec.md Section 9 (maintenance mode on → migrations →
+deploy MCP to Render → deploy Angular to GitHub Pages → health checks →
+maintenance mode off). Report the result explicitly:
+- If deployment succeeded: produce UAT Checklist normally.
+- If deployment failed: state failure reason explicitly, withhold UAT Checklist,
+  state "UAT checklist withheld — deployment failed: [reason]."
+- If no user-facing surfaces were touched this contract: state "Deployment:
+  not required this contract" and omit UAT Checklist.
+
+**Conformance test:** Does the CodeClose output contain all eight numbered sections under "CodeClose Verification" with explicit declarations for each? Yes = compliant. Any section absent = violation.
+
+**Exceptions:** None.
+
+---
+
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | May 2026 | v2.6*

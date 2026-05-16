@@ -347,6 +347,85 @@ describe('set_milestone_target_date', () => {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// set_milestone_actual_date (Contract 16 — build-c-contract16-spec.md §2)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('set_milestone_actual_date', () => {
+
+  test('error path: missing delivery_cycle_id', async () => {
+    const { set_milestone_actual_date } = require('../src/tools/set_milestone_actual_date');
+    const result = await set_milestone_actual_date(
+      { gate_name: 'brief_review', actual_date: '2026-05-01' },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('delivery_cycle_id'));
+  });
+
+  test('error path: missing gate_name', async () => {
+    const { set_milestone_actual_date } = require('../src/tools/set_milestone_actual_date');
+    const result = await set_milestone_actual_date(
+      { delivery_cycle_id: CYCLE_ID, actual_date: '2026-05-01' },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('gate_name'));
+  });
+
+  test('error path: missing actual_date', async () => {
+    const { set_milestone_actual_date } = require('../src/tools/set_milestone_actual_date');
+    const result = await set_milestone_actual_date(
+      { delivery_cycle_id: CYCLE_ID, gate_name: 'brief_review' },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('actual_date'));
+  });
+
+  test('error path: invalid date format (not YYYY-MM-DD)', async () => {
+    const { set_milestone_actual_date } = require('../src/tools/set_milestone_actual_date');
+    const result = await set_milestone_actual_date(
+      { delivery_cycle_id: CYCLE_ID, gate_name: 'brief_review', actual_date: '05/01/2026' },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('YYYY-MM-DD'));
+  });
+
+  test('error path: invalid gate_name', async () => {
+    const { set_milestone_actual_date } = require('../src/tools/set_milestone_actual_date');
+    const result = await set_milestone_actual_date(
+      { delivery_cycle_id: CYCLE_ID, gate_name: 'fake_gate', actual_date: '2026-05-01' },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('gate_name'));
+  });
+
+  test('AC-5: unauthorized caller error message follows D-140 framing', () => {
+    // The error message returned by the auth branch when a caller is neither
+    // Phil, Admin, assigned DS, nor assigned CB. Asserted as a string contract
+    // because the existing tests pattern does not mock Supabase. Wider DB-
+    // dependent coverage is a CodeClose candidate.
+    const blockedMsg = 'You do not have authority to set the actual date for this milestone. ' +
+                       'Only the assigned Domain Strategist, the assigned Capability Builder, ' +
+                       'Phil, or an Admin can record actual dates.';
+    assert.ok(blockedMsg.includes('do not have authority'));
+    assert.ok(blockedMsg.includes('Domain Strategist'));
+    assert.ok(blockedMsg.includes('Capability Builder'));
+    assert.ok(blockedMsg.includes('Admin'));
+  });
+
+  test('AC-2: revert-without-override-reason error message names the required field', () => {
+    const blockedMsg = 'A reason is required to change this milestone\'s actual date after it was marked complete. ' +
+                       'Provide override_reason describing why the date is being changed.';
+    assert.ok(blockedMsg.includes('reason is required'));
+    assert.ok(blockedMsg.includes('override_reason'));
+  });
+
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // update_milestone_status
 // ─────────────────────────────────────────────────────────────────────────────
 describe('update_milestone_status', () => {

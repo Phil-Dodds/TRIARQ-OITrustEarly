@@ -23,6 +23,7 @@ export const SCREEN_KEYS = {
   DELIVERY_WORKSTREAMS: 'delivery.workstreams',
   DELIVERY_DIVISIONS:   'delivery.divisions',
   DELIVERY_GATES:       'delivery.gates',
+  ADMIN_USERS:          'admin.users',
 } as const;
 
 export type ScreenKey = typeof SCREEN_KEYS[keyof typeof SCREEN_KEYS];

@@ -173,4 +173,57 @@ export class AuthService {
   isAuthenticated(): boolean {
     return !!this._session$.value;
   }
+
+  // ── User screen state (D-171, D-370 — Contract 16) ──────────────────────────
+  //
+  // user_screen_state is the only table written directly from Angular without
+  // going through MCP. Spec authorizes this Arch-1 exception in
+  // build-c-contract16-spec.md §3.2: "the MCP layer governs business data;
+  // screen state is a UI concern." The authenticated Supabase client lives
+  // here, so the two screen-state methods live here too — keeps the
+  // @supabase/supabase-js client surface contained to a single file.
+  //
+  // RLS policy in migration 032 restricts read/upsert to the calling user's
+  // own rows (auth.uid()), so callers do not need to scope by user_id beyond
+  // what RLS already enforces. The screen_key column is namespaced per
+  // SCREEN_KEYS in screen-state.service.ts — never constructed dynamically
+  // (Rule 4).
+  //
+  // Source: D-171, D-370, build-c-contract16-spec.md §3.
+
+  async restoreUserScreenState(
+    screen_key: string
+  ): Promise<{ filter_state: unknown; sort_state: unknown; last_rendered_at: string } | null> {
+    const user_id = this.getCurrentUser()?.id;
+    if (!user_id) { return null; }
+
+    const { data, error } = await this.supabase
+      .from('user_screen_state')
+      .select('filter_state, sort_state, last_rendered_at')
+      .eq('user_id', user_id)
+      .eq('screen_key', screen_key)
+      .maybeSingle();
+
+    if (error || !data) { return null; }
+    return data as { filter_state: unknown; sort_state: unknown; last_rendered_at: string };
+  }
+
+  async upsertUserScreenState(
+    screen_key: string,
+    filter_state: Record<string, unknown>,
+    sort_state: Record<string, unknown>
+  ): Promise<void> {
+    const user_id = this.getCurrentUser()?.id;
+    if (!user_id) { return; }
+
+    await this.supabase
+      .from('user_screen_state')
+      .upsert({
+        user_id,
+        screen_key,
+        filter_state,
+        sort_state,
+        last_rendered_at: new Date().toISOString()
+      }, { onConflict: 'user_id,screen_key' });
+  }
 }

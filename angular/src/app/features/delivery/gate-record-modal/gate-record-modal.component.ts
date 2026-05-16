@@ -539,6 +539,12 @@ export class GateRecordModalComponent {
   // MatDialog's default Escape handler also closes (with `undefined` result);
   // afterClosed in the parent treats `undefined` and `{refreshKind:'none'}`
   // identically (no refresh), so duplicate closes are safe.
+  //
+  // B-97 (Contract 16): stopPropagation on happy path — defense-in-depth so
+  // the keydown event does not continue bubbling to other document-level
+  // listeners (e.g. parent panel onEscKey) regardless of CDK overlay
+  // dispatcher registration order. Detail's gateModalOpen flag is the primary
+  // guard; this is a second line.
   @HostListener('document:keydown.escape', ['$event'])
   onEscape(ev: KeyboardEvent): void {
     if (this.processing) {
@@ -546,6 +552,7 @@ export class GateRecordModalComponent {
       ev.preventDefault();
       return;
     }
+    ev.stopPropagation();
     this.onDismiss();
   }
 
