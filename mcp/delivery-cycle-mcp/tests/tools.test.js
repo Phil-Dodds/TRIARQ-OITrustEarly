@@ -415,7 +415,11 @@ describe('set_milestone_actual_date', () => {
     assert.ok(blockedMsg.includes('Admin'));
   });
 
-  test('AC-2: revert-without-override-reason error message names the required field', () => {
+  test('AC-2: revert-without-override-reason error message names the required field (deferred — block commented out pending UI input)', () => {
+    // Contract 16 UAT (CC-016): block commented out in tool — UI has no
+    // override_reason input, so the restriction would make completed actual
+    // dates uncorrectable. Test kept as the locked-in error contract for when
+    // the block is re-enabled (UI delivery of override_reason input).
     const blockedMsg = 'A reason is required to change this milestone\'s actual date after it was marked complete. ' +
                        'Provide override_reason describing why the date is being changed.';
     assert.ok(blockedMsg.includes('reason is required'));

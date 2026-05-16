@@ -114,13 +114,18 @@ async function set_milestone_actual_date(params, caller_user_id) {
   const prior_actual_date = milestone.actual_date;
   const isRevert = prior_actual_date && milestone.date_status === 'complete';
 
-  if (isRevert && !override_reason) {
-    return {
-      success: false,
-      error: 'A reason is required to change this milestone\'s actual date after it was marked complete. ' +
-             'Provide override_reason describing why the date is being changed.'
-    };
-  }
+  // TODO: re-enable when UI surfaces override_reason input — Contract 16 known gap.
+  // The detail panel has no override_reason field; without it, completed actual
+  // dates are uncorrectable through the UI. The block stays in code as a future
+  // guard. isRevert is still computed for the event log entry below.
+  //
+  // if (isRevert && !override_reason) {
+  //   return {
+  //     success: false,
+  //     error: 'A reason is required to change this milestone\'s actual date after it was marked complete. ' +
+  //            'Provide override_reason describing why the date is being changed.'
+  //   };
+  // }
 
   // ── Write actual_date + date_status='complete' (+ optional override) ──────
   const update = {
