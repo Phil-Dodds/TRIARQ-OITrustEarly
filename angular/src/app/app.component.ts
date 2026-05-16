@@ -44,8 +44,19 @@ export class AppComponent implements OnInit {
     // first-landing route, not just /home. HomeComponent also calls
     // loadProfile() — UserProfileService is idempotent on repeat calls
     // (subsequent calls from HomeComponent are still fine).
-    if (this.auth.isAuthenticated()) {
-      this.profileService.loadProfile();
-    }
+    //
+    // Contract 16 UAT fix (CC-019): wait for AuthService.waitForInit() before
+    // checking isAuthenticated(). The session is restored asynchronously from
+    // storage during AuthService's constructor; ngOnInit runs before that
+    // promise resolves. Without the wait, isAuthenticated() returns false on
+    // any deep-link landing route (e.g. /delivery/cycles), loadProfile is
+    // never called, profile$ stays null, and the sidebar filters out every
+    // role-restricted item. Symptom: Phil sees five sidebar items instead of
+    // six on routes other than /home.
+    this.auth.waitForInit().then(() => {
+      if (this.auth.isAuthenticated()) {
+        this.profileService.loadProfile();
+      }
+    });
   }
 }

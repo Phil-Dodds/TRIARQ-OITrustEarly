@@ -618,6 +618,19 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
             directly_assigned_divisions: Division[];
           }>('division', 'get_user_divisions', { user_id: profile.id }).subscribe(res => {
             this.availableDivisions = res.data?.all_accessible_divisions ?? [];
+
+            // Contract 16 UAT fix (CC-020): re-patch division_id after options
+            // load. The form was initialised in ngOnInit with cycle.division_id
+            // BEFORE availableDivisions populated. With reactive forms + a
+            // <select> bound via *ngFor, NgSelectControlValueAccessor does not
+            // reliably re-sync the DOM value once options appear after the
+            // form value was set. Re-patching the value here forces Angular
+            // to match the now-rendered option for the cycle's Division.
+            const currentDivId = this.form?.get('division_id')?.value;
+            if (currentDivId) {
+              this.form.get('division_id')?.setValue(currentDivId, { emitEvent: false });
+            }
+
             this.cdr.markForCheck();
           })
         );
