@@ -70,7 +70,7 @@ export class HomeComponent implements OnInit {
 
   get showSystemHealth():    boolean { return this.isPhil; }
   get showDivisions():       boolean { return this.isPhil || this.isAdmin; }
-  get showUserManagement():  boolean { return this.isAdmin; }
+  get showUserManagement():  boolean { return this.isPhil || this.isAdmin; }
   // My Delivery Cycles card — DS and CB only (build-c-supplement-spec Section 6, D-150).
   // Phil and Admin use the full dashboard. CE is read-only and not in a create/DS/CB role.
   // assigned_to_current_user scopes data server-side; role check here hides card for non-DS/CB.

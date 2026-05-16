@@ -71,6 +71,26 @@ async function get_delivery_cycle(params, caller_user_id) {
     if (divRow) { home_division_name = divRow.division_name; }
   }
 
+  // ── Resolve cycle's own division name (Contract 16 UAT fix, CC-017) ───────
+  // The DeliveryCycle type defines division_name as an optional joined field
+  // (database.ts:230). list_delivery_cycles enriches it; get_delivery_cycle did
+  // not — detail panel rendered "Division: Not set" even when division_id was
+  // populated. Mirror the list_delivery_cycles pattern (B-28 fix, Contract 9).
+  let cycle_division_name = null;
+  let cycle_division_display_name_short = null;
+  if (cycle.division_id) {
+    const { data: cycleDivRow } = await supabase
+      .from('divisions')
+      .select('division_name, display_name_short')
+      .eq('id', cycle.division_id)
+      .is('deleted_at', null)
+      .single();
+    if (cycleDivRow) {
+      cycle_division_name = cycleDivRow.division_name;
+      cycle_division_display_name_short = cycleDivRow.display_name_short;
+    }
+  }
+
   // ── Fetch Jira links ──────────────────────────────────────────────────────
   const { data: jira_links } = await supabase
     .from('jira_links')
@@ -154,6 +174,8 @@ async function get_delivery_cycle(params, caller_user_id) {
     success: true,
     data: {
       ...cycle,
+      division_name:            cycle_division_name,
+      display_name_short:       cycle_division_display_name_short,
       assigned_ds_display_name: cycle.assigned_ds_user_id ? (userMap[cycle.assigned_ds_user_id] ?? null) : null,
       assigned_cb_display_name: cycle.assigned_cb_user_id ? (userMap[cycle.assigned_cb_user_id] ?? null) : null,
       milestone_dates:  milestone_dates       || [],

@@ -160,7 +160,10 @@ Per Phil 2026-05-15: **"Angular bundle ready — full deploy delegated to Phil."
 
 | CC-016 | **§2 UAT — override_reason block commented out (deferred to UI delivery).** Per Phil 2026-05-16: the `isRevert && !override_reason` block in `set_milestone_actual_date.js` makes completed actual dates uncorrectable through the UI because the detail panel has no `override_reason` input. Block is now commented out (in-code TODO marker) until UI surfaces the input. `isRevert` is still computed for the event-log entry. Test for the error contract retained with a "deferred — block commented out pending UI input" comment so the contract is locked for re-enable. UAT step 8 will be marked DEFERRED rather than retested; will retest once UI surfaces override_reason. |
 
-**Gap check:** CC-001 through CC-016 — sequential, no gaps. PASS per Rule 17.
+| CC-017 | **UAT Bug 1 — admin gate accepts `phil` role.** `home.component.ts:73` had `get showUserManagement(): boolean { return this.isAdmin; }` — matched only `'admin'`, not `'phil'`. All other capability checks in the codebase already pair `isPhil \|\| isAdmin` (sidebar, dashboard, MCP layer, divisions component, deploy-schedule, etc.). Single outlier. One-line fix: `return this.isPhil \|\| this.isAdmin;`. Not actually a route guard (no role-based guard exists in app-routing.module.ts; `/admin` has authGuard only) — UI visibility on home card. Per D-135/D-136, `phil` is correct DB value; the UI check was the bug. |
+| CC-018 | **UAT Bug 2 — get_delivery_cycle missing division_name enrichment.** Detail panel rendered "Division: Not set" while grid rendered the division correctly. Root cause: `list_delivery_cycles.js` enriches each cycle response with `division_name` (Contract 9 B-28 fix at lines 160–175) — `get_delivery_cycle.js` never replicated the enrichment. Cycle's `division_id` was returned (via `select('*')` spread) but the joined `division_name` was never fetched from the divisions table. The DeliveryCycle type defines `division_name?: string` as an optional joined field (database.ts:230); detail.component reads `cycle.division_name` (undefined → "Not set"). Fix: added the missing fetch + spread to `get_delivery_cycle.js`, mirroring the list pattern; also returns `display_name_short` for consistency. Edit form blank dropdown deferred to UAT verification — may resolve with primary fix or may require separate `compareWith` directive on the select (suspected timing issue with reactive form + dynamic *ngFor options). |
+
+**Gap check:** CC-001 through CC-018 — sequential, no gaps. PASS per Rule 17.
 
 ---
 
@@ -286,6 +289,7 @@ Until full deploy completes, the running site reflects the prior contract. Do NO
 | DEFER-DOC-AUTHOR | Document Author self-correct session (D-306): create `CLAUDE.src.md`, add RATIONALE block "Why (addition — D-372)" and GOVERNING comment `<!-- GOVERNING: S-030, S-031, D-357, D-371, D-372 -->` to Rule 29. Update `auth.service.ts` "ONLY file" comment to reflect Contract 16 screen-state addition. | CC-003, F1, CC-010 |
 | DEFER-MCP-COUNT | Reconcile build-c-spec.md "20 tools" vs actual 18 in `delivery-cycle-mcp/src/tools/`. Spec language stale. | Audit §3 |
 | DEFER-ORPHAN-AUDIT | Sweep `public.users` for rows with no corresponding `auth.users.id` (other orphans). Single audit query, low cost. Decide whether to delete or backfill auth identities for each. Origin of Vijay's orphan never identified. | CC-013, F9 |
+| DEFER-D-374 | Rule 31 / D-374 — Master Merge as Code Responsibility. Design is authoring the rule per Phil 2026-05-16. Reaches Code via Document Author in a future contract. No Code action this session. Trigger: Contract 16 uncommitted-worktree gap (CC-015). | CC-015, Design Chat 2026-05-16 |
 
 ---
 
