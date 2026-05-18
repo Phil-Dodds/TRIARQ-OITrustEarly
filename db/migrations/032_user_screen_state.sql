@@ -8,9 +8,16 @@
 -- targeting that pair is the natural write op.
 --
 -- RLS: enabled per D-353. Users read and upsert only their own rows. Policy
--- uses auth.uid() to match the user_id column, which is why the table is
--- read/written via the Angular-side authenticated Supabase client and not
--- through MCP (Arch-1 exception authorized by D-171).
+-- uses auth.uid() to match the user_id column.
+--
+-- Contract 17 §2: this table is read and written exclusively through MCP
+-- (division-mcp tools get_user_screen_state and upsert_user_screen_state).
+-- Per D-380 (pending — Design authorization in progress), no direct Supabase
+-- client access from Angular. The prior comment cited D-171 as authorizing an
+-- Arch-1 exception; D-171 is the hub-page decision and does not authorize the
+-- exception. Design ruled the "RLS handles it" rationalization architecturally
+-- unsound — RLS protects the data but does not justify bypassing the MCP
+-- boundary. RLS remains as a defense-in-depth layer.
 --
 -- Filter and sort state are jsonb. Search-text fields are excluded by the
 -- application — never written into filter_state. last_rendered_at drives the

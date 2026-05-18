@@ -32,6 +32,7 @@ import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
+import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 import {
   WorkstreamSummaryItem,
   Division
@@ -297,6 +298,7 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
     private readonly mcp:         McpService,
     private readonly profile:     UserProfileService,
     private readonly router:      Router,
+    private readonly screenState: ScreenStateService,
     private readonly cdr:         ChangeDetectorRef
   ) {}
 
@@ -305,12 +307,25 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
       this.profile.profile$.pipe(
         filter((p): p is NonNullable<typeof p> => p !== null),
         take(1)
-      ).subscribe(profile => {
+      ).subscribe(async profile => {
         this.currentUserId = profile.id ?? '';
         const role         = profile.system_role;
         this.isPrivileged  = role === 'phil' || role === 'admin';
         // Cycle creation is open to ds/cb/admin/phil per existing dashboard rules.
         this.canCreateCycle = ['phil', 'admin', 'ds', 'cb'].includes(role);
+
+        // Contract 17 §2 / D-380: restore persisted toggle state via MCP.
+        // showMyDivisionsOnly is the only persisted control on this screen
+        // (sort is hardcoded). Hidden for Phil/Admin per D-DeliveryHub-FourViews,
+        // so restore is a no-op for privileged callers but cheap.
+        const saved = await this.screenState.restore(SCREEN_KEYS.DELIVERY_WORKSTREAMS);
+        if (saved) {
+          const filter = saved.filter_state ?? {};
+          if (typeof filter['showMyDivisionsOnly'] === 'boolean') {
+            this.showMyDivisionsOnly = filter['showMyDivisionsOnly'] as boolean;
+          }
+        }
+
         if (!this.isPrivileged) {
           this.loadUserDivisions(this.currentUserId);
         } else {
@@ -322,6 +337,15 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void { this.profileSub.unsubscribe(); }
+
+  /** Contract 17 §2 / D-380: persist filter toggle through MCP. */
+  private saveScreenState(): void {
+    this.screenState.save(
+      SCREEN_KEYS.DELIVERY_WORKSTREAMS,
+      { showMyDivisionsOnly: this.showMyDivisionsOnly },
+      {}
+    );
+  }
 
   private async loadUserDivisions(userId: string): Promise<void> {
     if (!userId) { this.loadSummary(); return; }
@@ -366,7 +390,10 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
     });
   }
 
-  onToggleChange(): void { this.loadSummary(); }
+  onToggleChange(): void {
+    this.saveScreenState();
+    this.loadSummary();
+  }
 
   /** Sort by total active cycles desc, then name. */
   get sortedWorkstreams(): WorkstreamSummaryItem[] {

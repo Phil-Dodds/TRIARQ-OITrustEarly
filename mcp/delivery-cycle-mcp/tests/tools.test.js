@@ -663,9 +663,10 @@ describe('lifecycle constants (D-108, ARCH-12)', () => {
     assert.equal(lifecycle.nextStage('BRIEF'), 'DESIGN');
   });
 
-  test('nextStage returns correct next stage from VALIDATE to PILOT', () => {
+  test('nextStage returns correct next stage from VALIDATE to UAT', () => {
     // AC: cycle advances through at least three stages; gate records created at correct positions
-    assert.equal(lifecycle.nextStage('VALIDATE'), 'PILOT');
+    // Per D-108 the lifecycle sequence is VALIDATE → UAT → PILOT
+    assert.equal(lifecycle.nextStage('VALIDATE'), 'UAT');
   });
 
 });

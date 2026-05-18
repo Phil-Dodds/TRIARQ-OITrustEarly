@@ -34,8 +34,8 @@ import { McpService }                  from '../../../core/services/mcp.service'
 import { UserProfileService }          from '../../../core/services/user-profile.service';
 import { AuthService }                 from '../../../core/services/auth.service';
 import {
-  SCREEN_KEYS,
-  SCREEN_STATE_RECENCY_DAYS
+  ScreenStateService,
+  SCREEN_KEYS
 }                                       from '../../../core/services/screen-state.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
@@ -608,11 +608,12 @@ export class UsersComponent implements OnInit {
   readonly skeletonRows = [1, 2, 3, 4, 5];
 
   constructor(
-    private readonly mcp:     McpService,
-    private readonly profile: UserProfileService,
-    private readonly auth:    AuthService,
-    private readonly fb:      FormBuilder,
-    private readonly cdr:     ChangeDetectorRef
+    private readonly mcp:         McpService,
+    private readonly profile:     UserProfileService,
+    private readonly auth:        AuthService,
+    private readonly screenState: ScreenStateService,
+    private readonly fb:          FormBuilder,
+    private readonly cdr:         ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -631,18 +632,16 @@ export class UsersComponent implements OnInit {
     this.restoreScreenState();
   }
 
-  // ── D-171 / D-370 screen-state persistence (Contract 16) ───────────────────
-  // First adopter of the user_screen_state table. Calls AuthService (which is
-  // the only file with a Supabase client — Arch-1 exception authorized by
-  // D-171 / build-c-contract16-spec.md §3.2). Search text is never persisted —
-  // only roleFilter and nameSortDir.
+  // ── Screen-state persistence — D-171 / D-370 / D-380 ──────────────────────
+  // Contract 17 §2: routed through ScreenStateService → division-mcp. The
+  // Contract 16 direct-Supabase path was an unauthorized Arch-1 exception;
+  // Design ruled it must be removed. user_id is taken from the JWT at the MCP
+  // boundary. Search text is never persisted (D-171) — only roleFilter and
+  // nameSortDir. Server enforces the 7-day recency rule.
 
   private async restoreScreenState(): Promise<void> {
-    const saved = await this.auth.restoreUserScreenState(SCREEN_KEYS.ADMIN_USERS);
+    const saved = await this.screenState.restore(SCREEN_KEYS.ADMIN_USERS);
     if (!saved) { return; }
-
-    const ageDays = (Date.now() - new Date(saved.last_rendered_at).getTime()) / 86_400_000;
-    if (ageDays > SCREEN_STATE_RECENCY_DAYS) { return; }
 
     const filter = saved.filter_state as { roleFilter?: string } | null;
     const sort   = saved.sort_state   as { nameSortDir?: 'asc' | 'desc' } | null;
@@ -652,7 +651,7 @@ export class UsersComponent implements OnInit {
   }
 
   private saveScreenState(): void {
-    void this.auth.upsertUserScreenState(
+    this.screenState.save(
       SCREEN_KEYS.ADMIN_USERS,
       { roleFilter:  this.roleFilter },
       { nameSortDir: this.nameSortDir }
@@ -663,7 +662,13 @@ export class UsersComponent implements OnInit {
   get filteredSortedUsers(): User[] {
     let result = [...this.users];
     if (this.roleFilter !== 'all') {
-      result = result.filter(u => u.system_role === this.roleFilter);
+      // B-51 / Contract 17 §4: 'phil' rows render under the Admin filter tab.
+      // DB system_role values remain distinct (D-135/D-136) — collapse is display-only.
+      if (this.roleFilter === 'admin') {
+        result = result.filter(u => u.system_role === 'admin' || u.system_role === 'phil');
+      } else {
+        result = result.filter(u => u.system_role === this.roleFilter);
+      }
     }
     result.sort((a, b) => {
       const cmp = a.display_name.localeCompare(b.display_name);
@@ -1125,26 +1130,25 @@ export class UsersComponent implements OnInit {
   }
 
   /** B-53: dynamic role-filter tabs — only render tabs for roles with at least one user.
-   *  "All" tab always present. Source: Contract 10 §7 B-53. */
+   *  "All" tab always present. Source: Contract 10 §7 B-53.
+   *  Contract 17 §4: 'phil' rows render under the Admin tab — no separate Phil tab.
+   *  The 'admin' tab is shown if any user has role 'admin' OR 'phil'. */
   get visibleRoleFilters(): { value: string; label: string }[] {
     const visible: { value: string; label: string }[] = [{ value: 'all', label: 'All' }];
     const presentRoles = new Set(this.users.map(u => u.system_role));
-    // Order matters: DS, CB, CE, Admin, Phil — match prior layout.
     const order: { value: SystemRole; label: string }[] = [
       { value: 'ds',    label: 'DS' },
       { value: 'cb',    label: 'CB' },
       { value: 'ce',    label: 'CE' },
-      { value: 'admin', label: 'Admin' },
-      { value: 'phil',  label: 'Admin' } // B-51: 'phil' filter still valid; label "Admin" matches badge label
+      { value: 'admin', label: 'Admin' }
     ];
     for (const opt of order) {
-      if (presentRoles.has(opt.value)) {
-        // Avoid duplicate "Admin" label when both 'admin' and 'phil' exist — disambiguate.
-        if (opt.value === 'phil' && presentRoles.has('admin')) {
-          visible.push({ value: 'phil', label: 'Admin (Phil)' });
-        } else {
-          visible.push({ value: opt.value, label: opt.label });
+      if (opt.value === 'admin') {
+        if (presentRoles.has('admin') || presentRoles.has('phil')) {
+          visible.push({ value: 'admin', label: 'Admin' });
         }
+      } else if (presentRoles.has(opt.value)) {
+        visible.push({ value: opt.value, label: opt.label });
       }
     }
     return visible;

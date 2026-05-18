@@ -20,6 +20,9 @@ const { validateJwt } = require('./middleware/jwt');
 const { create_delivery_workstream }     = require('./tools/create_delivery_workstream');
 const { list_delivery_workstreams }      = require('./tools/list_delivery_workstreams');
 const { update_workstream_active_status } = require('./tools/update_workstream_active_status');
+// Contract 17 §9: unified workstream edit tool. Handles workstream_name,
+// display_name_short, home_division_id, workstream_lead_user_id, active_status.
+const { update_delivery_workstream }     = require('./tools/update_delivery_workstream');
 
 const { create_delivery_cycle }          = require('./tools/create_delivery_cycle');
 const { update_delivery_cycle }          = require('./tools/update_delivery_cycle');
@@ -57,6 +60,7 @@ const TOOLS = {
   create_delivery_workstream,
   list_delivery_workstreams,
   update_workstream_active_status,
+  update_delivery_workstream,
 
   // Delivery Cycle lifecycle
   create_delivery_cycle,

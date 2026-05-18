@@ -30,6 +30,7 @@ import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
+import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 import {
   DeliveryCycle,
@@ -123,7 +124,9 @@ interface ScheduleRow {
 
         <label class="gs-gate-filter">
           <span>Gate:</span>
-          <select class="oi-input" [(ngModel)]="filterGate">
+          <select class="oi-input"
+                  [(ngModel)]="filterGate"
+                  (ngModelChange)="onFilterChange()">
             <option value="">All gates</option>
             <option *ngFor="let g of allGates" [value]="g">{{ gateLabel(g) }}</option>
           </select>
@@ -405,11 +408,12 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
   private readonly profileSub = new Subscription();
 
   constructor(
-    private readonly delivery: DeliveryService,
-    private readonly mcp:      McpService,
-    private readonly profile:  UserProfileService,
-    private readonly router:   Router,
-    private readonly cdr:      ChangeDetectorRef
+    private readonly delivery:    DeliveryService,
+    private readonly mcp:         McpService,
+    private readonly profile:     UserProfileService,
+    private readonly router:      Router,
+    private readonly screenState: ScreenStateService,
+    private readonly cdr:         ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -417,11 +421,24 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
       this.profile.profile$.pipe(
         filter((p): p is NonNullable<typeof p> => p !== null),
         take(1)
-      ).subscribe(profile => {
+      ).subscribe(async profile => {
         const userId = profile.id ?? '';
         const role   = profile.system_role;
         this.isPrivileged   = role === 'phil' || role === 'admin';
         this.canCreateCycle = ['phil', 'admin', 'ds', 'cb'].includes(role);
+
+        // Contract 17 §2 / D-380: restore persisted filter state via MCP.
+        const saved = await this.screenState.restore(SCREEN_KEYS.DELIVERY_GATES);
+        if (saved) {
+          const filter = saved.filter_state ?? {};
+          if (typeof filter['filterGate'] === 'string') {
+            this.filterGate = filter['filterGate'] as GateName | '';
+          }
+          if (typeof filter['showMyDivisionsOnly'] === 'boolean') {
+            this.showMyDivisionsOnly = filter['showMyDivisionsOnly'] as boolean;
+          }
+        }
+
         if (!this.isPrivileged) {
           this.loadUserDivisions(userId);
         } else {
@@ -433,6 +450,21 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void { this.profileSub.unsubscribe(); }
+
+  /** Contract 17 §2 / D-380: persist filter state through MCP. */
+  private saveScreenState(): void {
+    this.screenState.save(
+      SCREEN_KEYS.DELIVERY_GATES,
+      {
+        filterGate:          this.filterGate,
+        showMyDivisionsOnly: this.showMyDivisionsOnly
+      },
+      {}
+    );
+  }
+
+  /** Wired to filter and toggle change handlers. */
+  onFilterChange(): void { this.saveScreenState(); }
 
   private async loadUserDivisions(userId: string): Promise<void> {
     if (!userId) { this.loadCycles(); return; }
@@ -486,7 +518,10 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
     });
   }
 
-  onToggleChange(): void { this.loadCycles(); }
+  onToggleChange(): void {
+    this.saveScreenState();
+    this.loadCycles();
+  }
 
   // ── Row classification ────────────────────────────────────────────────────
 

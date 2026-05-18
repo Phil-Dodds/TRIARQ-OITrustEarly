@@ -1421,53 +1421,61 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // Save: filter dropdowns + sort field + sort dir + division scope.
   // Restore: only when no drill-down query params are active (D-175 takes priority).
 
+  // Contract 17 §2 / D-380: screen state goes through ScreenStateService → MCP.
+  // user_id is taken from the JWT at the MCP boundary — never passed from here.
   private saveScreenState(): void {
-    const userId = this.profile.getCurrentProfile()?.id;
-    if (!userId) { return; }  // profile not yet loaded — skip
-    this.screenState.save(SCREEN_KEYS.DELIVERY_CYCLES, userId, {
-      filterStage:           this.filterStage,
-      filterTier:            this.filterTier,
-      filterWorkstream:      this.filterWorkstream,
-      filterDivision:        this.filterDivision,
-      includeChildDivisions: this.includeChildDivisions,
-      filterNextGate:        this.filterNextGate,
-      filterDs:              this.filterDs,
-      filterCb:              this.filterCb,
-      filterGateStatus:      this.filterGateStatus,
-      filterAssignedPerson:  this.filterAssignedPerson,
-      sortField:             this.sortField,
-      sortDir:               this.sortDir
-    });
+    this.screenState.save(
+      SCREEN_KEYS.DELIVERY_CYCLES,
+      {
+        filterStage:           this.filterStage,
+        filterTier:            this.filterTier,
+        filterWorkstream:      this.filterWorkstream,
+        filterDivision:        this.filterDivision,
+        includeChildDivisions: this.includeChildDivisions,
+        filterNextGate:        this.filterNextGate,
+        filterDs:              this.filterDs,
+        filterCb:              this.filterCb,
+        filterGateStatus:      this.filterGateStatus,
+        filterAssignedPerson:  this.filterAssignedPerson
+      },
+      {
+        sortField: this.sortField,
+        sortDir:   this.sortDir
+      }
+    );
   }
 
-  private restoreScreenState(): void {
+  private async restoreScreenState(): Promise<void> {
     // D-175: drill-down query params take priority — do not overwrite with saved state
     if (this.drillDownFromQp) { return; }
-    const userId = this.profile.getCurrentProfile()?.id;
-    if (!userId) { return; }
-    const saved = this.screenState.restore(SCREEN_KEYS.DELIVERY_CYCLES, userId);
+    const saved = await this.screenState.restore(SCREEN_KEYS.DELIVERY_CYCLES);
     if (!saved) { return; }
-    if (typeof saved['filterStage']      === 'string') { this.filterStage      = saved['filterStage']; }
-    if (typeof saved['filterTier']       === 'string') { this.filterTier       = saved['filterTier']; }
-    if (typeof saved['filterWorkstream'] === 'string') { this.filterWorkstream = saved['filterWorkstream']; }
-    if (typeof saved['filterDivision']   === 'string') { this.filterDivision   = saved['filterDivision']; }
-    if (typeof saved['filterNextGate']   === 'string') { this.filterNextGate   = saved['filterNextGate']; }
-    if (typeof saved['filterDs']             === 'string') { this.filterDs             = saved['filterDs']; }
-    if (typeof saved['filterCb']             === 'string') { this.filterCb             = saved['filterCb']; }
-    if (typeof saved['filterGateStatus']     === 'string') { this.filterGateStatus     = saved['filterGateStatus']; }
+    const filter = saved.filter_state ?? {};
+    const sort   = saved.sort_state   ?? {};
+    if (typeof filter['filterStage']      === 'string') { this.filterStage      = filter['filterStage'] as string; }
+    if (typeof filter['filterTier']       === 'string') { this.filterTier       = filter['filterTier'] as string; }
+    if (typeof filter['filterWorkstream'] === 'string') { this.filterWorkstream = filter['filterWorkstream'] as string; }
+    if (typeof filter['filterDivision']   === 'string') { this.filterDivision   = filter['filterDivision'] as string; }
+    if (typeof filter['filterNextGate']   === 'string') { this.filterNextGate   = filter['filterNextGate'] as string; }
+    if (typeof filter['filterDs']             === 'string') { this.filterDs             = filter['filterDs'] as string; }
+    if (typeof filter['filterCb']             === 'string') { this.filterCb             = filter['filterCb'] as string; }
+    if (typeof filter['filterGateStatus']     === 'string') { this.filterGateStatus     = filter['filterGateStatus'] as string; }
     // CC-Decision-2026-04-12-F: migrate legacy 'my_cycles' screen state to 'me'.
-    if (typeof saved['filterAssignedPerson'] === 'string') {
-      this.filterAssignedPerson = saved['filterAssignedPerson'] === 'my_cycles' ? 'me' : saved['filterAssignedPerson'];
+    if (typeof filter['filterAssignedPerson'] === 'string') {
+      this.filterAssignedPerson = filter['filterAssignedPerson'] === 'my_cycles' ? 'me' : (filter['filterAssignedPerson'] as string);
     }
-    if (typeof saved['sortField']        === 'string') {
-      this.sortField = saved['sortField'] as 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification';
+    if (typeof filter['includeChildDivisions'] === 'boolean') {
+      this.includeChildDivisions = filter['includeChildDivisions'];
     }
-    if (typeof saved['sortDir'] === 'string') {
-      this.sortDir = saved['sortDir'] as 'asc' | 'desc';
+    if (typeof sort['sortField'] === 'string') {
+      this.sortField = sort['sortField'] as 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification';
     }
-    if (typeof saved['includeChildDivisions'] === 'boolean') {
-      this.includeChildDivisions = saved['includeChildDivisions'];
+    if (typeof sort['sortDir'] === 'string') {
+      this.sortDir = sort['sortDir'] as 'asc' | 'desc';
     }
+    // Apply restored state to the view
+    this.applyFilters(false);
+    this.cdr.markForCheck();
   }
 
   // persist=false used by count card shortcuts — set filter without writing to memory. Source: D-HubCounts-2026-04-06.

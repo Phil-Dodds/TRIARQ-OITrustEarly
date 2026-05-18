@@ -1,85 +1,107 @@
 // screen-state.service.ts — Pathways OI Trust
-// Persists filter and sort state per screen per user.
-// Item 4 (Part 3), Principle 4 (self-clarifying screen keys), Principle 9 (skeleton on restore).
+// Per-user filter and sort persistence (D-171, D-370, D-380).
 //
-// Current implementation: localStorage with 7-day expiry.
-// MCP write-back to user_screen_state table is planned for a future build session
-// when a screen-state MCP endpoint is added to division-mcp or document-access-mcp.
+// Contract 17 §2 / D-380, D-381: screen state is mediated by MCP. The
+// `user_screen_state` table is never read or written from the Angular-side
+// authenticated Supabase client. user_id is taken from the JWT at the MCP
+// boundary — Angular does not pass it.
 //
-// D-93: no direct Supabase. D-140: fails silently — filter state is quality-of-life, not core.
+// The earlier localStorage implementation has been removed. The migration
+// 032 Arch-1 exception cited under D-171 was incorrect (D-171 is the hub
+// page decision); Design ruled the direct-Supabase pattern from Contract 16
+// unauthorized and required this migration.
 
 import { Injectable } from '@angular/core';
+import { firstValueFrom, Observable } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
+import { of } from 'rxjs';
 
-/** SCREEN_STATE_RECENCY_DAYS = 7 — shared constant per Part 3 Item 4. */
+import { McpService } from './mcp.service';
+import { McpResponse } from '../types/database';
+
+/** SCREEN_STATE_RECENCY_DAYS = 7 — recency policy enforced server-side. */
 export const SCREEN_STATE_RECENCY_DAYS = 7;
 
 /**
- * Screen key constants — declared once here as the authority.
+ * Screen key constants — declared once here as the authority (Rule 4).
  * Components import and use these — never construct keys dynamically.
- * Principle 4: self-explanatory without surrounding context.
  */
 export const SCREEN_KEYS = {
-  DELIVERY_CYCLES:      'delivery.cycles',
-  DELIVERY_WORKSTREAMS: 'delivery.workstreams',
-  DELIVERY_DIVISIONS:   'delivery.divisions',
-  DELIVERY_GATES:       'delivery.gates',
-  ADMIN_USERS:          'admin.users',
+  DELIVERY_CYCLES:          'delivery.cycles',
+  DELIVERY_WORKSTREAMS:     'delivery.workstreams',
+  DELIVERY_DIVISIONS:       'delivery.divisions',
+  DELIVERY_GATES:           'delivery.gates',
+  DELIVERY_DEPLOY_SCHEDULE: 'delivery.deploy-schedule',
+  ADMIN_USERS:              'admin.users',
+  ADMIN_WORKSTREAMS:        'admin.workstreams',
 } as const;
 
 export type ScreenKey = typeof SCREEN_KEYS[keyof typeof SCREEN_KEYS];
 
-interface StoredState {
-  state:    Record<string, unknown>;
-  saved_at: string; // ISO timestamp
+export interface RestoredScreenState {
+  filter_state:     Record<string, unknown>;
+  sort_state:       Record<string, unknown>;
+  last_rendered_at: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class ScreenStateService {
 
+  constructor(private readonly mcp: McpService) {}
+
   /**
-   * Restore screen state for a given key and user.
-   * Returns null when: not found, expired (> SCREEN_STATE_RECENCY_DAYS), or parse error.
+   * Restore screen state for the calling user (JWT-scoped) and screen.
+   * Returns null when nothing is stored within the 7-day recency window or on
+   * any error — restore failures are non-critical and degrade to defaults.
    */
-  restore(screenKey: ScreenKey, userId: string): Record<string, unknown> | null {
-    const key = this.storageKey(screenKey, userId);
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) { return null; }
-      const stored: StoredState = JSON.parse(raw) as StoredState;
-      const ageMs   = Date.now() - new Date(stored.saved_at).getTime();
-      const ageDays = ageMs / 86_400_000;
-      if (ageDays > SCREEN_STATE_RECENCY_DAYS) {
-        localStorage.removeItem(key);
-        return null;
-      }
-      return stored.state;
-    } catch {
-      // Corrupted storage — ignore silently (non-critical)
-      return null;
-    }
+  restore(screenKey: ScreenKey): Promise<RestoredScreenState | null> {
+    return firstValueFrom(
+      this.mcp.call<RestoredScreenState | null>('division', 'get_user_screen_state', {
+        screen_key: screenKey
+      }).pipe(
+        map((res: McpResponse<RestoredScreenState | null>) =>
+          (res?.success && res.data) ? res.data : null
+        ),
+        catchError(() => of(null))
+      )
+    );
   }
 
   /**
-   * Save screen state for a given key and user.
-   * Search text is never persisted — pass only filter dropdowns, sort column, sort direction.
-   * Fails silently on quota errors (private browsing, storage full).
+   * Persist screen state for the calling user (JWT-scoped) and screen.
+   * Fire-and-forget — failures are swallowed because screen state is
+   * quality-of-life, not core (D-140 / Arch-3).
+   *
+   * filterState: persisted filter dropdown values, scope toggles, etc.
+   *              Search-text fields are never persisted (D-171).
+   * sortState:   persisted sort column + direction.
    */
-  save(screenKey: ScreenKey, userId: string, state: Record<string, unknown>): void {
-    const key = this.storageKey(screenKey, userId);
-    const stored: StoredState = { state, saved_at: new Date().toISOString() };
-    try {
-      localStorage.setItem(key, JSON.stringify(stored));
-    } catch {
-      // Storage quota or private browsing — non-critical, ignore
-    }
+  save(
+    screenKey:   ScreenKey,
+    filterState: Record<string, unknown>,
+    sortState:   Record<string, unknown> = {}
+  ): void {
+    this.mcp.call<RestoredScreenState>('division', 'upsert_user_screen_state', {
+      screen_key:   screenKey,
+      filter_state: filterState,
+      sort_state:   sortState
+    }).pipe(
+      catchError(() => of(null))
+    ).subscribe();
   }
 
-  /** Clear stored state for a screen + user combination. */
-  clear(screenKey: ScreenKey, userId: string): void {
-    localStorage.removeItem(this.storageKey(screenKey, userId));
-  }
-
-  private storageKey(screenKey: ScreenKey, userId: string): string {
-    return `oi_trust.screen_state.${userId}.${screenKey}`;
+  /**
+   * Raw observable for callers that want explicit error handling.
+   * Not used by default — restore() above is the standard path.
+   */
+  restore$(screenKey: ScreenKey): Observable<RestoredScreenState | null> {
+    return this.mcp.call<RestoredScreenState | null>('division', 'get_user_screen_state', {
+      screen_key: screenKey
+    }).pipe(
+      map((res: McpResponse<RestoredScreenState | null>) =>
+        (res?.success && res.data) ? res.data : null
+      ),
+      catchError(() => of(null))
+    );
   }
 }

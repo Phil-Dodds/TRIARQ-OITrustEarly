@@ -179,6 +179,107 @@ describe('create_user', () => {
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Contract 17 §2 / D-380 — get_user_screen_state
+// JWT-only user identification; never accepts user_id as a parameter.
+// Returns null when nothing stored or row is older than 7 days.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('get_user_screen_state', () => {
+
+  test('error path: missing caller_user_id rejected (no JWT)', async () => {
+    const { get_user_screen_state } = require('../src/tools/get_user_screen_state');
+    const result = await get_user_screen_state({ screen_key: 'admin.users' }, null);
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('Authenticated user'));
+  });
+
+  test('error path: missing screen_key rejected', async () => {
+    const { get_user_screen_state } = require('../src/tools/get_user_screen_state');
+    const result = await get_user_screen_state({}, 'user-1');
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('screen_key'));
+  });
+
+  test('error path: empty screen_key rejected', async () => {
+    const { get_user_screen_state } = require('../src/tools/get_user_screen_state');
+    const result = await get_user_screen_state({ screen_key: '   ' }, 'user-1');
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('screen_key'));
+  });
+
+  test('recency rule: SCREEN_STATE_RECENCY_DAYS is 7', () => {
+    const { SCREEN_STATE_RECENCY_DAYS } = require('../src/tools/get_user_screen_state');
+    assert.equal(SCREEN_STATE_RECENCY_DAYS, 7);
+  });
+
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Contract 17 §2 / D-380 — upsert_user_screen_state
+// JWT-only user identification; never accepts user_id as a parameter.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('upsert_user_screen_state', () => {
+
+  test('error path: missing caller_user_id rejected (no JWT)', async () => {
+    const { upsert_user_screen_state } = require('../src/tools/upsert_user_screen_state');
+    const result = await upsert_user_screen_state(
+      { screen_key: 'admin.users', filter_state: {}, sort_state: {} },
+      null
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('Authenticated user'));
+  });
+
+  test('error path: missing screen_key rejected', async () => {
+    const { upsert_user_screen_state } = require('../src/tools/upsert_user_screen_state');
+    const result = await upsert_user_screen_state({}, 'user-1');
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('screen_key'));
+  });
+
+  test('error path: non-object filter_state rejected', async () => {
+    const { upsert_user_screen_state } = require('../src/tools/upsert_user_screen_state');
+    const result = await upsert_user_screen_state(
+      { screen_key: 'admin.users', filter_state: 'not-an-object' },
+      'user-1'
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('filter_state'));
+  });
+
+  test('error path: non-object sort_state rejected', async () => {
+    const { upsert_user_screen_state } = require('../src/tools/upsert_user_screen_state');
+    const result = await upsert_user_screen_state(
+      { screen_key: 'admin.users', sort_state: 42 },
+      'user-1'
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('sort_state'));
+  });
+
+  test('D-380 contract: tool signature does not accept user_id parameter', () => {
+    // Lock the JWT-only behavior. caller_user_id is the second arg from the
+    // router (extracted from the JWT). A params.user_id would be ignored by
+    // the implementation — but to prevent confusion, this test documents that
+    // user_id is not an expected param key.
+    const { upsert_user_screen_state } = require('../src/tools/upsert_user_screen_state');
+    // The handler signature is (params, caller_user_id) — calling with a
+    // user_id in params must not change which user the row is written for.
+    // We exercise this via the error path (no caller_user_id) — a params.user_id
+    // must not satisfy the auth check.
+    return upsert_user_screen_state(
+      { screen_key: 'admin.users', user_id: 'attacker-impersonation-attempt' },
+      null
+    ).then(result => {
+      assert.equal(result.success, false);
+      assert.ok(result.error.includes('Authenticated user'));
+    });
+  });
+
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe('update_user', () => {
 
   test('error path: immutable field rejected', async () => {

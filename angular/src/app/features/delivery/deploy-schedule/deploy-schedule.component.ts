@@ -40,6 +40,7 @@ import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
+import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 import {
   DeliveryCycle,
@@ -412,11 +413,12 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
   private readonly profileSub = new Subscription();
 
   constructor(
-    private readonly delivery: DeliveryService,
-    private readonly mcp:      McpService,
-    private readonly profile:  UserProfileService,
-    private readonly router:   Router,
-    private readonly cdr:      ChangeDetectorRef
+    private readonly delivery:    DeliveryService,
+    private readonly mcp:         McpService,
+    private readonly profile:     UserProfileService,
+    private readonly router:      Router,
+    private readonly screenState: ScreenStateService,
+    private readonly cdr:         ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
@@ -424,11 +426,21 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
       this.profile.profile$.pipe(
         filter((p): p is NonNullable<typeof p> => p !== null),
         take(1)
-      ).subscribe(profile => {
+      ).subscribe(async profile => {
         const userId = profile.id ?? '';
         const role   = profile.system_role;
         this.isPrivileged   = role === 'phil' || role === 'admin';
         this.canCreateCycle = ['phil', 'admin', 'ds', 'cb'].includes(role);
+
+        // Contract 17 §2 / D-380: restore persisted toggle state via MCP.
+        const saved = await this.screenState.restore(SCREEN_KEYS.DELIVERY_DEPLOY_SCHEDULE);
+        if (saved) {
+          const filter = saved.filter_state ?? {};
+          if (typeof filter['showMyDivisionsOnly'] === 'boolean') {
+            this.showMyDivisionsOnly = filter['showMyDivisionsOnly'] as boolean;
+          }
+        }
+
         if (!this.isPrivileged) {
           this.loadUserDivisions(userId);
         } else {
@@ -440,6 +452,15 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void { this.profileSub.unsubscribe(); }
+
+  /** Contract 17 §2 / D-380: persist toggle through MCP. */
+  private saveScreenState(): void {
+    this.screenState.save(
+      SCREEN_KEYS.DELIVERY_DEPLOY_SCHEDULE,
+      { showMyDivisionsOnly: this.showMyDivisionsOnly },
+      {}
+    );
+  }
 
   private async loadUserDivisions(userId: string): Promise<void> {
     if (!userId) { this.loadAll(); return; }
@@ -499,7 +520,10 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
     }
   }
 
-  onToggleChange(): void { this.loadAll(); }
+  onToggleChange(): void {
+    this.saveScreenState();
+    this.loadAll();
+  }
 
   // ── Quarter math ──────────────────────────────────────────────────────────
 

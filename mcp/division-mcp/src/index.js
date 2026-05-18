@@ -29,6 +29,9 @@ const { update_user_email }        = require('./tools/update_user_email');
 const { list_users }               = require('./tools/list_users');
 const { get_user_invite_statuses } = require('./tools/get_user_invite_statuses');
 const { resend_invite }            = require('./tools/resend_invite');
+// Contract 17 §2 / D-380: screen state mediated by MCP. user_id from JWT only.
+const { get_user_screen_state }    = require('./tools/get_user_screen_state');
+const { upsert_user_screen_state } = require('./tools/upsert_user_screen_state');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -69,7 +72,9 @@ app.post('/tools/:toolName', async (req, res) => {
     update_user_email,
     list_users,
     get_user_invite_statuses,
-    resend_invite
+    resend_invite,
+    get_user_screen_state,
+    upsert_user_screen_state
   };
 
   if (!tools[toolName]) {
@@ -134,7 +139,9 @@ app.get('/tools', (req, res) => {
       { name: 'update_user_email',        method: 'POST', path: '/tools/update_user_email' },
       { name: 'list_users',               method: 'POST', path: '/tools/list_users' },
       { name: 'get_user_invite_statuses', method: 'POST', path: '/tools/get_user_invite_statuses' },
-      { name: 'resend_invite',            method: 'POST', path: '/tools/resend_invite' }
+      { name: 'resend_invite',            method: 'POST', path: '/tools/resend_invite' },
+      { name: 'get_user_screen_state',    method: 'POST', path: '/tools/get_user_screen_state' },
+      { name: 'upsert_user_screen_state', method: 'POST', path: '/tools/upsert_user_screen_state' }
     ]
   });
 });

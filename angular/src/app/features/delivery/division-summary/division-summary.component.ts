@@ -205,13 +205,15 @@ export class DivisionSummaryComponent implements OnInit, OnDestroy {
       this.profile.profile$.pipe(
         filter((p): p is NonNullable<typeof p> => p !== null),
         take(1)
-      ).subscribe(profile => {
+      ).subscribe(async profile => {
         this.currentUserId = profile.id ?? '';
-        // Item 4: restore saved sort state (Principle 9: skeleton shows during restore load)
-        const saved = this.screenState.restore(SCREEN_KEY, this.currentUserId);
+        // Item 4 / Contract 17 §2: restore saved sort state via MCP (D-380).
+        // Principle 9: skeleton shows while load + restore complete.
+        const saved = await this.screenState.restore(SCREEN_KEY);
         if (saved) {
-          if (typeof saved['sortCol'] === 'string') { this.sortCol = saved['sortCol'] as DivisionSortCol; }
-          if (saved['sortDir'] === 'asc' || saved['sortDir'] === 'desc') { this.sortDir = saved['sortDir']; }
+          const sort = saved.sort_state ?? {};
+          if (typeof sort['sortCol'] === 'string') { this.sortCol = sort['sortCol'] as DivisionSortCol; }
+          if (sort['sortDir'] === 'asc' || sort['sortDir'] === 'desc') { this.sortDir = sort['sortDir'] as 'asc' | 'desc'; }
         }
         const role        = profile.system_role;
         this.isPrivileged = role === 'phil' || role === 'admin';
@@ -305,8 +307,8 @@ export class DivisionSummaryComponent implements OnInit, OnDestroy {
   }
 
   saveState(): void {
-    if (!this.currentUserId) { return; }
-    this.screenState.save(SCREEN_KEY, this.currentUserId, {
+    // Contract 17 §2 / D-380: user_id from JWT; not passed from here.
+    this.screenState.save(SCREEN_KEY, {}, {
       sortCol: this.sortCol,
       sortDir: this.sortDir,
     });

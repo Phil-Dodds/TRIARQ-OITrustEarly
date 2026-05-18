@@ -97,3 +97,62 @@ describe('DeliveryCycleDetailComponent — onEscKey() (B-97 Contract 16)', () =>
     expect(closeEmitSpy).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Contract 17 §1 regression coverage — stage badge resolution.
+ *
+ * Bug: after approving a gate, the cycle stage badge in the detail panel header
+ * did not update even though the Stage Track diamond moved correctly. D-345
+ * specifies "full reload on approval" — the fix is in the data binding path,
+ * not an additional reload. The badge resolves through currentStageLabel(),
+ * which reads this.cycle?.current_lifecycle_stage on every change-detection
+ * pass. Replacing this.cycle with a fresh reference must update the label.
+ *
+ * This test locks the binding so a future change that mirrors the stage to a
+ * local field (or breaks the getter's read of this.cycle) is caught.
+ */
+describe('DeliveryCycleDetailComponent — currentStageLabel reflects cycle reference (Contract 17 §1)', () => {
+  let fixture: ComponentFixture<DeliveryCycleDetailComponent>;
+  let component: DeliveryCycleDetailComponent;
+
+  beforeEach(async () => {
+    const deliverySpy = jasmine.createSpyObj<DeliveryService>('DeliveryService', ['getCycle']);
+    const profileSpy  = jasmine.createSpyObj<UserProfileService>('UserProfileService', ['listUsers', 'getCurrentProfile']);
+    const dialogSpy   = jasmine.createSpyObj<MatDialog>('MatDialog', ['open'], { openDialogs: [] });
+    const routeStub   = { snapshot: { paramMap: { get: (_key: string) => null } } } as unknown as ActivatedRoute;
+
+    await TestBed.configureTestingModule({
+      imports: [DeliveryCycleDetailComponent, NoopAnimationsModule],
+      providers: [
+        { provide: ActivatedRoute,     useValue: routeStub },
+        { provide: DeliveryService,    useValue: deliverySpy },
+        { provide: UserProfileService, useValue: profileSpy },
+        { provide: MatDialog,          useValue: dialogSpy }
+      ]
+    }).compileComponents();
+
+    fixture   = TestBed.createComponent(DeliveryCycleDetailComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('returns empty when no cycle is loaded', () => {
+    component.cycle = null;
+    expect(component.currentStageLabel).toBe('');
+  });
+
+  it('resolves the label from the current cycle.current_lifecycle_stage', () => {
+    component.cycle = { current_lifecycle_stage: 'SPEC' } as any;
+    expect(component.currentStageLabel).toBe('Spec');
+  });
+
+  it('reflects a new label when the cycle reference is replaced (gate-approval reload)', () => {
+    component.cycle = { current_lifecycle_stage: 'SPEC' } as any;
+    expect(component.currentStageLabel).toBe('Spec');
+
+    // Simulate D-345 full reload: loadCycle replaces this.cycle with the post-approval
+    // record returned by get_delivery_cycle. The label getter must reflect the new value
+    // on the next CD pass.
+    component.cycle = { current_lifecycle_stage: 'BUILD' } as any;
+    expect(component.currentStageLabel).toBe('Build');
+  });
+});

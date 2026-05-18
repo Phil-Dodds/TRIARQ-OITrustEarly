@@ -169,12 +169,15 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <div>
             <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);flex-wrap:wrap;
                         margin-bottom:var(--triarq-space-xs);">
-              <!-- Stage badge — Visual Layout Standards 1.7/3.1: 4px radius, not pill -->
+              <!-- Stage badge — Visual Layout Standards 1.7/3.1: 4px radius, not pill.
+                   Contract 17 §1: read through currentStageLabel() getter so the badge
+                   resolves the label from the current cycle reference on every CD pass.
+                   D-345 full reload replaces this.cycle; OnPush + markForCheck propagate. -->
               <span style="background:var(--triarq-color-primary,#257099);color:#fff;
                            font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
                            border-radius:4px;padding:3px 8px;text-transform:uppercase;
                            letter-spacing:0.5px;">
-                {{ STAGE_LABEL_MAP[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
+                {{ currentStageLabel || cycle.current_lifecycle_stage }}
               </span>
               <!-- Tier badge — Visual Layout Standards 1.7/3.1: tier colors, 4px radius -->
               <span [style.background]="tierBadgeBg(cycle.tier_classification)"

@@ -10,12 +10,13 @@ const { supabase } = require('../db');
 /**
  * @param {object} params
  * @param {string} params.workstream_name
+ * @param {string} [params.display_name_short] - D-203, max 20 chars; required at the UI layer (Contract 17 §9.6)
  * @param {string} params.home_division_id
  * @param {string} params.workstream_lead_user_id
  * @param {string} caller_user_id - from JWT
  */
 async function create_delivery_workstream(params, caller_user_id) {
-  const { workstream_name, home_division_id, workstream_lead_user_id } = params;
+  const { workstream_name, display_name_short, home_division_id, workstream_lead_user_id } = params;
 
   if (!workstream_name || !workstream_name.trim()) {
     return { success: false, error: 'workstream_name is required.' };
@@ -25,6 +26,13 @@ async function create_delivery_workstream(params, caller_user_id) {
   }
   if (!workstream_lead_user_id) {
     return { success: false, error: 'workstream_lead_user_id is required.' };
+  }
+  // D-203 / Contract 17 §9: 20-char ceiling on display_name_short.
+  if (display_name_short !== undefined && display_name_short !== null && typeof display_name_short !== 'string') {
+    return { success: false, error: 'display_name_short must be a string.' };
+  }
+  if (typeof display_name_short === 'string' && display_name_short.length > 20) {
+    return { success: false, error: 'display_name_short must be 20 characters or fewer.' };
   }
 
   // Verify caller is admin or phil
@@ -75,14 +83,19 @@ async function create_delivery_workstream(params, caller_user_id) {
     return { success: false, error: 'The designated Workstream lead account is inactive. Assign an active user as lead.' };
   }
 
+  const insertRow = {
+    workstream_name:         workstream_name.trim(),
+    home_division_id,
+    workstream_lead_user_id,
+    active_status:           true
+  };
+  if (typeof display_name_short === 'string' && display_name_short.trim()) {
+    insertRow.display_name_short = display_name_short.trim();
+  }
+
   const { data: workstream, error: insertErr } = await supabase
     .from('delivery_workstreams')
-    .insert({
-      workstream_name:         workstream_name.trim(),
-      home_division_id,
-      workstream_lead_user_id,
-      active_status:           true
-    })
+    .insert(insertRow)
     .select()
     .single();
 

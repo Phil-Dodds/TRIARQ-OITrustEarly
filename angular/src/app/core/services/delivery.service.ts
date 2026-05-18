@@ -32,11 +32,27 @@ export class DeliveryService {
   // ── Workstream tools ───────────────────────────────────────────────────────
 
   createWorkstream(params: {
-    workstream_name:       string;
-    home_division_id:      string;
+    workstream_name:         string;
+    display_name_short?:     string;   // Contract 17 §9: required at UI, optional at MCP
+    home_division_id:        string;
     workstream_lead_user_id: string;
   }): Observable<McpResponse<DeliveryWorkstream>> {
     return this.mcp.call<DeliveryWorkstream>('delivery', 'create_delivery_workstream', params as Record<string, unknown>);
+  }
+
+  /**
+   * Contract 17 §9: unified update for editable Workstream fields and active_status.
+   * Supersedes updateWorkstreamActiveStatus. Only supplied fields are changed.
+   */
+  updateWorkstream(params: {
+    workstream_id:            string;
+    workstream_name?:         string;
+    display_name_short?:      string | null;
+    home_division_id?:        string;
+    workstream_lead_user_id?: string;
+    active_status?:           boolean;
+  }): Observable<McpResponse<DeliveryWorkstream>> {
+    return this.mcp.call<DeliveryWorkstream>('delivery', 'update_delivery_workstream', params as Record<string, unknown>);
   }
 
   listWorkstreams(params: {
