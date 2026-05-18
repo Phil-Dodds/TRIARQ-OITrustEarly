@@ -52,8 +52,8 @@ const ADMIN_CARDS: AdminCard[] = [
       <!-- Page header -->
       <div style="margin-bottom:var(--triarq-space-xl);">
         <h3 style="margin:0 0 6px 0;">Administration</h3>
-        <p style="margin:0;font-size:var(--triarq-text-small);
-                  color:var(--triarq-color-text-secondary);max-width:560px;">
+        <!-- S-015 surface description: 11px italic #5A5A5A. Contract 17 CC-018. -->
+        <p style="margin:0;font-size:11px;font-style:italic;color:#5A5A5A;max-width:560px;">
           System configuration and governance management. Changes made here affect
           access, workflow, and data visibility across all Divisions.
           Proceed deliberately — most actions are not reversible without admin intervention.
