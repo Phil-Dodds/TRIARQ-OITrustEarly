@@ -19,7 +19,7 @@
 //   D-380 ScreenStateService → MCP screen-state persistence (screen key
 //         `admin.workstreams`)
 //
-// Pattern reference: All Delivery Cycles (/delivery/cycles).
+// Pattern reference: All Initiatives (/initiatives/list).
 
 import {
   Component,
@@ -75,7 +75,7 @@ type PanelMode    = 'none' | 'view' | 'edit' | 'create';
               <h3 style="margin:0 0 4px 0;">Delivery Workstreams</h3>
               <!-- S-015 surface description (11px italic Stone). -->
               <div style="font-size:11px;font-style:italic;color:#5A5A5A;">
-                Persistent delivery teams. Each Delivery Cycle belongs to exactly one Workstream.
+                Persistent delivery teams. Each Initiative belongs to exactly one Workstream.
               </div>
 
               <!-- Counts row (shown when no filters active) -->
@@ -417,7 +417,7 @@ type PanelMode    = 'none' | 'view' | 'edit' | 'create';
                         style="background:none;border:none;color:var(--triarq-color-primary);
                                cursor:pointer;text-decoration:underline;margin-left:8px;
                                font-size:var(--triarq-text-small);padding:0;">
-                  View cycles →
+                  View Initiatives →
                 </button>
               </div>
             </section>
@@ -1160,9 +1160,9 @@ export class WorkstreamAdminComponent implements OnInit {
       : name.slice(0, 2).toUpperCase();
   }
 
-  /** "View cycles →" link. Pre-set workstream filter on dashboard.
+  /** "View Initiatives →" link. Pre-set workstream filter on dashboard.
    *  D-171: pre-set shortcuts from drill-in do not write to filter memory. */
   goToCyclesForWorkstream(workstreamId: string): void {
-    this.router.navigate(['/delivery/cycles'], { queryParams: { workstream_id: workstreamId } });
+    this.router.navigate(['/initiatives/list'], { queryParams: { workstream_id: workstreamId } });
   }
 }

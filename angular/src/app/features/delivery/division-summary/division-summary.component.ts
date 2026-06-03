@@ -28,6 +28,7 @@ import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 import { DivisionSummaryItem, Division } from '../../../core/types/database';
+import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 // Item 4 (Part 3): screen key declared at top of file — Principle 4 (self-clarifying names)
 const SCREEN_KEY = SCREEN_KEYS.DELIVERY_DIVISIONS;
@@ -44,16 +45,16 @@ type DivisionSortCol = 'division_name' | 'active_cycle_count';
 
       <!-- Back + title -->
       <div style="margin-bottom:var(--triarq-space-md);">
-        <a routerLink="/delivery"
+        <a routerLink="/initiatives"
            style="font-size:var(--triarq-text-small);
                   color:var(--triarq-color-primary);text-decoration:none;">
-          ← Delivery Cycle Tracking
+          ← Initiative Tracking
         </a>
         <h3 style="margin:8px 0 4px 0;">Division Summary</h3>
         <p style="margin:0;font-size:var(--triarq-text-small);
                   color:var(--triarq-color-text-secondary);">
-          Active delivery cycle count by Division, shown in hierarchy order.
-          Click a Division to see all its cycles.
+          Active Initiative count by Division, shown in hierarchy order.
+          Click a Division to see all its Initiatives.
         </p>
       </div>
 
@@ -216,7 +217,7 @@ export class DivisionSummaryComponent implements OnInit, OnDestroy {
           if (sort['sortDir'] === 'asc' || sort['sortDir'] === 'desc') { this.sortDir = sort['sortDir'] as 'asc' | 'desc'; }
         }
         const role        = profile.system_role;
-        this.isPrivileged = role === 'phil' || role === 'admin';
+        this.isPrivileged = role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN;
         if (!this.isPrivileged) {
           this.loadUserDivisions(this.currentUserId);
         } else {
@@ -315,7 +316,7 @@ export class DivisionSummaryComponent implements OnInit, OnDestroy {
   }
 
   drillDown(divisionId: string): void {
-    this.router.navigate(['/delivery/cycles'], { queryParams: { division_id: divisionId } });
+    this.router.navigate(['/initiatives/list'], { queryParams: { division_id: divisionId } });
   }
 
   // D-176: flat indented list in tree order (parent before children, siblings alphabetical)

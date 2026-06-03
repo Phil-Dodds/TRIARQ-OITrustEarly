@@ -126,7 +126,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       </div>
       <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
         Check that you have access to this Division, or return to the
-        <a routerLink="/delivery" style="color:var(--triarq-color-primary);">Delivery Dashboard</a>.
+        <a routerLink="/initiatives" style="color:var(--triarq-color-primary);">Initiative Tracking</a>.
         If access has been granted recently, try refreshing.
       </div>
     </div>
@@ -524,37 +524,51 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </span>
           </div>
 
-          <!-- DS (Domain Strategist) -->
+          <!-- DCS (Domain Capability Strategist) — D-389 -->
           <div>
             <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Domain Strategist</div>
-            <span *ngIf="cycle.assigned_ds_display_name"
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Domain Capability Strategist</div>
+            <span *ngIf="cycle.assigned_dcs_display_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
-              {{ cycle.assigned_ds_display_name }}
+              {{ cycle.assigned_dcs_display_name }}
             </span>
-            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
-            <span *ngIf="!cycle.assigned_ds_display_name"
+            <span *ngIf="!cycle.assigned_dcs_display_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Domain Strategist: Unassigned
+              Domain Capability Strategist: Unassigned
             </span>
           </div>
 
-          <!-- CB (Capability Builder) -->
+          <!-- EPO (Engineering Product Owner) — D-390 -->
           <div>
             <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Capability Builder</div>
-            <span *ngIf="cycle.assigned_cb_display_name"
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Engineering Product Owner</div>
+            <span *ngIf="cycle.assigned_epo_display_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
-              {{ cycle.assigned_cb_display_name }}
+              {{ cycle.assigned_epo_display_name }}
             </span>
-            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
-            <span *ngIf="!cycle.assigned_cb_display_name"
+            <span *ngIf="!cycle.assigned_epo_display_name"
                   style="display:inline-block;padding:3px 10px;border-radius:999px;
                          border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Capability Builder: Unassigned
+              Engineering Product Owner: Unassigned
+            </span>
+          </div>
+
+          <!-- DOL (Domain Outcome Lead) — D-391 -->
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Domain Outcome Lead</div>
+            <span *ngIf="cycle.assigned_dol_display_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
+              {{ cycle.assigned_dol_display_name }}
+            </span>
+            <span *ngIf="!cycle.assigned_dol_display_name"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;
+                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
+              Domain Outcome Lead: Unassigned
             </span>
           </div>
 
@@ -599,13 +613,13 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       </div>
 
       <!-- ── Session 2026-03-24-F: missing actual date warning ───────────── -->
-      <!-- Spec: "[N] Milestone(s) are missing actual dates for Gates this Delivery Cycle has already passed." -->
+      <!-- "[N] Milestone(s) are missing actual dates for Gates this Initiative has already passed." -->
       <div *ngIf="missingActualDateGateNames.length > 0"
            style="margin-bottom:var(--triarq-space-md);
                   background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
                   border-radius:0 6px 6px 0;padding:var(--triarq-space-sm) var(--triarq-space-md);">
         <div style="font-weight:500;font-size:var(--triarq-text-small);margin-bottom:4px;">
-          ⚠ {{ missingActualDateGateNames.length }} Milestone{{ missingActualDateGateNames.length > 1 ? 's are' : ' is' }} missing actual dates for Gates this Delivery Cycle has already passed.
+          ⚠ {{ missingActualDateGateNames.length }} Milestone{{ missingActualDateGateNames.length > 1 ? 's are' : ' is' }} missing actual dates for Gates this Initiative has already passed.
         </div>
         <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
           Actual dates are recorded automatically on Gate approval — if missing, the Gate may have been approved before date tracking was active. Add them manually to maintain a complete audit record.
@@ -1341,16 +1355,9 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   advancingStage    = false;
   advanceError      = '';
 
-  // DS / CB assignment
+  // Role assignments rendered in Identity zone — editing happens via the Edit panel
+  // (delivery-cycle-edit-panel.component.ts), so no inline edit state lives here.
   allUsers:   User[] = [];
-  editingDs   = false;
-  savingDs    = false;
-  dsError     = '';
-  dsControl   = new FormControl('');
-  editingCb   = false;
-  savingCb    = false;
-  cbError     = '';
-  cbControl   = new FormControl('');
 
   // Item 1: Milestone status edit — status dropdown per row
   editingMilestoneStatus:  GateName | null = null;
@@ -1766,86 +1773,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.editingOutcome = false;
     this.outcomeError   = '';
     this.cdr.markForCheck();
-  }
-
-  // ── DS / CB assignment ─────────────────────────────────────────────────────
-
-  startDsEdit(): void {
-    this.dsControl.setValue(this.cycle?.assigned_ds_user_id ?? '');
-    this.editingDs = true;
-    this.dsError   = '';
-    this.cdr.markForCheck();
-  }
-
-  cancelDsEdit(): void { this.editingDs = false; this.dsError = ''; this.cdr.markForCheck(); }
-
-  saveDs(): void {
-    if (!this.cycle) { return; }
-    this.savingDs = true;
-    this.dsError  = '';
-    this.cdr.markForCheck();
-
-    this.delivery.assignDsCb({
-      delivery_cycle_id:    this.cycle.delivery_cycle_id,
-      assigned_ds_user_id:  this.dsControl.value || null
-    }).subscribe({
-      next: (res) => {
-        if (res.success && res.data) {
-          this.cycle!.assigned_ds_user_id      = res.data.assigned_ds_user_id;
-          this.cycle!.assigned_ds_display_name = this.allUsers.find(u => u.id === res.data!.assigned_ds_user_id)?.display_name;
-          this.editingDs = false;
-          this.loadEvents(this.cycle!.delivery_cycle_id);
-        } else {
-          this.dsError = res.error ?? 'Assignment failed.';
-        }
-        this.savingDs = false;
-        this.cdr.markForCheck();
-      },
-      error: (err: { error?: string }) => {
-        this.dsError  = err.error ?? 'Assignment failed. Check permissions and try again.';
-        this.savingDs = false;
-        this.cdr.markForCheck();
-      }
-    });
-  }
-
-  startCbEdit(): void {
-    this.cbControl.setValue(this.cycle?.assigned_cb_user_id ?? '');
-    this.editingCb = true;
-    this.cbError   = '';
-    this.cdr.markForCheck();
-  }
-
-  cancelCbEdit(): void { this.editingCb = false; this.cbError = ''; this.cdr.markForCheck(); }
-
-  saveCb(): void {
-    if (!this.cycle) { return; }
-    this.savingCb = true;
-    this.cbError  = '';
-    this.cdr.markForCheck();
-
-    this.delivery.assignDsCb({
-      delivery_cycle_id:    this.cycle.delivery_cycle_id,
-      assigned_cb_user_id:  this.cbControl.value || null
-    }).subscribe({
-      next: (res) => {
-        if (res.success && res.data) {
-          this.cycle!.assigned_cb_user_id      = res.data.assigned_cb_user_id;
-          this.cycle!.assigned_cb_display_name = this.allUsers.find(u => u.id === res.data!.assigned_cb_user_id)?.display_name;
-          this.editingCb = false;
-          this.loadEvents(this.cycle!.delivery_cycle_id);
-        } else {
-          this.cbError = res.error ?? 'Assignment failed.';
-        }
-        this.savingCb = false;
-        this.cdr.markForCheck();
-      },
-      error: (err: { error?: string }) => {
-        this.cbError  = err.error ?? 'Assignment failed. Check permissions and try again.';
-        this.savingCb = false;
-        this.cdr.markForCheck();
-      }
-    });
   }
 
   saveOutcome(): void {
@@ -2597,7 +2524,8 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           { label: 'Context Package attached (at least one Brief Artifact)',      met: briefArts.length > 0 },
           { label: 'Outcome Statement set',                                        met: !!c.outcome_statement },
           { label: 'Tier classification set',                                      met: !!c.tier_classification },
-          { label: 'Assigned Domain Strategist set',                               met: !!c.assigned_ds_user_id },
+          { label: 'Assigned Domain Capability Strategist set',                   met: !!c.assigned_dcs_user_id },
+          { label: 'Assigned Domain Outcome Lead set',                            met: !!c.assigned_dol_user_id },
         ];
       case 'go_to_build':
         return [
@@ -2607,11 +2535,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           { label: 'Tier classification set',                                      met: !!c.tier_classification },
           { label: 'Jira epic linked',                                             met: !!(c.jira_links?.[0]?.jira_epic_key) },
           { label: 'MCP scope declared (Cursor Prompt or Agent Registry)',         met: hasName(specArts, 'cursor prompt', 'agent registry', 'mcp scope') },
-          { label: 'Assigned Capability Builder set',                              met: !!c.assigned_cb_user_id },
+          { label: 'Assigned Engineering Product Owner set',                       met: !!c.assigned_epo_user_id },
         ];
       case 'go_to_deploy':
         return [
-          { label: 'Delivery Cycle Build Report attached',                         met: hasName(buildArts, 'build report') },
+          { label: 'Initiative Build Report attached',                             met: hasName(buildArts, 'build report') },
           { label: 'UAT sign-off record attached',                                 met: hasName(uatArts, 'uat sign') },
           ...(isTier3 ? [
             { label: '7-step governance checklist attached (Tier 3)',              met: hasName(uatArts, '7-step', 'governance checklist') },

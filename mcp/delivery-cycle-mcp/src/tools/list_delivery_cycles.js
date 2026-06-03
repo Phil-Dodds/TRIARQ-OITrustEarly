@@ -74,8 +74,9 @@ async function list_delivery_cycles(params, caller_user_id) {
       tier_classification,
       current_lifecycle_stage,
       outcome_statement,
-      assigned_ds_user_id,
-      assigned_cb_user_id,
+      assigned_dcs_user_id,
+      assigned_epo_user_id,
+      assigned_dol_user_id,
       jira_epic_key,
       created_at,
       updated_at
@@ -122,27 +123,31 @@ async function list_delivery_cycles(params, caller_user_id) {
     query = query.eq('tier_classification', tier_classification);
   }
 
-  // Build C supplement: filter to cycles where caller is assigned DS or CB
+  // D-391: filter to Initiatives where caller is assigned DCS, EPO, or DOL.
   if (assigned_to_current_user) {
-    query = query.or(`assigned_ds_user_id.eq.${caller_user_id},assigned_cb_user_id.eq.${caller_user_id}`);
+    query = query.or(
+      `assigned_dcs_user_id.eq.${caller_user_id},` +
+      `assigned_epo_user_id.eq.${caller_user_id},` +
+      `assigned_dol_user_id.eq.${caller_user_id}`
+    );
   }
 
   const { data: cycles, error } = await query;
 
   if (error) {
-    return { success: false, error: `Failed to list Delivery Cycles: ${error.message}` };
+    return { success: false, error: `Failed to list Initiatives: ${error.message}` };
   }
 
   if (!cycles || cycles.length === 0) {
     return { success: true, data: [] };
   }
 
-  // ── Resolve DS / CB display names (migration 024 columns) ────────────────
-  // Collect all unique user IDs that need display names (DS + CB across all cycles).
+  // ── Resolve DCS / EPO / DOL display names ─────────────────────────────────
   const userIdSet = new Set();
   cycles.forEach(c => {
-    if (c.assigned_ds_user_id) { userIdSet.add(c.assigned_ds_user_id); }
-    if (c.assigned_cb_user_id) { userIdSet.add(c.assigned_cb_user_id); }
+    if (c.assigned_dcs_user_id) { userIdSet.add(c.assigned_dcs_user_id); }
+    if (c.assigned_epo_user_id) { userIdSet.add(c.assigned_epo_user_id); }
+    if (c.assigned_dol_user_id) { userIdSet.add(c.assigned_dol_user_id); }
   });
 
   let userMap = {};
@@ -177,8 +182,9 @@ async function list_delivery_cycles(params, caller_user_id) {
 
   const enriched = cycles.map(c => ({
     ...c,
-    assigned_ds_display_name: c.assigned_ds_user_id ? (userMap[c.assigned_ds_user_id] ?? null) : null,
-    assigned_cb_display_name: c.assigned_cb_user_id ? (userMap[c.assigned_cb_user_id] ?? null) : null,
+    assigned_dcs_display_name: c.assigned_dcs_user_id ? (userMap[c.assigned_dcs_user_id] ?? null) : null,
+    assigned_epo_display_name: c.assigned_epo_user_id ? (userMap[c.assigned_epo_user_id] ?? null) : null,
+    assigned_dol_display_name: c.assigned_dol_user_id ? (userMap[c.assigned_dol_user_id] ?? null) : null,
     division_name:       c.division_id ? (divisionMap[c.division_id]?.division_name ?? null) : null,
     display_name_short:  c.division_id ? (divisionMap[c.division_id]?.display_name_short ?? null) : null
   }));

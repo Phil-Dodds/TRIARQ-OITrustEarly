@@ -1,13 +1,13 @@
 // delivery.module.ts — DeliveryModule (lazy-loaded, D-143)
-// Build C + dashboard redesign: hub, summary views, cycle list, cycle detail.
+// Build C + dashboard redesign: hub, summary views, Initiative list, Initiative detail.
 //
-// Sub-routes (D-188):
-//   /delivery               → DeliveryHubComponent       (hub — no data, 4 option cards)
-//   /delivery/workstreams   → WorkstreamSummaryComponent (WIP counts per workstream)
-//   /delivery/divisions     → DivisionSummaryComponent   (cycle counts per division)
-//   /delivery/gates         → GatesSummaryComponent      (upcoming/overdue gate counts)
-//   /delivery/cycles        → DeliveryCycleDashboardComponent (full list, with filters)
-//   /delivery/:cycle_id     → DeliveryCycleDetailComponent
+// Sub-routes (D-188 / D-392):
+//   /initiatives                → DeliveryHubComponent       (hub — no data, 4 option cards)
+//   /initiatives/workstreams    → WorkstreamSummaryComponent (WIP counts per workstream)
+//   /initiatives/divisions      → DivisionSummaryComponent   (Initiative counts per division)
+//   /initiatives/gates          → GatesSummaryComponent      (upcoming/overdue gate counts)
+//   /initiatives/list           → DeliveryCycleDashboardComponent (full list, with filters)
+//   /initiatives/:cycle_id      → DeliveryCycleDetailComponent
 //
 // Named routes declared before :cycle_id to prevent routing conflicts.
 
@@ -53,14 +53,16 @@ import { IonicModule }  from '@ionic/angular';
           import('./deploy-schedule/deploy-schedule.component')
             .then(c => c.DeployScheduleComponent)
       },
-      // ── Full cycle list (moved from '' to 'cycles' — D-188) ───────────────
+      // ── Full Initiative list (D-188 / D-392: 'cycles' renamed to 'list') ──
       {
-        path: 'cycles',
+        path: 'list',
         loadComponent: () =>
           import('./dashboard/delivery-cycle-dashboard.component')
             .then(c => c.DeliveryCycleDashboardComponent)
       },
-      // ── Cycle detail — must be last (param route) ─────────────────────────
+      // Legacy child path — preserves bookmarks before D-392 rename.
+      { path: 'cycles', redirectTo: 'list', pathMatch: 'full' },
+      // ── Initiative detail — must be last (param route) ────────────────────
       {
         path: ':cycle_id',
         loadComponent: () =>

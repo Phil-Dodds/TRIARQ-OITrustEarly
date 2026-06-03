@@ -38,6 +38,7 @@ import {
   Division,
   LifecycleStage
 } from '../../../core/types/database';
+import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -84,11 +85,11 @@ interface ScheduleRow {
 
       <!-- D-298 header -->
       <div class="gs-header">
-        <a routerLink="/delivery" class="gs-back-link">← Delivery Cycle Tracking</a>
+        <a routerLink="/initiatives" class="gs-back-link">← Initiative Tracking</a>
         <div class="gs-header-row">
           <h3 class="gs-title">Gate Schedule</h3>
           <button *ngIf="canCreateCycle" class="gs-new-cycle" (click)="onNewCycle()">
-            + New Cycle
+            + New Initiative
           </button>
         </div>
         <p class="gs-subtitle">
@@ -424,8 +425,8 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
       ).subscribe(async profile => {
         const userId = profile.id ?? '';
         const role   = profile.system_role;
-        this.isPrivileged   = role === 'phil' || role === 'admin';
-        this.canCreateCycle = ['phil', 'admin', 'ds', 'cb'].includes(role);
+        this.isPrivileged   = role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN;
+        this.canCreateCycle = [SYSTEM_ROLES.PHIL, SYSTEM_ROLES.ADMIN, SYSTEM_ROLES.DCS, SYSTEM_ROLES.EPO, SYSTEM_ROLES.DOL].includes(role);
 
         // Contract 17 §2 / D-380: restore persisted filter state via MCP.
         const saved = await this.screenState.restore(SCREEN_KEYS.DELIVERY_GATES);
@@ -573,7 +574,7 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
 
   /** D-DeliveryHub-GateSummary: tap banner to drill to overdue filter. */
   onBannerTap(): void {
-    this.router.navigate(['/delivery/cycles'], { queryParams: { gate_status: 'overdue' } });
+    this.router.navigate(['/initiatives/list'], { queryParams: { gate_status: 'overdue' } });
   }
 
   // D-308 / S-018 (Contract 15): tap row opens detail in the right panel of
@@ -617,7 +618,7 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
     if (!this.isPrivileged && this.showMyDivisionsOnly && this.userDivisionIds.length === 1) {
       queryParams['division_id'] = this.userDivisionIds[0];
     }
-    this.router.navigate(['/delivery/cycles'], { queryParams });
+    this.router.navigate(['/initiatives/list'], { queryParams });
   }
 
   gateLabel(g: GateName): string { return GATE_LABELS[g]; }

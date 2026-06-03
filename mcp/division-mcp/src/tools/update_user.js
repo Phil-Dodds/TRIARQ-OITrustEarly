@@ -6,7 +6,7 @@
 
 const { supabase } = require('../db');
 
-const VALID_ROLES  = ['phil', 'ds', 'cb', 'ce', 'admin'];
+const VALID_ROLES  = ['phil', 'dcs', 'epo', 'dol', 'ce', 'admin'];
 const MUTABLE_FIELDS = ['display_name', 'system_role', 'is_active', 'allow_both_admin_and_functional_roles'];
 
 /**

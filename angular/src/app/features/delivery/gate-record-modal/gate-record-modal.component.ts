@@ -112,7 +112,7 @@ const GATE_LABELS: Record<GateName, string> = {
               {{ statusLabel }}
             </span>
             <span *ngIf="statusLabel === 'Not Yet Active'" class="grm-status-hint">
-              Advance the Delivery Cycle through earlier stages to unlock this Gate.
+              Advance the Initiative through earlier stages to unlock this Gate.
             </span>
             <span *ngIf="record?.workstream_active_at_clearance === false"
                   class="grm-status-error">
@@ -201,7 +201,7 @@ const GATE_LABELS: Record<GateName, string> = {
 
           <!-- Not yet active — advancement guidance, no action -->
           <div *ngIf="!record && isNotYetActive" class="grm-meta">
-            Advance the Delivery Cycle through earlier stages to unlock this Gate.
+            Advance the Initiative through earlier stages to unlock this Gate.
           </div>
 
           <!-- pending / not_started — Submit for Approval (DS/CB) -->
@@ -215,7 +215,7 @@ const GATE_LABELS: Record<GateName, string> = {
                   : (resubmitMode ? 'Re-submit for Approval' : 'Submit for Approval') }}
             </button>
             <div *ngIf="!data.callerCanSubmitGates" class="grm-meta">
-              Only the assigned Domain Strategist, Capability Builder, or Phil can submit this Gate.
+              Only the assigned Domain Capability Strategist, Engineering Product Owner, Domain Outcome Lead, or Phil can submit this Gate.
             </div>
           </ng-container>
 
@@ -290,7 +290,7 @@ const GATE_LABELS: Record<GateName, string> = {
           <div class="oi-confirm-icon">⚠</div>
           <div class="oi-confirm-body">
             <div class="oi-confirm-text">
-              Approving this gate will advance the Delivery Cycle. This cannot be
+              Approving this gate will advance the Initiative. This cannot be
               undone without a stage regression.
             </div>
             <div class="grm-action-row">

@@ -37,6 +37,7 @@ import {
   WorkstreamSummaryItem,
   Division
 } from '../../../core/types/database';
+import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 @Component({
   selector:        'app-workstream-summary',
@@ -48,13 +49,13 @@ import {
 
       <!-- D-298 header zone -->
       <div class="ws-header">
-        <a routerLink="/delivery" class="ws-back-link">← Delivery Cycle Tracking</a>
+        <a routerLink="/initiatives" class="ws-back-link">← Initiative Tracking</a>
         <div class="ws-header-row">
           <h3 class="ws-title">Workstream Summary</h3>
           <button *ngIf="canCreateCycle"
                   class="ws-new-cycle"
                   (click)="onNewCycle()">
-            + New Cycle
+            + New Initiative
           </button>
         </div>
         <!-- S-015 surface description -->
@@ -310,9 +311,9 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
       ).subscribe(async profile => {
         this.currentUserId = profile.id ?? '';
         const role         = profile.system_role;
-        this.isPrivileged  = role === 'phil' || role === 'admin';
-        // Cycle creation is open to ds/cb/admin/phil per existing dashboard rules.
-        this.canCreateCycle = ['phil', 'admin', 'ds', 'cb'].includes(role);
+        this.isPrivileged  = role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN;
+        // Initiative creation open to DCS/EPO/DOL/Admin/Phil per dashboard canCreateCycle rule.
+        this.canCreateCycle = [SYSTEM_ROLES.PHIL, SYSTEM_ROLES.ADMIN, SYSTEM_ROLES.DCS, SYSTEM_ROLES.EPO, SYSTEM_ROLES.DOL].includes(role);
 
         // Contract 17 §2 / D-380: restore persisted toggle state via MCP.
         // showMyDivisionsOnly is the only persisted control on this screen
@@ -410,16 +411,16 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
   drillDown(params: { workstream_id?: string | null }): void {
     const queryParams: Record<string, string> = {};
     if (params.workstream_id) { queryParams['workstream_id'] = params.workstream_id; }
-    this.router.navigate(['/delivery/cycles'], { queryParams });
+    this.router.navigate(['/initiatives/list'], { queryParams });
   }
 
   onDivisionClick(divisionId: string): void {
-    this.router.navigate(['/delivery/cycles'], { queryParams: { division_id: divisionId } });
+    this.router.navigate(['/initiatives/list'], { queryParams: { division_id: divisionId } });
   }
 
   /** D-HubCreate-2026-04-06: + New Cycle navigates to dashboard with new=true. */
   onNewCycle(): void {
-    this.router.navigate(['/delivery/cycles'], { queryParams: { new: 'true' } });
+    this.router.navigate(['/initiatives/list'], { queryParams: { new: 'true' } });
   }
 
   trackByWsId(_: number, ws: WorkstreamSummaryItem): string {

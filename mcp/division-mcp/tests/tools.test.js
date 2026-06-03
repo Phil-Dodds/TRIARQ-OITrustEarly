@@ -63,7 +63,7 @@ describe('create_division', () => {
 
   test('error path: non-admin caller is rejected with explanation', async () => {
     // The tool fetches caller from DB — mock returns a ds-role user
-    const dsUser = { id: ADMIN_ID, system_role: 'ds', is_active: true };
+    const dsUser = { id: ADMIN_ID, system_role: 'dcs', is_active: true };
     // We need to inject the mock. Since db.js uses module-level singleton,
     // we test the validation logic directly here.
     const result = { success: false, error: 'Creating Divisions requires Admin role. Your current role does not have this permission. Contact your System Admin to request access.' };
@@ -152,11 +152,11 @@ describe('create_user', () => {
   test('error path: missing required fields', async () => {
     const { create_user } = require('../src/tools/create_user');
 
-    const noEmail = await create_user({ display_name: 'Test', system_role: 'ds' }, ADMIN_ID);
+    const noEmail = await create_user({ display_name: 'Test', system_role: 'dcs' }, ADMIN_ID);
     assert.equal(noEmail.success, false);
     assert.ok(noEmail.error.includes('email'));
 
-    const noName = await create_user({ email: 'x@x.com', system_role: 'ds' }, ADMIN_ID);
+    const noName = await create_user({ email: 'x@x.com', system_role: 'dcs' }, ADMIN_ID);
     assert.equal(noName.success, false);
     assert.ok(noName.error.includes('display_name'));
 

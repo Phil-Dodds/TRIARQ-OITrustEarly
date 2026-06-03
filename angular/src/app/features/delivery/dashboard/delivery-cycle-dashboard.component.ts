@@ -63,6 +63,7 @@ import {
   GateStateMap
 } from '../../../core/types/database';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
+import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -111,15 +112,15 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
 
       <!-- Row 1 — Page identity: back link | rule | title | surface description -->
       <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;">
-        <a routerLink="/delivery"
+        <a routerLink="/initiatives"
            style="font-size:13px;color:#257099;text-decoration:none;padding-top:7px;flex-shrink:0;">
-          ← Delivery Cycle Tracking
+          ← Initiative Tracking
         </a>
         <span style="border-left:1px solid #ddd;height:16px;align-self:center;margin:0 4px;flex-shrink:0;"></span>
-        <span style="font-size:26px;font-weight:400;color:#1a1a1a;white-space:nowrap;flex-shrink:0;">Delivery Cycles</span>
+        <span style="font-size:26px;font-weight:400;color:#1a1a1a;white-space:nowrap;flex-shrink:0;">Initiatives</span>
         <!-- S-015 / D-288: surface description. Source: Contract 6 Step 4.1. -->
         <span style="font-size:12px;font-style:italic;color:#777;flex:1;padding-top:8px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          Track and manage delivery cycles across your divisions and workstreams.
+          Track and manage Initiatives across your divisions and workstreams.
         </span>
       </div>
 
@@ -133,12 +134,12 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
             <div style="font-size:28px;font-weight:300;color:#257099;line-height:1.1;">{{ activeCycleCount }}</div>
             <div style="font-size:12px;color:#888;">Active Cycles</div>
           </div>
-          <!-- My Cycles — hidden at zero, tappable → Assigned Person filter -->
+          <!-- My Initiatives — hidden at zero, tappable → Assigned Person filter -->
           <div *ngIf="myCyclesCount > 0"
                (click)="onMyCyclesTap()"
                style="background:#fff;border:1px solid #E8E8E8;border-radius:8px;padding:8px 16px 10px;cursor:pointer;">
             <div style="font-size:28px;font-weight:300;color:#257099;line-height:1.1;">{{ myCyclesCount }}</div>
-            <div style="font-size:12px;color:#888;">My Cycles</div>
+            <div style="font-size:12px;color:#888;">My Initiatives</div>
           </div>
           <!-- Overdue Gates — hidden at zero, tappable → Gate Status filter -->
           <div *ngIf="overdueGateCount > 0"
@@ -180,12 +181,12 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
             Gate Status: {{ filterGateStatus === 'overdue' ? 'Overdue' : filterGateStatus === 'pending' ? 'Pending' : 'Approved' }}
             <button (click)="filterGateStatus='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
           </span>
-          <!-- D-277: chip shows Me / Unassigned DS / Unassigned CB / person name. CC-Decision-2026-04-12-F. -->
+          <!-- D-277: chip shows Me / Unassigned DCS / EPO / DOL / person name. -->
           <span *ngIf="filterAssignedPerson"
                 style="display:inline-flex;align-items:center;gap:4px;background:#fff;
                        border:1.5px solid #257099;color:#257099;border-radius:999px;
                        padding:4px 12px;font-size:13px;white-space:nowrap;">
-            Assigned: {{ filterAssignedPerson === 'me' ? 'Me' : filterAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : filterAssignedPerson === 'unassigned_cb' ? 'Unassigned CB' : personDisplayName(filterAssignedPerson) }}
+            Assigned: {{ assignedPersonChipLabel(filterAssignedPerson) }}
             <button (click)="filterAssignedPerson='';personScope='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
           </span>
           <span *ngIf="filterDivision"
@@ -219,7 +220,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
                   style="background:#257099;color:#fff;border:none;border-radius:6px;
                          padding:8px 18px;font-size:14px;font-family:Roboto,sans-serif;
                          font-weight:500;cursor:pointer;white-space:nowrap;">
-            + New Cycle
+            + New Initiative
           </button>
         </div>
 
@@ -332,7 +333,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
               <span style="font-weight:500;">Assigned Person</span>
               <span style="display:flex;align-items:center;gap:8px;">
                 <span *ngIf="stagedAssignedPerson" style="font-size:12px;color:var(--triarq-color-primary,#257099);">
-                  {{ stagedAssignedPerson === 'me' ? 'Me' : stagedAssignedPerson === 'unassigned_ds' ? 'Unassigned DS' : stagedAssignedPerson === 'unassigned_cb' ? 'Unassigned CB' : personDisplayName(stagedAssignedPerson) }}
+                  {{ assignedPersonChipLabel(stagedAssignedPerson) }}
                 </span>
                 <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'person' ? '▲' : '▼' }}</span>
               </span>
@@ -358,14 +359,19 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
                   Me
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" name="personScopeRadio" [value]="'unassigned_ds_terminal'" [(ngModel)]="personScope"
-                         (change)="stagedAssignedPerson='unassigned_ds'" />
-                  Unassigned DS
+                  <input type="radio" name="personScopeRadio" [value]="'unassigned_dcs_terminal'" [(ngModel)]="personScope"
+                         (change)="stagedAssignedPerson='unassigned_dcs'" />
+                  Unassigned DCS
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" name="personScopeRadio" [value]="'unassigned_cb_terminal'" [(ngModel)]="personScope"
-                         (change)="stagedAssignedPerson='unassigned_cb'" />
-                  Unassigned CB
+                  <input type="radio" name="personScopeRadio" [value]="'unassigned_epo_terminal'" [(ngModel)]="personScope"
+                         (change)="stagedAssignedPerson='unassigned_epo'" />
+                  Unassigned EPO
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                  <input type="radio" name="personScopeRadio" [value]="'unassigned_dol_terminal'" [(ngModel)]="personScope"
+                         (change)="stagedAssignedPerson='unassigned_dol'" />
+                  Unassigned DOL
                 </label>
               </div>
               <!-- Person list: renders when Normal or Bigger scope selected -->
@@ -573,7 +579,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
       <div *ngIf="loadError && !loading"
            style="padding:var(--triarq-space-md);max-width:600px;">
         <div style="color:var(--triarq-color-error);font-weight:500;margin-bottom:4px;">
-          Delivery Cycles could not load.
+          Initiatives could not load.
         </div>
         <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
           {{ loadError }}
@@ -683,16 +689,16 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
             </div>
           </div>
 
-          <!-- Col 6: Team — CB / Workstream / DS stacked chips. D-265: null values collapse. -->
+          <!-- Col 6: Team — EPO / Workstream / DCS / DOL stacked chips. D-265, D-389/D-390/D-391: null values collapse. -->
           <div style="overflow:hidden;padding-top:4px;display:flex;flex-direction:column;gap:3px;"
                (click)="$event.stopPropagation()">
-            <span *ngIf="cycle.assigned_cb_display_name"
+            <span *ngIf="cycle.assigned_epo_display_name"
                   style="display:inline-block;padding:2px 6px;border-radius:4px;
                          background:rgba(37,112,153,0.08);color:#257099;font-size:11px;
                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
                          max-width:100px;"
-                  title="CB: {{ cycle.assigned_cb_display_name }}">
-              {{ cycle.assigned_cb_display_name }}
+                  title="EPO: {{ cycle.assigned_epo_display_name }}">
+              {{ cycle.assigned_epo_display_name }}
             </span>
             <span *ngIf="cycle.workstream?.workstream_name || workstreamName(cycle.workstream_id ?? '')"
                   style="display:inline-block;padding:2px 6px;border-radius:4px;
@@ -702,15 +708,23 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
                   title="{{ cycle.workstream?.workstream_name || workstreamName(cycle.workstream_id ?? '') }}">
               {{ cycle.workstream?.workstream_name || workstreamName(cycle.workstream_id ?? '') }}
             </span>
-            <span *ngIf="cycle.assigned_ds_display_name"
+            <span *ngIf="cycle.assigned_dcs_display_name"
                   style="display:inline-block;padding:2px 6px;border-radius:4px;
                          background:rgba(37,112,153,0.08);color:#257099;font-size:11px;
                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
                          max-width:100px;"
-                  title="DS: {{ cycle.assigned_ds_display_name }}">
-              {{ cycle.assigned_ds_display_name }}
+                  title="DCS: {{ cycle.assigned_dcs_display_name }}">
+              {{ cycle.assigned_dcs_display_name }}
             </span>
-            <span *ngIf="!cycle.assigned_cb_display_name && !cycle.workstream?.workstream_name && !cycle.workstream_id && !cycle.assigned_ds_display_name"
+            <span *ngIf="cycle.assigned_dol_display_name"
+                  style="display:inline-block;padding:2px 6px;border-radius:4px;
+                         background:rgba(37,112,153,0.08);color:#257099;font-size:11px;
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                         max-width:100px;"
+                  title="DOL: {{ cycle.assigned_dol_display_name }}">
+              {{ cycle.assigned_dol_display_name }}
+            </span>
+            <span *ngIf="!cycle.assigned_epo_display_name && !cycle.workstream?.workstream_name && !cycle.workstream_id && !cycle.assigned_dcs_display_name && !cycle.assigned_dol_display_name"
                   style="color:#9E9E9E;font-style:italic;font-size:11px;">—</span>
           </div>
 
@@ -739,22 +753,22 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
             </div>
           </ng-container>
 
-          <!-- State 2: Has Division, no cycles -->
+          <!-- State 2: Has Division, no Initiatives -->
           <ng-container *ngIf="hasDivision && cycles.length === 0">
             <div style="font-weight:500;color:var(--triarq-color-text-primary);margin-bottom:6px;">
-              No active Delivery Cycles in your Divisions
+              No active Initiatives in your Divisions
             </div>
             <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
                         max-width:400px;line-height:1.6;">
-              <span *ngIf="canCreateCycle">Use "+ New Cycle" above to create the first one.</span>
-              <span *ngIf="!canCreateCycle">No cycles have been created yet in your Divisions.</span>
+              <span *ngIf="canCreateCycle">Use "+ New Initiative" above to create the first one.</span>
+              <span *ngIf="!canCreateCycle">No Initiatives have been created yet in your Divisions.</span>
             </div>
           </ng-container>
 
-          <!-- State 3: Cycles exist but filters exclude all results -->
+          <!-- State 3: Initiatives exist but filters exclude all results -->
           <ng-container *ngIf="hasDivision && cycles.length > 0">
             <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-              No cycles match the current filters.
+              No Initiatives match the current filters.
               <span (click)="clearFilters()"
                     style="color:var(--triarq-color-primary);cursor:pointer;
                            text-decoration:underline;margin-left:4px;">
@@ -771,7 +785,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
                   font-size:var(--triarq-text-small);
                   color:var(--triarq-color-text-secondary);">
         Showing {{ filtered.length }}<span *ngIf="filtered.length < cycles.length"> of {{ cycles.length }}</span>
-        cycle{{ cycles.length === 1 ? '' : 's' }}
+        Initiative{{ cycles.length === 1 ? '' : 's' }}
         <span *ngIf="sortField"> · sorted by {{ sortLabel() }}</span>
       </div>
     </div><!-- /left panel -->
@@ -874,12 +888,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // D-277: peer options scope selector for assigned person filter.
   // '' = no option selected. 'normal'|'bigger' = scope activators. Others = terminal radio values.
   // CC-Decision-2026-04-12-F: replaces assignedPersonOptions loop. Source: Contract 5 Block 3.2.
-  personScope: '' | 'normal' | 'bigger' | 'me_terminal' | 'unassigned_ds_terminal' | 'unassigned_cb_terminal' = '';
+  personScope: '' | 'normal' | 'bigger' | 'me_terminal' | 'unassigned_dcs_terminal' | 'unassigned_epo_terminal' | 'unassigned_dol_terminal' = '';
 
   // Gate status filter: 'overdue' | 'pending' | 'approved' | ''
   filterGateStatus: string = '';
 
-  // Assigned person shortcut: 'my_cycles' | 'unassigned_ds' | 'unassigned_cb' | ''
+  // Assigned person shortcut: 'my_initiatives' | 'unassigned_dcs' | 'unassigned_epo' | 'unassigned_dol' | ''
   filterAssignedPerson: string = '';
 
   // Filter state (ngModel bindings — not reactive form controls)
@@ -892,9 +906,10 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   includeChildDivisions:    boolean = false;
   // D-173/D-175: next gate filter — computed client-side from lifecycle stage
   filterNextGate:           string  = '';
-  // D-172: Assigned DS and Assigned CB filters — client-side, derived from loaded cycles
-  filterDs:                 string  = '';
-  filterCb:                 string  = '';
+  // D-389/D-390: assigned DCS / EPO filters — client-side, derived from loaded cycles
+  filterDcs:                string  = '';
+  filterEpo:                string  = '';
+  filterDol:                string  = '';
 
   // S7: Hub summary card state — derived from loaded cycles + delivery summary
   deliverySummary: DeliverySummary | null = null;
@@ -975,8 +990,14 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       .subscribe(() => {
         const p    = this.profile.getCurrentProfile();
         const role = p?.system_role;
-        // S8: CE is read-only — can view cycles but not create them (enforced at MCP layer too).
-        this.canCreateCycle = role === 'ds' || role === 'phil' || role === 'admin' || role === 'cb';
+        // S8: CE is read-only — can view Initiatives but not create them (enforced at MCP layer too).
+        // D-389/D-390/D-391: DCS, EPO, and DOL can create alongside Phil/Admin.
+        this.canCreateCycle =
+          role === SYSTEM_ROLES.DCS ||
+          role === SYSTEM_ROLES.EPO ||
+          role === SYSTEM_ROLES.DOL ||
+          role === SYSTEM_ROLES.PHIL ||
+          role === SYSTEM_ROLES.ADMIN;
         this.checkUserDivisions();
         this.cdr.markForCheck();
       });
@@ -990,7 +1011,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     // D-170: Phil and Admin have implicit access to all Divisions — no assignment needed.
     // Skip MCP call entirely. Division filter will be populated from this.divisions
     // (loaded by loadDivisions()) via the filterDivisionOptions getter.
-    if (role === 'phil' || role === 'admin') {
+    if (role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN) {
       this.hasDivision     = true;
       this.divisionChecked = true;
       this.profile.setHasDivision(true);
@@ -1041,7 +1062,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // Other roles use only their directly-assigned divisions.
   get filterDivisionOptions(): Division[] {
     const role = this.profile.getCurrentProfile()?.system_role;
-    if (role === 'phil' || role === 'admin') {
+    if (role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN) {
       return this.divisions;
     }
     return this.userDivisions;
@@ -1261,12 +1282,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  // D-172: Unique DS options derived from loaded cycles — only show people who appear in current result set.
-  get dsFilterOptions(): { user_id: string; display_name: string }[] {
+  // D-389: Unique DCS options derived from loaded Initiatives.
+  get dcsFilterOptions(): { user_id: string; display_name: string }[] {
     const seen = new Map<string, string>();
     for (const c of this.cycles) {
-      if (c.assigned_ds_user_id && c.assigned_ds_display_name) {
-        seen.set(c.assigned_ds_user_id, c.assigned_ds_display_name);
+      if (c.assigned_dcs_user_id && c.assigned_dcs_display_name) {
+        seen.set(c.assigned_dcs_user_id, c.assigned_dcs_display_name);
       }
     }
     return Array.from(seen.entries())
@@ -1274,12 +1295,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       .sort((a, b) => a.display_name.localeCompare(b.display_name));
   }
 
-  // D-172: Unique CB options derived from loaded cycles.
-  get cbFilterOptions(): { user_id: string; display_name: string }[] {
+  // D-390: Unique EPO options derived from loaded Initiatives.
+  get epoFilterOptions(): { user_id: string; display_name: string }[] {
     const seen = new Map<string, string>();
     for (const c of this.cycles) {
-      if (c.assigned_cb_user_id && c.assigned_cb_display_name) {
-        seen.set(c.assigned_cb_user_id, c.assigned_cb_display_name);
+      if (c.assigned_epo_user_id && c.assigned_epo_display_name) {
+        seen.set(c.assigned_epo_user_id, c.assigned_epo_display_name);
       }
     }
     return Array.from(seen.entries())
@@ -1287,8 +1308,21 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       .sort((a, b) => a.display_name.localeCompare(b.display_name));
   }
 
-  /** D-277: All unique DS + CB persons across loaded cycles — deduped by user_id.
-   * Source for Assigned Person filter Bigger List. CC-Decision-2026-04-12-F.
+  // D-391: Unique DOL options derived from loaded Initiatives.
+  get dolFilterOptions(): { user_id: string; display_name: string }[] {
+    const seen = new Map<string, string>();
+    for (const c of this.cycles) {
+      if (c.assigned_dol_user_id && c.assigned_dol_display_name) {
+        seen.set(c.assigned_dol_user_id, c.assigned_dol_display_name);
+      }
+    }
+    return Array.from(seen.entries())
+      .map(([user_id, display_name]) => ({ user_id, display_name }))
+      .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  }
+
+  /** D-277/D-389/D-390/D-391: All unique DCS + EPO + DOL persons across loaded Initiatives.
+   * Source for Assigned Person filter Bigger List.
    * D-253: reads from _personListAllCache — never computes inline. Cache rebuilt in rebuildFilterCaches(). */
   get assignedPersonListAll(): { user_id: string; display_name: string; division_name?: string }[] {
     return this._personListAllCache;
@@ -1304,11 +1338,14 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   private _computePersonListAll(): { user_id: string; display_name: string; division_name?: string }[] {
     const seen = new Map<string, { user_id: string; display_name: string; division_name?: string }>();
     for (const c of this.cycles) {
-      if (c.assigned_ds_user_id && c.assigned_ds_display_name) {
-        seen.set(c.assigned_ds_user_id, { user_id: c.assigned_ds_user_id, display_name: c.assigned_ds_display_name, division_name: c.division_name ?? undefined });
+      if (c.assigned_dcs_user_id && c.assigned_dcs_display_name) {
+        seen.set(c.assigned_dcs_user_id, { user_id: c.assigned_dcs_user_id, display_name: c.assigned_dcs_display_name, division_name: c.division_name ?? undefined });
       }
-      if (c.assigned_cb_user_id && c.assigned_cb_display_name && !seen.has(c.assigned_cb_user_id)) {
-        seen.set(c.assigned_cb_user_id, { user_id: c.assigned_cb_user_id, display_name: c.assigned_cb_display_name, division_name: c.division_name ?? undefined });
+      if (c.assigned_epo_user_id && c.assigned_epo_display_name && !seen.has(c.assigned_epo_user_id)) {
+        seen.set(c.assigned_epo_user_id, { user_id: c.assigned_epo_user_id, display_name: c.assigned_epo_display_name, division_name: c.division_name ?? undefined });
+      }
+      if (c.assigned_dol_user_id && c.assigned_dol_display_name && !seen.has(c.assigned_dol_user_id)) {
+        seen.set(c.assigned_dol_user_id, { user_id: c.assigned_dol_user_id, display_name: c.assigned_dol_display_name, division_name: c.division_name ?? undefined });
       }
     }
     return Array.from(seen.values()).sort((a, b) => a.display_name.localeCompare(b.display_name));
@@ -1320,11 +1357,14 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     const seen = new Map<string, { user_id: string; display_name: string; division_name?: string }>();
     for (const c of this.cycles) {
       if (!c.division_id || !userDivisionIds.has(c.division_id)) { continue; }
-      if (c.assigned_ds_user_id && c.assigned_ds_display_name) {
-        seen.set(c.assigned_ds_user_id, { user_id: c.assigned_ds_user_id, display_name: c.assigned_ds_display_name, division_name: c.division_name ?? undefined });
+      if (c.assigned_dcs_user_id && c.assigned_dcs_display_name) {
+        seen.set(c.assigned_dcs_user_id, { user_id: c.assigned_dcs_user_id, display_name: c.assigned_dcs_display_name, division_name: c.division_name ?? undefined });
       }
-      if (c.assigned_cb_user_id && c.assigned_cb_display_name && !seen.has(c.assigned_cb_user_id)) {
-        seen.set(c.assigned_cb_user_id, { user_id: c.assigned_cb_user_id, display_name: c.assigned_cb_display_name, division_name: c.division_name ?? undefined });
+      if (c.assigned_epo_user_id && c.assigned_epo_display_name && !seen.has(c.assigned_epo_user_id)) {
+        seen.set(c.assigned_epo_user_id, { user_id: c.assigned_epo_user_id, display_name: c.assigned_epo_display_name, division_name: c.division_name ?? undefined });
+      }
+      if (c.assigned_dol_user_id && c.assigned_dol_display_name && !seen.has(c.assigned_dol_user_id)) {
+        seen.set(c.assigned_dol_user_id, { user_id: c.assigned_dol_user_id, display_name: c.assigned_dol_display_name, division_name: c.division_name ?? undefined });
       }
     }
     return Array.from(seen.values()).sort((a, b) => a.display_name.localeCompare(b.display_name));
@@ -1397,7 +1437,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
           this.loadError = '';
           this.applyFilters();
         } else {
-          this.loadError = res.error ?? 'Delivery Cycles could not be loaded.';
+          this.loadError = res.error ?? 'Initiatives could not be loaded.';
         }
         this.loading = false;
         this.cdr.markForCheck();
@@ -1424,6 +1464,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // Contract 17 §2 / D-380: screen state goes through ScreenStateService → MCP.
   // user_id is taken from the JWT at the MCP boundary — never passed from here.
   private saveScreenState(): void {
+    // Contract 17 §2 / D-380: MCP-backed signature (no userId arg; JWT at MCP boundary).
+    // Contract 18 filter renames applied.
     this.screenState.save(
       SCREEN_KEYS.DELIVERY_CYCLES,
       {
@@ -1433,8 +1475,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         filterDivision:        this.filterDivision,
         includeChildDivisions: this.includeChildDivisions,
         filterNextGate:        this.filterNextGate,
-        filterDs:              this.filterDs,
-        filterCb:              this.filterCb,
+        filterDcs:             this.filterDcs,
+        filterEpo:             this.filterEpo,
+        filterDol:             this.filterDol,
         filterGateStatus:      this.filterGateStatus,
         filterAssignedPerson:  this.filterAssignedPerson
       },
@@ -1450,6 +1493,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (this.drillDownFromQp) { return; }
     const saved = await this.screenState.restore(SCREEN_KEYS.DELIVERY_CYCLES);
     if (!saved) { return; }
+    // Contract 17 §2 / D-380: shape is { filter_state, sort_state }.
     const filter = saved.filter_state ?? {};
     const sort   = saved.sort_state   ?? {};
     if (typeof filter['filterStage']      === 'string') { this.filterStage      = filter['filterStage'] as string; }
@@ -1457,12 +1501,18 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (typeof filter['filterWorkstream'] === 'string') { this.filterWorkstream = filter['filterWorkstream'] as string; }
     if (typeof filter['filterDivision']   === 'string') { this.filterDivision   = filter['filterDivision'] as string; }
     if (typeof filter['filterNextGate']   === 'string') { this.filterNextGate   = filter['filterNextGate'] as string; }
-    if (typeof filter['filterDs']             === 'string') { this.filterDs             = filter['filterDs'] as string; }
-    if (typeof filter['filterCb']             === 'string') { this.filterCb             = filter['filterCb'] as string; }
+    if (typeof filter['filterDcs']            === 'string') { this.filterDcs            = filter['filterDcs'] as string; }
+    if (typeof filter['filterEpo']            === 'string') { this.filterEpo            = filter['filterEpo'] as string; }
+    if (typeof filter['filterDol']            === 'string') { this.filterDol            = filter['filterDol'] as string; }
     if (typeof filter['filterGateStatus']     === 'string') { this.filterGateStatus     = filter['filterGateStatus'] as string; }
-    // CC-Decision-2026-04-12-F: migrate legacy 'my_cycles' screen state to 'me'.
+    // Migrate legacy filterAssignedPerson values to D-389/D-390/D-391 vocabulary.
     if (typeof filter['filterAssignedPerson'] === 'string') {
-      this.filterAssignedPerson = filter['filterAssignedPerson'] === 'my_cycles' ? 'me' : (filter['filterAssignedPerson'] as string);
+      const legacy = filter['filterAssignedPerson'] as string;
+      this.filterAssignedPerson =
+        legacy === 'my_cycles'       ? 'me' :
+        legacy === 'unassigned_ds'   ? 'unassigned_dcs' :
+        legacy === 'unassigned_cb'   ? 'unassigned_epo' :
+        legacy;
     }
     if (typeof filter['includeChildDivisions'] === 'boolean') {
       this.includeChildDivisions = filter['includeChildDivisions'];
@@ -1497,26 +1547,34 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         if (nextGate !== this.filterNextGate) { return false; }
       }
 
-      // D-172: Assigned DS filter
-      if (this.filterDs && c.assigned_ds_user_id !== this.filterDs) { return false; }
+      // D-389: Assigned DCS filter
+      if (this.filterDcs && c.assigned_dcs_user_id !== this.filterDcs) { return false; }
 
-      // D-172: Assigned CB filter
-      if (this.filterCb && c.assigned_cb_user_id !== this.filterCb) { return false; }
+      // D-390: Assigned EPO filter
+      if (this.filterEpo && c.assigned_epo_user_id !== this.filterEpo) { return false; }
 
-      // D-HubFilter-2026-04-06 / D-277: Assigned Person filter.
-      // CC-Decision-2026-04-12-F: 'my_cycles' renamed to 'me'. UUID = specific person (DS or CB).
+      // D-391: Assigned DOL filter
+      if (this.filterDol && c.assigned_dol_user_id !== this.filterDol) { return false; }
+
+      // D-HubFilter-2026-04-06 / D-277 / D-391: Assigned Person filter.
+      // 'me' = cycles where caller is DCS, EPO, or DOL. UUID = specific person across the same three roles.
       if (this.filterAssignedPerson) {
         const userId = this.profile.getCurrentProfile()?.id ?? '';
         if (this.filterAssignedPerson === 'me') {
-          if (c.assigned_ds_user_id !== userId && c.assigned_cb_user_id !== userId) { return false; }
-        } else if (this.filterAssignedPerson === 'unassigned_ds') {
-          if (c.assigned_ds_user_id) { return false; }
-        } else if (this.filterAssignedPerson === 'unassigned_cb') {
-          if (c.assigned_cb_user_id) { return false; }
+          if (c.assigned_dcs_user_id !== userId &&
+              c.assigned_epo_user_id !== userId &&
+              c.assigned_dol_user_id !== userId) { return false; }
+        } else if (this.filterAssignedPerson === 'unassigned_dcs') {
+          if (c.assigned_dcs_user_id) { return false; }
+        } else if (this.filterAssignedPerson === 'unassigned_epo') {
+          if (c.assigned_epo_user_id) { return false; }
+        } else if (this.filterAssignedPerson === 'unassigned_dol') {
+          if (c.assigned_dol_user_id) { return false; }
         } else {
-          // UUID: filter to cycles where that person is DS or CB. D-277.
-          if (c.assigned_ds_user_id !== this.filterAssignedPerson &&
-              c.assigned_cb_user_id !== this.filterAssignedPerson) { return false; }
+          // UUID: filter to cycles where that person is DCS, EPO, or DOL.
+          if (c.assigned_dcs_user_id !== this.filterAssignedPerson &&
+              c.assigned_epo_user_id !== this.filterAssignedPerson &&
+              c.assigned_dol_user_id !== this.filterAssignedPerson) { return false; }
         }
       }
 
@@ -1576,8 +1634,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterWorkstream      = '';
     this.activeWorkstreamTab   = '';
     this.filterNextGate        = '';
-    this.filterDs              = '';
-    this.filterCb              = '';
+    this.filterDcs             = '';
+    this.filterEpo             = '';
+    this.filterDol             = '';
     // Division filter requires server reload — not cleared here.
     // Division is intentionally NOT cleared by "Clear filters" (it's a scope selection).
     this.applyFilters();
@@ -1588,13 +1647,26 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterTier            = '';
     this.filterWorkstream      = '';
     this.filterNextGate        = '';
-    this.filterDs              = '';
-    this.filterCb              = '';
+    this.filterDcs             = '';
+    this.filterEpo             = '';
+    this.filterDol             = '';
     this.filterGateStatus      = '';
     this.filterAssignedPerson  = '';
     this.filterDivision        = '';
     this.includeChildDivisions = false;
     this.loadCycles();
+  }
+
+  // D-389/D-390/D-391: Chip label for the Assigned Person filter — covers Me, the three
+  // role-specific "Unassigned" terminals, and named person UUIDs (looked up via personDisplayName).
+  assignedPersonChipLabel(value: string): string {
+    switch (value) {
+      case 'me':              return 'Me';
+      case 'unassigned_dcs':  return 'Unassigned DCS';
+      case 'unassigned_epo':  return 'Unassigned EPO';
+      case 'unassigned_dol':  return 'Unassigned DOL';
+      default:                return this.personDisplayName(value);
+    }
   }
 
   setSort(field: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification'): void {
@@ -1678,13 +1750,15 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   // ── Getters and helpers added in view correction session 2026-04-09-D ──────────────
 
-  /** My Cycles count — active cycles where current user is DS or CB. Source: D-HubCounts-2026-04-06. */
+  /** My Initiatives count — active Initiatives where caller is DCS, EPO, or DOL. D-391. */
   get myCyclesCount(): number {
     const userId = this.profile.getCurrentProfile()?.id;
     if (!userId) { return 0; }
     return this.cycles.filter(c =>
       !this.TERMINAL_STAGES.includes(c.current_lifecycle_stage) &&
-      (c.assigned_ds_user_id === userId || c.assigned_cb_user_id === userId)
+      (c.assigned_dcs_user_id === userId ||
+       c.assigned_epo_user_id === userId ||
+       c.assigned_dol_user_id === userId)
     ).length;
   }
 
@@ -1782,8 +1856,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  /** Count card tap: My Cycles — sets assigned person filter, does NOT persist to memory. Source: D-HubCounts-2026-04-06. */
-  // CC-Decision-2026-04-12-F: 'my_cycles' renamed to 'me'. Source: Contract 5 Block 3.2.
+  /** Count card tap: My Initiatives — sets assigned person filter, does NOT persist to memory. */
   onMyCyclesTap(): void {
     this.filterAssignedPerson = 'me';
     this.applyFilters(false);
@@ -1876,8 +1949,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     const stage = cycle.current_lifecycle_stage;
 
     // Rule 1: terminal states
-    if (stage === 'COMPLETE')  { return 'Cycle complete'; }
-    if (stage === 'CANCELLED') { return 'Cycle cancelled'; }
+    if (stage === 'COMPLETE')  { return 'Initiative complete'; }
+    if (stage === 'CANCELLED') { return 'Initiative cancelled'; }
     if (stage === 'ON_HOLD')   { return 'On hold'; }
 
     // Rule 2: blocked gate (workstream inactive)

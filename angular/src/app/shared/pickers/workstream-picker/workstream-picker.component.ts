@@ -10,7 +10,7 @@
 // - Pre-selects current workstream row if one is already set on the cycle
 // - OK: emits selected workstream; Cancel: emits null
 //
-// Inactive Workstreams are NOT selectable in the Delivery Cycle workflow (D-165, ARCH-23).
+// Inactive Workstreams are NOT selectable in the Initiative workflow (D-165, ARCH-23).
 // They are shown (when toggle is on) so the user can see why the previous selection may be blocked.
 //
 // D-93: No direct Supabase access — calls DeliveryService which calls MCP.

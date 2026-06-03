@@ -1,30 +1,30 @@
 // update_delivery_cycle.js
 // Pathways OI Trust — delivery-cycle-mcp
-// Updates mutable fields on an existing Delivery Cycle.
+// Updates mutable fields on an existing Initiative (D-392).
 // All supplied fields are written; omitted fields are not changed.
 // Logs a field_edit event per D-229 for every changed field.
 //
-// CC-Decision-2026-04-10-D: Net-new tool built in Contract 2 (2026-04-10) —
-//   not a correction to an existing tool. Required for the Edit Cycle surface.
-//   The individual-field tools (set_outcome_statement, assign_ds_cb_to_cycle)
-//   remain for their specific use cases; this tool is the Edit surface save path.
+// The individual-field tools (set_outcome_statement, assign_roles_to_cycle)
+// remain for their specific use cases; this tool is the Edit surface save path.
 //
-// Source: build-c-spec Section 4 (update_delivery_cycle contract), D-229, Contract 2 2026-04-10
+// Source: D-229, D-389, D-390, D-391, D-393.
 
 'use strict';
 
 const { supabase } = require('../db');
 
+const VALID_TIERS = ['tier_1', 'tier_2', 'tier_3'];
+
 // Mutable fields accepted by this tool and their display labels for event log.
-// Source: delivery-cycle-detail-panel-spec-2026-04-09.md Section 2.3
 const MUTABLE_FIELD_LABELS = {
-  cycle_title:             'Delivery Cycle Title',
+  cycle_title:             'Initiative Title',
   division_id:             'Division',
   outcome_statement:       'Outcome Statement',
   workstream_id:           'Delivery Workstream',
   tier_classification:     'Tier Classification',
-  assigned_ds_user_id:     'Assigned Domain Strategist',
-  assigned_cb_user_id:     'Assigned Capability Builder',
+  assigned_dcs_user_id:    'Assigned Domain Capability Strategist',
+  assigned_epo_user_id:    'Assigned Engineering Product Owner',
+  assigned_dol_user_id:    'Assigned Domain Outcome Lead',
   jira_epic_key:           'Jira Epic Link'
 };
 
@@ -36,8 +36,9 @@ const MUTABLE_FIELD_LABELS = {
  * @param {string|null} [params.outcome_statement]    — Optional; null clears the field
  * @param {string|null} [params.workstream_id]        — Optional; null clears the field (D-165)
  * @param {string}  [params.tier_classification]      — Optional; 'tier_1'|'tier_2'|'tier_3'
- * @param {string|null} [params.assigned_ds_user_id]  — Optional; null clears (D-174)
- * @param {string|null} [params.assigned_cb_user_id]  — Optional; null clears (D-174)
+ * @param {string|null} [params.assigned_dcs_user_id] — Optional; null clears (D-389)
+ * @param {string|null} [params.assigned_epo_user_id] — Optional; null clears (D-390)
+ * @param {string|null} [params.assigned_dol_user_id] — Optional; null clears (D-391)
  * @param {string|null} [params.jira_epic_key]        — Optional; null clears the field
  * @param {string} caller_user_id - from JWT
  */
@@ -65,25 +66,25 @@ async function update_delivery_cycle(params, caller_user_id) {
   }
 
   if (fields.tier_classification !== undefined) {
-    if (!['tier_1', 'tier_2', 'tier_3'].includes(fields.tier_classification)) {
+    if (!VALID_TIERS.includes(fields.tier_classification)) {
       return { success: false, error: 'tier_classification must be one of: tier_1, tier_2, tier_3.' };
     }
   }
 
-  // ── Fetch current cycle record ─────────────────────────────────────────────
+  // ── Fetch current Initiative record ────────────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, cycle_status, division_id, workstream_id, tier_classification, outcome_statement, assigned_ds_user_id, assigned_cb_user_id, jira_epic_key')
+    .select('delivery_cycle_id, cycle_title, cycle_status, division_id, workstream_id, tier_classification, outcome_statement, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, jira_epic_key')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
 
   if (cycleErr || !cycle) {
-    return { success: false, error: 'Delivery Cycle not found or has been deleted.' };
+    return { success: false, error: 'Initiative not found or has been deleted.' };
   }
 
   if (cycle.cycle_status === 'cancelled') {
-    return { success: false, error: 'This Delivery Cycle is cancelled. Un-cancel it before making edits.' };
+    return { success: false, error: 'This Initiative is cancelled. Un-cancel it before making edits.' };
   }
 
   // ── Verify foreign key references (if supplied) ────────────────────────────
@@ -111,28 +112,27 @@ async function update_delivery_cycle(params, caller_user_id) {
     }
   }
 
-  if (fields.assigned_ds_user_id) {
-    const { data: ds, error: dsErr } = await supabase
+  async function verifyAssignedUserOrFail(userId, paramName) {
+    if (!userId) { return null; }
+    const { data: user, error: userErr } = await supabase
       .from('users')
       .select('id')
-      .eq('id', fields.assigned_ds_user_id)
+      .eq('id', userId)
       .is('deleted_at', null)
       .single();
-    if (dsErr || !ds) {
-      return { success: false, error: 'assigned_ds_user_id not found or has been deleted.' };
+    if (userErr || !user) {
+      return { success: false, error: `${paramName} not found or has been deleted.` };
     }
+    return null;
   }
 
-  if (fields.assigned_cb_user_id) {
-    const { data: cb, error: cbErr } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', fields.assigned_cb_user_id)
-      .is('deleted_at', null)
-      .single();
-    if (cbErr || !cb) {
-      return { success: false, error: 'assigned_cb_user_id not found or has been deleted.' };
-    }
+  const assigneeFailure = (
+    await verifyAssignedUserOrFail(fields.assigned_dcs_user_id, 'assigned_dcs_user_id') ||
+    await verifyAssignedUserOrFail(fields.assigned_epo_user_id, 'assigned_epo_user_id') ||
+    await verifyAssignedUserOrFail(fields.assigned_dol_user_id, 'assigned_dol_user_id')
+  );
+  if (assigneeFailure) {
+    return assigneeFailure;
   }
 
   // ── Build update payload — only supplied mutable fields ───────────────────
@@ -160,7 +160,7 @@ async function update_delivery_cycle(params, caller_user_id) {
     .single();
 
   if (updateErr) {
-    return { success: false, error: `Failed to update Delivery Cycle: ${updateErr.message}` };
+    return { success: false, error: `Failed to update Initiative: ${updateErr.message}` };
   }
 
   // ── Log field_edit event per D-229 ────────────────────────────────────────

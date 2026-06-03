@@ -32,7 +32,7 @@ async function get_delivery_cycle(params, caller_user_id) {
     .single();
 
   if (cycleErr || !cycle) {
-    return { success: false, error: 'Delivery Cycle not found or has been deleted.' };
+    return { success: false, error: 'Initiative not found or has been deleted.' };
   }
 
   // ── Fetch milestone dates ─────────────────────────────────────────────────
@@ -107,10 +107,11 @@ async function get_delivery_cycle(params, caller_user_id) {
     .is('deleted_at', null)
     .order('attached_at', { ascending: true });
 
-  // ── Resolve DS / CB display names + caller role ───────────────────────────
+  // ── Resolve DCS / EPO / DOL display names + caller role ───────────────────
   const userIdsToResolve = [
-    cycle.assigned_ds_user_id,
-    cycle.assigned_cb_user_id,
+    cycle.assigned_dcs_user_id,
+    cycle.assigned_epo_user_id,
+    cycle.assigned_dol_user_id,
     caller_user_id
   ].filter(Boolean);
 
@@ -130,12 +131,13 @@ async function get_delivery_cycle(params, caller_user_id) {
     }
   }
 
-  // ── Supplement Section 1: compute gate authority per gate for the caller ──
-  const isPhil       = callerRole === 'phil';
-  const isAssignedDs = cycle.assigned_ds_user_id === caller_user_id;
-  const isAssignedCb = cycle.assigned_cb_user_id === caller_user_id;
-  // Caller can submit if they are Phil, the assigned DS, or the assigned CB
-  const callerCanSubmitAny = isPhil || isAssignedDs || isAssignedCb;
+  // ── Compute gate authority per gate for the caller (D-389/D-390/D-391) ────
+  const isPhil        = callerRole === 'phil';
+  const isAssignedDcs = cycle.assigned_dcs_user_id === caller_user_id;
+  const isAssignedEpo = cycle.assigned_epo_user_id === caller_user_id;
+  const isAssignedDol = cycle.assigned_dol_user_id === caller_user_id;
+  // Caller can submit if they are Phil, or the assigned DCS, EPO, or DOL on this Initiative.
+  const callerCanSubmitAny = isPhil || isAssignedDcs || isAssignedEpo || isAssignedDol;
 
   // Resolve submitter display names for gate records that have submitted_by_user_id (D-345).
   const submitterIds = (gate_records || [])
@@ -174,10 +176,13 @@ async function get_delivery_cycle(params, caller_user_id) {
     success: true,
     data: {
       ...cycle,
-      division_name:            cycle_division_name,
-      display_name_short:       cycle_division_display_name_short,
-      assigned_ds_display_name: cycle.assigned_ds_user_id ? (userMap[cycle.assigned_ds_user_id] ?? null) : null,
-      assigned_cb_display_name: cycle.assigned_cb_user_id ? (userMap[cycle.assigned_cb_user_id] ?? null) : null,
+      // Contract 17 UAT Bug 2 fix: include division_name + display_name_short.
+      division_name:             cycle_division_name,
+      display_name_short:        cycle_division_display_name_short,
+      // D-389/D-390/D-391: DCS / EPO / DOL display names from joined user map.
+      assigned_dcs_display_name: cycle.assigned_dcs_user_id ? (userMap[cycle.assigned_dcs_user_id] ?? null) : null,
+      assigned_epo_display_name: cycle.assigned_epo_user_id ? (userMap[cycle.assigned_epo_user_id] ?? null) : null,
+      assigned_dol_display_name: cycle.assigned_dol_user_id ? (userMap[cycle.assigned_dol_user_id] ?? null) : null,
       milestone_dates:  milestone_dates       || [],
       gate_records:     enrichedGateRecords,
       workstream:       workstream ? { ...workstream, home_division_name } : null,

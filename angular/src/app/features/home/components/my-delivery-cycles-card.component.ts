@@ -1,7 +1,7 @@
 // my-delivery-cycles-card.component.ts
-// Home screen card — My Delivery Cycles summary.
-// Shows active cycles where the current user is the assigned DS or CB (assigned_to_current_user).
-// Build C supplement: uses assigned_to_current_user filter to scope to this user's own cycles.
+// Home screen card — My Initiatives summary (D-392).
+// Shows active Initiatives where the caller is the assigned DCS, EPO, or DOL (D-391).
+// Server scopes via assigned_to_current_user.
 // D-93: DeliveryService only — no direct Supabase.
 // Rule 2: Presentation only.
 
@@ -56,7 +56,7 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
     <div class="oi-card oi-home-card">
       <div style="display:flex;align-items:center;justify-content:space-between;
                   margin-bottom:var(--triarq-space-md);">
-        <h4 style="margin:0;font-size:var(--triarq-text-h4);">My Delivery Cycles</h4>
+        <h4 style="margin:0;font-size:var(--triarq-text-h4);">My Initiatives</h4>
       </div>
 
       <!-- D-178 Tier 1: Skeleton for initial load -->
@@ -75,7 +75,7 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
                   border-radius:0 6px 6px 0;padding:var(--triarq-space-xs) var(--triarq-space-sm);
                   font-size:var(--triarq-text-small);font-weight:500;
                   margin-bottom:var(--triarq-space-sm);">
-        ⚠ {{ attentionCount }} cycle{{ attentionCount === 1 ? '' : 's' }} need{{ attentionCount === 1 ? 's' : '' }} attention
+        ⚠ {{ attentionCount }} Initiative{{ attentionCount === 1 ? '' : 's' }} need{{ attentionCount === 1 ? 's' : '' }} attention
       </div>
 
       <!-- Active cycle list — S6: next gate + target date + tier badge per row -->
@@ -87,7 +87,7 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
           <!-- Row 1: cycle title + stage badge + tier badge + attention indicator -->
           <div style="display:flex;align-items:center;gap:var(--triarq-space-xs);
                       margin-bottom:2px;flex-wrap:wrap;">
-            <a [routerLink]="['/delivery', cycle.delivery_cycle_id]"
+            <a [routerLink]="['/initiatives', cycle.delivery_cycle_id]"
                style="color:var(--triarq-color-text-primary);text-decoration:none;
                       font-weight:500;font-size:var(--triarq-text-small);
                       flex:1;min-width:0;
@@ -138,21 +138,21 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
       <!-- Empty state -->
       <div *ngIf="!loading && activeCycles.length === 0"
            style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-        No active cycles assigned to you.
-        <a routerLink="/delivery/cycles"
+        No active Initiatives assigned to you.
+        <a routerLink="/initiatives/list"
            style="display:block;margin-top:var(--triarq-space-xs);
                   color:var(--triarq-color-primary);text-decoration:none;">
-          + Start a Delivery Cycle
+          + Start an Initiative
         </a>
       </div>
 
-      <!-- Footer: "View all [N] cycles →" (S6) -->
+      <!-- Footer: "View all [N] Initiatives →" -->
       <div style="margin-top:var(--triarq-space-sm);padding-top:var(--triarq-space-xs);
                   border-top:1px solid var(--triarq-color-border);">
-        <a routerLink="/delivery"
+        <a routerLink="/initiatives"
            style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                   text-decoration:none;">
-          View all {{ totalActive > 0 ? totalActive + ' ' : '' }}cycle{{ totalActive === 1 ? '' : 's' }} →
+          View all {{ totalActive > 0 ? totalActive + ' ' : '' }}Initiative{{ totalActive === 1 ? '' : 's' }} →
         </a>
       </div>
     </div>

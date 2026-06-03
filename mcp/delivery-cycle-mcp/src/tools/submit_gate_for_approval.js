@@ -1,17 +1,16 @@
 // submit_gate_for_approval.js
 // Pathways OI Trust — delivery-cycle-mcp
 // Submits a gate for approval. Validates workstream assignment, active_status,
-// DS assignment (brief_review gate), and CB assignment (go_to_build gate).
+// DCS assignment, DOL assignment (brief_review), and EPO assignment (go_to_build).
 //
 // D-165: Workstream must be assigned before any gate can be submitted.
 //   At brief_review: cycle has no workstream → blocked with assignment instruction.
-//   At all subsequent gates: workstream must also be assigned (invariant after brief_review clears).
+//   At all subsequent gates: workstream must also be assigned.
 //
-// CC-006 (Session 2026-04-04):
-//   brief_review gate: assigned_ds_user_id must be non-null. DS is accountable for the cycle
-//     through delivery — having no DS named at brief review means there is no accountable party.
-//   go_to_build gate: assigned_cb_user_id must be non-null. CB is accountable for the build
-//     phase — must be named before the cycle enters BUILD.
+// D-389/D-390/D-391:
+//   brief_review gate: assigned_dcs_user_id AND assigned_dol_user_id must both be non-null.
+//     DCS is accountable for the Initiative through delivery; DOL is accountable for the outcome.
+//   go_to_build gate: assigned_epo_user_id must be non-null. EPO is accountable for the build phase.
 //
 // ARCH-23: If workstream inactive at gate time: gate_status = 'blocked',
 //   workstream_active_at_clearance = false recorded.
@@ -19,8 +18,7 @@
 //   submitted_at = now() and submitted_by_user_id = JWT identity recorded.
 //   workstream_active_at_clearance = true recorded.
 // Appends event log entry in all cases.
-// Source: D-140, D-165, D-345, ARCH-23, CC-006,
-//   build-c-spec Section 4.1–4.2, supplement Section 1,
+// Source: D-140, D-165, D-345, ARCH-23, D-389, D-390, D-391,
 //   gate-submission-flow-spec-2026-04-19 §3.1.
 
 'use strict';
@@ -61,20 +59,19 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
-  // ── Fetch cycle ────────────────────────────────────────────────────────────
+  // ── Fetch Initiative ──────────────────────────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, workstream_id, current_lifecycle_stage, assigned_ds_user_id, assigned_cb_user_id')
+    .select('delivery_cycle_id, cycle_title, workstream_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
 
   if (cycleErr || !cycle) {
-    return { success: false, error: 'Delivery Cycle not found or has been deleted.' };
+    return { success: false, error: 'Initiative not found or has been deleted.' };
   }
 
-  // ── Supplement Section 1: caller must be Phil, the assigned DS, or the assigned CB ──
-  // Also fetch display_name for event_description (gate-submission-flow-spec §3.1).
+  // ── Submission authority: Phil, DCS, EPO, or DOL on this Initiative (D-389/D-390/D-391) ──
   const { data: caller } = await supabase
     .from('users')
     .select('system_role, display_name')
@@ -85,15 +82,16 @@ async function submit_gate_for_approval(params, caller_user_id) {
   const callerRole         = caller?.system_role ?? '';
   const callerDisplayName  = caller?.display_name ?? 'A user';
   const gateNameDisplay    = GATE_NAME_DISPLAY[gate_name] ?? gate_name;
-  const isPhil       = callerRole === 'phil';
-  const isAssignedDs = cycle.assigned_ds_user_id === caller_user_id;
-  const isAssignedCb = cycle.assigned_cb_user_id === caller_user_id;
+  const isPhil        = callerRole === 'phil';
+  const isAssignedDcs = cycle.assigned_dcs_user_id === caller_user_id;
+  const isAssignedEpo = cycle.assigned_epo_user_id === caller_user_id;
+  const isAssignedDol = cycle.assigned_dol_user_id === caller_user_id;
 
-  if (!isPhil && !isAssignedDs && !isAssignedCb) {
+  if (!isPhil && !isAssignedDcs && !isAssignedEpo && !isAssignedDol) {
     return {
       success: false,
       error: 'You do not have authority to submit this gate for approval. ' +
-             'Only the assigned Domain Strategist, the assigned Capability Builder, or Phil can submit gates.'
+             'Only the assigned Domain Capability Strategist, Engineering Product Owner, Domain Outcome Lead, or Phil can submit gates.'
     };
   }
 
@@ -108,56 +106,76 @@ async function submit_gate_for_approval(params, caller_user_id) {
       .insert({
         delivery_cycle_id,
         event_type:        'gate_blocked',
-        event_description: `Gate '${gate_name}' blocked: no Workstream is assigned to this cycle.`,
+        event_description: `Gate '${gate_name}' blocked: no Workstream is assigned to this Initiative.`,
         actor_user_id:     caller_user_id,
         event_metadata:    { gate_name, reason: 'no_workstream_assigned' }
       });
 
     return {
       success: false,
-      error: `Cannot submit ${gateLabel} gate — this cycle has no Workstream assigned. ` +
+      error: `Cannot submit ${gateLabel} gate — this Initiative has no Workstream assigned. ` +
              `Assign a Workstream before submitting for approval. ` +
-             `An Admin or DS user can update the cycle's Workstream.`
+             `An Admin or DCS can update the Initiative's Workstream.`
     };
   }
 
-  // ── CC-006: DS required before brief_review gate ──────────────────────────
-  if (gate_name === 'brief_review' && !cycle.assigned_ds_user_id) {
+  // ── D-389: DCS required before brief_review gate ──────────────────────────
+  if (gate_name === 'brief_review' && !cycle.assigned_dcs_user_id) {
     await supabase
       .from('cycle_event_log')
       .insert({
         delivery_cycle_id,
         event_type:        'gate_blocked',
-        event_description: `Gate 'brief_review' blocked: no Delivery Specialist is assigned to this cycle.`,
+        event_description: `Gate 'brief_review' blocked: no Domain Capability Strategist is assigned to this Initiative.`,
         actor_user_id:     caller_user_id,
-        event_metadata:    { gate_name, reason: 'no_ds_assigned' }
+        event_metadata:    { gate_name, reason: 'no_dcs_assigned' }
       });
 
     return {
       success: false,
-      error: `Cannot submit Brief Review gate — no Delivery Specialist is assigned to this cycle. ` +
-             `A DS must be named before Brief Review can proceed. ` +
-             `An Admin or Phil can assign a DS using the cycle's edit panel.`
+      error: `Cannot submit Brief Review gate — no Domain Capability Strategist is assigned to this Initiative. ` +
+             `A DCS must be named before Brief Review can proceed. ` +
+             `An Admin or Phil can assign a DCS using the Initiative's edit panel.`
     };
   }
 
-  // ── CC-006: CB required before go_to_build gate ───────────────────────────
-  if (gate_name === 'go_to_build' && !cycle.assigned_cb_user_id) {
+  // ── D-391: DOL required before brief_review gate ──────────────────────────
+  if (gate_name === 'brief_review' && !cycle.assigned_dol_user_id) {
     await supabase
       .from('cycle_event_log')
       .insert({
         delivery_cycle_id,
         event_type:        'gate_blocked',
-        event_description: `Gate 'go_to_build' blocked: no Capability Builder is assigned to this cycle.`,
+        event_description: `Gate 'brief_review' blocked: no Domain Outcome Lead is assigned to this Initiative.`,
         actor_user_id:     caller_user_id,
-        event_metadata:    { gate_name, reason: 'no_cb_assigned' }
+        event_metadata:    { gate_name, reason: 'no_dol_assigned' }
       });
 
     return {
       success: false,
-      error: `Cannot submit Go to Build gate — no Capability Builder is assigned to this cycle. ` +
-             `A CB must be named before this cycle enters the BUILD phase. ` +
-             `An Admin or Phil can assign a CB using the cycle's edit panel.`
+      error: `Cannot submit Brief Review gate — no Domain Outcome Lead is assigned to this Initiative. ` +
+             `A DOL must be named before Brief Review can proceed. ` +
+             `An Admin or Phil can assign a DOL using the Initiative's edit panel.`
+    };
+  }
+
+  // ── D-390: EPO required before go_to_build gate ───────────────────────────
+  if (gate_name === 'go_to_build' && !cycle.assigned_epo_user_id) {
+    await supabase
+      .from('cycle_event_log')
+      .insert({
+        delivery_cycle_id,
+        event_type:        'gate_blocked',
+        event_description: `Gate 'go_to_build' blocked: no Engineering Product Owner is assigned to this Initiative.`,
+        actor_user_id:     caller_user_id,
+        event_metadata:    { gate_name, reason: 'no_epo_assigned' }
+      });
+
+    return {
+      success: false,
+      error: `Cannot submit Go to Build gate — no Engineering Product Owner is assigned to this Initiative. ` +
+             `An EPO must be named before this Initiative enters the BUILD phase. ` +
+             `An Admin or Phil can assign an EPO using the Initiative's edit panel.`
     };
   }
 

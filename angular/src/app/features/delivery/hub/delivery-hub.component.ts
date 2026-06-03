@@ -1,10 +1,10 @@
 // delivery-hub.component.ts — DeliveryHubComponent
-// Route: /delivery  (D-171, D-188)
+// Route: /initiatives  (D-171, D-188, D-392)
 //
-// Hub page for Delivery Cycle Tracking. Shows four option cards.
+// Hub page for Initiative Tracking. Shows four option cards.
 // No data is loaded at hub level — the hub is purely navigational.
 // Principle 3: each card states What, Why, and How for its view.
-// D-163: entry point for Delivery Cycle Tracking (all roles see sidebar → /delivery).
+// D-163: entry point for Initiative Tracking (all roles see sidebar → /initiatives).
 //
 // D-356 / S-015 (Contract 13): card descriptions and page subtitle render at
 // 11px italic Stone (#5A5A5A). Cards for unbuilt views carry a "Coming Soon"
@@ -27,34 +27,34 @@ interface HubCard {
 
 const HUB_CARDS: HubCard[] = [
   {
-    title:       'All Delivery Cycles',
-    route:       '/delivery/cycles',
+    title:       'All Initiatives',
+    route:       '/initiatives/list',
     icon:        '≡',
-    description: 'The full list of active cycles with filtering by stage, tier, workstream, ' +
-                 'division, and next gate. Use this when you know the cycle you are looking ' +
+    description: 'The full list of active Initiatives with filtering by stage, tier, workstream, ' +
+                 'division, and next gate. Use this when you know the Initiative you are looking ' +
                  'for, or want to apply a combination of filters.'
   },
   {
     title:       'Workstream Summary',
-    route:       '/delivery/workstreams',
+    route:       '/initiatives/workstreams',
     icon:        '⟳',
     description: 'WIP counts per workstream across Pre-Build, Build, and Post-Deploy ' +
-                 'stages. Identify workstreams over the 3-cycle WIP limit. Click the ' +
-                 'workstream name to see the matching cycles.'
+                 'stages. Identify workstreams over the 3-Initiative WIP limit. Click the ' +
+                 'workstream name to see the matching Initiatives.'
   },
   {
     title:       'Gate Schedule',
-    route:       '/delivery/gates',
+    route:       '/initiatives/gates',
     icon:        '▷',
     description: 'Gates coming up in the next 7 days and gates with overdue target dates. ' +
-                 'Use this to prioritize approval actions and identify stalled cycles. ' +
-                 'Click a cycle row to open it.'
+                 'Use this to prioritize approval actions and identify stalled Initiatives. ' +
+                 'Click an Initiative row to open it.'
   },
   {
     title:       'Deploy Gate by Quarter',
-    route:       '/delivery/deploy-schedule',
+    route:       '/initiatives/deploy-schedule',
     icon:        '◫',
-    description: 'Go to Deploy gates grouped by quarter. See which cycles are scheduled ' +
+    description: 'Go to Deploy gates grouped by quarter. See which Initiatives are scheduled ' +
                  'to reach production each quarter and track commitment against target dates. ' +
                  'Use this for release planning and capacity conversations.'
   }
@@ -70,11 +70,11 @@ const HUB_CARDS: HubCard[] = [
 
       <!-- Page header -->
       <div class="dh-header">
-        <h3 class="dh-title">Delivery Cycle Tracking</h3>
+        <h3 class="dh-title">Initiative Tracking</h3>
         <!-- S-015: 11px italic #5A5A5A subtitle -->
         <p class="dh-subtitle">
-          Select a view to explore active delivery cycles across your divisions.
-          Each view groups and filters cycles differently — choose the one that
+          Select a view to explore active Initiatives across your divisions.
+          Each view groups and filters Initiatives differently — choose the one that
           matches your current question.
         </p>
       </div>

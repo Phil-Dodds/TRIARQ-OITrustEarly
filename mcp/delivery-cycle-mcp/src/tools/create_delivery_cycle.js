@@ -1,34 +1,37 @@
 // create_delivery_cycle.js
 // Pathways OI Trust — delivery-cycle-mcp
-// Creates a new Delivery Cycle. Seeds five cycle_milestone_dates rows and
+// Creates a new Initiative (D-392). Seeds five cycle_milestone_dates rows and
 // gate_records for all five gates. Appends creation event to cycle_event_log.
-// DS, CB, CE, Phil, and Admin roles may create cycles.
+// DCS, EPO, DOL, CE, Phil, and Admin roles may create Initiatives.
 //
 // D-165: workstream_id is optional at creation. If provided, it must exist.
 // It does not need to be active at creation — active status is checked at gate time (ARCH-23).
 // Workstream must be assigned before Brief Review gate can be submitted.
 //
-// CC-006 (Session 2026-04-04): cycle_owner_user_id removed — same person as assigned_ds_user_id.
-// assigned_ds_user_id is nullable at creation; required before Brief Review gate (enforced in submit_gate_for_approval).
-// assigned_cb_user_id is nullable at creation; required before Go to Build gate.
-// D-194 (Session 2026-04-06): assigned_cb_user_id added to create params — single-call creation (Option B).
+// D-389/D-390/D-391: assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id
+// are nullable at creation. Gate enforcement (DCS+DOL for Brief Review, EPO for Go to Build)
+// lives in submit_gate_for_approval.
 //
-// Source: D-83, D-108, D-124, D-125, D-165, CC-006, D-194, build-c-spec Section 4.1
+// Source: D-83, D-108, D-124, D-125, D-165, D-194, D-389, D-390, D-391, D-393.
 
 'use strict';
 
 const { supabase } = require('../db');
 const { GATE_MILESTONE_LABELS, ALL_GATES } = require('../lifecycle');
 
+const VALID_TIERS         = ['tier_1', 'tier_2', 'tier_3'];
+const VALID_CREATOR_ROLES = ['dcs', 'epo', 'dol', 'ce', 'phil', 'admin'];
+
 /**
  * @param {object} params
  * @param {string}  params.cycle_title
  * @param {string}  [params.cycle_description]
  * @param {string}  params.division_id
- * @param {string}  [params.workstream_id]         — Optional at creation (D-165)
- * @param {string}  params.tier_classification     — 'tier_1' | 'tier_2' | 'tier_3'
- * @param {string}  [params.assigned_ds_user_id]   — Optional at creation (CC-006); required before Brief Review gate
- * @param {string}  [params.assigned_cb_user_id]   — Optional at creation (D-194); required before Go to Build gate
+ * @param {string}  [params.workstream_id]          — Optional at creation (D-165)
+ * @param {string}  params.tier_classification      — 'tier_1' | 'tier_2' | 'tier_3'
+ * @param {string}  [params.assigned_dcs_user_id]   — Optional; required before Brief Review (D-389)
+ * @param {string}  [params.assigned_epo_user_id]   — Optional; required before Go to Build (D-390)
+ * @param {string}  [params.assigned_dol_user_id]   — Optional; required before Brief Review (D-391)
  * @param {string}  [params.outcome_statement]      — Optional; can be set at creation or later
  * @param {string}  [params.jira_epic_key]          — Optional Jira Epic Key
  * @param {object}  [params.milestone_target_dates] — Optional gate target dates at creation
@@ -46,8 +49,9 @@ async function create_delivery_cycle(params, caller_user_id) {
     division_id,
     workstream_id,
     tier_classification,
-    assigned_ds_user_id,
-    assigned_cb_user_id,
+    assigned_dcs_user_id,
+    assigned_epo_user_id,
+    assigned_dol_user_id,
     outcome_statement,
     jira_epic_key,
     milestone_target_dates
@@ -65,12 +69,11 @@ async function create_delivery_cycle(params, caller_user_id) {
   if (!tier_classification) {
     return { success: false, error: 'tier_classification is required.' };
   }
-  if (!['tier_1', 'tier_2', 'tier_3'].includes(tier_classification)) {
+  if (!VALID_TIERS.includes(tier_classification)) {
     return { success: false, error: 'tier_classification must be one of: tier_1, tier_2, tier_3.' };
   }
-  // assigned_ds_user_id is optional at creation (CC-006) — required before Brief Review gate.
-  // assigned_cb_user_id is optional at creation (D-194) — required before Go to Build gate.
-  // No required checks here — gate enforcement is in submit_gate_for_approval.
+  // DCS / EPO / DOL are nullable at creation. Gate enforcement
+  // (DCS+DOL → Brief Review, EPO → Go to Build) lives in submit_gate_for_approval.
 
   // ── Caller role check ─────────────────────────────────────────────────────
   const { data: caller, error: callerErr } = await supabase
@@ -86,10 +89,10 @@ async function create_delivery_cycle(params, caller_user_id) {
   if (!caller.is_active) {
     return { success: false, error: 'Your account is inactive.' };
   }
-  if (!['ds', 'cb', 'ce', 'phil', 'admin'].includes(caller.system_role)) {
+  if (!VALID_CREATOR_ROLES.includes(caller.system_role)) {
     return {
       success: false,
-      error: 'Creating Delivery Cycles requires DS, CB, CE, Admin, or Phil role. Your current role does not have this permission.'
+      error: 'Creating Initiatives requires DCS, EPO, DOL, CE, Admin, or Phil role. Your current role does not have this permission.'
     };
   }
 
@@ -123,32 +126,28 @@ async function create_delivery_cycle(params, caller_user_id) {
     return { success: false, error: 'division_id not found or has been deleted.' };
   }
 
-  // ── Verify assigned DS exists (if provided) ───────────────────────────────
-  if (assigned_ds_user_id) {
-    const { data: ds, error: dsErr } = await supabase
+  // ── Verify provided assignees exist ───────────────────────────────────────
+  async function verifyAssignedUserOrFail(userId, paramName) {
+    if (!userId) { return null; }
+    const { data: user, error: userErr } = await supabase
       .from('users')
       .select('id, is_active')
-      .eq('id', assigned_ds_user_id)
+      .eq('id', userId)
       .is('deleted_at', null)
       .single();
-
-    if (dsErr || !ds) {
-      return { success: false, error: 'assigned_ds_user_id not found or has been deleted.' };
+    if (userErr || !user) {
+      return { success: false, error: `${paramName} not found or has been deleted.` };
     }
+    return null;
   }
 
-  // ── Verify assigned CB exists (if provided) ───────────────────────────────
-  if (assigned_cb_user_id) {
-    const { data: cb, error: cbErr } = await supabase
-      .from('users')
-      .select('id, is_active')
-      .eq('id', assigned_cb_user_id)
-      .is('deleted_at', null)
-      .single();
-
-    if (cbErr || !cb) {
-      return { success: false, error: 'assigned_cb_user_id not found or has been deleted.' };
-    }
+  const assigneeFailure = (
+    await verifyAssignedUserOrFail(assigned_dcs_user_id, 'assigned_dcs_user_id') ||
+    await verifyAssignedUserOrFail(assigned_epo_user_id, 'assigned_epo_user_id') ||
+    await verifyAssignedUserOrFail(assigned_dol_user_id, 'assigned_dol_user_id')
+  );
+  if (assigneeFailure) {
+    return assigneeFailure;
   }
 
   // ── Insert cycle ──────────────────────────────────────────────────────────
@@ -161,16 +160,17 @@ async function create_delivery_cycle(params, caller_user_id) {
       workstream_id:           workstream_id || null,
       tier_classification,
       current_lifecycle_stage: 'BRIEF',
-      assigned_ds_user_id:     assigned_ds_user_id || null,  // CC-006: nullable at creation
-      assigned_cb_user_id:     assigned_cb_user_id || null,  // D-194: nullable at creation
-      outcome_statement:       outcome_statement   || null,
-      jira_epic_key:           jira_epic_key       || null
+      assigned_dcs_user_id:    assigned_dcs_user_id || null,  // D-389: nullable at creation
+      assigned_epo_user_id:    assigned_epo_user_id || null,  // D-390: nullable at creation
+      assigned_dol_user_id:    assigned_dol_user_id || null,  // D-391: nullable at creation
+      outcome_statement:       outcome_statement    || null,
+      jira_epic_key:           jira_epic_key        || null
     })
     .select()
     .single();
 
   if (cycleErr) {
-    return { success: false, error: `Failed to create Delivery Cycle: ${cycleErr.message}` };
+    return { success: false, error: `Failed to create Initiative: ${cycleErr.message}` };
   }
 
   const cycle_id = cycle.delivery_cycle_id;
@@ -191,7 +191,7 @@ async function create_delivery_cycle(params, caller_user_id) {
     .insert(milestoneRows);
 
   if (milestonesErr) {
-    return { success: false, error: `Cycle created but milestone seeding failed: ${milestonesErr.message}` };
+    return { success: false, error: `Initiative created but milestone seeding failed: ${milestonesErr.message}` };
   }
 
   // ── Seed five gate_record rows ─────────────────────────────────────────────
@@ -208,7 +208,7 @@ async function create_delivery_cycle(params, caller_user_id) {
     .insert(gateRows);
 
   if (gatesErr) {
-    return { success: false, error: `Cycle created but gate record seeding failed: ${gatesErr.message}` };
+    return { success: false, error: `Initiative created but gate record seeding failed: ${gatesErr.message}` };
   }
 
   // ── Append creation event ─────────────────────────────────────────────────
@@ -216,28 +216,29 @@ async function create_delivery_cycle(params, caller_user_id) {
     ? `in ${workstream.workstream_name}`
     : 'with no Workstream assigned (assign before Brief Review gate)';
 
-  const dsDesc = assigned_ds_user_id
-    ? ` DS assigned at creation.`
-    : ` No DS assigned yet (required before Brief Review gate).`;
-
-  const cbDesc = assigned_cb_user_id
-    ? ` CB assigned at creation.`
-    : '';
+  const dcsDesc = assigned_dcs_user_id
+    ? ` DCS assigned at creation.`
+    : ` No DCS assigned yet (required before Brief Review gate).`;
+  const epoDesc = assigned_epo_user_id ? ` EPO assigned at creation.` : '';
+  const dolDesc = assigned_dol_user_id
+    ? ` DOL assigned at creation.`
+    : ` No DOL assigned yet (required before Brief Review gate).`;
 
   await supabase
     .from('cycle_event_log')
     .insert({
       delivery_cycle_id: cycle_id,
       event_type:        'cycle_created',
-      event_description: `Delivery Cycle "${cycle.cycle_title}" created at ${tier_classification} ${workstreamDesc}.${dsDesc}${cbDesc}`,
+      event_description: `Initiative "${cycle.cycle_title}" created at ${tier_classification} ${workstreamDesc}.${dcsDesc}${epoDesc}${dolDesc}`,
       actor_user_id:     caller_user_id,
       event_metadata: {
         tier_classification,
-        workstream_id:       workstream_id       || null,
-        workstream_name:     workstream?.workstream_name || null,
+        workstream_id:        workstream_id        || null,
+        workstream_name:      workstream?.workstream_name || null,
         division_id,
-        assigned_ds_user_id: assigned_ds_user_id || null,
-        assigned_cb_user_id: assigned_cb_user_id || null
+        assigned_dcs_user_id: assigned_dcs_user_id || null,
+        assigned_epo_user_id: assigned_epo_user_id || null,
+        assigned_dol_user_id: assigned_dol_user_id || null
       }
     });
 

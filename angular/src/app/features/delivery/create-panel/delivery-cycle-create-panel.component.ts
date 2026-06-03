@@ -7,17 +7,17 @@
 //
 // D-182 (Entity Picker Pattern, Principle 12):
 //   Workstream uses WorkstreamPickerComponent (CC-002).
-//   DS and CB use UserPickerComponent (D-182 DS/CB scope logic, CC-007 two-scope).
+//   DCS, EPO, DOL use UserPickerComponent (D-389/D-390/D-391).
 //
 // D-165: Delivery Workstream is optional at creation. Required before Brief Review gate.
-// D-174: DS and CB are nullable at creation. Gate enforcement at MCP level only.
-// CC-008: Field order is Division → Delivery Cycle Title → Outcome → Workstream → Tier → DS → CB → Jira.
-//   D-194: Outcome Statement moved to position 3 per Contract 6 spec. Source: Contract 6 Step 5.2.
+// D-174 / D-391: DCS, EPO, DOL nullable at creation. Gate enforcement at MCP level only.
+// Field order: Division → Initiative Title → Outcome → Workstream → Tier → DCS → EPO → DOL → Jira.
+//   D-194: Outcome Statement at position 3.
 //
-// D-290: Create form opens in right panel — never full-width overlay. Wired via dashboard. Source: D-290.
-// D-291: Panel header sticky (position:sticky;top:0). Source: D-291.
-// D-292: Create panel modal — ESC and cancelSignal trigger dirty-state check. Source: D-292.
-// D-204: Selecting a Workstream pre-populates CB from workstream lead if CB not yet set. Source: D-204.
+// D-290: Create form opens in right panel — never full-width overlay. Wired via dashboard.
+// D-291: Panel header sticky (position:sticky;top:0).
+// D-292: Create panel modal — ESC and cancelSignal trigger dirty-state check.
+// D-204: Selecting a Workstream pre-populates EPO from workstream lead if EPO not yet set.
 // D-93: No direct Supabase access — all data via DeliveryService → MCP.
 // ChangeDetection: OnPush.
 
@@ -40,6 +40,7 @@ import { LoadingOverlayComponent }   from '../../../shared/components/loading-ov
 import { WorkstreamPickerComponent } from '../../../shared/pickers/workstream-picker/workstream-picker.component';
 import { UserPickerComponent }       from '../../../shared/pickers/user-picker/user-picker.component';
 import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User } from '../../../core/types/database';
+import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 @Component({
   selector: 'app-delivery-cycle-create-panel',
@@ -54,11 +55,11 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
     <div class="cp-panel" style="position:relative;">
 
       <!-- D-178 Tier 3 overlay during submit -->
-      <app-loading-overlay [visible]="submitting" message="Creating Delivery Cycle…"></app-loading-overlay>
+      <app-loading-overlay [visible]="submitting" message="Creating Initiative…"></app-loading-overlay>
 
       <!-- Panel header -->
       <div class="cp-header">
-        <h2 class="cp-title">New Delivery Cycle</h2>
+        <h2 class="cp-title">New Initiative</h2>
         <button class="cp-close" type="button" (click)="close()" aria-label="Close panel">✕</button>
       </div>
 
@@ -81,17 +82,17 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
                  class="cp-field-error">Division is required.</div>
           </div>
 
-          <!-- 2. Delivery Cycle Title (CC-008: Division first, per Phil's instruction) -->
+          <!-- 2. Initiative Title (CC-008: Division first, per Phil's instruction) -->
           <div class="cp-field">
             <label class="cp-label">
-              Delivery Cycle Title <span class="cp-required" aria-hidden="true">*</span>
+              Initiative Title <span class="cp-required" aria-hidden="true">*</span>
             </label>
             <input formControlName="cycle_title" class="cp-input"
                    [class.cp-input--error]="f['cycle_title'].invalid && f['cycle_title'].touched"
                    type="text" maxlength="120"
                    placeholder="e.g. Member Attribution Model" />
             <div *ngIf="f['cycle_title'].invalid && f['cycle_title'].touched"
-                 class="cp-field-error">Delivery Cycle Title is required.</div>
+                 class="cp-field-error">Initiative Title is required.</div>
           </div>
 
           <!-- 3. Outcome Statement (optional — D-194: position 3. Source: Contract 6 Step 5.2.) -->
@@ -99,7 +100,7 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
             <label class="cp-label">Outcome Statement</label>
             <textarea formControlName="outcome_statement" class="cp-input cp-textarea"
                       rows="3"
-                      placeholder="What measurable result will this Delivery Cycle deliver?">
+                      placeholder="What measurable result will this Initiative deliver?">
             </textarea>
             <div class="cp-gate-note">Should be set before Brief Review Gate.</div>
           </div>
@@ -148,45 +149,63 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
                  class="cp-field-error">Tier Classification is required.</div>
           </div>
 
-          <!-- 6. Assigned Domain Strategist (optional, UserPicker per D-182) -->
+          <!-- 6. Assigned Domain Capability Strategist (optional, UserPicker per D-182) -->
           <div class="cp-field">
-            <label class="cp-label">Assigned Domain Strategist</label>
-            <div *ngIf="selectedDs; else noDsPicked" class="cp-user-chip-row">
+            <label class="cp-label">Assigned Domain Capability Strategist</label>
+            <div *ngIf="selectedDcs; else noDcsPicked" class="cp-user-chip-row">
               <span class="cp-entity-chip">
                 <span class="cp-user-avatar"
-                      [style.background]="selectedDsColor">{{ selectedDsInitials }}</span>
-                {{ selectedDs.display_name }}
+                      [style.background]="selectedDcsColor">{{ selectedDcsInitials }}</span>
+                {{ selectedDcs.display_name }}
               </span>
               <button type="button" class="cp-chip-remove"
-                      (click)="clearDs()">✕ Remove</button>
+                      (click)="clearDcs()">✕ Remove</button>
             </div>
             <!-- D-290 Step 5.4: no 'Assign later' text in trigger. Source: Contract 6 Step 5.4. -->
-            <ng-template #noDsPicked>
-              <button type="button" class="cp-picker-trigger" (click)="openDsPicker()"></button>
+            <ng-template #noDcsPicked>
+              <button type="button" class="cp-picker-trigger" (click)="openDcsPicker()"></button>
             </ng-template>
             <div class="cp-gate-note">Required before Brief Review Gate.</div>
           </div>
 
-          <!-- 7. Assigned Capability Builder (optional, UserPicker per D-182, D-204 pre-populate from WS lead) -->
+          <!-- 7. Assigned Engineering Product Owner (optional, UserPicker per D-182, D-204 pre-populate from WS lead) -->
           <div class="cp-field">
-            <label class="cp-label">Assigned Capability Builder</label>
-            <div *ngIf="selectedCb; else noCbPicked" class="cp-user-chip-row">
+            <label class="cp-label">Assigned Engineering Product Owner</label>
+            <div *ngIf="selectedEpo; else noEpoPicked" class="cp-user-chip-row">
               <span class="cp-entity-chip">
                 <span class="cp-user-avatar"
-                      [style.background]="selectedCbColor">{{ selectedCbInitials }}</span>
-                {{ selectedCb.display_name }}
+                      [style.background]="selectedEpoColor">{{ selectedEpoInitials }}</span>
+                {{ selectedEpo.display_name }}
               </span>
               <button type="button" class="cp-chip-remove"
-                      (click)="clearCb()">✕ Remove</button>
+                      (click)="clearEpo()">✕ Remove</button>
             </div>
             <!-- D-290 Step 5.4: no 'Assign later' text in trigger. Source: Contract 6 Step 5.4. -->
-            <ng-template #noCbPicked>
-              <button type="button" class="cp-picker-trigger" (click)="openCbPicker()"></button>
+            <ng-template #noEpoPicked>
+              <button type="button" class="cp-picker-trigger" (click)="openEpoPicker()"></button>
             </ng-template>
             <div class="cp-gate-note">Required before Go to Build Gate.</div>
           </div>
 
-          <!-- 8. Jira Epic Link (optional) -->
+          <!-- 8. Assigned Domain Outcome Lead (optional, UserPicker per D-182, D-391) -->
+          <div class="cp-field">
+            <label class="cp-label">Assigned Domain Outcome Lead</label>
+            <div *ngIf="selectedDol; else noDolPicked" class="cp-user-chip-row">
+              <span class="cp-entity-chip">
+                <span class="cp-user-avatar"
+                      [style.background]="selectedDolColor">{{ selectedDolInitials }}</span>
+                {{ selectedDol.display_name }}
+              </span>
+              <button type="button" class="cp-chip-remove"
+                      (click)="clearDol()">✕ Remove</button>
+            </div>
+            <ng-template #noDolPicked>
+              <button type="button" class="cp-picker-trigger" (click)="openDolPicker()"></button>
+            </ng-template>
+            <div class="cp-gate-note">Required before Brief Review Gate.</div>
+          </div>
+
+          <!-- 9. Jira Epic Link (optional) -->
           <div class="cp-field">
             <label class="cp-label">Jira Epic Link</label>
             <input formControlName="jira_epic_key" class="cp-input"
@@ -209,7 +228,7 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
               <ion-spinner *ngIf="submitting" name="crescent"
                            style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
               </ion-spinner>
-              {{ submitting ? 'Creating…' : 'Create Delivery Cycle' }}
+              {{ submitting ? 'Creating…' : 'Create Initiative' }}
             </button>
           </div>
         </form>
@@ -252,22 +271,31 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
       (workstreamSelected)="onWorkstreamSelected($event)">
     </app-workstream-picker>
 
-    <!-- DS User Picker modal (D-182) -->
+    <!-- DCS User Picker modal (D-182) -->
     <app-user-picker
-      *ngIf="showDsPicker"
-      userRole="ds"
+      *ngIf="showDcsPicker"
+      userRole="dcs"
       [divisionId]="form.get('division_id')?.value || null"
-      [currentUserId]="selectedDs?.id ?? null"
-      (userSelected)="onDsSelected($event)">
+      [currentUserId]="selectedDcs?.id ?? null"
+      (userSelected)="onDcsSelected($event)">
     </app-user-picker>
 
-    <!-- CB User Picker modal (D-182) -->
+    <!-- EPO User Picker modal (D-182) -->
     <app-user-picker
-      *ngIf="showCbPicker"
-      userRole="cb"
+      *ngIf="showEpoPicker"
+      userRole="epo"
       [divisionId]="form.get('division_id')?.value || null"
-      [currentUserId]="selectedCb?.id ?? null"
-      (userSelected)="onCbSelected($event)">
+      [currentUserId]="selectedEpo?.id ?? null"
+      (userSelected)="onEpoSelected($event)">
+    </app-user-picker>
+
+    <!-- DOL User Picker modal (D-182, D-391) -->
+    <app-user-picker
+      *ngIf="showDolPicker"
+      userRole="dol"
+      [divisionId]="form.get('division_id')?.value || null"
+      [currentUserId]="selectedDol?.id ?? null"
+      (userSelected)="onDolSelected($event)">
     </app-user-picker>
   `,
   styles: [`
@@ -417,17 +445,23 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
   showWorkstreamPicker = false;
   selectedWorkstream: DeliveryWorkstream | null = null;
 
-  // DS picker state (D-182)
-  showDsPicker = false;
-  selectedDs:       User | null = null;
-  selectedDsInitials = '';
-  selectedDsColor    = '#257099';
+  // DCS picker state (D-182, D-389)
+  showDcsPicker = false;
+  selectedDcs:       User | null = null;
+  selectedDcsInitials = '';
+  selectedDcsColor    = '#257099';
 
-  // CB picker state (D-182)
-  showCbPicker = false;
-  selectedCb:       User | null = null;
-  selectedCbInitials = '';
-  selectedCbColor    = '#257099';
+  // EPO picker state (D-182, D-390)
+  showEpoPicker = false;
+  selectedEpo:       User | null = null;
+  selectedEpoInitials = '';
+  selectedEpoColor    = '#257099';
+
+  // DOL picker state (D-182, D-391)
+  showDolPicker = false;
+  selectedDol:       User | null = null;
+  selectedDolInitials = '';
+  selectedDolColor    = '#257099';
 
   private subs = new Subscription();
 
@@ -457,12 +491,12 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
       jira_epic_key:       ['']
     });
 
-    // Pre-populate DS if caller is DS role (CC-004 auto-assignment rule)
+    // Pre-populate DCS if caller is DCS role (CC-004 auto-assignment rule)
     this.subs.add(
       this.profile.profile$.pipe(filter(p => p !== null), take(1)).subscribe(p => {
-        if (p?.system_role === 'ds' && p.id && p.display_name) {
-          this.selectedDs = p as unknown as User;
-          this.updateDsChip(this.selectedDs);
+        if (p?.system_role === SYSTEM_ROLES.DCS && p.id && p.display_name) {
+          this.selectedDcs = p as unknown as User;
+          this.updateDcsChip(this.selectedDcs);
           this.cdr.markForCheck();
         }
         // If user has only one Division, pre-select it
@@ -504,8 +538,9 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
       v['tier_classification'] ||
       v['jira_epic_key'] ||
       this.selectedWorkstream ||
-      this.selectedDs ||
-      this.selectedCb
+      this.selectedDcs ||
+      this.selectedEpo ||
+      this.selectedDol
     );
   }
 
@@ -558,68 +593,87 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
       if (!this.form.get('division_id')?.value && ws.home_division_id) {
         this.form.patchValue({ division_id: ws.home_division_id });
       }
-      // D-204 (B-68 / Contract 12): pre-populate CB from workstream lead when CB
+      // D-204 (B-68 / Contract 12): pre-populate EPO from workstream lead when EPO
       // is not already set. CC-C11-001 retired this rule; Design Session 2026-05-03
       // rejected CC-C11-001, reinstating D-204. Field remains user-editable.
-      if (!this.selectedCb && ws.workstream_lead_user_id && ws.lead_display_name) {
+      if (!this.selectedEpo && ws.workstream_lead_user_id && ws.lead_display_name) {
         // The picker enriches each workstream with lead_display_name via
         // list_delivery_workstreams. id + display_name are the only fields the
-        // CB chip and submit path read; remaining User fields are filled with
+        // EPO chip and submit path read; remaining User fields are filled with
         // safe defaults to keep the type honest without an extra MCP round-trip.
         const leadUser: User = {
           id:                                    ws.workstream_lead_user_id,
           display_name:                          ws.lead_display_name,
           email:                                 '',
-          system_role:                           'cb',
+          system_role:                           SYSTEM_ROLES.EPO,
           allow_both_admin_and_functional_roles: false,
           is_active:                             true,
           created_at:                            '',
           updated_at:                            '',
           deleted_at:                            null
         };
-        this.selectedCb = leadUser;
-        this.updateCbChip(leadUser);
+        this.selectedEpo = leadUser;
+        this.updateEpoChip(leadUser);
       }
     }
     this.cdr.markForCheck();
   }
 
-  // ── DS picker ───────────────────────────────────────────────────────────────
-  openDsPicker(): void { this.showDsPicker = true; this.cdr.markForCheck(); }
+  // ── DCS picker ──────────────────────────────────────────────────────────────
+  openDcsPicker(): void { this.showDcsPicker = true; this.cdr.markForCheck(); }
 
-  onDsSelected(user: User | null): void {
-    this.showDsPicker = false;
+  onDcsSelected(user: User | null): void {
+    this.showDcsPicker = false;
     if (user) {
-      this.selectedDs = user;
-      this.updateDsChip(user);
+      this.selectedDcs = user;
+      this.updateDcsChip(user);
     }
     this.cdr.markForCheck();
   }
 
-  clearDs(): void { this.selectedDs = null; this.cdr.markForCheck(); }
+  clearDcs(): void { this.selectedDcs = null; this.cdr.markForCheck(); }
 
-  private updateDsChip(user: User): void {
-    this.selectedDsInitials = nameInitials(user.display_name || '');
-    this.selectedDsColor    = avatarColorFromName(user.display_name || '');
+  private updateDcsChip(user: User): void {
+    this.selectedDcsInitials = nameInitials(user.display_name || '');
+    this.selectedDcsColor    = avatarColorFromName(user.display_name || '');
   }
 
-  // ── CB picker ───────────────────────────────────────────────────────────────
-  openCbPicker(): void { this.showCbPicker = true; this.cdr.markForCheck(); }
+  // ── EPO picker ──────────────────────────────────────────────────────────────
+  openEpoPicker(): void { this.showEpoPicker = true; this.cdr.markForCheck(); }
 
-  onCbSelected(user: User | null): void {
-    this.showCbPicker = false;
+  onEpoSelected(user: User | null): void {
+    this.showEpoPicker = false;
     if (user) {
-      this.selectedCb = user;
-      this.updateCbChip(user);
+      this.selectedEpo = user;
+      this.updateEpoChip(user);
     }
     this.cdr.markForCheck();
   }
 
-  clearCb(): void { this.selectedCb = null; this.cdr.markForCheck(); }
+  clearEpo(): void { this.selectedEpo = null; this.cdr.markForCheck(); }
 
-  private updateCbChip(user: User): void {
-    this.selectedCbInitials = nameInitials(user.display_name || '');
-    this.selectedCbColor    = avatarColorFromName(user.display_name || '');
+  private updateEpoChip(user: User): void {
+    this.selectedEpoInitials = nameInitials(user.display_name || '');
+    this.selectedEpoColor    = avatarColorFromName(user.display_name || '');
+  }
+
+  // ── DOL picker (D-391) ──────────────────────────────────────────────────────
+  openDolPicker(): void { this.showDolPicker = true; this.cdr.markForCheck(); }
+
+  onDolSelected(user: User | null): void {
+    this.showDolPicker = false;
+    if (user) {
+      this.selectedDol = user;
+      this.updateDolChip(user);
+    }
+    this.cdr.markForCheck();
+  }
+
+  clearDol(): void { this.selectedDol = null; this.cdr.markForCheck(); }
+
+  private updateDolChip(user: User): void {
+    this.selectedDolInitials = nameInitials(user.display_name || '');
+    this.selectedDolColor    = avatarColorFromName(user.display_name || '');
   }
 
   // ── Submission ───────────────────────────────────────────────────────────────
@@ -643,9 +697,10 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
       tier_classification: v.tier_classification,
       // D-165: workstream optional at creation
       ...(this.selectedWorkstream ? { workstream_id: this.selectedWorkstream.workstream_id } : {}),
-      // D-174: DS/CB nullable at creation
-      ...(this.selectedDs ? { assigned_ds_user_id: this.selectedDs.id } : {}),
-      ...(this.selectedCb ? { assigned_cb_user_id: this.selectedCb.id } : {}),
+      // D-174 / D-391: DCS, EPO, DOL nullable at creation; gate pre-checks enforce
+      ...(this.selectedDcs ? { assigned_dcs_user_id: this.selectedDcs.id } : {}),
+      ...(this.selectedEpo ? { assigned_epo_user_id: this.selectedEpo.id } : {}),
+      ...(this.selectedDol ? { assigned_dol_user_id: this.selectedDol.id } : {}),
       // Optional fields — only send if non-empty
       ...(v.outcome_statement?.trim() ? { outcome_statement: v.outcome_statement.trim() } : {}),
       ...(v.jira_epic_key?.trim()     ? { jira_epic_key:     v.jira_epic_key.trim()     } : {})

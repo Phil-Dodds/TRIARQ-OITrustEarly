@@ -1,6 +1,6 @@
 // index.js
 // Pathways OI Trust — delivery-cycle-mcp v1.0
-// Stateless Node.js MCP server. Full Delivery Cycle lifecycle management.
+// Stateless Node.js MCP server. Full Initiative lifecycle management (D-392).
 // JWT validation fires on every request before any tool logic (D-93, D-144).
 //
 // Tool naming: verb_noun
@@ -32,7 +32,7 @@ const { advance_cycle_stage }            = require('./tools/advance_cycle_stage'
 const { reverse_cycle_stage }            = require('./tools/reverse_cycle_stage');
 const { set_cycle_on_hold }              = require('./tools/set_cycle_on_hold');
 const { resume_cycle_from_hold }         = require('./tools/resume_cycle_from_hold');
-const { assign_ds_cb_to_cycle }          = require('./tools/assign_ds_cb_to_cycle');
+const { assign_roles_to_cycle }          = require('./tools/assign_roles_to_cycle');
 const { set_outcome_statement }          = require('./tools/set_outcome_statement');
 
 const { submit_gate_for_approval }       = require('./tools/submit_gate_for_approval');
@@ -71,7 +71,7 @@ const TOOLS = {
   reverse_cycle_stage,
   set_cycle_on_hold,
   resume_cycle_from_hold,
-  assign_ds_cb_to_cycle,
+  assign_roles_to_cycle,
   set_outcome_statement,
 
   // Gate workflow (D-345)

@@ -7,6 +7,7 @@ import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@
 import { UserProfileService } from '../../core/services/user-profile.service';
 import { McpService }         from '../../core/services/mcp.service';
 import { SystemRole, User }   from '../../core/types/database';
+import { SYSTEM_ROLES }       from '../../core/constants/roles';
 import { firstValueFrom }     from 'rxjs';
 
 @Component({
@@ -41,7 +42,7 @@ export class HomeComponent implements OnInit {
   private async checkDivisionMembership(): Promise<void> {
     // D-170: Phil and Admin have implicit access to all Divisions — no assignment needed.
     // Skip the membership check entirely; treat as fully provisioned.
-    if (this.role === 'phil' || this.role === 'admin') {
+    if (this.role === SYSTEM_ROLES.PHIL || this.role === SYSTEM_ROLES.ADMIN) {
       this.hasDivision = true;
       this.profileService.setHasDivision(true);
       return;
@@ -61,20 +62,21 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  // Role visibility helpers — used in template to show/hide cards per D-150
-  get isPhil():  boolean { return this.role === 'phil'; }
-  get isDS():    boolean { return this.role === 'ds'; }
-  get isCB():    boolean { return this.role === 'cb'; }
-  get isCE():    boolean { return this.role === 'ce'; }
-  get isAdmin(): boolean { return this.role === 'admin'; }
+  // Role visibility helpers — used in template to show/hide cards per D-150.
+  get isPhil():  boolean { return this.role === SYSTEM_ROLES.PHIL; }
+  get isDCS():   boolean { return this.role === SYSTEM_ROLES.DCS; }
+  get isEPO():   boolean { return this.role === SYSTEM_ROLES.EPO; }
+  get isDOL():   boolean { return this.role === SYSTEM_ROLES.DOL; }
+  get isCE():    boolean { return this.role === SYSTEM_ROLES.CE; }
+  get isAdmin(): boolean { return this.role === SYSTEM_ROLES.ADMIN; }
 
   get showSystemHealth():    boolean { return this.isPhil; }
   get showDivisions():       boolean { return this.isPhil || this.isAdmin; }
+  // UAT Bug 1 fix from master: showUserManagement is Phil OR Admin (not Admin only).
   get showUserManagement():  boolean { return this.isPhil || this.isAdmin; }
-  // My Delivery Cycles card — DS and CB only (build-c-supplement-spec Section 6, D-150).
-  // Phil and Admin use the full dashboard. CE is read-only and not in a create/DS/CB role.
-  // assigned_to_current_user scopes data server-side; role check here hides card for non-DS/CB.
-  get showDeliveryCycles():  boolean { return this.isDS || this.isCB; }
+  // My Initiatives card — DCS, EPO, DOL only (D-391). Phil and Admin use the full dashboard.
+  // CE is read-only and has no per-Initiative field. Server scopes data via assigned_to_current_user.
+  get showDeliveryCycles():  boolean { return this.isDCS || this.isEPO || this.isDOL; }
 
   // Phil and Admin always see the main cards — they need the Divisions card to
   // bootstrap the hierarchy before they can have a division assignment themselves.

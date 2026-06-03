@@ -88,7 +88,7 @@ type LoginState = 'idle' | 'sending' | 'error';
       <!-- RIGHT PANEL -->
       <div class="login-right">
 
-        <h2 class="rp-headline">Delivery Cycle management<br/>is in UAT.</h2>
+        <h2 class="rp-headline">Initiative management<br/>is in UAT.</h2>
 
         <div class="feature-list">
 
@@ -114,8 +114,8 @@ type LoginState = 'idle' | 'sending' | 'error';
               </svg>
             </div>
             <div>
-              <p class="feature-label">Delivery Cycle Tracking</p>
-              <p class="feature-description">Create and track delivery cycles from Context Brief through production release — with named gates, milestone dates, and role-based visibility for DSs and CBs.</p>
+              <p class="feature-label">Initiative Tracking</p>
+              <p class="feature-description">Create and track Initiatives from Context Brief through production release — with named gates, milestone dates, and role-based visibility for DCS, EPO, and DOL assignees.</p>
             </div>
           </div>
 

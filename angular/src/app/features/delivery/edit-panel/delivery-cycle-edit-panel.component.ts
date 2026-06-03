@@ -1,5 +1,5 @@
 // delivery-cycle-edit-panel.component.ts — Pathways OI Trust
-// Responsible for: mutable field editing of a Delivery Cycle (8 fields per spec).
+// Responsible for: mutable field editing of an Initiative (D-392; 9 fields).
 // NOT responsible for: gate approval, stage advancement, artifact operations,
 //   destructive actions (Cancel/Un-cancel) — those live in delivery-cycle-detail.component.ts.
 //   Per D-226 (Responsibility Declaration).
@@ -83,7 +83,7 @@ function epAvatarColorFromName(name: string): string {
         <!-- D-291: position:sticky;top:0 sticks to outer scroll container. B-23 fix: works now
              because ep-overlay no longer has overflow:hidden. Source: D-291, Contract 9. -->
         <div class="ep-header">
-          <h2 class="ep-title">Edit Delivery Cycle</h2>
+          <h2 class="ep-title">Edit Initiative</h2>
           <div class="ep-header-actions">
             <button type="button" class="ep-btn-cancel-header"
                     [disabled]="saving"
@@ -106,17 +106,17 @@ function epAvatarColorFromName(name: string): string {
         <div class="ep-body" #epBody>
           <form [formGroup]="form" novalidate>
 
-            <!-- 1. Delivery Cycle Title -->
+            <!-- 1. Initiative Title -->
             <div class="ep-field">
               <label class="ep-label">
-                Delivery Cycle Title <span class="ep-required">*</span>
+                Initiative Title <span class="ep-required">*</span>
               </label>
               <input formControlName="cycle_title" class="ep-input"
                      type="text" maxlength="120" />
               <!-- B-38: S-025 Pattern 1 guidance text. Source: Contract 10 §3 B-38. -->
               <div class="ep-hint">The name used across all views and reports.</div>
               <div *ngIf="f['cycle_title'].invalid && f['cycle_title'].touched"
-                   class="ep-field-error">Delivery Cycle Title is required.</div>
+                   class="ep-field-error">Initiative Title is required.</div>
             </div>
 
             <!-- 2. Division -->
@@ -132,7 +132,7 @@ function epAvatarColorFromName(name: string): string {
                 </option>
               </select>
               <!-- B-38: S-025 Pattern 1 guidance text. Source: Contract 10 §3 B-38. -->
-              <div class="ep-hint">The Division that owns this Delivery Cycle.</div>
+              <div class="ep-hint">The Division that owns this Initiative.</div>
               <div *ngIf="f['division_id'].invalid && f['division_id'].touched"
                    class="ep-field-error">Division is required.</div>
               <!-- Approver change note — stubbed per CC-Decision-2026-04-10-E -->
@@ -199,47 +199,64 @@ function epAvatarColorFromName(name: string): string {
               </div>
             </div>
 
-            <!-- 6. Assigned Domain Strategist — B-26: UserPickerComponent replaces <select>. Source: D-182, Contract 9. -->
+            <!-- 6. Assigned Domain Capability Strategist (D-389; UserPickerComponent per D-182). -->
             <div class="ep-field">
-              <label class="ep-label">Assigned Domain Strategist</label>
-              <div *ngIf="selectedDs; else noDsPicked" class="ep-user-chip-row">
+              <label class="ep-label">Assigned Domain Capability Strategist</label>
+              <div *ngIf="selectedDcs; else noDcsPicked" class="ep-user-chip-row">
                 <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
-                  <span class="ep-user-avatar" [style.background]="selectedDsColor">{{ selectedDsInitials }}</span>
-                  {{ selectedDs.display_name }}
+                  <span class="ep-user-avatar" [style.background]="selectedDcsColor">{{ selectedDcsInitials }}</span>
+                  {{ selectedDcs.display_name }}
                 </span>
-                <button type="button" class="ep-chip-remove" (click)="clearDs()">✕ Remove</button>
+                <button type="button" class="ep-chip-remove" (click)="clearDcs()">✕ Remove</button>
               </div>
-              <ng-template #noDsPicked>
+              <ng-template #noDcsPicked>
                 <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
-                        (click)="openDsPicker()">
+                        (click)="openDcsPicker()">
                   <span class="ep-picker-placeholder">— Unassigned —</span>
                 </button>
               </ng-template>
-              <button *ngIf="!selectedDs" type="button" class="ep-picker-trigger"
-                      style="display:none;" (click)="openDsPicker()"></button>
               <div class="ep-hint">Required before Brief Review Gate.</div>
             </div>
 
-            <!-- 7. Assigned Capability Builder — B-26: UserPickerComponent replaces <select>. Source: D-182, Contract 9. -->
+            <!-- 7. Assigned Engineering Product Owner (D-390; UserPickerComponent per D-182). -->
             <div class="ep-field">
-              <label class="ep-label">Assigned Capability Builder</label>
-              <div *ngIf="selectedCb; else noCbPicked" class="ep-user-chip-row">
+              <label class="ep-label">Assigned Engineering Product Owner</label>
+              <div *ngIf="selectedEpo; else noEpoPicked" class="ep-user-chip-row">
                 <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
-                  <span class="ep-user-avatar" [style.background]="selectedCbColor">{{ selectedCbInitials }}</span>
-                  {{ selectedCb.display_name }}
+                  <span class="ep-user-avatar" [style.background]="selectedEpoColor">{{ selectedEpoInitials }}</span>
+                  {{ selectedEpo.display_name }}
                 </span>
-                <button type="button" class="ep-chip-remove" (click)="clearCb()">✕ Remove</button>
+                <button type="button" class="ep-chip-remove" (click)="clearEpo()">✕ Remove</button>
               </div>
-              <ng-template #noCbPicked>
+              <ng-template #noEpoPicked>
                 <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
-                        (click)="openCbPicker()">
+                        (click)="openEpoPicker()">
                   <span class="ep-picker-placeholder">— Unassigned —</span>
                 </button>
               </ng-template>
               <div class="ep-hint">Required before Go to Build Gate.</div>
             </div>
 
-            <!-- 8. Jira Epic Link -->
+            <!-- 8. Assigned Domain Outcome Lead (D-391; UserPickerComponent per D-182). -->
+            <div class="ep-field">
+              <label class="ep-label">Assigned Domain Outcome Lead</label>
+              <div *ngIf="selectedDol; else noDolPicked" class="ep-user-chip-row">
+                <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
+                  <span class="ep-user-avatar" [style.background]="selectedDolColor">{{ selectedDolInitials }}</span>
+                  {{ selectedDol.display_name }}
+                </span>
+                <button type="button" class="ep-chip-remove" (click)="clearDol()">✕ Remove</button>
+              </div>
+              <ng-template #noDolPicked>
+                <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
+                        (click)="openDolPicker()">
+                  <span class="ep-picker-placeholder">— Unassigned —</span>
+                </button>
+              </ng-template>
+              <div class="ep-hint">Required before Brief Review Gate.</div>
+            </div>
+
+            <!-- 9. Jira Epic Link -->
             <div class="ep-field">
               <label class="ep-label">Jira Epic Link</label>
               <input formControlName="jira_epic_key" class="ep-input"
@@ -299,22 +316,31 @@ function epAvatarColorFromName(name: string): string {
       (workstreamSelected)="onWorkstreamSelected($event)">
     </app-workstream-picker>
 
-    <!-- DS User Picker modal — B-26: replaces <select>. Source: D-182, Contract 9. -->
+    <!-- DCS User Picker modal (D-389, D-182). -->
     <app-user-picker
-      *ngIf="showDsPicker"
-      userRole="ds"
+      *ngIf="showDcsPicker"
+      userRole="dcs"
       [divisionId]="form.get('division_id')?.value || null"
-      [currentUserId]="selectedDs?.id ?? null"
-      (userSelected)="onDsSelected($event)">
+      [currentUserId]="selectedDcs?.id ?? null"
+      (userSelected)="onDcsSelected($event)">
     </app-user-picker>
 
-    <!-- CB User Picker modal — B-26: replaces <select>. Source: D-182, Contract 9. -->
+    <!-- EPO User Picker modal (D-390, D-182). -->
     <app-user-picker
-      *ngIf="showCbPicker"
-      userRole="cb"
+      *ngIf="showEpoPicker"
+      userRole="epo"
       [divisionId]="form.get('division_id')?.value || null"
-      [currentUserId]="selectedCb?.id ?? null"
-      (userSelected)="onCbSelected($event)">
+      [currentUserId]="selectedEpo?.id ?? null"
+      (userSelected)="onEpoSelected($event)">
+    </app-user-picker>
+
+    <!-- DOL User Picker modal (D-391, D-182). -->
+    <app-user-picker
+      *ngIf="showDolPicker"
+      userRole="dol"
+      [divisionId]="form.get('division_id')?.value || null"
+      [currentUserId]="selectedDol?.id ?? null"
+      (userSelected)="onDolSelected($event)">
     </app-user-picker>
   `,
   styles: [`
@@ -418,7 +444,7 @@ function epAvatarColorFromName(name: string): string {
     }
     .ep-chip-remove:hover { color: #C62828; }
 
-    /* User chip row — B-26 DS/CB entity picker chips */
+    /* User chip row — DCS/EPO/DOL entity picker chips */
     .ep-user-chip-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .ep-user-avatar {
       width: 22px; height: 22px; border-radius: 50%;
@@ -442,7 +468,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
 
   // The cycle to edit — passed from the View panel.
   @Input() cycle!: DeliveryCycle;
-  // All users accessible in the caller's context — used to pre-populate DS/CB pickers.
+  // All users accessible in the caller's context — used to pre-populate DCS/EPO/DOL pickers.
   @Input() allUsers: User[] = [];
   // D-292: Dashboard/detail increments to signal cancel (scrim click). Source: D-292.
   // B-12 fix: cancelSignal routes through requestCancel() — dirty-state check fires correctly.
@@ -477,17 +503,23 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   showTierChangeWarning = false;
   private originalTier: TierClassification = '' as TierClassification;
 
-  // B-26: DS entity picker state. Source: D-182, Contract 9.
-  showDsPicker       = false;
-  selectedDs:        User | null = null;
-  selectedDsInitials = '';
-  selectedDsColor    = '#257099';
+  // DCS entity picker state (D-389, D-182).
+  showDcsPicker       = false;
+  selectedDcs:        User | null = null;
+  selectedDcsInitials = '';
+  selectedDcsColor    = '#257099';
 
-  // B-26: CB entity picker state. Source: D-182, Contract 9.
-  showCbPicker       = false;
-  selectedCb:        User | null = null;
-  selectedCbInitials = '';
-  selectedCbColor    = '#257099';
+  // EPO entity picker state (D-390, D-182).
+  showEpoPicker       = false;
+  selectedEpo:        User | null = null;
+  selectedEpoInitials = '';
+  selectedEpoColor    = '#257099';
+
+  // DOL entity picker state (D-391, D-182).
+  showDolPicker       = false;
+  selectedDol:        User | null = null;
+  selectedDolInitials = '';
+  selectedDolColor    = '#257099';
 
   private subs = new Subscription();
 
@@ -542,28 +574,40 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       } as unknown as DeliveryWorkstream;
     }
 
-    // B-26: Pre-populate DS from cycle data + allUsers.
-    if (this.cycle.assigned_ds_user_id) {
-      const dsUser = this.allUsers.find(u => u.id === this.cycle.assigned_ds_user_id);
-      if (dsUser) {
-        this.selectedDs = dsUser;
-        this.updateDsChip(dsUser);
+    // Pre-populate DCS from cycle data + allUsers.
+    if (this.cycle.assigned_dcs_user_id) {
+      const dcsUser = this.allUsers.find(u => u.id === this.cycle.assigned_dcs_user_id);
+      if (dcsUser) {
+        this.selectedDcs = dcsUser;
+        this.updateDcsChip(dcsUser);
       } else {
         // User not in allUsers (e.g. inactive or cross-division) — build minimal object
-        this.selectedDs = { id: this.cycle.assigned_ds_user_id, display_name: this.cycle.assigned_ds_display_name ?? 'Assigned DS' } as User;
-        this.updateDsChip(this.selectedDs);
+        this.selectedDcs = { id: this.cycle.assigned_dcs_user_id, display_name: this.cycle.assigned_dcs_display_name ?? 'Assigned DCS' } as User;
+        this.updateDcsChip(this.selectedDcs);
       }
     }
 
-    // B-26: Pre-populate CB from cycle data + allUsers.
-    if (this.cycle.assigned_cb_user_id) {
-      const cbUser = this.allUsers.find(u => u.id === this.cycle.assigned_cb_user_id);
-      if (cbUser) {
-        this.selectedCb = cbUser;
-        this.updateCbChip(cbUser);
+    // Pre-populate EPO from cycle data + allUsers.
+    if (this.cycle.assigned_epo_user_id) {
+      const epoUser = this.allUsers.find(u => u.id === this.cycle.assigned_epo_user_id);
+      if (epoUser) {
+        this.selectedEpo = epoUser;
+        this.updateEpoChip(epoUser);
       } else {
-        this.selectedCb = { id: this.cycle.assigned_cb_user_id, display_name: this.cycle.assigned_cb_display_name ?? 'Assigned CB' } as User;
-        this.updateCbChip(this.selectedCb);
+        this.selectedEpo = { id: this.cycle.assigned_epo_user_id, display_name: this.cycle.assigned_epo_display_name ?? 'Assigned EPO' } as User;
+        this.updateEpoChip(this.selectedEpo);
+      }
+    }
+
+    // Pre-populate DOL from cycle data + allUsers (D-391).
+    if (this.cycle.assigned_dol_user_id) {
+      const dolUser = this.allUsers.find(u => u.id === this.cycle.assigned_dol_user_id);
+      if (dolUser) {
+        this.selectedDol = dolUser;
+        this.updateDolChip(dolUser);
+      } else {
+        this.selectedDol = { id: this.cycle.assigned_dol_user_id, display_name: this.cycle.assigned_dol_display_name ?? 'Assigned DOL' } as User;
+        this.updateDolChip(this.selectedDol);
       }
     }
 
@@ -688,42 +732,61 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     this.cdr.markForCheck();
   }
 
-  // ── DS picker — B-26 ─────────────────────────────────────────────────────────
-  openDsPicker(): void { this.showDsPicker = true; this.cdr.markForCheck(); }
+  // ── DCS picker (D-389) ───────────────────────────────────────────────────────
+  openDcsPicker(): void { this.showDcsPicker = true; this.cdr.markForCheck(); }
 
-  onDsSelected(user: User | null): void {
-    this.showDsPicker = false;
+  onDcsSelected(user: User | null): void {
+    this.showDcsPicker = false;
     if (user) {
-      this.selectedDs = user;
-      this.updateDsChip(user);
+      this.selectedDcs = user;
+      this.updateDcsChip(user);
     }
     this.cdr.markForCheck();
   }
 
-  clearDs(): void { this.selectedDs = null; this.cdr.markForCheck(); }
+  clearDcs(): void { this.selectedDcs = null; this.cdr.markForCheck(); }
 
-  private updateDsChip(user: User): void {
-    this.selectedDsInitials = epNameInitials(user.display_name || '');
-    this.selectedDsColor    = epAvatarColorFromName(user.display_name || '');
+  private updateDcsChip(user: User): void {
+    this.selectedDcsInitials = epNameInitials(user.display_name || '');
+    this.selectedDcsColor    = epAvatarColorFromName(user.display_name || '');
   }
 
-  // ── CB picker — B-26 ─────────────────────────────────────────────────────────
-  openCbPicker(): void { this.showCbPicker = true; this.cdr.markForCheck(); }
+  // ── EPO picker (D-390) ───────────────────────────────────────────────────────
+  openEpoPicker(): void { this.showEpoPicker = true; this.cdr.markForCheck(); }
 
-  onCbSelected(user: User | null): void {
-    this.showCbPicker = false;
+  onEpoSelected(user: User | null): void {
+    this.showEpoPicker = false;
     if (user) {
-      this.selectedCb = user;
-      this.updateCbChip(user);
+      this.selectedEpo = user;
+      this.updateEpoChip(user);
     }
     this.cdr.markForCheck();
   }
 
-  clearCb(): void { this.selectedCb = null; this.cdr.markForCheck(); }
+  clearEpo(): void { this.selectedEpo = null; this.cdr.markForCheck(); }
 
-  private updateCbChip(user: User): void {
-    this.selectedCbInitials = epNameInitials(user.display_name || '');
-    this.selectedCbColor    = epAvatarColorFromName(user.display_name || '');
+  private updateEpoChip(user: User): void {
+    this.selectedEpoInitials = epNameInitials(user.display_name || '');
+    this.selectedEpoColor    = epAvatarColorFromName(user.display_name || '');
+  }
+
+  // ── DOL picker (D-391) ───────────────────────────────────────────────────────
+  openDolPicker(): void { this.showDolPicker = true; this.cdr.markForCheck(); }
+
+  onDolSelected(user: User | null): void {
+    this.showDolPicker = false;
+    if (user) {
+      this.selectedDol = user;
+      this.updateDolChip(user);
+    }
+    this.cdr.markForCheck();
+  }
+
+  clearDol(): void { this.selectedDol = null; this.cdr.markForCheck(); }
+
+  private updateDolChip(user: User): void {
+    this.selectedDolInitials = epNameInitials(user.display_name || '');
+    this.selectedDolColor    = epAvatarColorFromName(user.display_name || '');
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────────
@@ -766,14 +829,18 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     if (v.tier_classification !== this.cycle.tier_classification) {
       payload.tier_classification = v.tier_classification;
     }
-    // B-26: DS/CB from picker state (no longer form controls).
-    const newDsId = this.selectedDs?.id ?? null;
-    if (newDsId !== (this.cycle.assigned_ds_user_id ?? null)) {
-      payload.assigned_ds_user_id = newDsId;
+    // DCS / EPO / DOL from picker state (no longer form controls).
+    const newDcsId = this.selectedDcs?.id ?? null;
+    if (newDcsId !== (this.cycle.assigned_dcs_user_id ?? null)) {
+      payload.assigned_dcs_user_id = newDcsId;
     }
-    const newCbId = this.selectedCb?.id ?? null;
-    if (newCbId !== (this.cycle.assigned_cb_user_id ?? null)) {
-      payload.assigned_cb_user_id = newCbId;
+    const newEpoId = this.selectedEpo?.id ?? null;
+    if (newEpoId !== (this.cycle.assigned_epo_user_id ?? null)) {
+      payload.assigned_epo_user_id = newEpoId;
+    }
+    const newDolId = this.selectedDol?.id ?? null;
+    if (newDolId !== (this.cycle.assigned_dol_user_id ?? null)) {
+      payload.assigned_dol_user_id = newDolId;
     }
     const newJira = v.jira_epic_key?.trim() || null;
     if (newJira !== (this.cycle.jira_epic_key ?? null)) {
@@ -812,7 +879,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     if (!raw) { return 'Save failed. Please try again.'; }
     const lower = raw.toLowerCase();
     if (lower.includes('unique') || lower.includes('duplicate') || lower.includes('already exists')) {
-      return 'A Delivery Cycle with this title already exists in this Division. Use a different title.';
+      return 'An Initiative with this title already exists in this Division. Use a different title.';
     }
     if (lower.includes('foreign key') || lower.includes('violates') || lower.includes('constraint')) {
       return 'Save failed — one of the selected values is no longer valid. Refresh and try again.';
@@ -837,7 +904,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     }
   }
 
-  // D-292: Any form field differs from original cycle value, or Workstream/DS/CB has changed.
+  // D-292: Any form field differs from original cycle value, or Workstream/DCS/EPO/DOL has changed.
   isDirty(): boolean {
     const f = this.form.value as Record<string, unknown>;
     return (
@@ -847,8 +914,9 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       f['tier_classification'] !== this.cycle.tier_classification ||
       f['jira_epic_key']       !== (this.cycle.jira_epic_key       ?? '') ||
       (this.selectedWorkstream?.workstream_id ?? null) !== (this.cycle.workstream_id ?? null) ||
-      (this.selectedDs?.id ?? null) !== (this.cycle.assigned_ds_user_id ?? null) ||
-      (this.selectedCb?.id ?? null) !== (this.cycle.assigned_cb_user_id ?? null)
+      (this.selectedDcs?.id ?? null) !== (this.cycle.assigned_dcs_user_id ?? null) ||
+      (this.selectedEpo?.id ?? null) !== (this.cycle.assigned_epo_user_id ?? null) ||
+      (this.selectedDol?.id ?? null) !== (this.cycle.assigned_dol_user_id ?? null)
     );
   }
 

@@ -1,5 +1,5 @@
 // user-picker.component.ts — Pathways OI Trust
-// Picker modal for selecting a DS or CB user. Implements D-182 Entity Picker Pattern.
+// Picker modal for selecting a DCS, EPO, or DOL user. Implements D-182 Entity Picker Pattern.
 //
 // D-182 (Entity Picker Pattern, Principle 12):
 //   - Scope radio: tightest scope default, explicit progression
@@ -14,13 +14,13 @@
 //   This requires trust ancestry lookup not supported by current list_users MCP params.
 //   Deferred to Design Chat for MCP enhancement. Noted as CC-007.
 //
-// Scope logic per D-182 Principle 12 DS/CB section:
+// Scope logic per D-182 Principle 12 role-assignment section:
 //   "This Division" (default) → users with target role in the cycle's Division.
 //   "All Divisions"           → all users with target role in the system.
 //
 // D-93: No direct Supabase access — calls division-mcp via McpService.
 // ChangeDetection: OnPush.
-// D-184: Entity name capitalization — "Domain Strategist", "Capability Builder" in UI.
+// D-184: Entity name capitalization — role display labels via ROLE_DISPLAY_NAMES (roles.ts).
 
 import {
   Component, OnInit, OnDestroy, Input, Output, EventEmitter,
@@ -30,7 +30,8 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { McpService } from '../../../core/services/mcp.service';
-import { User } from '../../../core/types/database';
+import { User, SystemRole } from '../../../core/types/database';
+import { SYSTEM_ROLES, ROLE_DISPLAY_NAMES } from '../../../core/constants/roles';
 
 type UserPickerScope = 'division' | 'all';
 
@@ -95,7 +96,7 @@ function avatarColorFromName(name: string): string {
         <!-- D-299 / B-13 fix: "This Division" scope with no divisionId — inline inform only.
              Does NOT block the list — shows below scope row. Source: D-299. -->
         <div *ngIf="noDivisionMessage" class="up-no-division-msg">
-          This Delivery Cycle doesn't have a Division set yet. Select a Division on the form to filter by Division.
+          This Initiative doesn't have a Division set yet. Select a Division on the form to filter by Division.
         </div>
 
         <!-- Error -->
@@ -322,8 +323,8 @@ function avatarColorFromName(name: string): string {
   `]
 })
 export class UserPickerComponent implements OnInit, OnDestroy {
-  /** Role to filter: 'ds' or 'cb' */
-  @Input() userRole: 'ds' | 'cb' = 'ds';
+  /** Role to filter the picker — D-389/D-390/D-391. */
+  @Input() userRole: SystemRole = SYSTEM_ROLES.DCS;
   /** Division ID for "This Division" scope. Null → skip division scope, default to All. */
   @Input() divisionId: string | null = null;
   /** Pre-selected user ID (current value on the cycle). */
@@ -351,7 +352,7 @@ export class UserPickerComponent implements OnInit, OnDestroy {
   scopeOptions: { value: UserPickerScope; label: string }[] = [];
 
   get roleLabel(): string {
-    return this.userRole === 'ds' ? 'Domain Strategist' : 'Capability Builder';
+    return ROLE_DISPLAY_NAMES[this.userRole] ?? this.userRole;
   }
 
   private subs = new Subscription();

@@ -40,6 +40,7 @@ import {
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { User, SystemRole, Division }  from '../../../core/types/database';
+import { SYSTEM_ROLES, ROLE_ABBREVIATIONS } from '../../../core/constants/roles';
 
 /** get_user_divisions response shape */
 interface UserDivisionsData {
@@ -130,8 +131,9 @@ interface UserDivisionsData {
                 </label>
                 <select formControlName="system_role" class="oi-input">
                   <option value="">— Select role —</option>
-                  <option value="ds">DS — Domain Strategist</option>
-                  <option value="cb">CB — Capability Builder</option>
+                  <option value="dcs">DCS — Domain Capability Strategist</option>
+                  <option value="epo">EPO — Engineering Product Owner</option>
+                  <option value="dol">DOL — Domain Outcome Lead</option>
                   <option value="ce">CE — Context Engineer</option>
                   <option value="admin">Admin</option>
                 </select>
@@ -365,8 +367,9 @@ interface UserDivisionsData {
                       Role *
                     </label>
                     <select formControlName="system_role" class="oi-input">
-                      <option value="ds">DS — Domain Strategist</option>
-                      <option value="cb">CB — Capability Builder</option>
+                      <option value="dcs">DCS — Domain Capability Strategist</option>
+                      <option value="epo">EPO — Engineering Product Owner</option>
+                      <option value="dol">DOL — Domain Outcome Lead</option>
                       <option value="ce">CE — Context Engineer</option>
                       <option value="admin">Admin</option>
                       <option value="phil">Phil</option>
@@ -575,12 +578,13 @@ export class UsersComponent implements OnInit {
   nameSortDir:  'asc'|'desc' = 'asc';
 
   readonly roleFilters = [
-    { value: 'all',   label: 'All' },
-    { value: 'ds',    label: 'DS' },
-    { value: 'cb',    label: 'CB' },
-    { value: 'ce',    label: 'CE' },
-    { value: 'admin', label: 'Admin' },
-    { value: 'phil',  label: 'Phil' }
+    { value: 'all',                  label: 'All' },
+    { value: SYSTEM_ROLES.DCS,       label: 'DCS' },
+    { value: SYSTEM_ROLES.EPO,       label: 'EPO' },
+    { value: SYSTEM_ROLES.DOL,       label: 'DOL' },
+    { value: SYSTEM_ROLES.CE,        label: 'CE' },
+    { value: SYSTEM_ROLES.ADMIN,     label: 'Admin' },
+    { value: SYSTEM_ROLES.PHIL,      label: 'Phil' }
   ];
 
   // ── Edit user state ────────────────────────────────────────────────────────
@@ -1125,27 +1129,28 @@ export class UsersComponent implements OnInit {
 
   /** B-51: display label override — 'phil' role renders as "Admin". */
   roleDisplayLabel(role: SystemRole): string {
-    if (role === 'phil') { return 'Admin'; }
-    return role.toUpperCase();
+    if (role === SYSTEM_ROLES.PHIL) { return 'Admin'; }
+    return ROLE_ABBREVIATIONS[role] ?? role.toUpperCase();
   }
 
   /** B-53: dynamic role-filter tabs — only render tabs for roles with at least one user.
-   *  "All" tab always present. Source: Contract 10 §7 B-53.
+   *  "All" tab always present. Order: DCS, EPO, DOL, CE, Admin.
    *  Contract 17 §4: 'phil' rows render under the Admin tab — no separate Phil tab.
    *  The 'admin' tab is shown if any user has role 'admin' OR 'phil'. */
   get visibleRoleFilters(): { value: string; label: string }[] {
     const visible: { value: string; label: string }[] = [{ value: 'all', label: 'All' }];
     const presentRoles = new Set(this.users.map(u => u.system_role));
     const order: { value: SystemRole; label: string }[] = [
-      { value: 'ds',    label: 'DS' },
-      { value: 'cb',    label: 'CB' },
-      { value: 'ce',    label: 'CE' },
-      { value: 'admin', label: 'Admin' }
+      { value: SYSTEM_ROLES.DCS,   label: 'DCS' },
+      { value: SYSTEM_ROLES.EPO,   label: 'EPO' },
+      { value: SYSTEM_ROLES.DOL,   label: 'DOL' },
+      { value: SYSTEM_ROLES.CE,    label: 'CE' },
+      { value: SYSTEM_ROLES.ADMIN, label: 'Admin' }
     ];
     for (const opt of order) {
-      if (opt.value === 'admin') {
-        if (presentRoles.has('admin') || presentRoles.has('phil')) {
-          visible.push({ value: 'admin', label: 'Admin' });
+      if (opt.value === SYSTEM_ROLES.ADMIN) {
+        if (presentRoles.has(SYSTEM_ROLES.ADMIN) || presentRoles.has(SYSTEM_ROLES.PHIL)) {
+          visible.push({ value: SYSTEM_ROLES.ADMIN, label: 'Admin' });
         }
       } else if (presentRoles.has(opt.value)) {
         visible.push({ value: opt.value, label: opt.label });

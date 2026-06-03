@@ -36,10 +36,19 @@ const routes: Routes = [
     loadChildren: () => import('./features/chat/chat.module').then(m => m.ChatModule)
   },
   {
-    path: 'delivery',
+    path: 'initiatives',
     canActivate: [authGuard],
     loadChildren: () => import('./features/delivery/delivery.module').then(m => m.DeliveryModule)
   },
+  // D-392: Legacy /delivery/* routes redirect to /initiatives/*. Preserves bookmarks and saved links.
+  { path: 'delivery',           redirectTo: 'initiatives',                  pathMatch: 'full' },
+  { path: 'delivery/cycles',    redirectTo: 'initiatives/list',             pathMatch: 'full' },
+  { path: 'delivery/workstreams',     redirectTo: 'initiatives/workstreams',      pathMatch: 'full' },
+  { path: 'delivery/divisions',       redirectTo: 'initiatives/divisions',        pathMatch: 'full' },
+  { path: 'delivery/gates',           redirectTo: 'initiatives/gates',            pathMatch: 'full' },
+  { path: 'delivery/deploy-schedule', redirectTo: 'initiatives/deploy-schedule',  pathMatch: 'full' },
+  // Param redirect for legacy detail link: /delivery/:cycle_id → /initiatives/:cycle_id
+  { path: 'delivery/:cycle_id',       redirectTo: 'initiatives/:cycle_id',        pathMatch: 'full' },
 
   {
     path: 'contact-admin',

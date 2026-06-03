@@ -82,8 +82,9 @@ export class DeliveryService {
     division_id:              string;
     workstream_id?:           string;          // optional — D-165
     tier_classification:      TierClassification;
-    assigned_ds_user_id?:     string;          // optional — CC-006: required before Brief Review gate
-    assigned_cb_user_id?:     string;          // optional — D-194: required before Go to Build gate
+    assigned_dcs_user_id?:    string;          // optional at creation; required before Brief Review gate
+    assigned_epo_user_id?:    string;          // optional at creation; required before Go to Build gate
+    assigned_dol_user_id?:    string;          // optional — D-391 (new); required before Brief Review gate
     outcome_statement?:       string;          // optional at creation
     jira_epic_key?:           string;          // optional
     milestone_target_dates?:  {               // optional gate target dates at creation
@@ -106,8 +107,9 @@ export class DeliveryService {
     outcome_statement?:      string | null;
     workstream_id?:          string | null;
     tier_classification?:    TierClassification;
-    assigned_ds_user_id?:    string | null;
-    assigned_cb_user_id?:    string | null;
+    assigned_dcs_user_id?:   string | null;
+    assigned_epo_user_id?:   string | null;
+    assigned_dol_user_id?:   string | null;
     jira_epic_key?:          string | null;
   }): Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>('delivery', 'update_delivery_cycle', params as Record<string, unknown>);
@@ -124,17 +126,18 @@ export class DeliveryService {
     workstream_id?:            string;
     filter_no_workstream?:     boolean;   // D-167: when true, returns only cycles with no workstream
     tier_classification?:      TierClassification;
-    assigned_to_current_user?: boolean;   // Build C supplement: when true, returns only cycles where caller is DS or CB
+    assigned_to_current_user?: boolean;   // D-391: when true, returns only cycles where caller is DCS, EPO, or DOL
   } = {}): Observable<McpResponse<DeliveryCycle[]>> {
     return this.mcp.call<DeliveryCycle[]>('delivery', 'list_delivery_cycles', params as Record<string, unknown>);
   }
 
-  assignDsCb(params: {
-    delivery_cycle_id:     string;
-    assigned_ds_user_id?:  string | null;
-    assigned_cb_user_id?:  string | null;
+  assignRolesToCycle(params: {
+    delivery_cycle_id:      string;
+    assigned_dcs_user_id?:  string | null;
+    assigned_epo_user_id?:  string | null;
+    assigned_dol_user_id?:  string | null;
   }): Observable<McpResponse<DeliveryCycle>> {
-    return this.mcp.call<DeliveryCycle>('delivery', 'assign_ds_cb_to_cycle', params as Record<string, unknown>);
+    return this.mcp.call<DeliveryCycle>('delivery', 'assign_roles_to_cycle', params as Record<string, unknown>);
   }
 
   advanceStage(delivery_cycle_id: string): Observable<McpResponse<DeliveryCycle>> {
@@ -200,7 +203,7 @@ export class DeliveryService {
 
   /**
    * D-345: withdraw a gate that is awaiting approval. Resets to not_started.
-   * Caller must have submit authority on the cycle (DS, CB, or Phil).
+   * Caller must have submit authority on the cycle (DCS, EPO, DOL, or Phil).
    */
   withdrawGateSubmission(params: {
     delivery_cycle_id: string;

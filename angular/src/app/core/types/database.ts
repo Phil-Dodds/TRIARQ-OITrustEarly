@@ -3,7 +3,8 @@
 // These match the schema exactly. Used by services and components.
 // No Supabase client imports here — this file is types only.
 
-export type SystemRole = 'phil' | 'ds' | 'cb' | 'ce' | 'admin';
+import type { SystemRole } from '../constants/roles';
+export type { SystemRole };
 export type LifecycleStatus = 'draft' | 'seed_review' | 'candidate' | 'canon' | 'superseded' | 'archived';
 export type FileFormat = 'pdf' | 'docx' | 'md' | 'txt';
 export type MalwareScanStatus = 'pending' | 'clean' | 'rejected';
@@ -217,9 +218,11 @@ export interface DeliveryCycle {
   outcome_statement:       string | null;
   outcome_set_by_user_id:  string | null;
   outcome_set_at:          string | null;
-  // cycle_owner_user_id removed — migration 025 (CC-006): redundant with assigned_ds_user_id
-  assigned_ds_user_id:     string | null;  // Delivery Specialist — nullable at creation, required before Brief Review (CC-006)
-  assigned_cb_user_id:     string | null;  // Capability Builder — migration 024
+  // cycle_owner_user_id removed (migration 025 — redundant with assigned_dcs_user_id).
+  // Gate enforcement (DCS+DOL → Brief Review, EPO → Go to Build) lives in submit_gate_for_approval.
+  assigned_dcs_user_id:    string | null;  // Domain Capability Strategist — required before Brief Review
+  assigned_epo_user_id:    string | null;  // Engineering Product Owner — required before Go to Build
+  assigned_dol_user_id:    string | null;  // Domain Outcome Lead — required before Brief Review
   pre_hold_lifecycle_stage: LifecycleStage | null;  // Stores stage before ON_HOLD — migration 024
   jira_epic_key:           string | null;
   created_at:              string;
@@ -229,8 +232,9 @@ export interface DeliveryCycle {
   workstream?:             DeliveryWorkstream;
   division_name?:          string;
   owner_display_name?:     string;
-  assigned_ds_display_name?: string;
-  assigned_cb_display_name?: string;
+  assigned_dcs_display_name?: string;
+  assigned_epo_display_name?: string;
+  assigned_dol_display_name?: string;
   milestone_dates?:        CycleMilestoneDate[];
   gate_records?:           GateRecord[];
   jira_links?:             JiraLink[];

@@ -1,5 +1,5 @@
 // stage-track.component.ts — StageTrackComponent (ARCH-25)
-// Standalone reusable component. Renders the 12-stage Delivery Cycle lifecycle
+// Standalone reusable component. Renders the 12-stage Initiative lifecycle
 // with 5 gate nodes in Full and Condensed display modes.
 //
 // Full mode:     All 10 stages + 5 gate nodes, labels shown, gate nodes interactive.

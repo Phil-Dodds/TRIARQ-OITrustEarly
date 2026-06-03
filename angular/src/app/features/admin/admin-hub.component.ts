@@ -20,14 +20,14 @@ interface AdminCard {
 const ADMIN_CARDS: AdminCard[] = [
   {
     title:       'Delivery Workstreams',
-    description: 'Create and manage Workstreams — the persistent delivery teams that Delivery Cycles are assigned to. Activating or deactivating a Workstream directly controls whether its cycles can clear gates.',
+    description: 'Create and manage Workstreams — the persistent delivery teams that Initiatives are assigned to. Activating or deactivating a Workstream directly controls whether its Initiatives can clear gates.',
     who:         'Phil and Admin',
     route:       'workstreams',
     icon:        '⬡'
   },
   {
     title:       'Divisions',
-    description: 'View and manage the Division hierarchy. Divisions scope which users can see which cycles, artifacts, and library content. Changes here affect access across the entire system.',
+    description: 'View and manage the Division hierarchy. Divisions scope which users can see which Initiatives, artifacts, and library content. Changes here affect access across the entire system.',
     who:         'Phil and Admin',
     route:       'divisions',
     icon:        '◫'

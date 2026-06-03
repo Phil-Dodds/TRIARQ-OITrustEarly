@@ -13,7 +13,7 @@
 
 const { supabase } = require('../db');
 
-const VALID_ROLES = ['phil', 'ds', 'cb', 'ce', 'admin'];
+const VALID_ROLES = ['phil', 'dcs', 'epo', 'dol', 'ce', 'admin'];
 
 // Inert redirect URL — see header comment. Override with APP_INVITE_REDIRECT_URL
 // if a Supabase template variant ever needs it.
@@ -26,7 +26,7 @@ const INVITE_REDIRECT_URL =
  * @param {object} params
  * @param {string} params.email
  * @param {string} params.display_name
- * @param {string} params.system_role - one of: phil, ds, cb, ce, admin
+ * @param {string} params.system_role - one of: phil, dcs, epo, dol, ce, admin
  * @param {string} caller_user_id
  */
 async function create_user(params, caller_user_id) {

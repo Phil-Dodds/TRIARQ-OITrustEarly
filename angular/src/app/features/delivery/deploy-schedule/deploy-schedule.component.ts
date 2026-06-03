@@ -48,6 +48,7 @@ import {
   DateStatus,
   CycleMilestoneDate
 } from '../../../core/types/database';
+import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 const DEPLOY_GATE = 'go_to_deploy';
 
@@ -79,15 +80,15 @@ interface QuarterLabel {
 
       <!-- D-298 header -->
       <div class="ds-header">
-        <a routerLink="/delivery" class="ds-back-link">← Delivery Cycle Tracking</a>
+        <a routerLink="/initiatives" class="ds-back-link">← Initiative Tracking</a>
         <div class="ds-header-row">
           <h3 class="ds-title">Deploy Gate by Quarter</h3>
           <button *ngIf="canCreateCycle" class="ds-new-cycle" (click)="onNewCycle()">
-            + New Cycle
+            + New Initiative
           </button>
         </div>
         <p class="ds-subtitle">
-          Go to Deploy gates grouped by quarter. See which cycles are scheduled
+          Go to Deploy gates grouped by quarter. See which Initiatives are scheduled
           to reach production each quarter and track commitment against target
           dates.
         </p>
@@ -429,8 +430,8 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
       ).subscribe(async profile => {
         const userId = profile.id ?? '';
         const role   = profile.system_role;
-        this.isPrivileged   = role === 'phil' || role === 'admin';
-        this.canCreateCycle = ['phil', 'admin', 'ds', 'cb'].includes(role);
+        this.isPrivileged   = role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN;
+        this.canCreateCycle = [SYSTEM_ROLES.PHIL, SYSTEM_ROLES.ADMIN, SYSTEM_ROLES.DCS, SYSTEM_ROLES.EPO, SYSTEM_ROLES.DOL].includes(role);
 
         // Contract 17 §2 / D-380: restore persisted toggle state via MCP.
         const saved = await this.screenState.restore(SCREEN_KEYS.DELIVERY_DEPLOY_SCHEDULE);
@@ -730,7 +731,7 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
   }
 
   openWorkstream(workstreamId: string | null): void {
-    this.router.navigate(['/delivery/workstreams'], {
+    this.router.navigate(['/initiatives/workstreams'], {
       queryParams: workstreamId ? { workstream_id: workstreamId } : {}
     });
   }
@@ -742,7 +743,7 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
     if (expandedIds.length === 1 && expandedIds[0] !== '__none__') {
       queryParams['workstream_id'] = expandedIds[0];
     }
-    this.router.navigate(['/delivery/cycles'], { queryParams });
+    this.router.navigate(['/initiatives/list'], { queryParams });
   }
 
   trackByWsId(_: number, group: WorkstreamGroup): string {
