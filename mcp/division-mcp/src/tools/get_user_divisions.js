@@ -22,10 +22,10 @@ async function get_user_divisions(params, caller_user_id) {
 
   if (!user_id) return { success: false, error: 'user_id is required.' };
 
-  // Verify user exists and get their role
+  // Verify user exists and resolve Admin flag — Contract 19 (D-394, CC-19-01).
   const { data: user, error: userErr } = await supabase
     .from('users')
-    .select('id, display_name, system_role')
+    .select('id, display_name, is_admin')
     .eq('id', user_id)
     .is('deleted_at', null)
     .single();
@@ -34,9 +34,9 @@ async function get_user_divisions(params, caller_user_id) {
     return { success: false, error: 'User not found.' };
   }
 
-  // ── D-170: Phil and Admin have implicit access to all Divisions ───────────
+  // ── D-170: Admin has implicit access to all Divisions ─────────────────────
   // No membership assignment required. Return all active divisions.
-  if (user.system_role === 'phil' || user.system_role === 'admin') {
+  if (user.is_admin === true) {
     const { data: allDivisions, error: allErr } = await supabase
       .from('divisions')
       .select('id, division_name, division_level, parent_division_id, division_type_label')

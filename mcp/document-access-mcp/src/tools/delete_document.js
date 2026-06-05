@@ -32,20 +32,23 @@ async function delete_document(params, caller_user_id) {
     return { success: false, error: 'Document has already been deleted.' };
   }
 
-  // Canon artifacts require Phil-level authority to delete
+  // Canon artifacts require super-admin authority to delete.
+  // Contract 19 (CC-19-06 option B): is_super_admin replaces the legacy
+  // system_role = 'phil' check. The flag is set by direct DB assignment only —
+  // there is no MCP write path — so the authority cannot escalate through the UI.
   if (artifact.lifecycle_status === 'canon') {
     const { data: caller } = await supabase
       .from('users')
-      .select('system_role')
+      .select('is_super_admin')
       .eq('id', caller_user_id)
       .is('deleted_at', null)
       .single();
 
-    if (!caller || caller.system_role !== 'phil') {
+    if (!caller || caller.is_super_admin !== true) {
       return {
         success: false,
         error: `"${artifact.artifact_title}" is a Canon document and cannot be deleted. `
-             + 'Only Phil (EVP P&G) can delete Canon documents. '
+             + 'Only a super-admin can delete Canon documents. '
              + 'To remove this document from circulation, request that it be Superseded or Archived instead.'
       };
     }

@@ -108,25 +108,26 @@ async function record_gate_decision(params, caller_user_id) {
     return { success: false, error: 'Delivery Cycle not found or has been deleted.' };
   }
 
-  // ── Supplement Section 1: caller must be Phil or the gate's designated approver ──
-  // Build C: approver_user_id is null → Phil approves. Build B wires RACI-configured approvers.
+  // ── Supplement Section 1: caller must be an Admin or the gate's designated approver ──
+  // Contract 19 (D-394, CC-19-01): boolean predicate; 'phil' collapsed into is_admin.
+  // Build C: approver_user_id is null → Admin fallback approves.
   const { data: caller } = await supabase
     .from('users')
-    .select('system_role, display_name')
+    .select('is_admin, display_name')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
-  const isPhil              = caller?.system_role === 'phil';
+  const isAdmin              = caller?.is_admin === true;
   const isDesignatedApprover = gate_record.approver_user_id === caller_user_id;
   const callerDisplayName    = caller?.display_name ?? 'Approver';
   const gateNameDisplay      = GATE_NAME_DISPLAY[gate_name] ?? gate_name;
-  // When no approver configured, Phil is the fallback (Build C default)
+  // When no approver configured, any Admin can approve (Build C default).
   const approverUnconfigured = !gate_record.approver_user_id;
 
-  if (!isPhil && !isDesignatedApprover) {
+  if (!isAdmin && !isDesignatedApprover) {
     const reason = approverUnconfigured
-      ? 'No approver has been configured for this gate — Phil is the default approver.'
+      ? 'No approver has been configured for this gate — an Admin is the default approver.'
       : 'You are not the designated approver for this gate.';
     return {
       success: false,

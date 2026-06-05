@@ -1,9 +1,10 @@
 // contact-admin.component.ts — Pathways OI Trust
 // Route: /contact-admin
 // Roles: all
-// Shows all active Admins (system_role = 'admin' or 'phil') with name and
-// clickable email address. Available to every authenticated user so anyone
-// can reach someone with system access.
+// Shows all active Admins (is_admin = true) with name and clickable email address.
+// Available to every authenticated user so anyone can reach someone with system access.
+// Contract 19 (CC-19-01): the legacy "System Owner" badge for phil is retired —
+// the boolean model treats Admin as a single system-level role (D-369), multi-user.
 // D-93: data via UserProfileService → division-mcp list_users. No direct DB.
 // D-140: clear load error with actionable message.
 // D-178: Tier 1 skeleton while loading.
@@ -83,14 +84,10 @@ import { User }                  from '../../core/types/database';
               {{ admin.display_name }}
             </div>
             <span class="oi-pill"
-                  [style.background]="admin.system_role === 'phil'
-                    ? 'var(--triarq-color-primary)'
-                    : 'var(--triarq-color-background-subtle)'"
-                  [style.color]="admin.system_role === 'phil'
-                    ? '#fff'
-                    : 'var(--triarq-color-text-secondary)'"
-                  style="font-size:10px;">
-              {{ admin.system_role === 'phil' ? 'System Owner' : 'Admin' }}
+                  style="background:var(--triarq-color-background-subtle);
+                         color:var(--triarq-color-text-secondary);
+                         font-size:10px;">
+              Admin
             </span>
           </div>
 

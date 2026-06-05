@@ -35,10 +35,10 @@ async function create_delivery_workstream(params, caller_user_id) {
     return { success: false, error: 'display_name_short must be 20 characters or fewer.' };
   }
 
-  // Verify caller is admin or phil
+  // Verify caller is Admin — Contract 19 (D-394, CC-19-01).
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('id, system_role, is_active')
+    .select('id, is_admin, is_active')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -49,7 +49,7 @@ async function create_delivery_workstream(params, caller_user_id) {
   if (!caller.is_active) {
     return { success: false, error: 'Your account is inactive.' };
   }
-  if (caller.system_role !== 'admin' && caller.system_role !== 'phil') {
+  if (caller.is_admin !== true) {
     return {
       success: false,
       error: 'Creating Delivery Workstreams requires Admin role. Your current role does not have this permission. Contact your System Admin to request access.'

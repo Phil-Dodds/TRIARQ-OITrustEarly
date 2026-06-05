@@ -32,15 +32,15 @@ async function get_cycle_event_log(params, caller_user_id) {
     return { success: false, error: 'Delivery Cycle not found or has been deleted.' };
   }
 
-  // Verify caller has division access (admin/phil bypass)
+  // Verify caller has division access (Admin bypass — Contract 19 D-394, CC-19-01).
   const { data: caller } = await supabase
     .from('users')
-    .select('system_role')
+    .select('is_admin')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
-  const isPrivileged = caller && ['admin', 'phil'].includes(caller.system_role);
+  const isPrivileged = caller?.is_admin === true;
 
   if (!isPrivileged) {
     const { data: membership } = await supabase

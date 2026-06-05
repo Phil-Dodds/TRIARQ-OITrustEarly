@@ -1,24 +1,22 @@
 // submit_gate_for_approval.js
 // Pathways OI Trust — delivery-cycle-mcp
-// Submits a gate for approval. Validates workstream assignment, active_status,
-// DCS assignment, DOL assignment (brief_review), and EPO assignment (go_to_build).
+// Submits a gate for approval. Validates DCS, DOL (brief_review), and EPO (go_to_build)
+// assignments. Workstream is recommended, not gate-required (Contract 19 Part 3b).
 //
-// D-165: Workstream must be assigned before any gate can be submitted.
-//   At brief_review: cycle has no workstream → blocked with assignment instruction.
-//   At all subsequent gates: workstream must also be assigned.
+// Contract 19 (Part 3b): Workstream null check removed. Workstream is recommended.
+//   When Workstream IS assigned: active_status check still gates submission (ARCH-23).
+//   When Workstream is null: submission proceeds; workstream_active_at_clearance = null.
 //
 // D-389/D-390/D-391:
 //   brief_review gate: assigned_dcs_user_id AND assigned_dol_user_id must both be non-null.
 //     DCS is accountable for the Initiative through delivery; DOL is accountable for the outcome.
 //   go_to_build gate: assigned_epo_user_id must be non-null. EPO is accountable for the build phase.
 //
-// ARCH-23: If workstream inactive at gate time: gate_status = 'blocked',
-//   workstream_active_at_clearance = false recorded.
-// If workstream active: gate transitions to 'awaiting_approval' (D-345).
+// ARCH-23 (when Workstream assigned): inactive → gate_status = 'blocked',
+//   workstream_active_at_clearance = false recorded. Active → 'awaiting_approval' (D-345).
 //   submitted_at = now() and submitted_by_user_id = JWT identity recorded.
-//   workstream_active_at_clearance = true recorded.
 // Appends event log entry in all cases.
-// Source: D-140, D-165, D-345, ARCH-23, D-389, D-390, D-391,
+// Source: D-140, D-345, ARCH-23, D-389, D-390, D-391, Contract 19 Part 3b,
 //   gate-submission-flow-spec-2026-04-19 §3.1.
 
 'use strict';
@@ -71,53 +69,34 @@ async function submit_gate_for_approval(params, caller_user_id) {
     return { success: false, error: 'Initiative not found or has been deleted.' };
   }
 
-  // ── Submission authority: Phil, DCS, EPO, or DOL on this Initiative (D-389/D-390/D-391) ──
+  // ── Submission authority: Admin, DCS, EPO, or DOL on this Initiative (D-389/D-390/D-391) ──
+  // Contract 19 (D-394): boolean predicate replaces system_role equality. CC-19-01 collapsed
+  // 'phil' into is_admin, so any Admin can submit on behalf of an Initiative.
   const { data: caller } = await supabase
     .from('users')
-    .select('system_role, display_name')
+    .select('is_admin, display_name')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
-  const callerRole         = caller?.system_role ?? '';
   const callerDisplayName  = caller?.display_name ?? 'A user';
   const gateNameDisplay    = GATE_NAME_DISPLAY[gate_name] ?? gate_name;
-  const isPhil        = callerRole === 'phil';
+  const isAdmin       = caller?.is_admin === true;
   const isAssignedDcs = cycle.assigned_dcs_user_id === caller_user_id;
   const isAssignedEpo = cycle.assigned_epo_user_id === caller_user_id;
   const isAssignedDol = cycle.assigned_dol_user_id === caller_user_id;
 
-  if (!isPhil && !isAssignedDcs && !isAssignedEpo && !isAssignedDol) {
+  if (!isAdmin && !isAssignedDcs && !isAssignedEpo && !isAssignedDol) {
     return {
       success: false,
       error: 'You do not have authority to submit this gate for approval. ' +
-             'Only the assigned Domain Capability Strategist, Engineering Product Owner, Domain Outcome Lead, or Phil can submit gates.'
+             'Only the assigned Domain Capability Strategist, Engineering Product Owner, Domain Outcome Lead, or an Admin can submit gates.'
     };
   }
 
-  // ── D-165: Workstream must be assigned before any gate can be submitted ───
-  if (!cycle.workstream_id) {
-    const gateLabel = gate_name === 'brief_review'
-      ? 'Brief Review'
-      : `the ${gate_name.replace(/_/g, ' ')}`;
-
-    await supabase
-      .from('cycle_event_log')
-      .insert({
-        delivery_cycle_id,
-        event_type:        'gate_blocked',
-        event_description: `Gate '${gate_name}' blocked: no Workstream is assigned to this Initiative.`,
-        actor_user_id:     caller_user_id,
-        event_metadata:    { gate_name, reason: 'no_workstream_assigned' }
-      });
-
-    return {
-      success: false,
-      error: `Cannot submit ${gateLabel} gate — this Initiative has no Workstream assigned. ` +
-             `Assign a Workstream before submitting for approval. ` +
-             `An Admin or DCS can update the Initiative's Workstream.`
-    };
-  }
+  // ── Contract 19 Part 3b: Workstream null check removed. Workstream recommended, not gate-required.
+  //   When Workstream IS assigned, active_status still gates submission (ARCH-23) — see below.
+  //   When Workstream is null, submission proceeds; the workstream-active branch is skipped.
 
   // ── D-389: DCS required before brief_review gate ──────────────────────────
   if (gate_name === 'brief_review' && !cycle.assigned_dcs_user_id) {
@@ -179,16 +158,20 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
-  // ── Fetch workstream ───────────────────────────────────────────────────────
-  const { data: workstream, error: wsErr } = await supabase
-    .from('delivery_workstreams')
-    .select('workstream_name, active_status')
-    .eq('workstream_id', cycle.workstream_id)
-    .is('deleted_at', null)
-    .single();
+  // ── Fetch workstream (only when assigned — Contract 19 Part 3b) ────────────
+  let workstream = null;
+  if (cycle.workstream_id) {
+    const { data: wsRow, error: wsErr } = await supabase
+      .from('delivery_workstreams')
+      .select('workstream_name, active_status')
+      .eq('workstream_id', cycle.workstream_id)
+      .is('deleted_at', null)
+      .single();
 
-  if (wsErr || !workstream) {
-    return { success: false, error: 'Assigned Workstream not found. Contact an Admin to reassign a valid Workstream.' };
+    if (wsErr || !wsRow) {
+      return { success: false, error: 'Assigned Workstream not found. Contact an Admin to reassign a valid Workstream.' };
+    }
+    workstream = wsRow;
   }
 
   // ── Fetch gate record ─────────────────────────────────────────────────────
@@ -214,10 +197,8 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
-  // ── Workstream active check (ARCH-23, Session 2026-03-24-Q) ─────────────
-  const workstream_active = workstream.active_status;
-
-  if (!workstream_active) {
+  // ── Workstream active check (ARCH-23) — only when Workstream assigned ────
+  if (workstream && !workstream.active_status) {
     const { data: blocked_gate, error: blockErr } = await supabase
       .from('gate_records')
       .update({
@@ -249,14 +230,19 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
-  // ── Workstream active — gate transitions to awaiting_approval (D-345) ────
+  // ── Submission path — Workstream active OR Workstream not assigned ───────
+  //   workstream_active_at_clearance:
+  //     true   — Workstream assigned + active
+  //     null   — no Workstream assigned (Contract 19 Part 3b)
+  const workstream_clearance = workstream ? true : null;
+
   const { data: updated_gate, error: updateErr } = await supabase
     .from('gate_records')
     .update({
       gate_status:                    'awaiting_approval',
       submitted_at:                   new Date().toISOString(),
       submitted_by_user_id:           caller_user_id,
-      workstream_active_at_clearance: true
+      workstream_active_at_clearance: workstream_clearance
     })
     .eq('gate_record_id', gate_record.gate_record_id)
     .select()

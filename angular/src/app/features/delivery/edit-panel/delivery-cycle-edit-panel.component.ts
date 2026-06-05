@@ -106,20 +106,7 @@ function epAvatarColorFromName(name: string): string {
         <div class="ep-body" #epBody>
           <form [formGroup]="form" novalidate>
 
-            <!-- 1. Initiative Title -->
-            <div class="ep-field">
-              <label class="ep-label">
-                Initiative Title <span class="ep-required">*</span>
-              </label>
-              <input formControlName="cycle_title" class="ep-input"
-                     type="text" maxlength="120" />
-              <!-- B-38: S-025 Pattern 1 guidance text. Source: Contract 10 §3 B-38. -->
-              <div class="ep-hint">The name used across all views and reports.</div>
-              <div *ngIf="f['cycle_title'].invalid && f['cycle_title'].touched"
-                   class="ep-field-error">Initiative Title is required.</div>
-            </div>
-
-            <!-- 2. Division -->
+            <!-- 1. Division -->
             <!-- B-24 fix: required asterisk removed — Division is required at creation only.
                  In Edit the cycle already has a Division; required indicator is misleading. Source: D-165, Contract 9. -->
             <div class="ep-field">
@@ -141,6 +128,19 @@ function epAvatarColorFromName(name: string): string {
               </div>
             </div>
 
+            <!-- 2. Initiative Title -->
+            <div class="ep-field">
+              <label class="ep-label">
+                Initiative Title <span class="ep-required">*</span>
+              </label>
+              <input formControlName="cycle_title" class="ep-input"
+                     type="text" maxlength="120" />
+              <!-- B-38: S-025 Pattern 1 guidance text. Source: Contract 10 §3 B-38. -->
+              <div class="ep-hint">The name used across all views and reports.</div>
+              <div *ngIf="f['cycle_title'].invalid && f['cycle_title'].touched"
+                   class="ep-field-error">Initiative Title is required.</div>
+            </div>
+
             <!-- 3. Outcome Statement -->
             <div class="ep-field">
               <label class="ep-label">Outcome Statement</label>
@@ -150,32 +150,64 @@ function epAvatarColorFromName(name: string): string {
               <div class="ep-hint">Should be set before Brief Review Gate.</div>
             </div>
 
-            <!-- 4. Delivery Workstream (entity picker, re-scopes on Division change) -->
-            <!-- B-14 fix: Workstream is optional at edit time per D-165. Removed required asterisk
-                 and required validation. Gate-enforcement only (Brief Review gate). Source: D-165. -->
+            <!-- 4. Assigned Domain Capability Strategist (D-389; UserPickerComponent per D-182). -->
             <div class="ep-field">
-              <label class="ep-label">Delivery Workstream</label>
-              <!-- B-25 fix: Division change no longer auto-clears Workstream. Shows amber warning
-                   when WS belongs to a different Division. User saves freely. Source: D-165, D-297, D-228, Contract 9. -->
-              <div *ngIf="workstreamDivisionNote" class="ep-amber-note">
-                {{ workstreamDivisionNote }}
+              <label class="ep-label">Assigned Domain Capability Strategist</label>
+              <div *ngIf="selectedDcs; else noDcsPicked" class="ep-user-chip-row">
+                <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
+                  <span class="ep-user-avatar" [style.background]="selectedDcsColor">{{ selectedDcsInitials }}</span>
+                  {{ selectedDcs.display_name }}
+                </span>
+                <button type="button" class="ep-chip-remove" (click)="clearDcs()">✕ Remove</button>
               </div>
-              <button type="button" class="ep-picker-trigger"
-                      (click)="openWorkstreamPicker()">
-                <span *ngIf="!selectedWorkstream" class="ep-picker-placeholder">
-                  — Select Workstream —
-                </span>
-                <span *ngIf="selectedWorkstream">
-                  <span class="ep-entity-chip">{{ selectedWorkstream.workstream_name }}</span>
-                </span>
-              </button>
-              <button *ngIf="selectedWorkstream" type="button"
-                      class="ep-chip-remove"
-                      (click)="clearWorkstream()">✕ Remove</button>
+              <ng-template #noDcsPicked>
+                <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
+                        (click)="openDcsPicker()">
+                  <span class="ep-picker-placeholder">— Unassigned —</span>
+                </button>
+              </ng-template>
               <div class="ep-hint">Required before Brief Review Gate.</div>
             </div>
 
-            <!-- 5. Tier Classification (dropdown in Edit — not option cards; spec 2.3 note 4) -->
+            <!-- 5. Assigned Engineering Product Owner (D-390; UserPickerComponent per D-182). -->
+            <div class="ep-field">
+              <label class="ep-label">Assigned Engineering Product Owner</label>
+              <div *ngIf="selectedEpo; else noEpoPicked" class="ep-user-chip-row">
+                <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
+                  <span class="ep-user-avatar" [style.background]="selectedEpoColor">{{ selectedEpoInitials }}</span>
+                  {{ selectedEpo.display_name }}
+                </span>
+                <button type="button" class="ep-chip-remove" (click)="clearEpo()">✕ Remove</button>
+              </div>
+              <ng-template #noEpoPicked>
+                <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
+                        (click)="openEpoPicker()">
+                  <span class="ep-picker-placeholder">— Unassigned —</span>
+                </button>
+              </ng-template>
+              <div class="ep-hint">Required before Go to Build Gate.</div>
+            </div>
+
+            <!-- 6. Assigned Domain Outcome Lead (D-391; UserPickerComponent per D-182). -->
+            <div class="ep-field">
+              <label class="ep-label">Assigned Domain Outcome Lead</label>
+              <div *ngIf="selectedDol; else noDolPicked" class="ep-user-chip-row">
+                <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
+                  <span class="ep-user-avatar" [style.background]="selectedDolColor">{{ selectedDolInitials }}</span>
+                  {{ selectedDol.display_name }}
+                </span>
+                <button type="button" class="ep-chip-remove" (click)="clearDol()">✕ Remove</button>
+              </div>
+              <ng-template #noDolPicked>
+                <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
+                        (click)="openDolPicker()">
+                  <span class="ep-picker-placeholder">— Unassigned —</span>
+                </button>
+              </ng-template>
+              <div class="ep-hint">Required before Brief Review Gate.</div>
+            </div>
+
+            <!-- 7. Tier Classification (dropdown in Edit — not option cards; spec 2.3 note 4) -->
             <!-- B-24 fix: required asterisk removed — Tier is required at creation only.
                  In Edit the cycle already has a Tier. Source: D-165, Contract 9. -->
             <div class="ep-field">
@@ -199,61 +231,28 @@ function epAvatarColorFromName(name: string): string {
               </div>
             </div>
 
-            <!-- 6. Assigned Domain Capability Strategist (D-389; UserPickerComponent per D-182). -->
+            <!-- 8. Delivery Workstream (entity picker, re-scopes on Division change) -->
+            <!-- B-14 fix: Workstream is optional at edit time per D-165. Removed required asterisk
+                 and required validation. Gate-enforcement only (Brief Review gate). Source: D-165. -->
             <div class="ep-field">
-              <label class="ep-label">Assigned Domain Capability Strategist</label>
-              <div *ngIf="selectedDcs; else noDcsPicked" class="ep-user-chip-row">
-                <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
-                  <span class="ep-user-avatar" [style.background]="selectedDcsColor">{{ selectedDcsInitials }}</span>
-                  {{ selectedDcs.display_name }}
-                </span>
-                <button type="button" class="ep-chip-remove" (click)="clearDcs()">✕ Remove</button>
+              <label class="ep-label">Delivery Workstream</label>
+              <!-- B-25 fix: Division change no longer auto-clears Workstream. Shows amber warning
+                   when WS belongs to a different Division. User saves freely. Source: D-165, D-297, D-228, Contract 9. -->
+              <div *ngIf="workstreamDivisionNote" class="ep-amber-note">
+                {{ workstreamDivisionNote }}
               </div>
-              <ng-template #noDcsPicked>
-                <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
-                        (click)="openDcsPicker()">
-                  <span class="ep-picker-placeholder">— Unassigned —</span>
-                </button>
-              </ng-template>
-              <div class="ep-hint">Required before Brief Review Gate.</div>
-            </div>
-
-            <!-- 7. Assigned Engineering Product Owner (D-390; UserPickerComponent per D-182). -->
-            <div class="ep-field">
-              <label class="ep-label">Assigned Engineering Product Owner</label>
-              <div *ngIf="selectedEpo; else noEpoPicked" class="ep-user-chip-row">
-                <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
-                  <span class="ep-user-avatar" [style.background]="selectedEpoColor">{{ selectedEpoInitials }}</span>
-                  {{ selectedEpo.display_name }}
+              <button type="button" class="ep-picker-trigger"
+                      (click)="openWorkstreamPicker()">
+                <span *ngIf="!selectedWorkstream" class="ep-picker-placeholder">
+                  — Select Workstream —
                 </span>
-                <button type="button" class="ep-chip-remove" (click)="clearEpo()">✕ Remove</button>
-              </div>
-              <ng-template #noEpoPicked>
-                <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
-                        (click)="openEpoPicker()">
-                  <span class="ep-picker-placeholder">— Unassigned —</span>
-                </button>
-              </ng-template>
-              <div class="ep-hint">Required before Go to Build Gate.</div>
-            </div>
-
-            <!-- 8. Assigned Domain Outcome Lead (D-391; UserPickerComponent per D-182). -->
-            <div class="ep-field">
-              <label class="ep-label">Assigned Domain Outcome Lead</label>
-              <div *ngIf="selectedDol; else noDolPicked" class="ep-user-chip-row">
-                <span class="ep-entity-chip" style="display:inline-flex;align-items:center;gap:6px;">
-                  <span class="ep-user-avatar" [style.background]="selectedDolColor">{{ selectedDolInitials }}</span>
-                  {{ selectedDol.display_name }}
+                <span *ngIf="selectedWorkstream">
+                  <span class="ep-entity-chip">{{ selectedWorkstream.workstream_name }}</span>
                 </span>
-                <button type="button" class="ep-chip-remove" (click)="clearDol()">✕ Remove</button>
-              </div>
-              <ng-template #noDolPicked>
-                <button type="button" class="ep-picker-trigger ep-picker-trigger--empty"
-                        (click)="openDolPicker()">
-                  <span class="ep-picker-placeholder">— Unassigned —</span>
-                </button>
-              </ng-template>
-              <div class="ep-hint">Required before Brief Review Gate.</div>
+              </button>
+              <button *ngIf="selectedWorkstream" type="button"
+                      class="ep-chip-remove"
+                      (click)="clearWorkstream()">✕ Remove</button>
             </div>
 
             <!-- 9. Jira Epic Link -->

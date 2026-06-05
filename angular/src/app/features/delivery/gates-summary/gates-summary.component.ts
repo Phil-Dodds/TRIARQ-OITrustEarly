@@ -38,7 +38,6 @@ import {
   Division,
   LifecycleStage
 } from '../../../core/types/database';
-import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -94,7 +93,7 @@ interface ScheduleRow {
         </div>
         <p class="gs-subtitle">
           Gates coming up in the next 7 days and gates with overdue target dates.
-          Use this to prioritize approval actions and identify stalled cycles.
+          Use this to prioritize approval actions and identify stalled Initiatives.
         </p>
       </div>
 
@@ -213,7 +212,7 @@ interface ScheduleRow {
 
         <!-- Full grid: cycles outside both windows -->
         <section class="gs-section">
-          <div class="gs-section-header">All Other Active Cycles</div>
+          <div class="gs-section-header">All Other Active Initiatives</div>
           <div class="gs-row gs-row-header">
             <span>Cycle</span>
             <span>Workstream</span>
@@ -424,9 +423,13 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
         take(1)
       ).subscribe(async profile => {
         const userId = profile.id ?? '';
-        const role   = profile.system_role;
-        this.isPrivileged   = role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN;
-        this.canCreateCycle = [SYSTEM_ROLES.PHIL, SYSTEM_ROLES.ADMIN, SYSTEM_ROLES.DCS, SYSTEM_ROLES.EPO, SYSTEM_ROLES.DOL].includes(role);
+        // Contract 19 (D-394): boolean flags replace system_role equality.
+        this.isPrivileged   = profile.is_admin === true;
+        this.canCreateCycle =
+          profile.is_admin === true ||
+          profile.is_dcs   === true ||
+          profile.is_epo   === true ||
+          profile.is_dol   === true;
 
         // Contract 17 §2 / D-380: restore persisted filter state via MCP.
         const saved = await this.screenState.restore(SCREEN_KEYS.DELIVERY_GATES);

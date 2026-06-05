@@ -62,39 +62,43 @@ async function set_milestone_actual_date(params, caller_user_id) {
   }
 
   // ── Fetch cycle (for assignment + authorization) ───────────────────────────
+  // Contract 19 (CC-19-05): column names updated to post-migration-032 form
+  // (assigned_dcs_user_id, assigned_epo_user_id). Was referencing the renamed
+  // assigned_ds_user_id / assigned_cb_user_id columns — pre-existing bug.
+  // assigned_dol_user_id added so DOL can also correct milestone dates.
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, assigned_ds_user_id, assigned_cb_user_id')
+    .select('delivery_cycle_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
 
   if (cycleErr || !cycle) {
-    return { success: false, error: 'Delivery Cycle not found or has been deleted.' };
+    return { success: false, error: 'Initiative not found or has been deleted.' };
   }
 
-  // ── Authorization: Phil, Admin, assigned DS, or assigned CB ───────────────
-  // Pattern matches submit_gate_for_approval + create_delivery_workstream.
+  // ── Authorization: Admin or assigned DCS/EPO/DOL on this Initiative ──────
+  // Contract 19 (D-394, CC-19-01): boolean predicate; phil collapsed into is_admin.
+  // CC-19-05: column names updated to post-migration-032 form; DOL added.
   const { data: caller } = await supabase
     .from('users')
-    .select('system_role, display_name')
+    .select('is_admin, display_name')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
-  const callerRole        = caller?.system_role ?? '';
   const callerDisplayName = caller?.display_name ?? 'A user';
-  const isPhil       = callerRole === 'phil';
-  const isAdmin      = callerRole === 'admin';
-  const isAssignedDs = cycle.assigned_ds_user_id === caller_user_id;
-  const isAssignedCb = cycle.assigned_cb_user_id === caller_user_id;
+  const isAdmin       = caller?.is_admin === true;
+  const isAssignedDcs = cycle.assigned_dcs_user_id === caller_user_id;
+  const isAssignedEpo = cycle.assigned_epo_user_id === caller_user_id;
+  const isAssignedDol = cycle.assigned_dol_user_id === caller_user_id;
 
-  if (!isPhil && !isAdmin && !isAssignedDs && !isAssignedCb) {
+  if (!isAdmin && !isAssignedDcs && !isAssignedEpo && !isAssignedDol) {
     return {
       success: false,
       error: 'You do not have authority to set the actual date for this milestone. ' +
-             'Only the assigned Domain Strategist, the assigned Capability Builder, ' +
-             'Phil, or an Admin can record actual dates.'
+             'Only the assigned Domain Capability Strategist, Engineering Product Owner, ' +
+             'Domain Outcome Lead, or an Admin can record actual dates.'
     };
   }
 

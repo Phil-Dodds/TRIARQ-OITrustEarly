@@ -27,7 +27,9 @@ import {
   FormBuilder,
   FormControl,
   FormGroup,
-  Validators
+  Validators,
+  AbstractControl,
+  ValidationErrors
 } from '@angular/forms';
 import { IonicModule }                 from '@ionic/angular';
 import { McpService }                  from '../../../core/services/mcp.service';
@@ -39,8 +41,16 @@ import {
 }                                       from '../../../core/services/screen-state.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
-import { User, SystemRole, Division }  from '../../../core/types/database';
-import { SYSTEM_ROLES, ROLE_ABBREVIATIONS } from '../../../core/constants/roles';
+import { User, Division }              from '../../../core/types/database';
+import {
+  ALL_ROLE_FLAGS,
+  ROLE_FLAG_ABBREVIATIONS,
+  ROLE_FLAG_DISPLAY_NAMES,
+  RoleFlag
+} from '../../../core/constants/roles';
+
+// Contract 19: the five active role flags managed by the Admin Users surface.
+type ActiveRoleFlag = Exclude<RoleFlag, 'is_phil'>;
 
 /** get_user_divisions response shape */
 interface UserDivisionsData {
@@ -48,6 +58,21 @@ interface UserDivisionsData {
   display_name:               string;
   directly_assigned_divisions: Division[];
   all_accessible_divisions:   (Division & { access_type: 'direct' | 'inherited' })[];
+}
+
+/**
+ * Contract 19 (Part 1e): form-level validator. The boolean role-flag checkboxes
+ * are independent controls; at least one must be true for the form to be valid.
+ */
+function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | null {
+  const v = group.value as Record<string, unknown>;
+  const any =
+    v['is_admin'] === true ||
+    v['is_dcs']   === true ||
+    v['is_epo']   === true ||
+    v['is_dol']   === true ||
+    v['is_ce']    === true;
+  return any ? null : { noRoleSelected: true };
 }
 
 @Component({
@@ -95,16 +120,19 @@ interface UserDivisionsData {
             Add New User
           </h4>
           <form [formGroup]="inviteForm" (ngSubmit)="submitInvite()">
-            <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:1fr 1fr 1fr;">
+            <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:1fr 1fr;">
               <div>
                 <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
                   Email Address *
                 </label>
+                <!-- Contract 19 (Part 1e): paste-parse "Display Name <email@domain.com>" on this field.
+                     When the pasted value matches that pattern, email + display_name are filled together. -->
                 <input
                   formControlName="email"
                   type="email"
                   class="oi-input"
                   placeholder="user@triarqhealth.com"
+                  (paste)="onEmailPaste($event)"
                 />
                 <div
                   *ngIf="inviteForm.get('email')?.invalid && inviteForm.get('email')?.touched"
@@ -125,22 +153,26 @@ interface UserDivisionsData {
                   style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
                 >Display name is required.</div>
               </div>
-              <div>
-                <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                  System Role *
+            </div>
+
+            <!-- Contract 19 (Part 1e): role checkboxes — one per flag. At least one must be selected. -->
+            <div style="margin-top:var(--triarq-space-sm);">
+              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                Roles *
+              </label>
+              <div style="display:flex;flex-wrap:wrap;gap:var(--triarq-space-sm);" [formGroup]="inviteForm">
+                <label *ngFor="let flag of ALL_ROLE_FLAGS"
+                       style="display:inline-flex;align-items:center;gap:6px;
+                              font-size:var(--triarq-text-small);cursor:pointer;
+                              padding:6px 12px;border:1px solid var(--triarq-color-border);
+                              border-radius:5px;background:#fff;user-select:none;">
+                  <input type="checkbox" [formControlName]="flag" />
+                  <span>{{ flagAbbrev(flag) }} — {{ flagDisplay(flag) }}</span>
                 </label>
-                <select formControlName="system_role" class="oi-input">
-                  <option value="">— Select role —</option>
-                  <option value="dcs">DCS — Domain Capability Strategist</option>
-                  <option value="epo">EPO — Engineering Product Owner</option>
-                  <option value="dol">DOL — Domain Outcome Lead</option>
-                  <option value="ce">CE — Context Engineer</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <div
-                  *ngIf="inviteForm.get('system_role')?.invalid && inviteForm.get('system_role')?.touched"
-                  style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-                >Role is required.</div>
+              </div>
+              <div *ngIf="inviteForm.errors?.['noRoleSelected'] && inviteForm.touched"
+                   style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
+                Select at least one role.
               </div>
             </div>
             <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
@@ -255,17 +287,41 @@ interface UserDivisionsData {
                    border-bottom:1px solid var(--triarq-color-border);
                    font-size:var(--triarq-text-small);align-items:center;"
           >
-            <span style="font-weight:500;color:var(--triarq-color-text-primary);">
-              {{ user.display_name }}
+            <span style="display:flex;flex-direction:column;gap:2px;">
+              <span style="font-weight:500;color:var(--triarq-color-text-primary);">
+                {{ user.display_name }}
+              </span>
+              <!-- Contract 19 (D-395, UAT #13): Division-membership count.
+                   Click "Assign" to open the full chip set. Tooltip lists names. -->
+              <span *ngIf="(user.division_names?.length ?? 0) > 0"
+                    [title]="(user.division_names ?? []).join(', ')"
+                    style="font-size:10px;color:var(--triarq-color-text-secondary);">
+                {{ user.division_names!.length }}
+                Division{{ user.division_names!.length === 1 ? '' : 's' }}
+              </span>
+              <span *ngIf="(user.division_names?.length ?? 0) === 0"
+                    style="font-size:10px;color:var(--triarq-color-text-secondary);font-style:italic;">
+                No Division
+              </span>
             </span>
             <span style="color:var(--triarq-color-text-secondary);">{{ user.email }}</span>
-            <span>
-              <!-- B-51: Phil role displays as "Admin"; styling matches DS/CB pattern. Source: Contract 10 §7 B-51. -->
-              <span
-                class="oi-pill"
-                [style.background]="rolePillBg(user.system_role)"
-                [style.color]="rolePillColor(user.system_role)"
-              >{{ roleDisplayLabel(user.system_role) }}</span>
+            <span style="display:flex;flex-wrap:wrap;gap:4px;">
+              <!-- Contract 19 (Part 1e): render one pill per role flag the user holds. -->
+              <ng-container *ngIf="userFlags(user).length > 0; else noRoles">
+                <span *ngFor="let flag of userFlags(user)"
+                      class="oi-pill"
+                      [style.background]="flagPillBg(flag)"
+                      [style.color]="flagPillColor(flag)">
+                  {{ flagAbbrev(flag) }}
+                </span>
+              </ng-container>
+              <ng-template #noRoles>
+                <span class="oi-pill"
+                      style="background:var(--triarq-color-background-subtle);
+                             color:var(--triarq-color-text-secondary);">
+                  No role
+                </span>
+              </ng-template>
             </span>
             <!-- Active/Inactive badge -->
             <span>
@@ -331,7 +387,7 @@ interface UserDivisionsData {
                      border-bottom:1px solid var(--triarq-color-border);"
             >
               <form [formGroup]="editForm" (ngSubmit)="submitEdit()">
-                <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:2fr 2fr 1fr 1fr auto;
+                <div style="display:grid;gap:var(--triarq-space-sm);grid-template-columns:2fr 2fr 1fr auto;
                             align-items:end;">
                   <div>
                     <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
@@ -364,19 +420,6 @@ interface UserDivisionsData {
                   </div>
                   <div>
                     <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                      Role *
-                    </label>
-                    <select formControlName="system_role" class="oi-input">
-                      <option value="dcs">DCS — Domain Capability Strategist</option>
-                      <option value="epo">EPO — Engineering Product Owner</option>
-                      <option value="dol">DOL — Domain Outcome Lead</option>
-                      <option value="ce">CE — Context Engineer</option>
-                      <option value="admin">Admin</option>
-                      <option value="phil">Phil</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
                       Status
                     </label>
                     <select formControlName="is_active" class="oi-input">
@@ -397,6 +440,27 @@ interface UserDivisionsData {
                       </ion-spinner>
                       {{ saving ? 'Saving…' : 'Save' }}
                     </button>
+                  </div>
+                </div>
+
+                <!-- Contract 19 (Part 1e): role checkboxes — same shape as Add User. -->
+                <div style="margin-top:var(--triarq-space-sm);">
+                  <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                    Roles *
+                  </label>
+                  <div style="display:flex;flex-wrap:wrap;gap:var(--triarq-space-sm);">
+                    <label *ngFor="let flag of ALL_ROLE_FLAGS"
+                           style="display:inline-flex;align-items:center;gap:6px;
+                                  font-size:var(--triarq-text-small);cursor:pointer;
+                                  padding:6px 12px;border:1px solid var(--triarq-color-border);
+                                  border-radius:5px;background:#fff;user-select:none;">
+                      <input type="checkbox" [formControlName]="flag" />
+                      <span>{{ flagAbbrev(flag) }} — {{ flagDisplay(flag) }}</span>
+                    </label>
+                  </div>
+                  <div *ngIf="editForm.errors?.['noRoleSelected'] && editForm.touched"
+                       style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
+                    Select at least one role.
                   </div>
                 </div>
                 <div
@@ -536,7 +600,7 @@ interface UserDivisionsData {
         {{ filteredSortedUsers.length }}
         <span *ngIf="roleFilter !== 'all'">of {{ users.length }}</span>
         user{{ users.length === 1 ? '' : 's' }}
-        <span *ngIf="roleFilter !== 'all'"> — filtered by {{ roleFilter.toUpperCase() }}</span>
+        <span *ngIf="roleFilter !== 'all'"> — filtered by {{ $any(this).flagAbbrev(roleFilter) }}</span>
       </div>
 
       <!-- Footer nav ────────────────────────────────────────────────────── -->
@@ -574,18 +638,12 @@ export class UsersComponent implements OnInit {
   resendSuccessMsg = '';
 
   // ── Sort / filter state ────────────────────────────────────────────────────
+  // Contract 19 (Part 1e): filter values match role-flag keys ('all' = no filter).
   roleFilter:   string       = 'all';
   nameSortDir:  'asc'|'desc' = 'asc';
 
-  readonly roleFilters = [
-    { value: 'all',                  label: 'All' },
-    { value: SYSTEM_ROLES.DCS,       label: 'DCS' },
-    { value: SYSTEM_ROLES.EPO,       label: 'EPO' },
-    { value: SYSTEM_ROLES.DOL,       label: 'DOL' },
-    { value: SYSTEM_ROLES.CE,        label: 'CE' },
-    { value: SYSTEM_ROLES.ADMIN,     label: 'Admin' },
-    { value: SYSTEM_ROLES.PHIL,      label: 'Phil' }
-  ];
+  // Template-accessible constants.
+  readonly ALL_ROLE_FLAGS = ALL_ROLE_FLAGS;
 
   // ── Edit user state ────────────────────────────────────────────────────────
   editingUserId:    string | null = null;
@@ -621,19 +679,48 @@ export class UsersComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    // Contract 19: role checkboxes replace the single system_role dropdown.
+    // The atLeastOneRole validator surfaces the "Select at least one role" error.
     this.inviteForm = this.fb.group({
       email:        ['', [Validators.required, Validators.email]],
       display_name: ['', Validators.required],
-      system_role:  ['', Validators.required]
-    });
+      is_admin:     [false],
+      is_dcs:       [false],
+      is_epo:       [false],
+      is_dol:       [false],
+      is_ce:        [false]
+    }, { validators: atLeastOneRoleValidator });
     this.editForm = this.fb.group({
       display_name: ['', Validators.required],
       email:        ['', [Validators.required, Validators.email]],
-      system_role:  ['', Validators.required],
-      is_active:    [true]
-    });
+      is_active:    [true],
+      is_admin:     [false],
+      is_dcs:       [false],
+      is_epo:       [false],
+      is_dol:       [false],
+      is_ce:        [false]
+    }, { validators: atLeastOneRoleValidator });
     this.loadUsers();
     this.restoreScreenState();
+  }
+
+  /**
+   * Contract 19 (Part 1e): "Email Address" field paste-parse.
+   * If the pasted value matches "Display Name <email@domain.com>", fill both
+   * display_name and email; otherwise let the paste land as-is.
+   */
+  onEmailPaste(ev: ClipboardEvent): void {
+    const raw = ev.clipboardData?.getData('text') ?? '';
+    const match = raw.match(/^\s*([^<]+?)\s*<\s*([^>\s]+)\s*>\s*$/);
+    if (!match) { return; }
+    ev.preventDefault();
+    const displayName = match[1].trim();
+    const emailValue  = match[2].trim();
+    this.inviteForm.patchValue({
+      display_name: displayName,
+      email:        emailValue
+    });
+    this.cdr.markForCheck();
   }
 
   // ── Screen-state persistence — D-171 / D-370 / D-380 ──────────────────────
@@ -663,16 +750,13 @@ export class UsersComponent implements OnInit {
   }
 
   // ── Sort / Filter ──────────────────────────────────────────────────────────
+  // Contract 19 (Part 1e): filter values are role-flag names; 'all' = no filter.
+  // A user appears under every flag they hold — multi-role users are surfaced everywhere.
   get filteredSortedUsers(): User[] {
     let result = [...this.users];
     if (this.roleFilter !== 'all') {
-      // B-51 / Contract 17 §4: 'phil' rows render under the Admin filter tab.
-      // DB system_role values remain distinct (D-135/D-136) — collapse is display-only.
-      if (this.roleFilter === 'admin') {
-        result = result.filter(u => u.system_role === 'admin' || u.system_role === 'phil');
-      } else {
-        result = result.filter(u => u.system_role === this.roleFilter);
-      }
+      const flag = this.roleFilter as ActiveRoleFlag;
+      result = result.filter(u => u[flag] === true);
     }
     result.sort((a, b) => {
       const cmp = a.display_name.localeCompare(b.display_name);
@@ -820,17 +904,28 @@ export class UsersComponent implements OnInit {
   }
 
   submitInvite(): void {
-    if (this.inviteForm.invalid) { return; }
+    if (this.inviteForm.invalid) {
+      // Surface the noRoleSelected error if user has not picked any role.
+      this.inviteForm.markAllAsTouched();
+      this.cdr.markForCheck();
+      return;
+    }
     this.inviting      = true;
     this.inviteError   = '';
     this.inviteSuccess = false;
     this.cdr.markForCheck();
 
+    const v = this.inviteForm.value as Record<string, unknown>;
     this.mcp
       .call<User>('division', 'create_user', {
-        email:        this.inviteForm.value.email as string,
-        display_name: this.inviteForm.value.display_name as string,
-        system_role:  this.inviteForm.value.system_role as SystemRole
+        email:        v['email']        as string,
+        display_name: v['display_name'] as string,
+        // Contract 19 (D-394): boolean flags. MCP derives the legacy system_role.
+        is_admin:     v['is_admin'] === true,
+        is_dcs:       v['is_dcs']   === true,
+        is_epo:       v['is_epo']   === true,
+        is_dol:       v['is_dol']   === true,
+        is_ce:        v['is_ce']    === true
       })
       .subscribe({
         next: (res) => {
@@ -869,11 +964,17 @@ export class UsersComponent implements OnInit {
     this.editError                = '';
     this.emailDuplicateError      = false;
     this.divisionsUserId          = null;  // close division panel if open
+    // Contract 19: boolean flags drive the checkbox set. The user record already
+    // carries the flags from list_users (Phase 1 dual-read).
     this.editForm.setValue({
       display_name: user.display_name,
       email:        user.email,
-      system_role:  user.system_role,
-      is_active:    user.is_active
+      is_active:    user.is_active,
+      is_admin:     user.is_admin === true,
+      is_dcs:       user.is_dcs   === true,
+      is_epo:       user.is_epo   === true,
+      is_dol:       user.is_dol   === true,
+      is_ce:        user.is_ce    === true
     });
     this.cdr.markForCheck();
   }
@@ -905,13 +1006,19 @@ export class UsersComponent implements OnInit {
     const emailChanged = newEmail !== this.editingUserOriginalEmail.toLowerCase();
 
     const updateOtherFields = (): void => {
+      const v = this.editForm.value as Record<string, unknown>;
       this.mcp
         .call<User>('division', 'update_user', {
           user_id: userId,
           updates: {
-            display_name: this.editForm.value.display_name as string,
-            system_role:  this.editForm.value.system_role  as SystemRole,
-            is_active:    this.editForm.value.is_active    as boolean
+            display_name: v['display_name'] as string,
+            is_active:    v['is_active']    as boolean,
+            // Contract 19 (D-394): role flag updates. MCP keeps system_role in sync.
+            is_admin:     v['is_admin'] === true,
+            is_dcs:       v['is_dcs']   === true,
+            is_epo:       v['is_epo']   === true,
+            is_dol:       v['is_dol']   === true,
+            is_ce:        v['is_ce']    === true
           }
         })
         .subscribe({
@@ -1103,60 +1210,44 @@ export class UsersComponent implements OnInit {
   }
 
   // ── Presentation helpers ───────────────────────────────────────────────────
-  // B-51: Phil role displays as "Admin" with text-only badge (no solid fill).
-  // The DB role value remains 'phil' — display layer only. Source: Contract 10 §7 B-51.
-  rolePillBg(role: SystemRole): string {
-    const map: Record<SystemRole, string> = {
-      phil:  '#e8f0f7',       // light Deep Navy tint (text-color badge, no solid fill)
-      admin: '#e3f2fd',
-      ds:    '#f3e5f5',
-      cb:    '#e8f5e9',
-      ce:    '#fff3e0'
-    };
-    return map[role] ?? 'var(--triarq-color-background-subtle)';
+  // Contract 19 (Part 1e): pill style keyed by role flag.
+  private static readonly FLAG_PILL_BG: Record<ActiveRoleFlag, string> = {
+    is_admin: '#e3f2fd',
+    is_dcs:   '#f3e5f5',
+    is_epo:   '#e8f5e9',
+    is_dol:   '#fde7e9',
+    is_ce:    '#fff3e0'
+  };
+  private static readonly FLAG_PILL_COLOR: Record<ActiveRoleFlag, string> = {
+    is_admin: '#1565c0',
+    is_dcs:   '#6a1b9a',
+    is_epo:   '#2e7d32',
+    is_dol:   '#c2185b',
+    is_ce:    '#e65100'
+  };
+
+  flagPillBg(flag: ActiveRoleFlag): string    { return UsersComponent.FLAG_PILL_BG[flag];    }
+  flagPillColor(flag: ActiveRoleFlag): string { return UsersComponent.FLAG_PILL_COLOR[flag]; }
+  flagAbbrev(flag: ActiveRoleFlag): string    { return ROLE_FLAG_ABBREVIATIONS[flag]; }
+  flagDisplay(flag: ActiveRoleFlag): string   { return ROLE_FLAG_DISPLAY_NAMES[flag]; }
+
+  /** Returns the role flags this user holds, in canonical display order (admin first). */
+  userFlags(user: User): ActiveRoleFlag[] {
+    return ALL_ROLE_FLAGS.filter(f => user[f] === true);
   }
 
-  rolePillColor(role: SystemRole): string {
-    const map: Record<SystemRole, string> = {
-      phil:  '#12274A',       // Deep Navy text — distinct from DS/CB but consistent pattern
-      admin: '#1565c0',
-      ds:    '#6a1b9a',
-      cb:    '#2e7d32',
-      ce:    '#e65100'
-    };
-    return map[role] ?? 'var(--triarq-color-text-secondary)';
-  }
-
-  /** B-51: display label override — 'phil' role renders as "Admin". */
-  roleDisplayLabel(role: SystemRole): string {
-    if (role === SYSTEM_ROLES.PHIL) { return 'Admin'; }
-    return ROLE_ABBREVIATIONS[role] ?? role.toUpperCase();
-  }
-
-  /** B-53: dynamic role-filter tabs — only render tabs for roles with at least one user.
-   *  "All" tab always present. Order: DCS, EPO, DOL, CE, Admin.
-   *  Contract 17 §4: 'phil' rows render under the Admin tab — no separate Phil tab.
-   *  The 'admin' tab is shown if any user has role 'admin' OR 'phil'. */
+  /**
+   * Contract 19 (Part 1e): role-filter tabs — All + any flag for which at least one user holds it.
+   * Order: Admin, DCS, EPO, DOL, CE (matches ALL_ROLE_FLAGS).
+   */
   get visibleRoleFilters(): { value: string; label: string }[] {
-    const visible: { value: string; label: string }[] = [{ value: 'all', label: 'All' }];
-    const presentRoles = new Set(this.users.map(u => u.system_role));
-    const order: { value: SystemRole; label: string }[] = [
-      { value: SYSTEM_ROLES.DCS,   label: 'DCS' },
-      { value: SYSTEM_ROLES.EPO,   label: 'EPO' },
-      { value: SYSTEM_ROLES.DOL,   label: 'DOL' },
-      { value: SYSTEM_ROLES.CE,    label: 'CE' },
-      { value: SYSTEM_ROLES.ADMIN, label: 'Admin' }
-    ];
-    for (const opt of order) {
-      if (opt.value === SYSTEM_ROLES.ADMIN) {
-        if (presentRoles.has(SYSTEM_ROLES.ADMIN) || presentRoles.has(SYSTEM_ROLES.PHIL)) {
-          visible.push({ value: SYSTEM_ROLES.ADMIN, label: 'Admin' });
-        }
-      } else if (presentRoles.has(opt.value)) {
-        visible.push({ value: opt.value, label: opt.label });
+    const tabs: { value: string; label: string }[] = [{ value: 'all', label: 'All' }];
+    for (const flag of ALL_ROLE_FLAGS) {
+      if (this.users.some(u => u[flag] === true)) {
+        tabs.push({ value: flag, label: ROLE_FLAG_ABBREVIATIONS[flag] });
       }
     }
-    return visible;
+    return tabs;
   }
 
   private setBlocked(primary: string, hint: string): void {

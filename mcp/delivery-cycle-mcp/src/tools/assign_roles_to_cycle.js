@@ -9,7 +9,8 @@
 
 const { supabase } = require('../db');
 
-const VALID_ASSIGNER_ROLES = ['phil', 'admin', 'dcs', 'epo', 'dol', 'ce'];
+// Contract 19 (D-394): any of these flags grants assigner authority.
+const ASSIGNER_FLAGS = ['is_admin', 'is_dcs', 'is_epo', 'is_dol', 'is_ce'];
 
 /**
  * @param {object} params
@@ -42,10 +43,10 @@ async function assign_roles_to_cycle(params, caller_user_id) {
     };
   }
 
-  // ── Caller role check ─────────────────────────────────────────────────────
+  // ── Caller role check — Contract 19 (D-394): any assigner flag grants access ──
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('system_role, is_active')
+    .select('is_admin, is_dcs, is_epo, is_dol, is_ce, is_active')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -56,10 +57,10 @@ async function assign_roles_to_cycle(params, caller_user_id) {
   if (!caller.is_active) {
     return { success: false, error: 'Your account is inactive.' };
   }
-  if (!VALID_ASSIGNER_ROLES.includes(caller.system_role)) {
+  if (!ASSIGNER_FLAGS.some(flag => caller[flag] === true)) {
     return {
       success: false,
-      error: 'Assigning a Domain Capability Strategist, Engineering Product Owner, or Domain Outcome Lead requires DCS, EPO, DOL, CE, Admin, or Phil role.'
+      error: 'Assigning a Domain Capability Strategist, Engineering Product Owner, or Domain Outcome Lead requires DCS, EPO, DOL, CE, or Admin role.'
     };
   }
 
@@ -80,7 +81,7 @@ async function assign_roles_to_cycle(params, caller_user_id) {
     if (!userId) { return null; }
     const { data: user, error: userErr } = await supabase
       .from('users')
-      .select('id, display_name, system_role, is_active')
+      .select('id, display_name, is_active')
       .eq('id', userId)
       .is('deleted_at', null)
       .single();

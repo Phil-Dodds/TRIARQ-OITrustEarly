@@ -31,7 +31,7 @@ import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { McpService } from '../../../core/services/mcp.service';
 import { User, SystemRole } from '../../../core/types/database';
-import { SYSTEM_ROLES, ROLE_DISPLAY_NAMES } from '../../../core/constants/roles';
+import { SYSTEM_ROLES, ROLE_DISPLAY_NAMES, userRoleToFlag } from '../../../core/constants/roles';
 
 type UserPickerScope = 'division' | 'all';
 
@@ -435,10 +435,13 @@ export class UserPickerComponent implements OnInit, OnDestroy {
           this.cdr.markForCheck();
           return;
         }
-        // Filter by role client-side — D-182: "This Division" loads small scoped list
-        const targetRole = this.userRole;
+        // Filter by role client-side — D-182: "This Division" loads small scoped list.
+        // Contract 19 (D-394): boolean flag predicate replaces system_role equality.
+        //   A user with is_admin = true AND is_dcs = true appears in BOTH DCS and Admin
+        //   role views — multi-role membership is the explicit intent.
+        const roleFlag = userRoleToFlag(this.userRole);
         const users = (res.data ?? []).filter(u =>
-          u.system_role === targetRole && !u.deleted_at
+          u[roleFlag] === true && !u.deleted_at
         );
         // B-13 fix: distinguish empty result from error. When scope is 'division' and
         // MCP succeeded but no users of this role exist in the Division, show plain message.

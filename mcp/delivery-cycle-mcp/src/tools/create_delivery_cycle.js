@@ -20,7 +20,8 @@ const { supabase } = require('../db');
 const { GATE_MILESTONE_LABELS, ALL_GATES } = require('../lifecycle');
 
 const VALID_TIERS         = ['tier_1', 'tier_2', 'tier_3'];
-const VALID_CREATOR_ROLES = ['dcs', 'epo', 'dol', 'ce', 'phil', 'admin'];
+// Contract 19 (D-394): boolean flag checks replace VALID_CREATOR_ROLES; any of these flags grants creation.
+const CREATOR_FLAGS = ['is_admin', 'is_dcs', 'is_epo', 'is_dol', 'is_ce'];
 
 /**
  * @param {object} params
@@ -75,10 +76,10 @@ async function create_delivery_cycle(params, caller_user_id) {
   // DCS / EPO / DOL are nullable at creation. Gate enforcement
   // (DCS+DOL → Brief Review, EPO → Go to Build) lives in submit_gate_for_approval.
 
-  // ── Caller role check ─────────────────────────────────────────────────────
+  // ── Caller role check — Contract 19 (D-394): any creator flag grants access ──
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('id, system_role, is_active')
+    .select('id, is_admin, is_dcs, is_epo, is_dol, is_ce, is_active')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -89,10 +90,10 @@ async function create_delivery_cycle(params, caller_user_id) {
   if (!caller.is_active) {
     return { success: false, error: 'Your account is inactive.' };
   }
-  if (!VALID_CREATOR_ROLES.includes(caller.system_role)) {
+  if (!CREATOR_FLAGS.some(flag => caller[flag] === true)) {
     return {
       success: false,
-      error: 'Creating Initiatives requires DCS, EPO, DOL, CE, Admin, or Phil role. Your current role does not have this permission.'
+      error: 'Creating Initiatives requires DCS, EPO, DOL, CE, or Admin role. Your current role does not have this permission.'
     };
   }
 

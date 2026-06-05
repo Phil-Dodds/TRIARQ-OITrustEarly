@@ -63,7 +63,6 @@ import {
   GateStateMap
 } from '../../../core/types/database';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
-import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -129,10 +128,10 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
 
         <!-- Left: summary cards (compact padding per D-298) -->
         <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-end;">
-          <!-- Active Cycles — always shown, not tappable -->
+          <!-- Active Initiatives — always shown, not tappable -->
           <div style="background:#fff;border:1px solid #E8E8E8;border-radius:8px;padding:8px 16px 10px;">
             <div style="font-size:28px;font-weight:300;color:#257099;line-height:1.1;">{{ activeCycleCount }}</div>
-            <div style="font-size:12px;color:#888;">Active Cycles</div>
+            <div style="font-size:12px;color:#888;">Active Initiatives</div>
           </div>
           <!-- My Initiatives — hidden at zero, tappable → Assigned Person filter -->
           <div *ngIf="myCyclesCount > 0"
@@ -598,7 +597,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
                   background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;
                   position:sticky;top:0;z-index:3;margin-top:10px;">
         <span>Division</span>
-        <span>Cycle Name</span>
+        <span>Initiative Name</span>
         <span>Outcome</span>
         <span>Stage</span>
         <span>Headline</span>
@@ -982,22 +981,21 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.loadDeliverySummary();
 
     // Subscribe to profile — fires immediately if already loaded, or when it arrives.
-    // canCreateCycle and checkUserDivisions() depend on system_role, which is only
-    // available after the profile MCP call completes. Reading it synchronously here
+    // canCreateCycle and checkUserDivisions() depend on the profile booleans, which are only
+    // available after the profile MCP call completes. Reading them synchronously here
     // produces null when the component is the first page loaded (race condition).
     this.profileSub = this.profile.profile$
       .pipe(filter(p => p !== null), take(1))
       .subscribe(() => {
-        const p    = this.profile.getCurrentProfile();
-        const role = p?.system_role;
+        const p = this.profile.getCurrentProfile();
+        // Contract 19 (D-394): boolean flags replace system_role equality.
         // S8: CE is read-only — can view Initiatives but not create them (enforced at MCP layer too).
-        // D-389/D-390/D-391: DCS, EPO, and DOL can create alongside Phil/Admin.
+        // D-389/D-390/D-391: DCS, EPO, and DOL can create alongside Admin.
         this.canCreateCycle =
-          role === SYSTEM_ROLES.DCS ||
-          role === SYSTEM_ROLES.EPO ||
-          role === SYSTEM_ROLES.DOL ||
-          role === SYSTEM_ROLES.PHIL ||
-          role === SYSTEM_ROLES.ADMIN;
+          p?.is_dcs   === true ||
+          p?.is_epo   === true ||
+          p?.is_dol   === true ||
+          p?.is_admin === true;
         this.checkUserDivisions();
         this.cdr.markForCheck();
       });
@@ -1006,12 +1004,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   private async checkUserDivisions(): Promise<void> {
     const currentProfile = this.profile.getCurrentProfile();
     const userId         = currentProfile?.id;
-    const role           = currentProfile?.system_role;
 
-    // D-170: Phil and Admin have implicit access to all Divisions — no assignment needed.
+    // D-170: Admin has implicit access to all Divisions — no assignment needed.
     // Skip MCP call entirely. Division filter will be populated from this.divisions
     // (loaded by loadDivisions()) via the filterDivisionOptions getter.
-    if (role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN) {
+    if (currentProfile?.is_admin === true) {
       this.hasDivision     = true;
       this.divisionChecked = true;
       this.profile.setHasDivision(true);
@@ -1058,11 +1055,10 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  // D-170: Phil and Admin use all loaded divisions for the filter (no assignment needed).
+  // D-170: Admin uses all loaded divisions for the filter (no assignment needed).
   // Other roles use only their directly-assigned divisions.
   get filterDivisionOptions(): Division[] {
-    const role = this.profile.getCurrentProfile()?.system_role;
-    if (role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN) {
+    if (this.profile.getCurrentProfile()?.is_admin === true) {
       return this.divisions;
     }
     return this.userDivisions;
@@ -1085,7 +1081,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       const label = STAGE_LABEL_MAP[c.current_lifecycle_stage] ?? c.current_lifecycle_stage;
       counts.set(label, (counts.get(label) ?? 0) + 1);
     }
-    if (counts.size === 0) { return 'No active cycles'; }
+    if (counts.size === 0) { return 'No active Initiatives'; }
     return Array.from(counts.entries())
       .map(([l, n]) => `${n} in ${l}`)
       .join(' · ');
@@ -1686,7 +1682,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   sortLabel(): string {
     const labels: Record<string, string> = {
-      cycle_title:             'cycle title',
+      cycle_title:             'Initiative title',
       current_lifecycle_stage: 'stage',
       tier_classification:     'tier'
     };

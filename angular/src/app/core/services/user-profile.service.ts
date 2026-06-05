@@ -1,6 +1,6 @@
 // user-profile.service.ts — Pathways OI Trust
 // Resolves and caches the authenticated user's public.users profile.
-// system_role from this profile drives role-aware UI (home screen cards, D-150).
+// Contract 19 (D-394): boolean role flags on the profile drive role-aware UI.
 // Called once after login; cached for the session.
 // Matches profile by Supabase user ID (D-248 — email+password auth, no dev bypass).
 
@@ -8,7 +8,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, firstValueFrom } from 'rxjs';
 import { McpService } from './mcp.service';
 import { AuthService } from './auth.service';
-import { User, SystemRole } from '../types/database';
+import { User } from '../types/database';
 
 @Injectable({ providedIn: 'root' })
 export class UserProfileService {
@@ -51,10 +51,6 @@ export class UserProfileService {
     return this._profile$.value;
   }
 
-  getCurrentRole(): SystemRole | null {
-    return this._profile$.value?.system_role ?? null;
-  }
-
   /** True if user has at least one Division membership (determines onboarding vs home). */
   hasAnyDivision(): boolean {
     // Resolved by checking get_user_divisions in the home screen component
@@ -91,7 +87,9 @@ export class UserProfileService {
   }
 
   /**
-   * Returns all active users whose system_role is 'phil' or 'admin'.
+   * Returns all active users with is_admin = true.
+   * Contract 19 (CC-19-01): phil collapsed into is_admin; the "phil-first" sort
+   * is retired and admins are sorted purely by display_name.
    * Used by the Contact an Admin screen — available to all roles.
    */
   listAdmins(): Observable<User[]> {
@@ -102,13 +100,8 @@ export class UserProfileService {
             observer.next([]);
           } else {
             const admins = response.data
-              .filter(u => u.is_active && (u.system_role === 'phil' || u.system_role === 'admin'))
-              .sort((a, b) => {
-                // Phil first, then alphabetical by display_name
-                if (a.system_role === 'phil') return -1;
-                if (b.system_role === 'phil') return 1;
-                return (a.display_name ?? '').localeCompare(b.display_name ?? '');
-              });
+              .filter(u => u.is_active && u.is_admin === true)
+              .sort((a, b) => (a.display_name ?? '').localeCompare(b.display_name ?? ''));
             observer.next(admins);
           }
           observer.complete();

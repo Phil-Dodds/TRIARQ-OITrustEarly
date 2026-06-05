@@ -210,7 +210,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <button (click)="openEditPanel()"
                     class="oi-btn-primary"
                     style="white-space:nowrap;font-size:var(--triarq-text-small);">
-              ✎ Edit Cycle
+              ✎ Edit Initiative
             </button>
 
             <!-- 2. D-349 dual entry point — submittable: opens gate sub-panel
@@ -256,16 +256,16 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     style="white-space:nowrap;font-size:11px;color:var(--triarq-color-error);
                            background:none;border:1px solid var(--triarq-color-error);
                            border-radius:5px;padding:3px 8px;cursor:pointer;">
-              Cancel Cycle
+              Cancel Initiative
             </button>
 
-            <!-- 5. Un-cancel Cycle — CANCELLED stage only -->
+            <!-- 5. Un-cancel Initiative — CANCELLED stage only -->
             <button *ngIf="cycle.current_lifecycle_stage === 'CANCELLED' && !uncancelConfirming"
                     (click)="uncancelConfirming = true"
                     style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
                            background:none;border:1px solid var(--triarq-color-primary);
                            border-radius:5px;padding:3px 8px;cursor:pointer;">
-              ↺ Un-cancel Cycle
+              ↺ Un-cancel Initiative
             </button>
 
             <!-- B-76: Close X aligned within the panel header (was a separate row above). -->
@@ -327,10 +327,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     background:#FFF5F5;">
           <div style="font-size:var(--triarq-text-small);font-weight:500;margin-bottom:4px;
                       color:var(--triarq-color-error);">
-            Cancel this cycle?
+            Cancel this Initiative?
           </div>
           <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);margin-bottom:6px;">
-            The cycle will be marked CANCELLED. You can un-cancel it later from this panel.
+            The Initiative will be marked CANCELLED. You can un-cancel it later from this panel.
           </div>
           <div style="display:flex;gap:6px;">
             <button class="oi-btn-primary"
@@ -339,7 +339,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     style="font-size:11px;padding:3px 10px;background:var(--triarq-color-error);
                            display:flex;align-items:center;gap:4px;">
               <ion-spinner *ngIf="cancelBusy" name="crescent" style="width:10px;height:10px;"></ion-spinner>
-              {{ cancelBusy ? 'Cancelling…' : 'Cancel Cycle' }}
+              {{ cancelBusy ? 'Cancelling…' : 'Cancel Initiative' }}
             </button>
             <button (click)="cancelConfirming = false; cancelError = ''"
                     style="font-size:11px;background:none;border:none;cursor:pointer;
@@ -473,7 +473,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         <div *ngIf="!cycle.outcome_statement"
              style="color:var(--triarq-color-text-secondary);font-size:14px;
                     font-style:italic;font-family:Roboto,sans-serif;">
-          Not set — should be added before Brief Review Gate. Edit via the Edit Cycle button above.
+          Not set — should be added before Brief Review Gate. Edit via the Edit Initiative button above.
         </div>
         <!-- When set: regular body text, not italic. D-296 amends D-276. Source: D-296. -->
         <div *ngIf="cycle.outcome_statement"

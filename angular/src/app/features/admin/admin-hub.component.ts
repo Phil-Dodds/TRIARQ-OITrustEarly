@@ -19,11 +19,11 @@ interface AdminCard {
 
 const ADMIN_CARDS: AdminCard[] = [
   {
-    title:       'Delivery Workstreams',
-    description: 'Create and manage Workstreams — the persistent delivery teams that Initiatives are assigned to. Activating or deactivating a Workstream directly controls whether its Initiatives can clear gates.',
+    title:       'Users',
+    description: 'View all user accounts, system roles, and active status. Assign roles and manage user access. A user without a Division assignment sees an onboarding message until assigned.',
     who:         'Phil and Admin',
-    route:       'workstreams',
-    icon:        '⬡'
+    route:       'users',
+    icon:        '◎'
   },
   {
     title:       'Divisions',
@@ -33,11 +33,11 @@ const ADMIN_CARDS: AdminCard[] = [
     icon:        '◫'
   },
   {
-    title:       'Users',
-    description: 'View all user accounts, system roles, and active status. Assign roles and manage user access. A user without a Division assignment sees an onboarding message until assigned.',
+    title:       'Delivery Workstreams',
+    description: 'Create and manage Workstreams — the persistent delivery teams that Initiatives are assigned to. Activating or deactivating a Workstream directly controls whether its Initiatives can clear gates.',
     who:         'Phil and Admin',
-    route:       'users',
-    icon:        '◎'
+    route:       'workstreams',
+    icon:        '⬡'
   }
 ];
 

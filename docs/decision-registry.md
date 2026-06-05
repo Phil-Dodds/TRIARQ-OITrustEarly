@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.27 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.28 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-369**
+**Next available: D-372**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -271,6 +271,9 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-366 | Template Version Recorded in Generated project-instructions.md | Claude Chat | 2026-05-07 | Active |
 | D-367 | Rule 27: Verify Inputs Before Executable Actions | Claude Chat | 2026-05-08 | Active |
 | D-368 | Rule 28: Cross-Project Instruction Propagation | Claude Chat | 2026-05-08 | Active |
+| D-369 | Multi-User System-Level Admin Model | Claude Chat | 2026-05-09 | Active |
+| D-370 | user_screen_state Table Build Assignment | Claude Chat | 2026-05-09 | Active |
+| D-371 | CSS Budget Warnings: Quality Discipline Not Ceiling Raise | Claude Chat | 2026-05-09 | Active |
 
 ---
 

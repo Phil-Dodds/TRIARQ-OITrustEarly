@@ -205,7 +205,7 @@ type PanelMode    = 'none' | 'view' | 'edit' | 'create';
                   </th>
                   <th (click)="toggleSort('active_cycle_count')"
                       style="text-align:right;padding:8px 4px;cursor:pointer;user-select:none;">
-                    Active Cycles {{ sortGlyph('active_cycle_count') }}
+                    Active Initiatives {{ sortGlyph('active_cycle_count') }}
                   </th>
                   <th (click)="toggleSort('active_status')"
                       style="text-align:left;padding:8px 4px;cursor:pointer;user-select:none;">

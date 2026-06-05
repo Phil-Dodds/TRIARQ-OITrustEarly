@@ -116,28 +116,28 @@ async function get_delivery_cycle(params, caller_user_id) {
   ].filter(Boolean);
 
   let userMap = {};
-  let callerRole = '';
+  let callerIsAdmin = false;
   if (userIdsToResolve.length > 0) {
     const { data: userRows } = await supabase
       .from('users')
-      .select('id, display_name, system_role')
+      .select('id, display_name, is_admin')
       .in('id', userIdsToResolve)
       .is('deleted_at', null);
     if (userRows) {
       userRows.forEach(u => {
         userMap[u.id] = u.display_name;
-        if (u.id === caller_user_id) { callerRole = u.system_role ?? ''; }
+        if (u.id === caller_user_id) { callerIsAdmin = u.is_admin === true; }
       });
     }
   }
 
   // ── Compute gate authority per gate for the caller (D-389/D-390/D-391) ────
-  const isPhil        = callerRole === 'phil';
+  // Contract 19 (D-394, CC-19-01): is_admin replaces the 'phil' single-role check.
   const isAssignedDcs = cycle.assigned_dcs_user_id === caller_user_id;
   const isAssignedEpo = cycle.assigned_epo_user_id === caller_user_id;
   const isAssignedDol = cycle.assigned_dol_user_id === caller_user_id;
-  // Caller can submit if they are Phil, or the assigned DCS, EPO, or DOL on this Initiative.
-  const callerCanSubmitAny = isPhil || isAssignedDcs || isAssignedEpo || isAssignedDol;
+  // Caller can submit if they are an Admin, or the assigned DCS, EPO, or DOL on this Initiative.
+  const callerCanSubmitAny = callerIsAdmin || isAssignedDcs || isAssignedEpo || isAssignedDol;
 
   // Resolve submitter display names for gate records that have submitted_by_user_id (D-345).
   const submitterIds = (gate_records || [])
@@ -166,7 +166,7 @@ async function get_delivery_cycle(params, caller_user_id) {
       // can_approve: caller is Phil, or caller is the designated approver_user_id, AND gate is awaiting
       // When approver_user_id is null (Build C default), Phil is the fallback approver
       can_approve: gr.gate_status === 'awaiting_approval' &&
-        (isPhil || gr.approver_user_id === caller_user_id),
+        (callerIsAdmin || gr.approver_user_id === caller_user_id),
       // can_withdraw: caller has submit authority and gate is awaiting_approval (D-345 §4)
       can_withdraw: callerCanSubmitAny && gr.gate_status === 'awaiting_approval'
     }

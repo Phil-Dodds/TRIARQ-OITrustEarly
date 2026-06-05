@@ -119,7 +119,7 @@ type ScopeType = 'division_tree' | 'trust' | 'user_divisions' | 'all';
             </span>
           </div>
           <div class="ws-echo-row">
-            <span class="ws-echo-label">Active cycles:</span>
+            <span class="ws-echo-label">Active Initiatives:</span>
             <span class="ws-echo-value">{{ echoWorkstream.active_cycle_count ?? 0 }}</span>
           </div>
         </div>
@@ -127,7 +127,7 @@ type ScopeType = 'division_tree' | 'trust' | 'user_divisions' | 'all';
         <!-- Inactive selection warning -->
         <div *ngIf="echoWorkstream && !echoWorkstream.active_status" class="ws-inactive-warning" role="alert">
           <span class="ws-error-primary">This Workstream is inactive and cannot be selected.</span>
-          <span class="ws-error-secondary">A Division Admin must reactivate it before it can be assigned to a cycle.</span>
+          <span class="ws-error-secondary">A Division Admin must reactivate it before it can be assigned to an Initiative.</span>
         </div>
 
         <!-- Footer -->

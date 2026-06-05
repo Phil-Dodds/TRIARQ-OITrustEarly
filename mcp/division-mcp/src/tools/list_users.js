@@ -1,6 +1,11 @@
 // list_users.js
 // Lists users. If division_id provided, returns users with access to that Division.
 // If no division_id, returns all active users (System Admin view).
+//
+// Contract 19 (D-395 — mapped to division_memberships per CC-19-02): the no-division-id
+// shape now includes a `division_names` array per user — the names of every Division
+// the user is a member of via division_memberships (active rows only). Powers the
+// Admin Users row display and the Division Memberships chip set in the edit panel.
 
 'use strict';
 
@@ -28,6 +33,7 @@ async function list_users(params, caller_user_id) {
           email,
           display_name,
           system_role,
+          is_admin, is_dcs, is_epo, is_dol, is_ce, is_super_admin,
           is_active,
           allow_both_admin_and_functional_roles
         )
@@ -47,18 +53,52 @@ async function list_users(params, caller_user_id) {
     return { success: true, data: users };
   }
 
-  // No division_id — return all non-deleted users
-  const { data, error } = await supabase
+  // No division_id — return all non-deleted users, enriched with active Division memberships.
+  const { data: users, error } = await supabase
     .from('users')
-    .select('id, email, display_name, system_role, is_active, allow_both_admin_and_functional_roles, created_at')
+    .select('id, email, display_name, system_role, is_admin, is_dcs, is_epo, is_dol, is_ce, is_super_admin, is_active, allow_both_admin_and_functional_roles, created_at')
     .is('deleted_at', null)
     .order('display_name');
 
   if (error) {
     return { success: false, error: `Failed to list users: ${error.message}` };
   }
+  if (!users || users.length === 0) {
+    return { success: true, data: [] };
+  }
 
-  return { success: true, data: data || [] };
+  // Contract 19 (D-395): enrich each user with their active Division memberships.
+  //   One batch query — joins division_memberships to divisions to get names.
+  //   revoked_at IS NULL = membership active; deleted_at NULL on both sides.
+  const userIds = users.map(u => u.id);
+  const { data: memberships, error: memErr } = await supabase
+    .from('division_memberships')
+    .select('user_id, divisions(id, division_name)')
+    .in('user_id', userIds)
+    .is('revoked_at', null)
+    .is('deleted_at', null);
+
+  if (memErr) {
+    // Membership enrichment is non-fatal — return users without the array.
+    return { success: true, data: users.map(u => ({ ...u, division_names: [] })) };
+  }
+
+  // Group membership names by user_id.
+  const namesByUser = new Map();
+  for (const row of memberships ?? []) {
+    const divisionName = row.divisions?.division_name;
+    if (!divisionName) { continue; }
+    const list = namesByUser.get(row.user_id) ?? [];
+    list.push(divisionName);
+    namesByUser.set(row.user_id, list);
+  }
+
+  const enriched = users.map(u => ({
+    ...u,
+    division_names: (namesByUser.get(u.id) ?? []).sort()
+  }));
+
+  return { success: true, data: enriched };
 }
 
 module.exports = { list_users };

@@ -11,7 +11,7 @@
 //
 // D-165: Delivery Workstream is optional at creation. Required before Brief Review gate.
 // D-174 / D-391: DCS, EPO, DOL nullable at creation. Gate enforcement at MCP level only.
-// Field order: Division → Initiative Title → Outcome → Workstream → Tier → DCS → EPO → DOL → Jira.
+// Field order: Division → Initiative Title → Outcome → DCS → EPO → DOL → Tier → Workstream → Jira.
 //   D-194: Outcome Statement at position 3.
 //
 // D-290: Create form opens in right panel — never full-width overlay. Wired via dashboard.
@@ -105,51 +105,7 @@ import { SYSTEM_ROLES } from '../../../core/constants/roles';
             <div class="cp-gate-note">Should be set before Brief Review Gate.</div>
           </div>
 
-          <!-- 4. Delivery Workstream (optional per D-165, picker per D-182/CC-002, position 4 per D-194) -->
-          <div class="cp-field">
-            <label class="cp-label">
-              Delivery Workstream
-              <span class="cp-optional-tag"> — recommended</span>
-            </label>
-            <!-- D-206: guard — show warning instead of picker if Division not selected -->
-            <div *ngIf="noDivisionWarning"
-                 style="font-size:12px;color:#E65100;margin-bottom:6px;">
-              Select a Division first — Workstream list is scoped to the selected Division.
-            </div>
-            <button type="button" class="cp-picker-trigger"
-                    (click)="openWorkstreamPicker()">
-              <!-- D-290 Step 5.4: no 'Assign later' text — empty trigger when no selection. Source: Contract 6 Step 5.4. -->
-              <span *ngIf="selectedWorkstream" class="cp-picker-value">
-                <span class="cp-entity-chip">
-                  {{ selectedWorkstream.workstream_name }}
-                  <span class="cp-chip-meta">({{ selectedWorkstream.home_division_name ?? '' }})</span>
-                </span>
-              </span>
-            </button>
-            <button *ngIf="selectedWorkstream" type="button"
-                    class="cp-chip-remove"
-                    (click)="selectedWorkstream = null"
-                    aria-label="Remove Workstream">✕ Remove</button>
-            <div class="cp-gate-note">Required before Brief Review Gate.</div>
-          </div>
-
-          <!-- 5. Tier Classification — dropdown per D-191 (locked: not cards, not radio buttons). Source: D-191. -->
-          <div class="cp-field">
-            <label class="cp-label">
-              Tier Classification <span class="cp-required" aria-hidden="true">*</span>
-            </label>
-            <select formControlName="tier_classification" class="cp-input"
-                    [class.cp-input--error]="f['tier_classification'].invalid && f['tier_classification'].touched">
-              <option value="">Select tier</option>
-              <option value="tier_1">Tier 1 — Fast Lane: Workflow changes, config updates, no platform dependencies</option>
-              <option value="tier_2">Tier 2 — Structured: Platform changes, integrations, cross-domain dependencies</option>
-              <option value="tier_3">Tier 3 — Governed: Agent deployments, compliance scope changes, AI Governance Board required</option>
-            </select>
-            <div *ngIf="f['tier_classification'].invalid && f['tier_classification'].touched"
-                 class="cp-field-error">Tier Classification is required.</div>
-          </div>
-
-          <!-- 6. Assigned Domain Capability Strategist (optional, UserPicker per D-182) -->
+          <!-- 4. Assigned Domain Capability Strategist (optional, UserPicker per D-182) -->
           <div class="cp-field">
             <label class="cp-label">Assigned Domain Capability Strategist</label>
             <div *ngIf="selectedDcs; else noDcsPicked" class="cp-user-chip-row">
@@ -161,14 +117,13 @@ import { SYSTEM_ROLES } from '../../../core/constants/roles';
               <button type="button" class="cp-chip-remove"
                       (click)="clearDcs()">✕ Remove</button>
             </div>
-            <!-- D-290 Step 5.4: no 'Assign later' text in trigger. Source: Contract 6 Step 5.4. -->
             <ng-template #noDcsPicked>
               <button type="button" class="cp-picker-trigger" (click)="openDcsPicker()"></button>
             </ng-template>
             <div class="cp-gate-note">Required before Brief Review Gate.</div>
           </div>
 
-          <!-- 7. Assigned Engineering Product Owner (optional, UserPicker per D-182, D-204 pre-populate from WS lead) -->
+          <!-- 5. Assigned Engineering Product Owner (optional, UserPicker per D-182, D-204 pre-populate from WS lead) -->
           <div class="cp-field">
             <label class="cp-label">Assigned Engineering Product Owner</label>
             <div *ngIf="selectedEpo; else noEpoPicked" class="cp-user-chip-row">
@@ -180,14 +135,13 @@ import { SYSTEM_ROLES } from '../../../core/constants/roles';
               <button type="button" class="cp-chip-remove"
                       (click)="clearEpo()">✕ Remove</button>
             </div>
-            <!-- D-290 Step 5.4: no 'Assign later' text in trigger. Source: Contract 6 Step 5.4. -->
             <ng-template #noEpoPicked>
               <button type="button" class="cp-picker-trigger" (click)="openEpoPicker()"></button>
             </ng-template>
             <div class="cp-gate-note">Required before Go to Build Gate.</div>
           </div>
 
-          <!-- 8. Assigned Domain Outcome Lead (optional, UserPicker per D-182, D-391) -->
+          <!-- 6. Assigned Domain Outcome Lead (optional, UserPicker per D-182, D-391) -->
           <div class="cp-field">
             <label class="cp-label">Assigned Domain Outcome Lead</label>
             <div *ngIf="selectedDol; else noDolPicked" class="cp-user-chip-row">
@@ -203,6 +157,48 @@ import { SYSTEM_ROLES } from '../../../core/constants/roles';
               <button type="button" class="cp-picker-trigger" (click)="openDolPicker()"></button>
             </ng-template>
             <div class="cp-gate-note">Required before Brief Review Gate.</div>
+          </div>
+
+          <!-- 7. Tier Classification — dropdown per D-191 (locked: not cards, not radio buttons). Source: D-191. -->
+          <div class="cp-field">
+            <label class="cp-label">
+              Tier Classification <span class="cp-required" aria-hidden="true">*</span>
+            </label>
+            <select formControlName="tier_classification" class="cp-input"
+                    [class.cp-input--error]="f['tier_classification'].invalid && f['tier_classification'].touched">
+              <option value="">Select tier</option>
+              <option value="tier_1">Tier 1 — Fast Lane: Workflow changes, config updates, no platform dependencies</option>
+              <option value="tier_2">Tier 2 — Structured: Platform changes, integrations, cross-domain dependencies</option>
+              <option value="tier_3">Tier 3 — Governed: Agent deployments, compliance scope changes, AI Governance Board required</option>
+            </select>
+            <div *ngIf="f['tier_classification'].invalid && f['tier_classification'].touched"
+                 class="cp-field-error">Tier Classification is required.</div>
+          </div>
+
+          <!-- 8. Delivery Workstream (optional per D-165, picker per D-182/CC-002) -->
+          <div class="cp-field">
+            <label class="cp-label">
+              Delivery Workstream
+              <span class="cp-optional-tag"> — recommended</span>
+            </label>
+            <!-- D-206: guard — show warning instead of picker if Division not selected -->
+            <div *ngIf="noDivisionWarning"
+                 style="font-size:12px;color:#E65100;margin-bottom:6px;">
+              Select a Division first — Workstream list is scoped to the selected Division.
+            </div>
+            <button type="button" class="cp-picker-trigger"
+                    (click)="openWorkstreamPicker()">
+              <span *ngIf="selectedWorkstream" class="cp-picker-value">
+                <span class="cp-entity-chip">
+                  {{ selectedWorkstream.workstream_name }}
+                  <span class="cp-chip-meta">({{ selectedWorkstream.home_division_name ?? '' }})</span>
+                </span>
+              </span>
+            </button>
+            <button *ngIf="selectedWorkstream" type="button"
+                    class="cp-chip-remove"
+                    (click)="selectedWorkstream = null"
+                    aria-label="Remove Workstream">✕ Remove</button>
           </div>
 
           <!-- 9. Jira Epic Link (optional) -->
@@ -486,15 +482,19 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
     this.form = this.fb.group({
       division_id:         ['', Validators.required],
       cycle_title:         ['', [Validators.required, Validators.maxLength(120)]],
-      tier_classification: ['', Validators.required],
+      // C19 Part 3e: Tier defaults to Tier 3 — Governed on New Initiative form.
+      // User can change before submit. Edit Initiative does not default — uses saved value.
+      tier_classification: ['tier_3', Validators.required],
       outcome_statement:   [''],
       jira_epic_key:       ['']
     });
 
-    // Pre-populate DCS if caller is DCS role (CC-004 auto-assignment rule)
+    // Pre-populate DCS if caller holds DCS role (CC-004 auto-assignment rule).
+    // Contract 19: boolean flag replaces system_role equality — caller may hold
+    // multiple roles; if they're a DCS, they get auto-assigned.
     this.subs.add(
       this.profile.profile$.pipe(filter(p => p !== null), take(1)).subscribe(p => {
-        if (p?.system_role === SYSTEM_ROLES.DCS && p.id && p.display_name) {
+        if (p?.is_dcs === true && p.id && p.display_name) {
           this.selectedDcs = p as unknown as User;
           this.updateDcsChip(this.selectedDcs);
           this.cdr.markForCheck();
@@ -605,7 +605,14 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
           id:                                    ws.workstream_lead_user_id,
           display_name:                          ws.lead_display_name,
           email:                                 '',
+          // Contract 19: legacy single-role retained during transition; flag set for the assumed role.
           system_role:                           SYSTEM_ROLES.EPO,
+          is_admin:                              false,
+          is_dcs:                                false,
+          is_epo:                                true,
+          is_dol:                                false,
+          is_ce:                                 false,
+          is_super_admin:                        false,
           allow_both_admin_and_functional_roles: false,
           is_active:                             true,
           created_at:                            '',

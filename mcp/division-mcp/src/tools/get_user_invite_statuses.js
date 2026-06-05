@@ -20,10 +20,10 @@ const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000;
  * @returns {{ success: boolean, data?: Array<{ user_id: string, invite_status: string }> }}
  */
 async function get_user_invite_statuses(params, caller_user_id) {
-  // Verify caller is admin
+  // Verify caller is Admin — Contract 19 (D-394, CC-19-01).
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('system_role')
+    .select('is_admin')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -31,7 +31,7 @@ async function get_user_invite_statuses(params, caller_user_id) {
   if (callerErr || !caller) {
     return { success: false, error: 'Caller user record not found.' };
   }
-  if (caller.system_role !== 'admin' && caller.system_role !== 'phil') {
+  if (caller.is_admin !== true) {
     return {
       success: false,
       error: 'Viewing invite statuses requires Admin role.'

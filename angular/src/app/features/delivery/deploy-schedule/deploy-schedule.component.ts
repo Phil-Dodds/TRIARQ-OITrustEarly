@@ -48,7 +48,6 @@ import {
   DateStatus,
   CycleMilestoneDate
 } from '../../../core/types/database';
-import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 const DEPLOY_GATE = 'go_to_deploy';
 
@@ -143,7 +142,7 @@ interface QuarterLabel {
                 Prior Quarter — {{ priorQuarter.label }} Actual
               </div>
               <div class="ds-grid ds-grid-header">
-                <span>Cycle</span>
+                <span>Initiative</span>
                 <span>Stage</span>
                 <span>Pilot Start</span>
                 <span>Status</span>
@@ -166,7 +165,7 @@ interface QuarterLabel {
                 </div>
               </ng-container>
               <ng-template #priorEmpty>
-                <div class="ds-row-empty">No cycles.</div>
+                <div class="ds-row-empty">No Initiatives.</div>
               </ng-template>
             </section>
 
@@ -176,7 +175,7 @@ interface QuarterLabel {
                 Current Quarter — {{ currentQuarter.label }} Planned/Actual
               </div>
               <div class="ds-grid ds-grid-header">
-                <span>Cycle</span>
+                <span>Initiative</span>
                 <span>Stage</span>
                 <span>Pilot Start</span>
                 <span>Status</span>
@@ -199,7 +198,7 @@ interface QuarterLabel {
                 </div>
               </ng-container>
               <ng-template #currentEmpty>
-                <div class="ds-row-empty">No cycles.</div>
+                <div class="ds-row-empty">No Initiatives.</div>
               </ng-template>
             </section>
 
@@ -207,7 +206,7 @@ interface QuarterLabel {
             <section class="ds-section">
               <div class="ds-section-header">Other Active</div>
               <div class="ds-grid ds-grid-header">
-                <span>Cycle</span>
+                <span>Initiative</span>
                 <span>Stage</span>
                 <span>Pilot Start</span>
                 <span>Status</span>
@@ -230,7 +229,7 @@ interface QuarterLabel {
                 </div>
               </ng-container>
               <ng-template #otherEmpty>
-                <div class="ds-row-empty">No cycles.</div>
+                <div class="ds-row-empty">No Initiatives.</div>
               </ng-template>
             </section>
 
@@ -429,9 +428,13 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
         take(1)
       ).subscribe(async profile => {
         const userId = profile.id ?? '';
-        const role   = profile.system_role;
-        this.isPrivileged   = role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN;
-        this.canCreateCycle = [SYSTEM_ROLES.PHIL, SYSTEM_ROLES.ADMIN, SYSTEM_ROLES.DCS, SYSTEM_ROLES.EPO, SYSTEM_ROLES.DOL].includes(role);
+        // Contract 19 (D-394): boolean flags replace system_role equality.
+        this.isPrivileged   = profile.is_admin === true;
+        this.canCreateCycle =
+          profile.is_admin === true ||
+          profile.is_dcs   === true ||
+          profile.is_epo   === true ||
+          profile.is_dol   === true;
 
         // Contract 17 §2 / D-380: restore persisted toggle state via MCP.
         const saved = await this.screenState.restore(SCREEN_KEYS.DELIVERY_DEPLOY_SCHEDULE);

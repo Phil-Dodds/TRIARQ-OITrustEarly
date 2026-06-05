@@ -18,10 +18,10 @@ async function assign_user_to_division(params, caller_user_id) {
   if (!user_id)     return { success: false, error: 'user_id is required.' };
   if (!division_id) return { success: false, error: 'division_id is required.' };
 
-  // Verify caller is admin
+  // Verify caller is Admin — Contract 19 (D-394, CC-19-01).
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('system_role, is_active')
+    .select('is_admin, is_active')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -29,7 +29,7 @@ async function assign_user_to_division(params, caller_user_id) {
   if (callerErr || !caller) {
     return { success: false, error: 'Caller user record not found.' };
   }
-  if (caller.system_role !== 'admin' && caller.system_role !== 'phil') {
+  if (caller.is_admin !== true) {
     return {
       success: false,
       error: 'Assigning users to Divisions requires Admin role. Your current role does not have this permission.'
@@ -39,7 +39,7 @@ async function assign_user_to_division(params, caller_user_id) {
   // Verify target user exists
   const { data: targetUser, error: userErr } = await supabase
     .from('users')
-    .select('id, display_name, system_role, allow_both_admin_and_functional_roles')
+    .select('id, display_name, system_role, is_admin, is_dcs, is_epo, is_dol, is_ce, is_super_admin, allow_both_admin_and_functional_roles')
     .eq('id', user_id)
     .is('deleted_at', null)
     .single();

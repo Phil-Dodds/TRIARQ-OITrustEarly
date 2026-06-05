@@ -54,15 +54,16 @@ async function list_delivery_cycles(params, caller_user_id) {
     return { success: false, error: `Failed to resolve Division access: ${memberErr.message}` };
   }
 
-  // Admin and Phil have access to all cycles regardless of direct membership.
+  // Admin has access to all Initiatives regardless of direct membership.
+  // Contract 19 (D-394, CC-19-01): boolean predicate; 'phil' collapsed into is_admin.
   const { data: caller } = await supabase
     .from('users')
-    .select('system_role')
+    .select('is_admin')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
-  const isPrivileged = caller && ['admin', 'phil'].includes(caller.system_role);
+  const isPrivileged = caller?.is_admin === true;
 
   let query = supabase
     .from('delivery_cycles')

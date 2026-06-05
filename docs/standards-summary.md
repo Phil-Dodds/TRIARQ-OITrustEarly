@@ -1,7 +1,5 @@
-
-
 # Standards Summary — Pathways OI Trust
-docs/standards-summary.md | v1.3 | April 2026 | CONFIDENTIAL
+docs/standards-summary.md | v1.6 | May 2026 | CONFIDENTIAL
 
 Read this file at every session start. Active Standards carry the same force as
 Non-Negotiable Architectural Rules. A spec element that conflicts with an Active
@@ -618,3 +616,76 @@ reports "acceptance criteria met" and Phil confirms in the next session.
 update = violation.
 
 **Exceptions:** None.
+
+---
+
+### S-028 — Processing Feedback Standard
+
+**Rule:** Every triggered operation shows immediate feedback before the first MCP
+call completes. Duration is never a criterion — the indicator appears on every
+call without threshold.
+
+Four processing contexts:
+
+**Context A — Button-triggered operations** (saves, submissions, approvals,
+confirmations, withdrawals): Button label changes to present-participle form
+immediately on tap ("Saving…", "Submitting…", "Approving…", "Confirming…",
+"Withdrawing…"). Button disabled during call. On failure: label reverts, button
+re-enables, D-200 Pattern 3 error inline adjacent to button.
+
+**Context B — List and picker loading**: Skeleton rows replace list content area
+immediately. Search field and scope controls remain active. On failure: Pattern 3
+error with Retry link inline. Governs S-022 "skeleton rows in list area."
+
+**Context C — Irreversible two-step operations (second call only)**: D-178 Tier 3
+Oravive overlay covers panel on the execution call. Dismisses on success or failure.
+Governs S-023 "Tier 3 loading overlay takes over on the second call."
+
+**Context D — Panel-level mutating operation**: Transparent non-interactive overlay
+covers the entire panel including the × close button. Nothing tappable during any
+write MCP call. Combined with Context A on the triggering button.
+
+**Loading philosophy — synchronous required for:** lists and grids (full load before
+any row tappable), View panels (full load before interactive), Edit panels (full load
+before form fields interactive).
+
+**Loading philosophy — async permitted only for:** hub landing page card headline
+strips and home screen card counts. No other async loading without a locked design
+decision.
+
+**Conformance test:** (1) Every button MCP call shows present-participle label change?
+(2) Every list/picker load shows skeleton rows? (3) Every two-step second call shows
+Tier 3 overlay? (4) Every mutating panel operation locks full panel including ×?
+(5) Lists, Views, Edit panels load completely before interactive? (6) Async loads
+limited to hub/home cards only? All yes = pass. Any no = violation.
+
+**Exceptions:** Hub landing page card headline strips and home screen card counts
+are explicitly async. No other exceptions without a locked design decision.
+
+---
+
+### S-030 — Component Design Standard
+
+**Rule:** Every component has a single, nameable responsibility stated in its class name. When a contract adds behavior to a component, Code first determines whether that behavior belongs in this component or should be extracted to a sub-component or service. Business logic appearing in more than one component is extracted to a shared service — not duplicated. The 300-line threshold is a trigger for the single-responsibility question, not an automatic refactor mandate.
+
+**Conformance test:** Does every component modified in this contract have a nameable single responsibility? Is any duplicated logic extracted rather than copied? Yes to both = compliant.
+
+**Exceptions:** None.
+
+**CodeClose-applicable:** Yes.
+
+**Governing decisions:** D-371 (CSS Budget Warnings: Quality Discipline Not Ceiling Raise)
+
+---
+
+### S-031 — Contract Code Quality Obligations
+
+**Rule:** Three obligations on every contract: (1) Test ratchet — any logic-touching change is protected by a test before the contract closes; any bug fix includes a regression test that would have caught the bug; coverage never decreases. (2) Pattern sweep — when a contract changes a shared pattern, Code searches for the same pattern in other components, reports findings in CodeClose, and flags them as next-contract candidates. (3) Descriptive naming — any method added or modified uses verb+object+context naming that describes the action and subject without requiring the reader to open the method.
+
+**Conformance test:** Does the CodeClose include a test ratchet confirmation? A pattern sweep report when a shared pattern was modified? Do all new/modified methods follow verb+object+context naming? Yes to all three = compliant.
+
+**Exceptions:** None.
+
+**CodeClose-applicable:** Yes.
+
+**Governing decisions:** D-371 (CSS Budget Warnings: Quality Discipline Not Ceiling Raise)

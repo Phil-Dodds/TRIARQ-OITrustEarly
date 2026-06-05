@@ -7,8 +7,8 @@ import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRe
 import { UserProfileService } from '../../../core/services/user-profile.service';
 import { AuthService }        from '../../../core/services/auth.service';
 import { Router }             from '@angular/router';
-import { SystemRole }         from '../../../core/types/database';
-import { SYSTEM_ROLES }       from '../../../core/constants/roles';
+import { User }               from '../../../core/types/database';
+import { RoleFlag }           from '../../../core/constants/roles';
 import { Subscription }       from 'rxjs';
 
 type DevStatus = 'new' | 'uat' | 'pilot' | 'not-started';
@@ -16,7 +16,8 @@ type DevStatus = 'new' | 'uat' | 'pilot' | 'not-started';
 interface NavItem {
   label:     string;
   route:     string;
-  roles:     SystemRole[] | 'all';
+  // Contract 19 (D-394): boolean flag gates the item. undefined = visible to all.
+  requiresFlag?: Exclude<RoleFlag, 'is_phil'>;
   devStatus: DevStatus;
 }
 
@@ -24,12 +25,12 @@ interface NavItem {
 // D-164: Admin functions are never individual sidebar links — they belong under /admin (Admin hub).
 // devStatus reflects current build stage. Update when a feature advances.
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home',                 route: '/home',           roles: 'all',                                          devStatus: 'uat'         },
-  { label: 'OI Library',           route: '/library',        roles: 'all',                                          devStatus: 'not-started' },
-  { label: 'Initiative Tracking',  route: '/initiatives',    roles: 'all',                                          devStatus: 'uat'         },
-  { label: 'Chat',                 route: '/chat',           roles: 'all',                                          devStatus: 'not-started' },
-  { label: 'Contact an Admin',     route: '/contact-admin',  roles: 'all',                                          devStatus: 'uat'         },
-  { label: 'Admin',                route: '/admin',          roles: [SYSTEM_ROLES.PHIL, SYSTEM_ROLES.ADMIN],        devStatus: 'uat'         },
+  { label: 'Home',                 route: '/home',           devStatus: 'uat'         },
+  { label: 'OI Library',           route: '/library',        devStatus: 'not-started' },
+  { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'uat'         },
+  { label: 'Chat',                 route: '/chat',           devStatus: 'not-started' },
+  { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'uat'         },
+  { label: 'Admin',                route: '/admin',          requiresFlag: 'is_admin', devStatus: 'uat' },
 ];
 
 @Component({
@@ -108,9 +109,9 @@ export class SidebarComponent implements OnInit, OnDestroy {
     this.sub.add(
       this.profileService.profile$.subscribe(profile => {
         this.displayName  = profile?.display_name ?? '';
-        const role        = profile?.system_role ?? null;
+        // Contract 19 (D-394): nav items gate on boolean flags. requiresFlag undefined = all.
         this.visibleItems = NAV_ITEMS.filter(item =>
-          item.roles === 'all' || (role && (item.roles as SystemRole[]).includes(role))
+          !item.requiresFlag || (profile && (profile as User)[item.requiresFlag] === true)
         );
         this.cdr.markForCheck();
       })

@@ -55,10 +55,10 @@ async function update_division(params, caller_user_id) {
     updates.display_name_short = trimmed;
   }
 
-  // Verify caller is admin
+  // Verify caller is Admin — Contract 19 (D-394, CC-19-01).
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('system_role, is_active')
+    .select('is_admin, is_active')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -66,7 +66,7 @@ async function update_division(params, caller_user_id) {
   if (callerErr || !caller) {
     return { success: false, error: 'Caller user record not found.' };
   }
-  if (caller.system_role !== 'admin' && caller.system_role !== 'phil') {
+  if (caller.is_admin !== true) {
     return {
       success: false,
       error: 'Updating Divisions requires Admin role. Your current role does not have this permission.'

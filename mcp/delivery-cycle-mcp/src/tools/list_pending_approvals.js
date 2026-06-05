@@ -29,15 +29,18 @@ const GATE_NAME_DISPLAY = {
  * @param {string} caller_user_id - from JWT
  */
 async function list_pending_approvals(_params, caller_user_id) {
-  // ── Caller role for Phil-fallback approver behaviour ─────────────────────
+  // ── Caller role for Admin-fallback approver behaviour ────────────────────
+  // Contract 19 (D-394, CC-19-01): boolean predicate; 'phil' collapsed into is_admin.
+  // Admins see any pending approval where the approver slot is unassigned, in addition
+  // to ones they are the explicit approver for.
   const { data: caller } = await supabase
     .from('users')
-    .select('system_role')
+    .select('is_admin')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
-  const isPhil = caller?.system_role === 'phil';
+  const isAdmin = caller?.is_admin === true;
 
   // ── Pending gate records the caller is the approver for ──────────────────
   let gateQuery = supabase
@@ -46,7 +49,7 @@ async function list_pending_approvals(_params, caller_user_id) {
     .eq('gate_status', 'awaiting_approval')
     .is('deleted_at', null);
 
-  if (isPhil) {
+  if (isAdmin) {
     gateQuery = gateQuery.or(`approver_user_id.eq.${caller_user_id},approver_user_id.is.null`);
   } else {
     gateQuery = gateQuery.eq('approver_user_id', caller_user_id);

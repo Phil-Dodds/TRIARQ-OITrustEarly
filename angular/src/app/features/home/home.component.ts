@@ -2,12 +2,15 @@
 // Role-aware home screen. Renders the correct card set per D-150.
 // Presentation only — no business logic, no MCP calls, no prompts (D-93 Rule 2).
 // All data arrives via @Input from the resolved profile.
+//
+// Contract 19 (D-394): role checks read boolean flags from the profile.
+//   A user with is_admin = true AND is_dcs = true sees both Admin and DCS cards —
+//   the multi-role intent is explicit.
 
 import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { UserProfileService } from '../../core/services/user-profile.service';
 import { McpService }         from '../../core/services/mcp.service';
-import { SystemRole, User }   from '../../core/types/database';
-import { SYSTEM_ROLES }       from '../../core/constants/roles';
+import { User }               from '../../core/types/database';
 import { firstValueFrom }     from 'rxjs';
 
 @Component({
@@ -17,7 +20,6 @@ import { firstValueFrom }     from 'rxjs';
 })
 export class HomeComponent implements OnInit {
   profile:      User | null = null;
-  role:         SystemRole | null = null;
   hasDivision:  boolean = false;
   loading:      boolean = true;
 
@@ -29,7 +31,6 @@ export class HomeComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     this.profile = await this.profileService.loadProfile();
-    this.role    = this.profile?.system_role ?? null;
 
     if (this.profile) {
       await this.checkDivisionMembership();
@@ -40,9 +41,9 @@ export class HomeComponent implements OnInit {
   }
 
   private async checkDivisionMembership(): Promise<void> {
-    // D-170: Phil and Admin have implicit access to all Divisions — no assignment needed.
+    // D-170: Admin has implicit access to all Divisions — no assignment needed.
     // Skip the membership check entirely; treat as fully provisioned.
-    if (this.role === SYSTEM_ROLES.PHIL || this.role === SYSTEM_ROLES.ADMIN) {
+    if (this.isAdmin) {
       this.hasDivision = true;
       this.profileService.setHasDivision(true);
       return;
@@ -62,31 +63,28 @@ export class HomeComponent implements OnInit {
     }
   }
 
-  // Role visibility helpers — used in template to show/hide cards per D-150.
-  get isPhil():  boolean { return this.role === SYSTEM_ROLES.PHIL; }
-  get isDCS():   boolean { return this.role === SYSTEM_ROLES.DCS; }
-  get isEPO():   boolean { return this.role === SYSTEM_ROLES.EPO; }
-  get isDOL():   boolean { return this.role === SYSTEM_ROLES.DOL; }
-  get isCE():    boolean { return this.role === SYSTEM_ROLES.CE; }
-  get isAdmin(): boolean { return this.role === SYSTEM_ROLES.ADMIN; }
+  // Role visibility helpers — Contract 19: read boolean flags from profile.
+  get isDCS():   boolean { return this.profile?.is_dcs   === true; }
+  get isEPO():   boolean { return this.profile?.is_epo   === true; }
+  get isDOL():   boolean { return this.profile?.is_dol   === true; }
+  get isCE():    boolean { return this.profile?.is_ce    === true; }
+  get isAdmin(): boolean { return this.profile?.is_admin === true; }
 
-  get showSystemHealth():    boolean { return this.isPhil; }
-  get showDivisions():       boolean { return this.isPhil || this.isAdmin; }
-  // UAT Bug 1 fix from master: showUserManagement is Phil OR Admin (not Admin only).
-  get showUserManagement():  boolean { return this.isPhil || this.isAdmin; }
-  // My Initiatives card — DCS, EPO, DOL only (D-391). Phil and Admin use the full dashboard.
-  // CE is read-only and has no per-Initiative field. Server scopes data via assigned_to_current_user.
+  get showSystemHealth():    boolean { return this.isAdmin; }
+  get showDivisions():       boolean { return this.isAdmin; }
+  get showUserManagement():  boolean { return this.isAdmin; }
+  // My Initiatives card — Contract 19 Part 3f: visible when caller holds any functional role,
+  //   regardless of also holding Admin. Multi-role users (e.g. Craig as Admin + DCS) see the card.
   get showDeliveryCycles():  boolean { return this.isDCS || this.isEPO || this.isDOL; }
 
-  // Phil and Admin always see the main cards — they need the Divisions card to
-  // bootstrap the hierarchy before they can have a division assignment themselves.
-  // Other roles see the onboarding message until an admin assigns them.
+  // Admin always sees the main cards — needs the Divisions card to bootstrap.
+  // Other roles see the onboarding message until an admin assigns a Division.
   get showOnboarding(): boolean {
-    return !this.hasDivision && !this.loading && !this.isPhil && !this.isAdmin;
+    return !this.hasDivision && !this.loading && !this.isAdmin;
   }
   get showMainCards(): boolean {
     if (this.loading) return false;
-    if (this.isPhil || this.isAdmin) return true;  // always visible for bootstrap
+    if (this.isAdmin) return true;
     return this.hasDivision;
   }
 }

@@ -18,10 +18,10 @@ async function revoke_division_membership(params, caller_user_id) {
   if (!user_id)     return { success: false, error: 'user_id is required.' };
   if (!division_id) return { success: false, error: 'division_id is required.' };
 
-  // Verify caller is admin
+  // Verify caller is Admin — Contract 19 (D-394, CC-19-01).
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('system_role, is_active')
+    .select('is_admin, is_active')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -29,7 +29,7 @@ async function revoke_division_membership(params, caller_user_id) {
   if (callerErr || !caller) {
     return { success: false, error: 'Caller user record not found.' };
   }
-  if (caller.system_role !== 'admin' && caller.system_role !== 'phil') {
+  if (caller.is_admin !== true) {
     return {
       success: false,
       error: 'Revoking Division memberships requires Admin role. Your current role does not have this permission.'

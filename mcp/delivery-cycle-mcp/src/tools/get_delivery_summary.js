@@ -25,10 +25,10 @@ const {
 async function get_delivery_summary(params, caller_id) {
   const { division_ids: requested_division_ids } = params;
 
-  // ── Resolve caller role ─────────────────────────────────────────────────────
+  // ── Resolve caller (Admin bypass — Contract 19 D-394, CC-19-01) ────────────
   const { data: callerData, error: callerError } = await supabase
     .from('users')
-    .select('system_role')
+    .select('is_admin')
     .eq('id', caller_id)
     .eq('is_active', true)
     .is('deleted_at', null)
@@ -38,8 +38,7 @@ async function get_delivery_summary(params, caller_id) {
     return { success: false, error: 'Could not verify caller role.' };
   }
 
-  const isPrivileged =
-    callerData.system_role === 'phil' || callerData.system_role === 'admin';
+  const isPrivileged = callerData.is_admin === true;
 
   // ── Resolve accessible division IDs ────────────────────────────────────────
   // null = all accessible (no filter). Array = restricted set.

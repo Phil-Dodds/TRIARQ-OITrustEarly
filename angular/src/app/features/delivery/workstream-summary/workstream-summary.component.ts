@@ -37,7 +37,6 @@ import {
   WorkstreamSummaryItem,
   Division
 } from '../../../core/types/database';
-import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 @Component({
   selector:        'app-workstream-summary',
@@ -310,10 +309,14 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
         take(1)
       ).subscribe(async profile => {
         this.currentUserId = profile.id ?? '';
-        const role         = profile.system_role;
-        this.isPrivileged  = role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN;
-        // Initiative creation open to DCS/EPO/DOL/Admin/Phil per dashboard canCreateCycle rule.
-        this.canCreateCycle = [SYSTEM_ROLES.PHIL, SYSTEM_ROLES.ADMIN, SYSTEM_ROLES.DCS, SYSTEM_ROLES.EPO, SYSTEM_ROLES.DOL].includes(role);
+        // Contract 19 (D-394): boolean flags replace system_role equality.
+        this.isPrivileged  = profile.is_admin === true;
+        // Initiative creation open to DCS/EPO/DOL/Admin per dashboard canCreateCycle rule.
+        this.canCreateCycle =
+          profile.is_admin === true ||
+          profile.is_dcs   === true ||
+          profile.is_epo   === true ||
+          profile.is_dol   === true;
 
         // Contract 17 §2 / D-380: restore persisted toggle state via MCP.
         // showMyDivisionsOnly is the only persisted control on this screen

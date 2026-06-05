@@ -39,15 +39,15 @@ async function list_delivery_workstreams(params, caller_user_id) {
     active_status
   } = params;
 
-  // ── Resolve caller role (needed for 'all' scope guard) ────────────────────
+  // ── Resolve caller (Admin bypass — Contract 19 D-394, CC-19-01) ────────────
   const { data: caller } = await supabase
     .from('users')
-    .select('system_role')
+    .select('is_admin')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
-  const isPrivileged = caller && ['admin', 'phil'].includes(caller.system_role);
+  const isPrivileged = caller?.is_admin === true;
 
   // ── Resolve which Division IDs to filter on ───────────────────────────────
   let divisionIdFilter = null; // null = no division filter applied

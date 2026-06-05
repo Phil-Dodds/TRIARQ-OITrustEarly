@@ -28,7 +28,6 @@ import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 import { DivisionSummaryItem, Division } from '../../../core/types/database';
-import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 // Item 4 (Part 3): screen key declared at top of file — Principle 4 (self-clarifying names)
 const SCREEN_KEY = SCREEN_KEYS.DELIVERY_DIVISIONS;
@@ -105,7 +104,7 @@ type DivisionSortCol = 'division_name' | 'active_cycle_count';
         </span>
         <span (click)="setSort('active_cycle_count')"
               style="text-align:right;cursor:pointer;user-select:none;">
-          Active Cycles {{ sortIndicator('active_cycle_count') }}
+          Active Initiatives {{ sortIndicator('active_cycle_count') }}
         </span>
       </div>
 
@@ -216,8 +215,8 @@ export class DivisionSummaryComponent implements OnInit, OnDestroy {
           if (typeof sort['sortCol'] === 'string') { this.sortCol = sort['sortCol'] as DivisionSortCol; }
           if (sort['sortDir'] === 'asc' || sort['sortDir'] === 'desc') { this.sortDir = sort['sortDir'] as 'asc' | 'desc'; }
         }
-        const role        = profile.system_role;
-        this.isPrivileged = role === SYSTEM_ROLES.PHIL || role === SYSTEM_ROLES.ADMIN;
+        // Contract 19 (D-394): boolean flag replaces system_role equality.
+        this.isPrivileged = profile.is_admin === true;
         if (!this.isPrivileged) {
           this.loadUserDivisions(this.currentUserId);
         } else {
