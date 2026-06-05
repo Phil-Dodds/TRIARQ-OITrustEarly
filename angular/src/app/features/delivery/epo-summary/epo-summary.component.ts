@@ -48,7 +48,7 @@ import {
   ScreenStateService,
   SCREEN_KEYS
 } from '../../../core/services/screen-state.service';
-import { EpoSummaryItem, Division } from '../../../core/types/database';
+import { EpoSummaryItem, Division, EpoWipLimitRow } from '../../../core/types/database';
 
 @Component({
   selector:        'app-epo-summary',
@@ -78,13 +78,24 @@ import { EpoSummaryItem, Division } from '../../../core/types/database';
         </p>
       </div>
 
-      <!-- 'Display only my Divisions' toggle (DCS/EPO/DOL only, defaults ON) -->
-      <label *ngIf="!isPrivileged" class="es-toggle">
-        <input type="checkbox"
-               [(ngModel)]="showMyDivisionsOnly"
-               (ngModelChange)="onToggleChange()" />
-        Display only my Divisions
-      </label>
+      <div class="es-toggle-row">
+        <!-- 'Display only my Divisions' toggle (DCS/EPO/DOL only, defaults ON) -->
+        <label *ngIf="!isPrivileged" class="es-toggle">
+          <input type="checkbox"
+                 [(ngModel)]="showMyDivisionsOnly"
+                 (ngModelChange)="onToggleChange()" />
+          Display only my Divisions
+        </label>
+
+        <!-- 'Show all EPOs' toggle (D-397 §5.2). Resets on every screen load —
+             NOT persisted via D-171. Reveals EPOs with zero active Initiatives. -->
+        <label class="es-toggle es-toggle-secondary">
+          <input type="checkbox"
+                 [(ngModel)]="showAllEpos"
+                 (ngModelChange)="onShowAllEposChange()" />
+          Show all EPOs
+        </label>
+      </div>
 
       <!-- Column headers — D-196 -->
       <div class="es-grid es-grid-header">
@@ -166,7 +177,9 @@ import { EpoSummaryItem, Division } from '../../../core/types/database';
     .es-new-cycle { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
     .es-new-cycle:hover { background: #1d5a7a; }
     .es-subtitle { margin: 4px 0 12px 0; font-size: 11px; font-style: italic; color: #5A5A5A; max-width: 720px; line-height: 1.6; }
-    .es-toggle { display: flex; align-items: center; gap: 8px; font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); margin-bottom: var(--triarq-space-md); cursor: pointer; }
+    .es-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--triarq-space-md); margin-bottom: var(--triarq-space-md); }
+    .es-toggle { display: flex; align-items: center; gap: 8px; font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); cursor: pointer; }
+    .es-toggle-secondary { color: var(--triarq-color-stone, #5A5A5A); font-size: 11px; margin-left: auto; }
     .es-grid { display: grid; grid-template-columns: 2fr 110px 100px 130px 80px; gap: var(--triarq-space-sm); padding: var(--triarq-space-xs) var(--triarq-space-sm); align-items: center; }
     .es-grid-header { font-size: var(--triarq-text-small); font-weight: 500; color: var(--triarq-color-text-secondary); border-bottom: 2px solid var(--triarq-color-border); }
     .es-grid-row { border-bottom: 1px solid var(--triarq-color-border); font-size: var(--triarq-text-small); }
@@ -188,6 +201,20 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
   isPrivileged         = false;
   showMyDivisionsOnly  = true;
   userDivisionIds:     string[] = [];
+
+  /** EPO rows with at least one active Initiative in scope. Loaded every time
+   *  the filter scope changes. Base set for rendering. */
+  private activeRows: EpoSummaryItem[] = [];
+
+  /** All EPOs (any is_epo = true user) with their configured WIP limits.
+   *  Lazy-loaded the first time 'Show all EPOs' is enabled. Used to back-fill
+   *  zero-Initiative EPOs into the visible list. */
+  private allEpoLimits: EpoWipLimitRow[] = [];
+  private allEposLoaded = false;
+
+  /** Toggle: surface EPOs with zero active Initiatives. Per D-397 §5.2,
+   *  this resets on every screen load — explicitly NOT persisted via D-171. */
+  showAllEpos          = false;
   rows: EpoSummaryItem[] = [];
   canCreateCycle       = false;
 
@@ -275,7 +302,8 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
     this.delivery.getDeliverySummary(params).subscribe({
       next: (res) => {
         if (res.success && res.data) {
-          this.rows = res.data.epo_summaries ?? [];
+          this.activeRows = res.data.epo_summaries ?? [];
+          this.rebuildRows();
         } else {
           this.loadError = res.error ?? 'Unable to reach the server. Check your connection and try again.';
         }
@@ -293,6 +321,66 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
   onToggleChange(): void {
     this.saveScreenState();
     this.loadSummary();
+  }
+
+  /**
+   * D-397 §5.2 'Show all EPOs' toggle. When enabled the first time, lazy-load
+   * get_epo_wip_limits (returns every is_epo = true user with their limits).
+   * On subsequent toggles, reuse the cached set.
+   */
+  onShowAllEposChange(): void {
+    if (this.showAllEpos && !this.allEposLoaded) {
+      this.delivery.getEpoWipLimits().subscribe({
+        next: (res) => {
+          if (res.success && res.data) {
+            this.allEpoLimits  = res.data;
+            this.allEposLoaded = true;
+          }
+          this.rebuildRows();
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          // Non-fatal — fall back to active-only rows and surface no error.
+          this.rebuildRows();
+          this.cdr.markForCheck();
+        }
+      });
+    } else {
+      this.rebuildRows();
+      this.cdr.markForCheck();
+    }
+  }
+
+  /**
+   * Merge active EPO summaries with the all-EPOs limit set when the toggle is
+   * on. Back-fills zero-Initiative EPOs at all-zero counts; preserves the
+   * existing sort order (active EPOs first by total cycles desc, zero-EPOs
+   * appended alphabetically).
+   */
+  private rebuildRows(): void {
+    if (!this.showAllEpos || !this.allEposLoaded) {
+      this.rows = this.activeRows;
+      return;
+    }
+    const activeIds = new Set(this.activeRows.map(r => r.user_id));
+    const zeroRows: EpoSummaryItem[] = this.allEpoLimits
+      .filter(l => !activeIds.has(l.user_id))
+      .map(l => ({
+        user_id:                  l.user_id,
+        display_name:             l.display_name,
+        total_active_cycles:      0,
+        wip_pre_build:            0,
+        wip_build:                0,
+        wip_post_deploy:          0,
+        wip_pre_build_limit:      l.pre_build_limit,
+        wip_build_limit:          l.build_limit,
+        wip_post_deploy_limit:    l.post_deploy_limit,
+        wip_pre_build_exceeded:   false,
+        wip_build_exceeded:       false,
+        wip_post_deploy_exceeded: false
+      }))
+      .sort((a, b) => a.display_name.localeCompare(b.display_name));
+    this.rows = [...this.activeRows, ...zeroRows];
   }
 
   anyZoneExceeded(r: EpoSummaryItem): boolean {

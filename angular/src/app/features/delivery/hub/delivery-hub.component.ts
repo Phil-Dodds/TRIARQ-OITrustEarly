@@ -12,9 +12,18 @@
 // corner, fully rounded. The badge is removed from a card as that view is
 // implemented. The "Open view →" link remains active on every card.
 
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  OnInit
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { IonicModule }  from '@ionic/angular';
+
+import { DeliveryService } from '../../../core/services/delivery.service';
+import { DeliverySummary } from '../../../core/types/database';
 
 interface HubCard {
   title:       string;
@@ -23,6 +32,17 @@ interface HubCard {
   icon:        string;
   /** D-356: render the "Coming Soon" badge on cards whose view has not been built yet. */
   comingSoon?: boolean;
+  /** Optional id; required for cards that surface an async headline (D-396 / spec §4). */
+  id?:         'all-initiatives' | 'epo-summary' | 'epo-schedule' | 'epo-deploy'
+            |  'workstream-summary' | 'gate-schedule' | 'deploy-schedule';
+}
+
+/** Spec §4 headline color semantics. */
+type HeadlineTone = 'green' | 'amber' | 'red';
+
+interface CardHeadline {
+  text: string;
+  tone: HeadlineTone;
 }
 
 // Contract 20 Session 2 (D-396): hub expands from 4 → 7 cards. EPO-organized
@@ -33,6 +53,7 @@ interface HubCard {
 // typos; live routes are bookmarked and deployed.
 const HUB_CARDS: HubCard[] = [
   {
+    id:          'all-initiatives',
     title:       'All Initiatives',
     route:       '/initiatives/list',
     icon:        '≡',
@@ -41,6 +62,7 @@ const HUB_CARDS: HubCard[] = [
                  'for, or want to apply a combination of filters.'
   },
   {
+    id:          'epo-summary',
     title:       'EPO Summary',
     route:       '/initiatives/epo-summary',
     icon:        '◐',
@@ -49,6 +71,7 @@ const HUB_CARDS: HubCard[] = [
                  'to see their matching Initiatives.'
   },
   {
+    id:          'epo-schedule',
     title:       'EPO Gate Schedule',
     route:       '/initiatives/epo-schedule',
     icon:        '◑',
@@ -57,6 +80,7 @@ const HUB_CARDS: HubCard[] = [
                  'attention this week.'
   },
   {
+    id:          'epo-deploy',
     title:       'EPO Deploy by Quarter',
     route:       '/initiatives/epo-deploy',
     icon:        '◒',
@@ -94,7 +118,7 @@ const HUB_CARDS: HubCard[] = [
   selector:        'app-delivery-hub',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, RouterModule],
+  imports:         [CommonModule, RouterModule, IonicModule],
   template: `
     <div class="dh-shell">
 
@@ -122,6 +146,24 @@ const HUB_CARDS: HubCard[] = [
 
           <div class="dh-icon">{{ card.icon }}</div>
           <div class="dh-card-title">{{ card.title }}</div>
+
+          <!-- Async headline strip (D-396, spec §4). Three EPO cards carry
+               a headline; loading state shows a skeleton, settled state
+               renders the headline with tone-driven color. S-028 authorizes
+               async on hub headlines. -->
+          <ng-container *ngIf="card.id && hasHeadline(card.id)">
+            <div *ngIf="headlinesLoading" class="dh-headline-skeleton">
+              <ion-skeleton-text animated style="height:11px;width:60%;border-radius:4px;"></ion-skeleton-text>
+            </div>
+            <div *ngIf="!headlinesLoading && headlines[card.id!]"
+                 class="dh-headline"
+                 [class.dh-headline-green]="headlines[card.id!]!.tone === 'green'"
+                 [class.dh-headline-amber]="headlines[card.id!]!.tone === 'amber'"
+                 [class.dh-headline-red]="headlines[card.id!]!.tone === 'red'">
+              {{ headlines[card.id!]!.text }}
+            </div>
+          </ng-container>
+
           <!-- S-015: 11px italic #5A5A5A description -->
           <div class="dh-card-description">{{ card.description }}</div>
 
@@ -207,10 +249,101 @@ const HUB_CARDS: HubCard[] = [
       padding: 2px 10px;
       border-radius: 999px;
     }
+
+    /* D-396 async headline strip — tone color per spec §4 table */
+    .dh-headline {
+      margin: 2px 0 6px 0;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1px;
+    }
+    .dh-headline-green { color: #2c8a3a; }
+    .dh-headline-amber { color: #b07000; }
+    .dh-headline-red   { color: #c0392b; }
+    .dh-headline-skeleton { margin: 2px 0 6px 0; }
   `]
 })
-export class DeliveryHubComponent {
+export class DeliveryHubComponent implements OnInit {
   readonly cards = HUB_CARDS;
+
+  /**
+   * Async headlines per card id. Loading state is shared — single
+   * getDeliverySummary call backs all three EPO headlines (S-028 authorizes
+   * the async pattern on hub card headlines only).
+   */
+  headlines: Partial<Record<NonNullable<HubCard['id']>, CardHeadline>> = {};
+  headlinesLoading = true;
+
+  constructor(
+    private readonly delivery: DeliveryService,
+    private readonly cdr:      ChangeDetectorRef
+  ) {}
+
+  ngOnInit(): void {
+    this.delivery.getDeliverySummary({}).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.buildHeadlines(res.data);
+        }
+        this.headlinesLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        // Non-fatal — hub remains navigable even when headlines fail.
+        this.headlinesLoading = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  /**
+   * Derive headline text + tone for each EPO card per spec §4 table.
+   *
+   * EPO Summary — total active EPOs + count with any zone exceeded.
+   * EPO Gate Schedule — sum overdue + upcoming counts across all gate types.
+   * EPO Deploy by Quarter — per CC-20-06, simplified to total active EPOs
+   *   only. Full spec wording ("X with prior-quarter misses") requires a
+   *   per-cycle deploy-gate target-date check that get_delivery_summary does
+   *   not currently surface — recorded as a follow-on item.
+   */
+  private buildHeadlines(summary: DeliverySummary): void {
+    const eposExceeded = (summary.epo_summaries ?? []).filter(e =>
+      e.wip_pre_build_exceeded || e.wip_build_exceeded || e.wip_post_deploy_exceeded
+    ).length;
+    const epoCount = (summary.epo_summaries ?? []).length;
+
+    this.headlines['epo-summary'] = epoCount === 0
+      ? { text: 'No EPOs with active Initiatives', tone: 'green' }
+      : eposExceeded === 0
+        ? { text: `${epoCount} EPOs · No WIP alerts`, tone: 'green' }
+        : { text: `${epoCount} EPOs · ${eposExceeded} with active WIP alerts`, tone: 'amber' };
+
+    const overdueTotal  = (summary.gate_summaries ?? [])
+      .reduce((sum, g) => sum + (g.overdue_count ?? 0), 0);
+    const upcomingTotal = (summary.gate_summaries ?? [])
+      .reduce((sum, g) => sum + (g.upcoming_count ?? 0), 0);
+
+    this.headlines['epo-schedule'] = overdueTotal > 0
+      ? {
+          text: `${overdueTotal} overdue · ${upcomingTotal} due in 7 days`,
+          tone: overdueTotal > 0 ? 'red' : 'amber'
+        }
+      : {
+          text: `No overdue gates · ${upcomingTotal} due in 7 days`,
+          tone: 'green'
+        };
+
+    // CC-20-06: simplified deploy headline — full prior-quarter-miss count
+    // requires per-cycle deploy-gate date check, deferred to a follow-on.
+    this.headlines['epo-deploy'] = epoCount === 0
+      ? { text: 'No EPOs with active Initiatives', tone: 'green' }
+      : { text: `${epoCount} EPOs · Deploy cadence loaded`, tone: 'green' };
+  }
+
+  /** Template helper — gate the headline strip to ids we configure here. */
+  hasHeadline(id: NonNullable<HubCard['id']>): boolean {
+    return id === 'epo-summary' || id === 'epo-schedule' || id === 'epo-deploy';
+  }
 
   onCardEnter(event: MouseEvent): void {
     const el = event.currentTarget as HTMLElement;

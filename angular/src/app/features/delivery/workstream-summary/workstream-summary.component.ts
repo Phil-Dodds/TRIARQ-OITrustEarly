@@ -63,7 +63,8 @@ import {
              EPO Summary view (/initiatives/epo-summary) carries the WIP alert UI. -->
         <p class="ws-subtitle">
           WIP throughput per Workstream across Pre-Build, Build, and Post-Deploy
-          stages. WIP limits are configured per EPO — see the EPO Summary view
+          stages. WIP limits are configured per EPO — see the
+          <a routerLink="/initiatives/epo-summary" class="ws-subtitle-link">EPO Summary view</a>
           for over-limit alerts.
         </p>
       </div>
@@ -179,6 +180,12 @@ import {
       font-size: 11px; font-style: italic; color: #5A5A5A;
       max-width: 720px; line-height: 1.6;
     }
+    .ws-subtitle-link {
+      color: var(--triarq-color-primary, #257099);
+      text-decoration: underline;
+      font-style: italic;
+    }
+    .ws-subtitle-link:hover { color: #1d5a7a; }
 
     .ws-toggle {
       display: flex; align-items: center; gap: 8px;

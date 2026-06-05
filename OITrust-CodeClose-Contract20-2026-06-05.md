@@ -1,14 +1,14 @@
-# OITrust CodeClose — Contract 20 (Units 1–7)
-Date: 2026-06-05 | Build C | Sessions 1 + 2 (combined CodeClose)
+# OITrust CodeClose — Contract 20 (Units 1–7 + Polish Pass)
+Date: 2026-06-05 | Build C | Sessions 1 + 2 + 3 (combined CodeClose)
 
 ---
 
 ## Session Summary
 
-Contract 20 ran across two sessions in one continuous Code conversation.
+Contract 20 ran across three sessions in one continuous Code conversation.
 Units 1–3 shipped first (per the original split). Phil approved continuation
-into Units 4–7 in the same conversation; both sessions land in this single
-CodeClose.
+into Units 4–7. After Session 2 UAT passed, Phil approved a Session 3 polish
+pass to recover three of the six CC-20-05 deferrals.
 
 **Units shipped — Session 1:**
 - Unit 1 — Schema migration 035 + `record_gate_decision` EPO WIP check + `get_delivery_summary` WIP field cleanup
@@ -23,6 +23,14 @@ CodeClose.
 
 All four new views ship as MVP — see CC-20-05 for spec deltas.
 
+**Polish items shipped — Session 3:**
+- Item 6 — Workstream Summary subtitle "EPO Summary view" now a clickable link
+- Item 4 — "Show all EPOs" toggle on EPO Summary view (D-397 §5.2)
+- Item 5 — Async hub headlines for the three new EPO cards (D-396 / spec §4)
+
+Three CC-20-05 deferrals remain — slide-in filter panel, expanded EPO row
+with embedded grid, role-aware EPO filter default.
+
 ---
 
 ## CC-Decisions
@@ -33,9 +41,10 @@ All four new views ship as MVP — see CC-20-05 for spec deltas.
 | CC-20-02 | Migration 035 skips the workstream WIP column drop. Columns named in spec §1.2 step 3 (`wip_limit_pre_build`, `wip_limit_build`, `wip_limit_post_deploy`) were never present in any prior migration — no columns to remove. Migration header records the omission. | Plan-mode pre-flight check |
 | CC-20-03 | Hub card route names stay as `/initiatives/gates` and `/initiatives/deploy-schedule`. Spec §4 paths `/initiatives/schedule` and `/initiatives/deploy` are treated as descriptive typos; live routes are bookmarked and deployed. (Relevant to Session 2, recorded now for traceability.) | Plan-mode pre-flight check |
 | CC-20-04 | Spec §2.3 + §2.4 named the wrong tools. `record_gate_decision` had no prior WIP check (the "current behavior" in spec is fictional) — EPO check is net-new. `list_delivery_workstreams` returns no WIP fields — `get_delivery_summary` was the actual carrier of `wip_*_limit` / `wip_*_exceeded`, retargeted there. Angular `WorkstreamSummaryItem` interface + Workstream Summary template updated to match. | Mid-Unit 1 implementation |
-| CC-20-05 | Units 4–7 ship as MVP, not full spec. Each new EPO view (`epo-summary`, `epo-schedule`, `epo-deploy`) renders EPO rows with aggregate counts and a drill-out link to `/initiatives/list?epo=user_id`. The slide-in filter panel (Division / EPO picker / Lifecycle Stage / Tier / Gate Status), active filter chips, "Show all EPOs" toggle, role-aware EPO filter default, and the expanded-EPO-row Initiative grid per spec §5.3 / §6.3 / §7.3 are **deferred**. Drill-out to the existing dashboard preserves every Initiative-level interaction (S-018 list → View) via that surface's filter chip path. Dashboard `?epo=` query-param drill-down added this contract. Async hub headlines for the 3 new EPO cards (spec §4 table) also deferred — cards render with description and Open link only. | Mid-Unit 4 implementation |
+| CC-20-05 | Units 4–7 ship as MVP, not full spec. Each new EPO view (`epo-summary`, `epo-schedule`, `epo-deploy`) renders EPO rows with aggregate counts and a drill-out link to `/initiatives/list?epo=user_id`. The slide-in filter panel (Division / EPO picker / Lifecycle Stage / Tier / Gate Status), active filter chips, "Show all EPOs" toggle, role-aware EPO filter default, and the expanded-EPO-row Initiative grid per spec §5.3 / §6.3 / §7.3 are **deferred**. Drill-out to the existing dashboard preserves every Initiative-level interaction (S-018 list → View) via that surface's filter chip path. Dashboard `?epo=` query-param drill-down added this contract. Async hub headlines for the 3 new EPO cards (spec §4 table) also deferred — cards render with description and Open link only. (Session 3 recovered: "Show all EPOs" toggle + async hub headlines + Workstream Summary subtitle link.) | Mid-Unit 4 implementation |
+| CC-20-06 | EPO Deploy by Quarter hub headline simplified. Spec §4 calls for "N EPOs · X with prior-quarter misses" (amber) or "N EPOs · On track" (green). The prior-quarter-miss count requires a per-cycle deploy-gate target-date check that `get_delivery_summary` does not currently surface — only zone counts + limits ship in `epo_summaries`. Session 3 headline ships as "N EPOs · Deploy cadence loaded" (green) — informative without misrepresenting state. Recovery path: extend `get_delivery_summary` `epo_summaries` rows with a `prior_quarter_miss_count` field on a follow-on contract, then update `buildHeadlines` to use it. | Mid-Session 3 implementation |
 
-Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04, CC-20-05. No gaps (Rule 17).
+Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04, CC-20-05, CC-20-06. No gaps (Rule 17).
 
 ---
 
@@ -73,6 +82,11 @@ Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04, CC-20-05. No gaps (Ru
 - `angular/src/app/features/delivery/delivery.module.ts` — register 3 new EPO view routes
 - `angular/src/app/features/delivery/hub/delivery-hub.component.ts` — 4 → 7 cards (CC-20-03 keeps live route names for cards 6–7)
 - `angular/src/app/features/delivery/dashboard/delivery-cycle-dashboard.component.ts` — accept `?epo=` query param for drill-down filter pre-population
+
+### Modified (logic-touching) — Session 3
+- `angular/src/app/features/delivery/workstream-summary/workstream-summary.component.ts` — subtitle "EPO Summary view" → `routerLink` to `/initiatives/epo-summary`
+- `angular/src/app/features/delivery/epo-summary/epo-summary.component.ts` — add `Show all EPOs` toggle that lazy-loads `get_epo_wip_limits` and merges zero-Initiative EPOs into the row set (D-397 §5.2)
+- `angular/src/app/features/delivery/hub/delivery-hub.component.ts` — add async headline strips for the three new EPO cards (D-396 / spec §4); single `getDeliverySummary` call on mount; skeleton during load; tone-driven color (green / amber / red)
 
 ---
 
@@ -258,9 +272,25 @@ Run after MCP + Angular deploy. Binary pass/fail. Run as Phil (Admin + Super-Adm
 45. Each EPO row shows three integer counts. Verify against actual go_to_deploy actual + target dates. **Pass:** counts match. **Fail:** misclassified.
 46. Click an EPO row. **Pass:** drills to `/initiatives/list?epo=<user_id>`. **Fail:** wrong navigation.
 
-### Surface 10 — Workstream Summary subtitle update — Session 2
+### Surface 10 — Workstream Summary subtitle update — Session 2 → Session 3
 
-47. Open `/initiatives/workstreams`. **Pass:** subtitle mentions "see the EPO Summary view for over-limit alerts" — and that link/view now exists. **Fail:** broken reference.
+47. Open `/initiatives/workstreams`. **Pass:** subtitle mentions "see the EPO Summary view for over-limit alerts". (Session 3) "EPO Summary view" is now a clickable underlined primary-color link. Clicking it navigates to `/initiatives/epo-summary`. **Fail:** plain text only, or wrong destination.
+
+### Surface 11 — EPO Summary "Show all EPOs" toggle — Session 3
+
+48. Open `/initiatives/epo-summary`. **Pass:** above the grid, a "Show all EPOs" toggle is visible on the right side (small, stone color), defaulting OFF. **Fail:** toggle missing.
+49. With toggle OFF, the row count equals the number of EPOs with at least one active Initiative in scope. **Pass.** **Fail:** zero-Initiative EPOs visible.
+50. Flip the toggle ON. **Pass:** within ~1s, additional rows appear at the bottom of the list — every other `is_epo = true` user, each at 0/0/0 against their configured limits (defaulting 3/3/3 if no `epo_wip_limits` row). Zero-Initiative rows show no ⚠ flag and no amber styling. **Fail:** no new rows or wrong limit values shown.
+51. Reload the page. **Pass:** toggle resets to OFF (per D-397 §5.2 — not persisted). **Fail:** toggle state remembered.
+
+### Surface 12 — Hub async headlines — Session 3
+
+52. Open `/initiatives`. **Pass:** the three EPO cards (positions 2, 3, 4) each show a short skeleton-line immediately under the title. **Fail:** no skeleton.
+53. Within ~1s, each card's skeleton replaces with a headline string and tone color (green / amber / red). **Pass:**
+    - **EPO Summary** card → "N EPOs · No WIP alerts" (green) or "N EPOs · X with active WIP alerts" (amber)
+    - **EPO Gate Schedule** card → "No overdue gates · Y due in 7 days" (green) or "X overdue · Y due in 7 days" (red)
+    - **EPO Deploy by Quarter** card → "N EPOs · Deploy cadence loaded" (green) — per CC-20-06, full spec wording deferred
+54. Click any of the three cards — navigation succeeds, headline state is irrelevant to the click target. **Pass.** **Fail:** card unclickable while headline loads.
 
 ---
 
@@ -313,16 +343,17 @@ Per memory rule (always state full Windows path at session close):
 
 ---
 
-## Follow-On Contract — Recovery of CC-20-05 Deferrals
+## Follow-On Contract — Remaining CC-20-05 Deferrals
 
-CC-20-05 captures specifically what was deferred from Units 4–7. The next
-Code contract should pick these up in this order:
+After Session 3, three items still remain. Priority order:
 
-1. **Slide-in filter panel for all three EPO views** — Division, EPO picker, Lifecycle Stage, Tier, Gate Status. Use existing dashboard's filter panel as the source pattern. Active filter chips bar.
-2. **Role-aware EPO filter default** — `is_epo = true` users default to self on first load when no stored screen state in 7 days.
-3. **Expanded EPO row content** — spec §5.3 (three zone sections per EPO with embedded Initiative grid), spec §6.3 (full grid below the two sections grouped by EPO), spec §7.3 (three quarter sections with embedded grid).
-4. **"Show all EPOs" toggle** — surface EPOs with zero active Initiatives in EPO Summary. Requires merging `get_epo_wip_limits` with `epo_summaries`.
-5. **Async hub headlines** — three new EPO cards on `/initiatives` hub get count headlines per spec §4 table.
-6. **Workstream Summary subtitle link** — make "EPO Summary view" tappable + route to `/initiatives/epo-summary`.
+1. **Slide-in filter panel for all three EPO views** — Division, EPO picker, Lifecycle Stage, Tier, Gate Status. Use existing dashboard's filter panel as the source pattern. Active filter chips bar. **(Biggest user value.)**
+2. **Role-aware EPO filter default** — `is_epo = true` users default to self on first load when no stored screen state in 7 days. Depends on (1).
+3. **Expanded EPO row content** — spec §5.3 (three zone sections per EPO with embedded Initiative grid), spec §6.3 (full grid below the two sections grouped by EPO), spec §7.3 (three quarter sections with embedded grid). **(Biggest implementation lift.)**
 
-Each item ships as a small contract; no D-number changes required since the deferrals trace to D-396 / D-397 / D-398 / D-399 (already built per impl_status above with the CC-20-05 partial-coverage note).
+Plus the standalone:
+- **CC-20-06 recovery** — extend `get_delivery_summary.epo_summaries` rows with `prior_quarter_miss_count` and update the EPO Deploy headline to "N EPOs · X with prior-quarter misses" per spec §4.
+
+Each item ships as a small contract; no D-number changes required since the
+deferrals trace to D-396 / D-397 / D-398 / D-399 (already built per
+impl_status with the CC-20-05 partial-coverage note).
