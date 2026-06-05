@@ -3,8 +3,6 @@
 // These match the schema exactly. Used by services and components.
 // No Supabase client imports here — this file is types only.
 
-import type { SystemRole } from '../constants/roles';
-export type { SystemRole };
 export type LifecycleStatus = 'draft' | 'seed_review' | 'candidate' | 'canon' | 'superseded' | 'archived';
 export type FileFormat = 'pdf' | 'docx' | 'md' | 'txt';
 export type MalwareScanStatus = 'pending' | 'clean' | 'rejected';
@@ -17,9 +15,7 @@ export interface User {
   id:                                    string;
   email:                                 string;
   display_name:                          string;
-  // Contract 19 (D-394, migration 033): boolean role flags replace single system_role.
-  //   A user can hold multiple roles simultaneously. system_role retained during transition
-  //   until migration 034 drops it.
+  // Boolean role flags (D-394, migration 033). A user can hold multiple roles simultaneously.
   is_admin:                              boolean;
   is_dcs:                                boolean;
   is_epo:                                boolean;
@@ -29,15 +25,13 @@ export interface User {
   //   and Canon-document delete authority. Not user-editable via the Admin UI — only
   //   set by direct DB assignment (Supabase Studio) to prevent privilege escalation.
   is_super_admin:                        boolean;
-  // Legacy single-role column. Read-only post-Contract 19; dropped at migration 034.
-  system_role:                           SystemRole;
   allow_both_admin_and_functional_roles: boolean;
   is_active:                             boolean;
   created_at:                            string;
   updated_at:                            string;
   deleted_at:                            string | null;
-  // Contract 19 (D-395, CC-19-02): active Division memberships, present on list_users
-  // responses that omit a division_id filter. Empty array = no memberships.
+  // Active Division memberships, present on list_users responses that omit a
+  // division_id filter (D-395, CC-19-02). Empty array = no memberships.
   division_names?:                       string[];
 }
 

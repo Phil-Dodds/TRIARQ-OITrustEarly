@@ -1,31 +1,21 @@
 // update_user.js
 // Updates mutable user fields. Admin-only.
-// allow_both_admin_and_functional_roles can only be set to true by the 'phil' role (D-139).
+// allow_both_admin_and_functional_roles can only be set to true by a super-admin (D-139, CC-19-06).
+//
+// Phase 2 (Contract 19 follow-up, migration 034): system_role removed. Role updates go
+// through the boolean flags only. is_super_admin is intentionally NOT mutable here —
+// bootstrap via direct DB assignment.
 
 'use strict';
 
 const { supabase } = require('../db');
 
-const VALID_ROLES  = ['phil', 'dcs', 'epo', 'dol', 'ce', 'admin'];
-
-// Contract 19 (D-394): boolean role flags joined to MUTABLE_FIELDS so the Admin UI can
-// toggle them via update_user. Phase 1 dual-write per CC-19-04 — system_role stays
-// in sync until migration 034 drops it.
+// Boolean role flags accepted as updates. is_super_admin is excluded by design.
 const ROLE_FLAGS = ['is_admin', 'is_dcs', 'is_epo', 'is_dol', 'is_ce'];
 const MUTABLE_FIELDS = [
-  'display_name', 'system_role', 'is_active', 'allow_both_admin_and_functional_roles',
+  'display_name', 'is_active', 'allow_both_admin_and_functional_roles',
   ...ROLE_FLAGS
 ];
-
-// Derives a legacy system_role value from the boolean flags. Priority: admin > dcs > epo > dol > ce.
-function deriveSystemRole(flags) {
-  if (flags.is_admin) return 'admin';
-  if (flags.is_dcs)   return 'dcs';
-  if (flags.is_epo)   return 'epo';
-  if (flags.is_dol)   return 'dol';
-  if (flags.is_ce)    return 'ce';
-  return null;
-}
 
 /**
  * @param {object} params
@@ -79,14 +69,6 @@ async function update_user(params, caller_user_id) {
     };
   }
 
-  // Validate system_role if being updated
-  if (updates.system_role && !VALID_ROLES.includes(updates.system_role)) {
-    return {
-      success: false,
-      error: `system_role must be one of: ${VALID_ROLES.join(', ')}.`
-    };
-  }
-
   // Verify target user exists
   const { data: existing, error: existErr } = await supabase
     .from('users')
@@ -99,31 +81,12 @@ async function update_user(params, caller_user_id) {
     return { success: false, error: 'User not found.' };
   }
 
-  // Build safe update payload.
+  // Build safe update payload from whitelisted fields.
   const payload = {};
   for (const field of MUTABLE_FIELDS) {
     if (updates[field] !== undefined) {
       payload[field] = updates[field];
     }
-  }
-
-  // Contract 19 dual-write: if any boolean flag was updated, derive an updated system_role too
-  //   to keep the legacy column in sync. The caller may omit system_role explicitly — we still
-  //   keep it aligned with whichever flag is the user's "primary" role under the legacy mapping.
-  const anyFlagInUpdate = ROLE_FLAGS.some(f => updates[f] !== undefined);
-  if (anyFlagInUpdate && updates.system_role === undefined) {
-    // Read existing user row to merge unchanged flags into the derivation.
-    const { data: existingFlags } = await supabase
-      .from('users')
-      .select('is_admin, is_dcs, is_epo, is_dol, is_ce')
-      .eq('id', user_id)
-      .single();
-    const merged = { ...(existingFlags ?? {}) };
-    for (const f of ROLE_FLAGS) {
-      if (updates[f] !== undefined) { merged[f] = updates[f]; }
-    }
-    const derived = deriveSystemRole(merged);
-    if (derived) { payload.system_role = derived; }
   }
 
   const { data: updated, error: updateErr } = await supabase

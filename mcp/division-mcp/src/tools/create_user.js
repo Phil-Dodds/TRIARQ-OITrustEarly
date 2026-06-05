@@ -8,27 +8,17 @@
 // /login, enters their email, then enters the OTP at /auth/verify-otp. The
 // redirectTo URL is unused by the OTP-only template but Supabase requires it —
 // we point it at the app root.
+//
+// Phase 2 (Contract 19 follow-up, migration 034): system_role removed. Role input
+// is exclusively boolean flags (is_admin, is_dcs, is_epo, is_dol, is_ce).
+// is_super_admin is intentionally NOT a settable parameter — bootstrap by direct DB.
 
 'use strict';
 
 const { supabase } = require('../db');
 
-const VALID_ROLES = ['phil', 'dcs', 'epo', 'dol', 'ce', 'admin'];
-
-// Contract 19 (D-394): boolean role flags. Each flag corresponds to a column.
+// Boolean role flags accepted as input. is_super_admin is excluded by design.
 const ROLE_FLAGS = ['is_admin', 'is_dcs', 'is_epo', 'is_dol', 'is_ce'];
-
-// Picks the legacy system_role value from a set of boolean flags.
-// Priority order matches the historical single-role semantics: admin first, then functional roles.
-// Used to keep the legacy system_role column populated during the Phase 1 transition (CC-19-04).
-function deriveSystemRole(flags) {
-  if (flags.is_admin) return 'admin';
-  if (flags.is_dcs)   return 'dcs';
-  if (flags.is_epo)   return 'epo';
-  if (flags.is_dol)   return 'dol';
-  if (flags.is_ce)    return 'ce';
-  return null;
-}
 
 // Inert redirect URL — see header comment. Override with APP_INVITE_REDIRECT_URL
 // if a Supabase template variant ever needs it.
@@ -41,8 +31,6 @@ const INVITE_REDIRECT_URL =
  * @param {object} params
  * @param {string} params.email
  * @param {string} params.display_name
- * @param {string} [params.system_role] - legacy single-role input (phil, dcs, epo, dol, ce, admin).
- *   Optional when boolean flags are provided.
  * @param {boolean} [params.is_admin]
  * @param {boolean} [params.is_dcs]
  * @param {boolean} [params.is_epo]
@@ -51,13 +39,12 @@ const INVITE_REDIRECT_URL =
  * @param {string} caller_user_id
  */
 async function create_user(params, caller_user_id) {
-  const { email, display_name, system_role } = params;
+  const { email, display_name } = params;
 
   if (!email)        return { success: false, error: 'email is required.' };
   if (!display_name) return { success: false, error: 'display_name is required.' };
 
-  // Contract 19: accept either system_role (legacy) or boolean flags.
-  //   At least one must be present; flag-based input takes precedence and is the new canonical form.
+  // Resolve role flag inputs. At least one must be set.
   const flagInput = {};
   let anyFlagSet = false;
   for (const flag of ROLE_FLAGS) {
@@ -69,33 +56,17 @@ async function create_user(params, caller_user_id) {
     }
   }
 
-  let effectiveSystemRole = system_role;
-  if (anyFlagSet) {
-    // Booleans take precedence — derive the legacy column from the flags.
-    effectiveSystemRole = deriveSystemRole(flagInput);
-  } else if (effectiveSystemRole) {
-    // Legacy input path — map the single role to its boolean.
-    if (!VALID_ROLES.includes(effectiveSystemRole)) {
-      return {
-        success: false,
-        error: `system_role must be one of: ${VALID_ROLES.join(', ')}. Received: ${effectiveSystemRole}.`
-      };
-    }
-    // CC-19-01: 'phil' collapses into is_admin.
-    if (effectiveSystemRole === 'phil' || effectiveSystemRole === 'admin') { flagInput.is_admin = true; }
-    if (effectiveSystemRole === 'dcs')   { flagInput.is_dcs   = true; }
-    if (effectiveSystemRole === 'epo')   { flagInput.is_epo   = true; }
-    if (effectiveSystemRole === 'dol')   { flagInput.is_dol   = true; }
-    if (effectiveSystemRole === 'ce')    { flagInput.is_ce    = true; }
-    anyFlagSet = true;
-  } else {
-    return { success: false, error: 'At least one role flag (is_admin, is_dcs, is_epo, is_dol, is_ce) or system_role is required.' };
+  if (!anyFlagSet) {
+    return {
+      success: false,
+      error: 'At least one role flag (is_admin, is_dcs, is_epo, is_dol, is_ce) is required.'
+    };
   }
 
-  // Verify caller is admin — Contract 19 (D-394): boolean predicate.
+  // Verify caller is Admin — Contract 19 (D-394): boolean predicate.
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('system_role, is_admin, is_active, allow_both_admin_and_functional_roles')
+    .select('is_admin, is_active, allow_both_admin_and_functional_roles')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -112,7 +83,7 @@ async function create_user(params, caller_user_id) {
 
   // D-139: admin + functional role separation
   // For new users, allow_both defaults to false — enforced at the DB level.
-  // Only Phil can set allow_both = true via update_user.
+  // Only a super-admin can set allow_both = true via update_user (CC-19-06).
 
   // Check for duplicate email in public.users
   const { data: existingEmail } = await supabase
@@ -129,25 +100,12 @@ async function create_user(params, caller_user_id) {
     };
   }
 
-  // Check whether a Supabase Auth account already exists for this email.
-  // If so, the user is already active — do not resend an invite.
-  // CCode-decision CC-AUTH-003: Checking for existing Supabase auth account on create_user.
-  //   listUsers() with email filter is used here to detect active accounts.
-  //   If the auth account exists and email_confirmed_at is set, the user is active
-  //   and we return a specific error rather than silently failing (D-140).
-  //   This check requires the service key (admin API) — already available in MCP servers.
-  const { data: authList } = await supabase.auth.admin.listUsers({ perPage: 1 });
-  // Note: listUsers does not support email filter in all Supabase versions.
-  // We use getUserByEmail via the admin API workaround below.
-  // If the above check is insufficient, the inviteUserByEmail call will return an error
-  // for already-confirmed emails, which we surface as a distinct user-facing error.
-
   // Send Supabase Auth invite — creates auth.users record and emails the OTP (D-354).
   const normalizedEmail = email.toLowerCase().trim();
   const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
     normalizedEmail,
     {
-      data:       { display_name, system_role: effectiveSystemRole },
+      data:       { display_name },
       redirectTo: INVITE_REDIRECT_URL
     }
   );
@@ -165,16 +123,13 @@ async function create_user(params, caller_user_id) {
 
   const auth_user_id = authData.user.id;
 
-  // Insert public.users record with the Supabase auth UUID.
-  // Contract 19: both system_role (legacy) and boolean flags are written —
-  // Phase 1 dual-write per CC-19-04 keeps existing consumers working until migration 034.
+  // Insert public.users record with the Supabase auth UUID and the chosen role flags.
   const { data: newUser, error: insertErr } = await supabase
     .from('users')
     .insert({
       id:           auth_user_id,
       email:        normalizedEmail,
       display_name: display_name.trim(),
-      system_role:  effectiveSystemRole,
       is_admin:     flagInput.is_admin,
       is_dcs:       flagInput.is_dcs,
       is_epo:       flagInput.is_epo,

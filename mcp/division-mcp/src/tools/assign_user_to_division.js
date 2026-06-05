@@ -39,7 +39,7 @@ async function assign_user_to_division(params, caller_user_id) {
   // Verify target user exists
   const { data: targetUser, error: userErr } = await supabase
     .from('users')
-    .select('id, display_name, system_role, is_admin, is_dcs, is_epo, is_dol, is_ce, is_super_admin, allow_both_admin_and_functional_roles')
+    .select('id, display_name, is_admin, is_dcs, is_epo, is_dol, is_ce, is_super_admin, allow_both_admin_and_functional_roles')
     .eq('id', user_id)
     .is('deleted_at', null)
     .single();

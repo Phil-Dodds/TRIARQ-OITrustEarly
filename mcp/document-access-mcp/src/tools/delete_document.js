@@ -33,9 +33,8 @@ async function delete_document(params, caller_user_id) {
   }
 
   // Canon artifacts require super-admin authority to delete.
-  // Contract 19 (CC-19-06 option B): is_super_admin replaces the legacy
-  // system_role = 'phil' check. The flag is set by direct DB assignment only —
-  // there is no MCP write path — so the authority cannot escalate through the UI.
+  // is_super_admin (CC-19-06 option B) is set by direct DB assignment only —
+  // no MCP write path — so the authority cannot escalate through the UI.
   if (artifact.lifecycle_status === 'canon') {
     const { data: caller } = await supabase
       .from('users')

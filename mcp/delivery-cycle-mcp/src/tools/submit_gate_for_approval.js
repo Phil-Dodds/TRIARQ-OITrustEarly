@@ -70,8 +70,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   }
 
   // ── Submission authority: Admin, DCS, EPO, or DOL on this Initiative (D-389/D-390/D-391) ──
-  // Contract 19 (D-394): boolean predicate replaces system_role equality. CC-19-01 collapsed
-  // 'phil' into is_admin, so any Admin can submit on behalf of an Initiative.
+  // Any Admin can submit on behalf of an Initiative (D-369).
   const { data: caller } = await supabase
     .from('users')
     .select('is_admin, display_name')

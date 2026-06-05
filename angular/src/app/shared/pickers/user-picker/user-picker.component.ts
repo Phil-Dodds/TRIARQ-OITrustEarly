@@ -30,8 +30,8 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { McpService } from '../../../core/services/mcp.service';
-import { User, SystemRole } from '../../../core/types/database';
-import { SYSTEM_ROLES, ROLE_DISPLAY_NAMES, userRoleToFlag } from '../../../core/constants/roles';
+import { User } from '../../../core/types/database';
+import { SYSTEM_ROLES, SystemRole, ROLE_DISPLAY_NAMES, userRoleToFlag } from '../../../core/constants/roles';
 
 type UserPickerScope = 'division' | 'all';
 

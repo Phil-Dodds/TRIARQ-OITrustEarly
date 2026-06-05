@@ -1,24 +1,16 @@
 -- 034_drop_system_role.sql
--- Pathways OI Trust — Build C, post-Contract 19
+-- Pathways OI Trust — Build C, Contract 19 Phase 2
 -- Governing decisions: D-394, CC-19-04 (Phase 1/Phase 2 split),
---                      CC-19-06 option B (is_super_admin replaces 'phil' semantics — RESOLVED).
+--                      CC-19-06 option B (is_super_admin replaces 'phil' semantics).
 --
--- DO NOT RUN until:
---   (1) Contract 19 UAT has confirmed all role-based behavior works on the booleans.
---   (2) The companion code change that removes the dual-write sync logic in
---       create_user.js / update_user.js has been deployed. Specifically, the
---       deriveSystemRole() helper and any "system_role: ..." assignments in the
---       insert/update payloads must be removed in the same deploy as this migration.
---   (3) `grep -r "system_role" mcp/ angular/src/` returns only comments, the
---       SystemRole type alias retention (or its removal), and no live reads/writes.
+-- RUN ORDER (this is the same session as the Phase 2 cleanup commit):
+--   (1) Push Phase 2 code to master (this commit).
+--   (2) Redeploy all three MCP services on Render. New MCP no longer reads or
+--       writes system_role. Existing column is harmlessly ignored.
+--   (3) Run this migration. Column drops cleanly because nothing references it.
+--   (4) Deploy new Angular bundle. User type no longer carries system_role.
 --
--- CC-19-06 status: RESOLVED. is_super_admin (added in migration 033) carries the
--- D-139 override authority and the Canon-document delete authority. The boolean
--- flag is bootstrapped by direct DB assignment in Supabase Studio — no MCP write
--- path — so dropping system_role does not break the override.
---
--- After running this migration, the boolean flags become the sole source of role truth.
--- The legacy column and CHECK constraint are dropped together.
+-- After this runs, the boolean flags become the sole source of role truth.
 
 BEGIN;
 

@@ -17,7 +17,7 @@ interface NavItem {
   label:     string;
   route:     string;
   // Contract 19 (D-394): boolean flag gates the item. undefined = visible to all.
-  requiresFlag?: Exclude<RoleFlag, 'is_phil'>;
+  requiresFlag?: RoleFlag;
   devStatus: DevStatus;
 }
 

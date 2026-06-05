@@ -46,9 +46,23 @@ function makeSupabaseMock(responses = []) {
 }
 
 // ── Helper: admin caller ──────────────────────────────────────────────────────
+// Boolean role flags per migration 033/034. is_super_admin distinguishes the
+// Phil-equivalent record from a regular admin.
 const ADMIN_ID = 'admin-user-uuid';
-const adminRecord = { id: ADMIN_ID, system_role: 'admin', is_active: true, allow_both_admin_and_functional_roles: false };
-const philRecord  = { id: 'phil-uuid', system_role: 'phil', is_active: true, allow_both_admin_and_functional_roles: true };
+const adminRecord = {
+  id: ADMIN_ID,
+  is_admin: true, is_dcs: false, is_epo: false, is_dol: false, is_ce: false,
+  is_super_admin: false,
+  is_active: true,
+  allow_both_admin_and_functional_roles: false
+};
+const philRecord  = {
+  id: 'phil-uuid',
+  is_admin: true, is_dcs: false, is_epo: false, is_dol: false, is_ce: false,
+  is_super_admin: true,
+  is_active: true,
+  allow_both_admin_and_functional_roles: true
+};
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,10 +76,8 @@ describe('create_division', () => {
   });
 
   test('error path: non-admin caller is rejected with explanation', async () => {
-    // The tool fetches caller from DB — mock returns a ds-role user
-    const dsUser = { id: ADMIN_ID, system_role: 'dcs', is_active: true };
-    // We need to inject the mock. Since db.js uses module-level singleton,
-    // we test the validation logic directly here.
+    // The tool fetches caller from DB — mock returns a DCS-only user
+    // (is_admin = false, is_dcs = true). We test the validation message shape.
     const result = { success: false, error: 'Creating Divisions requires Admin role. Your current role does not have this permission. Contact your System Admin to request access.' };
     assert.equal(result.success, false);
     assert.ok(result.error.includes('Admin role'));
@@ -152,27 +164,18 @@ describe('create_user', () => {
   test('error path: missing required fields', async () => {
     const { create_user } = require('../src/tools/create_user');
 
-    const noEmail = await create_user({ display_name: 'Test', system_role: 'dcs' }, ADMIN_ID);
+    const noEmail = await create_user({ display_name: 'Test', is_dcs: true }, ADMIN_ID);
     assert.equal(noEmail.success, false);
     assert.ok(noEmail.error.includes('email'));
 
-    const noName = await create_user({ email: 'x@x.com', system_role: 'dcs' }, ADMIN_ID);
+    const noName = await create_user({ email: 'x@x.com', is_dcs: true }, ADMIN_ID);
     assert.equal(noName.success, false);
     assert.ok(noName.error.includes('display_name'));
 
+    // No role flag set → rejected with a message naming the accepted flags.
     const noRole = await create_user({ email: 'x@x.com', display_name: 'Test' }, ADMIN_ID);
     assert.equal(noRole.success, false);
-    assert.ok(noRole.error.includes('system_role'));
-  });
-
-  test('error path: invalid system_role rejected', async () => {
-    const { create_user } = require('../src/tools/create_user');
-    const result = await create_user(
-      { email: 'x@x.com', display_name: 'Test', system_role: 'manager' },
-      ADMIN_ID
-    );
-    assert.equal(result.success, false);
-    assert.ok(result.error.includes('must be one of'));
+    assert.ok(noRole.error.includes('role flag'));
   });
 
 });
@@ -292,27 +295,38 @@ describe('update_user', () => {
     assert.ok(result.error.includes('cannot be updated'));
   });
 
-  test('error path: non-phil cannot grant allow_both override', async () => {
-    // This validation happens before DB calls — we can test the error message
+  test('error path: non-super-admin cannot grant allow_both override (CC-19-06)', async () => {
+    // Error message references super-admin authority — D-139 + HITRUST separation of duties.
     const result = {
       success: false,
-      error: 'Setting allow_both_admin_and_functional_roles requires Phil (EVP P&G) authority. '
+      error: 'Setting allow_both_admin_and_functional_roles requires super-admin authority. '
            + 'This override is a HITRUST separation-of-duties exception and cannot be granted by Division Admins.'
     };
     assert.equal(result.success, false);
     assert.ok(result.error.includes('HITRUST'));
     // D-140: explains what would unblock the action
-    assert.ok(result.error.includes('Phil'));
+    assert.ok(result.error.includes('super-admin'));
   });
 
-  test('error path: invalid system_role', async () => {
+  test('error path: system_role is immutable post-migration-034', async () => {
     const { update_user } = require('../src/tools/update_user');
     const result = await update_user(
       { user_id: 'u1', updates: { system_role: 'superuser' } },
       ADMIN_ID
     );
     assert.equal(result.success, false);
-    assert.ok(result.error.includes('must be one of'));
+    assert.ok(result.error.includes('cannot be updated'));
+  });
+
+  test('error path: is_super_admin is immutable (CC-19-09)', async () => {
+    // is_super_admin is intentionally NOT in MUTABLE_FIELDS — bootstrap by direct DB only.
+    const { update_user } = require('../src/tools/update_user');
+    const result = await update_user(
+      { user_id: 'u1', updates: { is_super_admin: true } },
+      ADMIN_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('cannot be updated'));
   });
 
 });

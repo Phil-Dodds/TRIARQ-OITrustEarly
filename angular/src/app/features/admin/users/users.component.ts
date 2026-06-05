@@ -49,8 +49,9 @@ import {
   RoleFlag
 } from '../../../core/constants/roles';
 
-// Contract 19: the five active role flags managed by the Admin Users surface.
-type ActiveRoleFlag = Exclude<RoleFlag, 'is_phil'>;
+// Alias retained for readability in this surface — RoleFlag now covers exactly the
+// five active flags (is_phil was retired post-migration 034).
+type ActiveRoleFlag = RoleFlag;
 
 /** get_user_divisions response shape */
 interface UserDivisionsData {
@@ -926,7 +927,7 @@ export class UsersComponent implements OnInit {
       .call<User>('division', 'create_user', {
         email:        v['email']        as string,
         display_name: v['display_name'] as string,
-        // Contract 19 (D-394): boolean flags. MCP derives the legacy system_role.
+        // Boolean role flags — sole source of role truth post-migration-034.
         is_admin:     v['is_admin'] === true,
         is_dcs:       v['is_dcs']   === true,
         is_epo:       v['is_epo']   === true,
@@ -1019,7 +1020,7 @@ export class UsersComponent implements OnInit {
           updates: {
             display_name: v['display_name'] as string,
             is_active:    v['is_active']    as boolean,
-            // Contract 19 (D-394): role flag updates. MCP keeps system_role in sync.
+            // Boolean role flag updates — MUTABLE_FIELDS in update_user MCP.
             is_admin:     v['is_admin'] === true,
             is_dcs:       v['is_dcs']   === true,
             is_epo:       v['is_epo']   === true,

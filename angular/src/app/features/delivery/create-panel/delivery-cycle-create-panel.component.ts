@@ -40,7 +40,6 @@ import { LoadingOverlayComponent }   from '../../../shared/components/loading-ov
 import { WorkstreamPickerComponent } from '../../../shared/pickers/workstream-picker/workstream-picker.component';
 import { UserPickerComponent }       from '../../../shared/pickers/user-picker/user-picker.component';
 import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User } from '../../../core/types/database';
-import { SYSTEM_ROLES } from '../../../core/constants/roles';
 
 @Component({
   selector: 'app-delivery-cycle-create-panel',
@@ -605,8 +604,8 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
           id:                                    ws.workstream_lead_user_id,
           display_name:                          ws.lead_display_name,
           email:                                 '',
-          // Contract 19: legacy single-role retained during transition; flag set for the assumed role.
-          system_role:                           SYSTEM_ROLES.EPO,
+          // Shim object for chip display only — picker enriches with lead_display_name.
+          // Workstream lead is assumed to hold the EPO role for the EPO pre-population path (D-204).
           is_admin:                              false,
           is_dcs:                                false,
           is_epo:                                true,
