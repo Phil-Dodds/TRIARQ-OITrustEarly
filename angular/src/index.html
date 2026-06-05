@@ -4,6 +4,18 @@
     <meta charset="utf-8" />
     <title>Pathways OI Trust</title>
     <!--
+      CC-20-09: Cache-busting on the HTML document itself.
+      Hashed bundle filenames (e.g. main-XXXXXXX.js) already invalidate when the
+      bundle content changes, but only when the browser re-fetches THIS file.
+      These meta tags tell the browser to revalidate index.html on every load.
+      Belt-and-suspenders paired with the VersionCheckService banner (see
+      version-check.service.ts) which polls dist/version.json and prompts a
+      reload when the deployed build hash changes.
+    -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <!--
       base href is required by Angular Router.
       At port time the TRIARQ deployment pipeline sets this correctly.
       D-143: APP_BASE_HREF is NOT provided in code with a hardcoded absolute path.
