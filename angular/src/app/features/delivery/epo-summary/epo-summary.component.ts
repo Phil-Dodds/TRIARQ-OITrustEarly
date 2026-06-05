@@ -87,13 +87,16 @@ import { EpoSummaryItem, Division, EpoWipLimitRow } from '../../../core/types/da
           Display only my Divisions
         </label>
 
-        <!-- 'Show all EPOs' toggle (D-397 §5.2). Resets on every screen load —
-             NOT persisted via D-171. Reveals EPOs with zero active Initiatives. -->
+        <!-- 'Include EPOs with no WIP' toggle (D-397 §5.2 + CC-20-07).
+             Spec wording was 'Show all EPOs'; Phil's UAT feedback preferred the
+             intent-clearer phrasing. Behavior identical: surfaces EPOs with
+             zero active Initiatives. Resets on every screen load — NOT
+             persisted via D-171. -->
         <label class="es-toggle es-toggle-secondary">
           <input type="checkbox"
-                 [(ngModel)]="showAllEpos"
-                 (ngModelChange)="onShowAllEposChange()" />
-          Show all EPOs
+                 [(ngModel)]="includeEposWithNoWip"
+                 (ngModelChange)="onIncludeEposToggle()" />
+          Include EPOs with no WIP
         </label>
       </div>
 
@@ -212,9 +215,11 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
   private allEpoLimits: EpoWipLimitRow[] = [];
   private allEposLoaded = false;
 
-  /** Toggle: surface EPOs with zero active Initiatives. Per D-397 §5.2,
-   *  this resets on every screen load — explicitly NOT persisted via D-171. */
-  showAllEpos          = false;
+  /** Toggle: include EPOs with zero active Initiatives in the row set.
+   *  Spec §5.2 named this 'Show all EPOs'; UAT-driven rename to 'Include
+   *  EPOs with no WIP' per CC-20-07. Resets on every screen load —
+   *  explicitly NOT persisted via D-171. */
+  includeEposWithNoWip = false;
   rows: EpoSummaryItem[] = [];
   canCreateCycle       = false;
 
@@ -324,12 +329,13 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * D-397 §5.2 'Show all EPOs' toggle. When enabled the first time, lazy-load
-   * get_epo_wip_limits (returns every is_epo = true user with their limits).
-   * On subsequent toggles, reuse the cached set.
+   * D-397 §5.2 'Include EPOs with no WIP' toggle (renamed per CC-20-07).
+   * When enabled the first time, lazy-load get_epo_wip_limits (returns every
+   * is_epo = true user with their limits). On subsequent toggles, reuse the
+   * cached set.
    */
-  onShowAllEposChange(): void {
-    if (this.showAllEpos && !this.allEposLoaded) {
+  onIncludeEposToggle(): void {
+    if (this.includeEposWithNoWip && !this.allEposLoaded) {
       this.delivery.getEpoWipLimits().subscribe({
         next: (res) => {
           if (res.success && res.data) {
@@ -358,7 +364,7 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
    * appended alphabetically).
    */
   private rebuildRows(): void {
-    if (!this.showAllEpos || !this.allEposLoaded) {
+    if (!this.includeEposWithNoWip || !this.allEposLoaded) {
       this.rows = this.activeRows;
       return;
     }

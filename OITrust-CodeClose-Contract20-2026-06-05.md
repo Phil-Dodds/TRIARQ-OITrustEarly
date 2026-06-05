@@ -43,8 +43,9 @@ with embedded grid, role-aware EPO filter default.
 | CC-20-04 | Spec §2.3 + §2.4 named the wrong tools. `record_gate_decision` had no prior WIP check (the "current behavior" in spec is fictional) — EPO check is net-new. `list_delivery_workstreams` returns no WIP fields — `get_delivery_summary` was the actual carrier of `wip_*_limit` / `wip_*_exceeded`, retargeted there. Angular `WorkstreamSummaryItem` interface + Workstream Summary template updated to match. | Mid-Unit 1 implementation |
 | CC-20-05 | Units 4–7 ship as MVP, not full spec. Each new EPO view (`epo-summary`, `epo-schedule`, `epo-deploy`) renders EPO rows with aggregate counts and a drill-out link to `/initiatives/list?epo=user_id`. The slide-in filter panel (Division / EPO picker / Lifecycle Stage / Tier / Gate Status), active filter chips, "Show all EPOs" toggle, role-aware EPO filter default, and the expanded-EPO-row Initiative grid per spec §5.3 / §6.3 / §7.3 are **deferred**. Drill-out to the existing dashboard preserves every Initiative-level interaction (S-018 list → View) via that surface's filter chip path. Dashboard `?epo=` query-param drill-down added this contract. Async hub headlines for the 3 new EPO cards (spec §4 table) also deferred — cards render with description and Open link only. (Session 3 recovered: "Show all EPOs" toggle + async hub headlines + Workstream Summary subtitle link.) | Mid-Unit 4 implementation |
 | CC-20-06 | EPO Deploy by Quarter hub headline simplified. Spec §4 calls for "N EPOs · X with prior-quarter misses" (amber) or "N EPOs · On track" (green). The prior-quarter-miss count requires a per-cycle deploy-gate target-date check that `get_delivery_summary` does not currently surface — only zone counts + limits ship in `epo_summaries`. Session 3 headline ships as "N EPOs · Deploy cadence loaded" (green) — informative without misrepresenting state. Recovery path: extend `get_delivery_summary` `epo_summaries` rows with a `prior_quarter_miss_count` field on a follow-on contract, then update `buildHeadlines` to use it. | Mid-Session 3 implementation |
+| CC-20-07 | EPO Summary toggle relabeled. Spec D-397 §5.2 names it "Show all EPOs"; Phil's Session 3 UAT preferred "Include EPOs with no WIP" — clearer intent, same behavior. Identifier renames in code: `showAllEpos` → `includeEposWithNoWip`, `onShowAllEposChange()` → `onIncludeEposToggle()`. Toggle behavior unchanged (zero-Initiative EPOs back-filled when checked; resets on every screen load). | Post-Session 3 UAT |
 
-Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04, CC-20-05, CC-20-06. No gaps (Rule 17).
+Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04, CC-20-05, CC-20-06, CC-20-07. No gaps (Rule 17).
 
 ---
 
@@ -276,9 +277,9 @@ Run after MCP + Angular deploy. Binary pass/fail. Run as Phil (Admin + Super-Adm
 
 47. Open `/initiatives/workstreams`. **Pass:** subtitle mentions "see the EPO Summary view for over-limit alerts". (Session 3) "EPO Summary view" is now a clickable underlined primary-color link. Clicking it navigates to `/initiatives/epo-summary`. **Fail:** plain text only, or wrong destination.
 
-### Surface 11 — EPO Summary "Show all EPOs" toggle — Session 3
+### Surface 11 — EPO Summary "Include EPOs with no WIP" toggle — Session 3 (CC-20-07)
 
-48. Open `/initiatives/epo-summary`. **Pass:** above the grid, a "Show all EPOs" toggle is visible on the right side (small, stone color), defaulting OFF. **Fail:** toggle missing.
+48. Open `/initiatives/epo-summary`. **Pass:** above the grid, an "Include EPOs with no WIP" toggle is visible on the right side (small, stone color), defaulting OFF. **Fail:** toggle missing or labeled "Show all EPOs".
 49. With toggle OFF, the row count equals the number of EPOs with at least one active Initiative in scope. **Pass.** **Fail:** zero-Initiative EPOs visible.
 50. Flip the toggle ON. **Pass:** within ~1s, additional rows appear at the bottom of the list — every other `is_epo = true` user, each at 0/0/0 against their configured limits (defaulting 3/3/3 if no `epo_wip_limits` row). Zero-Initiative rows show no ⚠ flag and no amber styling. **Fail:** no new rows or wrong limit values shown.
 51. Reload the page. **Pass:** toggle resets to OFF (per D-397 §5.2 — not persisted). **Fail:** toggle state remembered.
