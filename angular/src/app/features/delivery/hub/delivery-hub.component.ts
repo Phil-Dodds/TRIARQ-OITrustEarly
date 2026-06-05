@@ -25,6 +25,12 @@ interface HubCard {
   comingSoon?: boolean;
 }
 
+// Contract 20 Session 2 (D-396): hub expands from 4 → 7 cards. EPO-organized
+// views (positions 2–4) precede Workstream-organized views (positions 5–7).
+// Per CC-20-03, the existing route names /initiatives/gates and
+// /initiatives/deploy-schedule are retained — spec §4 paths
+// /initiatives/schedule and /initiatives/deploy are treated as descriptive
+// typos; live routes are bookmarked and deployed.
 const HUB_CARDS: HubCard[] = [
   {
     title:       'All Initiatives',
@@ -35,12 +41,36 @@ const HUB_CARDS: HubCard[] = [
                  'for, or want to apply a combination of filters.'
   },
   {
+    title:       'EPO Summary',
+    route:       '/initiatives/epo-summary',
+    icon:        '◐',
+    description: 'WIP counts per EPO across Pre-Build, Build, and Post-Deploy zones. ' +
+                 'Identify EPOs at or over their configured WIP limit. Click an EPO ' +
+                 'to see their matching Initiatives.'
+  },
+  {
+    title:       'EPO Gate Schedule',
+    route:       '/initiatives/epo-schedule',
+    icon:        '◑',
+    description: 'Overdue and upcoming gates organized by EPO. Use this to balance ' +
+                 'approval workload across owners and identify which EPO needs ' +
+                 'attention this week.'
+  },
+  {
+    title:       'EPO Deploy by Quarter',
+    route:       '/initiatives/epo-deploy',
+    icon:        '◒',
+    description: 'Deploy gate cadence per EPO across the prior quarter, current ' +
+                 'quarter, and other active Initiatives. Use this to track each ' +
+                 'EPO’s commitment against target dates.'
+  },
+  {
     title:       'Workstream Summary',
     route:       '/initiatives/workstreams',
     icon:        '⟳',
-    description: 'WIP counts per workstream across Pre-Build, Build, and Post-Deploy ' +
-                 'stages. Identify workstreams over the 3-Initiative WIP limit. Click the ' +
-                 'workstream name to see the matching Initiatives.'
+    description: 'WIP throughput per Workstream across Pre-Build, Build, and Post-Deploy ' +
+                 'stages. WIP limits live per EPO — see the EPO Summary view for ' +
+                 'over-limit alerts. Click the Workstream name to see the matching Initiatives.'
   },
   {
     title:       'Gate Schedule',

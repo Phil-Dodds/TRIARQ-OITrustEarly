@@ -403,9 +403,31 @@ export interface DivisionSummaryItem {
   active_cycle_count:  number;
 }
 
+/** WIP zone counts per EPO with limit and exceeded flags (Contract 20, D-397).
+ *  pre_build  = DESIGN, SPEC
+ *  build      = BUILD, VALIDATE, UAT
+ *  post_deploy = PILOT, RELEASE, OUTCOME
+ *  Limits come from epo_wip_limits (3/3/3 default when no row).
+ *  Returned only for EPOs with at least one active Initiative in scope. */
+export interface EpoSummaryItem {
+  user_id:                  string;
+  display_name:             string;
+  total_active_cycles:      number;
+  wip_pre_build:            number;
+  wip_build:                number;
+  wip_post_deploy:          number;
+  wip_pre_build_limit:      number;
+  wip_build_limit:          number;
+  wip_post_deploy_limit:    number;
+  wip_pre_build_exceeded:   boolean;
+  wip_build_exceeded:       boolean;
+  wip_post_deploy_exceeded: boolean;
+}
+
 /** Full summary response from get_delivery_summary MCP tool. */
 export interface DeliverySummary {
   workstream_summaries: WorkstreamSummaryItem[];
+  epo_summaries:        EpoSummaryItem[];
   gate_summaries:       GateSummaryItem[];
   division_summaries:   DivisionSummaryItem[];
 }

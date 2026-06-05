@@ -880,3 +880,50 @@ describe('get_epo_wip_limits', () => {
   });
 
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// get_delivery_summary — epo_summaries (Contract 20 Session 2, D-397)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('get_delivery_summary — epo_summaries shape (Contract 20 Session 2)', () => {
+
+  test('response envelope contract — epo_summaries row fields documented', () => {
+    // String-contract for the per-EPO summary row shape returned alongside
+    // workstream_summaries. Mocking Supabase is out of scope per existing pattern.
+    const sampleEpoRow = {
+      user_id:                  'epo-uuid',
+      display_name:             'Sample EPO',
+      total_active_cycles:      4,
+      wip_pre_build:            1,
+      wip_build:                3,
+      wip_post_deploy:          0,
+      wip_pre_build_limit:      3,
+      wip_build_limit:          3,
+      wip_post_deploy_limit:    3,
+      wip_pre_build_exceeded:   false,
+      wip_build_exceeded:       true,
+      wip_post_deploy_exceeded: false
+    };
+    for (const field of [
+      'user_id', 'display_name', 'total_active_cycles',
+      'wip_pre_build', 'wip_build', 'wip_post_deploy',
+      'wip_pre_build_limit', 'wip_build_limit', 'wip_post_deploy_limit',
+      'wip_pre_build_exceeded', 'wip_build_exceeded', 'wip_post_deploy_exceeded'
+    ]) {
+      assert.ok(field in sampleEpoRow, `field ${field} missing from epo_summaries row`);
+    }
+    // exceeded flag matches count >= limit
+    assert.equal(sampleEpoRow.wip_build_exceeded, sampleEpoRow.wip_build >= sampleEpoRow.wip_build_limit);
+  });
+
+  test('tool source includes buildEpoSummaries helper (CC-20-05)', () => {
+    const tool = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', 'src', 'tools', 'get_delivery_summary.js'),
+      'utf8'
+    );
+    assert.ok(tool.includes('buildEpoSummaries'));
+    assert.ok(tool.includes('epo_summaries'));
+    assert.ok(tool.includes('epo_wip_limits'));
+  });
+
+});

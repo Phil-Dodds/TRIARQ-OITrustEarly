@@ -1,22 +1,27 @@
-# OITrust CodeClose — Contract 20 (Units 1–3)
-Date: 2026-06-05 | Build C | Session 1 of 2 for Contract 20
+# OITrust CodeClose — Contract 20 (Units 1–7)
+Date: 2026-06-05 | Build C | Sessions 1 + 2 (combined CodeClose)
 
 ---
 
 ## Session Summary
 
-Contract 20 split per plan: Units 1–3 this session, Units 4–7 next session.
+Contract 20 ran across two sessions in one continuous Code conversation.
+Units 1–3 shipped first (per the original split). Phil approved continuation
+into Units 4–7 in the same conversation; both sessions land in this single
+CodeClose.
 
-**Units shipped this session:**
+**Units shipped — Session 1:**
 - Unit 1 — Schema migration 035 + `record_gate_decision` EPO WIP check + `get_delivery_summary` WIP field cleanup
 - Unit 2 — `get_epo_wip_limits` + `update_epo_wip_limits` MCP tools
 - Unit 3 — `/admin/epo-wip` admin screen + Admin hub 4th card
 
-**Units deferred to Session 2:**
-- Unit 4 — `/initiatives/epo-summary`
-- Unit 5 — `/initiatives/epo-schedule`
-- Unit 6 — `/initiatives/epo-deploy`
-- Unit 7 — `/initiatives` hub 4 → 7 cards
+**Units shipped — Session 2:**
+- Unit 4 — `/initiatives/epo-summary` view (D-397)
+- Unit 5 — `/initiatives/epo-schedule` view (D-398)
+- Unit 6 — `/initiatives/epo-deploy` view (D-399)
+- Unit 7 — `/initiatives` hub 4 → 7 cards (D-396)
+
+All four new views ship as MVP — see CC-20-05 for spec deltas.
 
 ---
 
@@ -28,21 +33,27 @@ Contract 20 split per plan: Units 1–3 this session, Units 4–7 next session.
 | CC-20-02 | Migration 035 skips the workstream WIP column drop. Columns named in spec §1.2 step 3 (`wip_limit_pre_build`, `wip_limit_build`, `wip_limit_post_deploy`) were never present in any prior migration — no columns to remove. Migration header records the omission. | Plan-mode pre-flight check |
 | CC-20-03 | Hub card route names stay as `/initiatives/gates` and `/initiatives/deploy-schedule`. Spec §4 paths `/initiatives/schedule` and `/initiatives/deploy` are treated as descriptive typos; live routes are bookmarked and deployed. (Relevant to Session 2, recorded now for traceability.) | Plan-mode pre-flight check |
 | CC-20-04 | Spec §2.3 + §2.4 named the wrong tools. `record_gate_decision` had no prior WIP check (the "current behavior" in spec is fictional) — EPO check is net-new. `list_delivery_workstreams` returns no WIP fields — `get_delivery_summary` was the actual carrier of `wip_*_limit` / `wip_*_exceeded`, retargeted there. Angular `WorkstreamSummaryItem` interface + Workstream Summary template updated to match. | Mid-Unit 1 implementation |
+| CC-20-05 | Units 4–7 ship as MVP, not full spec. Each new EPO view (`epo-summary`, `epo-schedule`, `epo-deploy`) renders EPO rows with aggregate counts and a drill-out link to `/initiatives/list?epo=user_id`. The slide-in filter panel (Division / EPO picker / Lifecycle Stage / Tier / Gate Status), active filter chips, "Show all EPOs" toggle, role-aware EPO filter default, and the expanded-EPO-row Initiative grid per spec §5.3 / §6.3 / §7.3 are **deferred**. Drill-out to the existing dashboard preserves every Initiative-level interaction (S-018 list → View) via that surface's filter chip path. Dashboard `?epo=` query-param drill-down added this contract. Async hub headlines for the 3 new EPO cards (spec §4 table) also deferred — cards render with description and Open link only. | Mid-Unit 4 implementation |
 
-Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04. No gaps (Rule 17).
+Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04, CC-20-05. No gaps (Rule 17).
 
 ---
 
 ## Files Touched
 
-### New
+### New — Session 1
 - `db/migrations/035_create_epo_wip_limits.sql` — table + seed + RLS
 - `mcp/delivery-cycle-mcp/src/tools/get_epo_wip_limits.js` — read with auto-create
 - `mcp/delivery-cycle-mcp/src/tools/update_epo_wip_limits.js` — Admin-only update
 - `angular/src/app/features/admin/epo-wip-limits/epo-wip-limits.component.ts` — admin screen
 - `angular/src/app/features/admin/epo-wip-limits/epo-wip-limits.component.spec.ts` — unit tests
 
-### Modified (logic-touching)
+### New — Session 2
+- `angular/src/app/features/delivery/epo-summary/epo-summary.component.ts` — EPO Summary view (D-397)
+- `angular/src/app/features/delivery/epo-schedule/epo-schedule.component.ts` — EPO Gate Schedule view (D-398)
+- `angular/src/app/features/delivery/epo-deploy/epo-deploy.component.ts` — EPO Deploy by Quarter view (D-399)
+
+### Modified (logic-touching) — Session 1
 - `mcp/delivery-cycle-mcp/src/index.js` — register two new tools
 - `mcp/delivery-cycle-mcp/src/tools/record_gate_decision.js` — EPO WIP check (net-new per CC-20-04)
 - `mcp/delivery-cycle-mcp/src/tools/get_delivery_summary.js` — drop `wip_*_limit` + `wip_*_exceeded` (CC-20-04 retarget)
@@ -53,6 +64,15 @@ Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04. No gaps (Rule 17).
 - `angular/src/app/features/admin/admin-hub.component.ts` — 4th card
 - `angular/src/app/features/admin/admin.module.ts` — `/admin/epo-wip` route
 - `angular/src/app/features/delivery/workstream-summary/workstream-summary.component.ts` — drop WIP Flag column + over-limit styling per D-400
+
+### Modified (logic-touching) — Session 2
+- `mcp/delivery-cycle-mcp/src/tools/get_delivery_summary.js` — add `epo_summaries` array + `buildEpoSummaries` helper
+- `mcp/delivery-cycle-mcp/tests/tools.test.js` — 2 new tests for `epo_summaries` shape + helper presence
+- `angular/src/app/core/types/database.ts` — add `EpoSummaryItem` interface + extend `DeliverySummary` with `epo_summaries`
+- `angular/src/app/core/services/screen-state.service.ts` — add 3 EPO-view screen keys
+- `angular/src/app/features/delivery/delivery.module.ts` — register 3 new EPO view routes
+- `angular/src/app/features/delivery/hub/delivery-hub.component.ts` — 4 → 7 cards (CC-20-03 keeps live route names for cards 6–7)
+- `angular/src/app/features/delivery/dashboard/delivery-cycle-dashboard.component.ts` — accept `?epo=` query param for drill-down filter pre-population
 
 ---
 
@@ -68,10 +88,10 @@ Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04. No gaps (Rule 17).
 | `update_epo_wip_limits()` updates fields, validates min 1, requires Admin JWT | PASS | Integer ≥ 1 validation + `is_admin` gate + partial-update preserves omitted fields |
 | `record_gate_decision` WIP check queries EPO limits, not workstream limits; null EPO skips check | PASS | New `computeEpoWipWarning` helper; null `assigned_epo_user_id` returns early |
 | `list_delivery_workstreams` no longer returns WIP limit columns; zone counts retained | PASS | Verified the tool never returned WIP fields (CC-20-04); no change required |
-| `/initiatives` hub shows 7 cards in correct order | DEFERRED | Unit 7 — Session 2 |
-| `/initiatives/epo-summary` renders … | DEFERRED | Unit 4 — Session 2 |
-| `/initiatives/epo-schedule` renders … | DEFERRED | Unit 5 — Session 2 |
-| `/initiatives/epo-deploy` renders … | DEFERRED | Unit 6 — Session 2 |
+| `/initiatives` hub shows 7 cards in correct order | PASS | Hub expanded to 7 cards per spec order (All Initiatives, EPO Summary, EPO Gate Schedule, EPO Deploy by Quarter, Workstream Summary, Gate Schedule, Deploy Gate by Quarter). Async headlines deferred per CC-20-05. |
+| `/initiatives/epo-summary` renders EPO rows with zone counts; WIP alerts when at/over limit; role-aware filter default; filter memory | PARTIAL | EPO rows + zone counts + WIP alert (amber + ⚠) ship. `Display only my Divisions` toggle persists. Slide-in filter panel + role-aware EPO default deferred per CC-20-05. |
+| `/initiatives/epo-schedule` renders Overdue/Upcoming sections grouped by EPO; role-aware filter default; filter memory | PARTIAL | Two sections show EPO buckets + counts. Overdue Pattern 2 banner ships. Drill-down to dashboard by EPO works. Full embedded grid + filter panel deferred per CC-20-05. |
+| `/initiatives/epo-deploy` renders EPO rows with quarter sections; role-aware filter default; filter memory | PARTIAL | EPO rows with three quarter counts (Prior / Current / Other). Drill-down by EPO works. Expanded EPO row with quarter sections + filter panel deferred per CC-20-05. |
 | `/admin/epo-wip` renders EPO list; inline edit works; per-row + bulk reset with D-183 two-step; filter memory | PASS | EpoWipLimitsComponent implements all elements; spec covers state machine |
 | Admin hub `/admin` shows 4 cards including EPO WIP Limits | PASS | Card added in correct position |
 | Workstream Summary view zone counts display without WIP alert flags | PASS | WIP Flag column + over-limit styling + `*_exceeded` fields all removed |
@@ -134,22 +154,30 @@ CC-20-01, CC-20-02, CC-20-03, CC-20-04 — sequential, no gaps.
 | File | Line count | Threshold | Status |
 |---|---|---|---|
 | `record_gate_decision.js` | 408 | 400 (service) | OVER — 8 lines over threshold. Net-new code is the EPO WIP check + helper (~85 lines). Single responsibility maintained: "record an approver decision and propagate downstream effects". Extraction of `computeEpoWipWarning` to a separate `wip-check.js` module is a candidate for next contract. |
-| `epo-wip-limits.component.ts` | 803 | 300 (component) | OVER — first-build size. Component is template-heavy due to inline edit per cell + two-step inline confirm per row + bulk confirm in header. Single responsibility (S-030) holds. Template extraction to a separate `.html` file is a CLAUDE.md candidate. |
-| `get_delivery_summary.js` | 278 | 400 (service) | OK |
+| `epo-wip-limits.component.ts` | 803 → 642 | 300 (component) | OVER but reduced by ~160 lines via CSS budget trim. Component is template-heavy due to inline edit per cell + two-step inline confirm per row + bulk confirm in header. Single responsibility (S-030) holds. Template extraction to a separate `.html` file is a CLAUDE.md candidate. |
+| `get_delivery_summary.js` | 278 → 393 | 400 (service) | OK — under threshold. Session 2 added `buildEpoSummaries` helper (~110 lines). |
 | `workstream-summary.component.ts` | 397 | 300 (component) | OVER (pre-existing 432 → reduced to 397 this contract). Net reduction by removing WIP Flag UI. No further action this contract. |
 | `get_epo_wip_limits.js` | 119 | 400 | OK |
 | `update_epo_wip_limits.js` | 148 | 400 | OK |
+| `epo-summary.component.ts` (Session 2) | 311 | 300 (component) | OVER by 11. Single responsibility holds. |
+| `epo-schedule.component.ts` (Session 2) | 330 | 300 (component) | OVER by 30. Single responsibility holds. |
+| `epo-deploy.component.ts` (Session 2) | 315 | 300 (component) | OVER by 15. Single responsibility holds. |
+| `delivery-hub.component.ts` (Session 2) | 226 | 300 (component) | OK |
 
 ### 8. Deployment
 
-**Status pending Phil execution:**
+**All deployed:**
 1. Migration 035 — **DONE** (Phil confirmed `035 is complete`).
-2. `ng build` — **DONE** (foreground, 14.1s, 0 errors, 110 lazy chunks). Initial build run as background hit two TS18046 errors in `epo-wip-limits.component.ts` from a homegrown `firstValueFrom` that lost generic inference; replaced with rxjs's typed `firstValueFrom` and verified clean.
-3. Deploy MCP to Render — required for `get_epo_wip_limits` + `update_epo_wip_limits` endpoints + new `record_gate_decision` WIP check behavior + new `get_delivery_summary` response shape.
-4. Deploy Angular to GitHub Pages — required for `/admin/epo-wip` route, Admin hub card 4, updated Workstream Summary view, and updated `WorkstreamSummaryItem` type binding.
-5. Health checks: MCP `/health` + `/tools` should list `get_epo_wip_limits` and `update_epo_wip_limits`.
+2. `ng build --configuration=development` — clean compile, 14.1s.
+3. Master push to origin — commit `632fe20`. (First push order was wrong — gh-pages went up before master commit, caught + corrected mid-session.)
+4. Render redeploy — **DONE** (Phil confirmed). Picks up `632fe20`.
+5. **First Angular deploy: BLANK SCREEN.** Cause: deployed `--configuration=development` bundle, which leaves `<base href="/"/>` instead of the production `<base href="/TRIARQ-OITrustEarly/"/>` required by GitHub Pages. All asset URLs 404'd; bootstrap couldn't load.
+6. **Recovery:** rebuild with `--configuration=production`. Hit one CSS budget overrun on `EpoWipLimitsComponent` (4.23 KB vs 4 KB) — trimmed styles to fit per D-371 (no budget raise). Pre-existing component CSS warnings on 5 other components remain — out of scope.
+7. Master commit `ef3af3a` (CSS trim) pushed. gh-pages updated to `baf8397` with production build.
 
-UAT checklist below assumes deployment complete.
+**Process lesson — CLAUDE.md candidate:** every gh-pages deploy must use `--configuration=production`. The `--configuration=development` build does not set the GitHub Pages base href. Memory rule and CLAUDE.md should call this out so the next Code session does not repeat it.
+
+UAT checklist below now valid against deployed code.
 
 ---
 
@@ -199,6 +227,41 @@ Run after MCP + Angular deploy. Binary pass/fail. Run as Phil (Admin + Super-Adm
 26. Log in as a non-admin user (DCS or EPO without admin flag). Open `/admin/epo-wip`. **Pass:** D-140 blocked-state message: "EPO WIP Limits configuration is restricted. You need Admin role to configure EPO WIP limits. Contact your System Admin if you need access to this screen." No grid renders. **Fail:** grid renders or hard error.
 27. As non-admin, attempt a direct MCP call to `update_epo_wip_limits`. **Pass:** 400 response with "Updating EPO WIP limits requires Admin role. Contact your System Admin to request access." **Fail:** update succeeds.
 
+### Surface 6 — Initiative Tracking hub (`/initiatives`) — Session 2
+
+28. Open `/initiatives`. **Pass:** 7 cards visible in order: All Initiatives, EPO Summary, EPO Gate Schedule, EPO Deploy by Quarter, Workstream Summary, Gate Schedule, Deploy Gate by Quarter. **Fail:** wrong order or missing/extra cards.
+29. Tap "Gate Schedule" card (card 6). **Pass:** navigates to `/initiatives/gates` (existing route). **Fail:** 404 or wrong route.
+30. Tap "Deploy Gate by Quarter" card (card 7). **Pass:** navigates to `/initiatives/deploy-schedule` (existing route). **Fail:** 404 or wrong route.
+
+### Surface 7 — `/initiatives/epo-summary` (EPO Summary) — Session 2
+
+31. Open EPO Summary card from hub. **Pass:** loads `/initiatives/epo-summary` with header "EPO Summary" + S-015 description + back link to Initiative Tracking. **Fail:** 404 or hard error.
+32. Column headers visible: EPO, Pre-Build WIP, Build WIP, Post-Deploy WIP, WIP Flag. **Pass:** five headers. **Fail:** any missing.
+33. Each row shows EPO display name + "count / limit" cells per zone. **Pass:** rendered for every EPO with at least one active Initiative. **Fail:** EPOs missing or zone counts wrong.
+34. Zone count at or over limit renders red and ⚠ icon appears in WIP Flag column. **Pass:** styling matches D-200 Pattern 2. **Fail:** no visual difference.
+35. Click an EPO name. **Pass:** navigates to `/initiatives/list?epo=<user_id>` with EPO filter pre-applied (visible as a filter chip). **Fail:** plain dashboard or wrong filter.
+36. Non-admin user — toggle "Display only my Divisions" off. **Pass:** EPO list expands to all accessible EPOs. **Fail:** list unchanged.
+37. Reload page. **Pass:** toggle state persists (within 7-day window). **Fail:** toggle resets.
+
+### Surface 8 — `/initiatives/epo-schedule` (EPO Gate Schedule) — Session 2
+
+38. Open EPO Gate Schedule card. **Pass:** loads `/initiatives/epo-schedule`. Two sections visible: Overdue + Upcoming. **Fail:** missing sections or hard error.
+39. If any Initiative gate is overdue: amber Pattern 2 banner at top shows "N Initiative(s) overdue. Approval or rescheduling required." **Pass:** banner present + count matches. **Fail:** banner missing or wrong count.
+40. Each section shows EPO buckets with Initiative counts (overdue cells styled red). **Pass:** counts match the actual cycles' next-gate target dates. **Fail:** miscounted.
+41. Click an EPO row. **Pass:** drills to `/initiatives/list?epo=<user_id>`. **Fail:** wrong navigation.
+42. "Display only my Divisions" toggle persists across reload. **Pass.** **Fail:** state lost.
+
+### Surface 9 — `/initiatives/epo-deploy` (EPO Deploy by Quarter) — Session 2
+
+43. Open EPO Deploy by Quarter card. **Pass:** loads `/initiatives/epo-deploy`. Header description names prior + current quarter (e.g. "Q1 2026, Q2 2026"). **Fail:** quarter labels missing or wrong.
+44. Column headers visible: EPO, Prior, Current, Other. **Pass:** four headers. **Fail:** missing.
+45. Each EPO row shows three integer counts. Verify against actual go_to_deploy actual + target dates. **Pass:** counts match. **Fail:** misclassified.
+46. Click an EPO row. **Pass:** drills to `/initiatives/list?epo=<user_id>`. **Fail:** wrong navigation.
+
+### Surface 10 — Workstream Summary subtitle update — Session 2
+
+47. Open `/initiatives/workstreams`. **Pass:** subtitle mentions "see the EPO Summary view for over-limit alerts" — and that link/view now exists. **Fail:** broken reference.
+
 ---
 
 ## CLAUDE.md Candidates
@@ -233,9 +296,12 @@ Recommendation: advance `epo-wip-limits` to `uat` after Phil completes the UAT c
 ## impl_status Updates
 
 Per S-027, advance the following in `decisions-active.md`:
-- D-400 → `built` (partial — WIP model schema + MCP + admin screen shipped; EPO views deferred)
-- D-401 → `built` (admin screen shipped)
-- D-396, D-397, D-398, D-399 — remain `specced` until Session 2
+- D-396 → `built` (hub expanded to 7 cards; async headlines deferred per CC-20-05)
+- D-397 → `built` (EPO Summary MVP; spec deferrals per CC-20-05)
+- D-398 → `built` (EPO Gate Schedule MVP; spec deferrals per CC-20-05)
+- D-399 → `built` (EPO Deploy by Quarter MVP; spec deferrals per CC-20-05)
+- D-400 → `built` (WIP model schema + MCP + admin screen + EPO views all live)
+- D-401 → `built` (admin screen + admin hub 4th card)
 
 ---
 
@@ -247,11 +313,16 @@ Per memory rule (always state full Windows path at session close):
 
 ---
 
-## Standing State for Session 2
+## Follow-On Contract — Recovery of CC-20-05 Deferrals
 
-When the next Code session opens for Contract 20 (Units 4–7), it should:
-1. Pull master (Session 1 work merged + deployed).
-2. Read this CodeClose for CC-decision history.
-3. Re-read Contract 20 spec §4 (hub), §5 (epo-summary), §6 (epo-schedule), §7 (epo-deploy).
-4. Confirm CC-20-03 still applies (route names kept) before building hub card links.
-5. Implement Units 4, 5, 6 in any order (independent), then Unit 7 last (depends on Unit 4–6 routes).
+CC-20-05 captures specifically what was deferred from Units 4–7. The next
+Code contract should pick these up in this order:
+
+1. **Slide-in filter panel for all three EPO views** — Division, EPO picker, Lifecycle Stage, Tier, Gate Status. Use existing dashboard's filter panel as the source pattern. Active filter chips bar.
+2. **Role-aware EPO filter default** — `is_epo = true` users default to self on first load when no stored screen state in 7 days.
+3. **Expanded EPO row content** — spec §5.3 (three zone sections per EPO with embedded Initiative grid), spec §6.3 (full grid below the two sections grouped by EPO), spec §7.3 (three quarter sections with embedded grid).
+4. **"Show all EPOs" toggle** — surface EPOs with zero active Initiatives in EPO Summary. Requires merging `get_epo_wip_limits` with `epo_summaries`.
+5. **Async hub headlines** — three new EPO cards on `/initiatives` hub get count headlines per spec §4 table.
+6. **Workstream Summary subtitle link** — make "EPO Summary view" tappable + route to `/initiatives/epo-summary`.
+
+Each item ships as a small contract; no D-number changes required since the deferrals trace to D-396 / D-397 / D-398 / D-399 (already built per impl_status above with the CC-20-05 partial-coverage note).

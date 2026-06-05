@@ -53,6 +53,25 @@ import { IonicModule }  from '@ionic/angular';
           import('./deploy-schedule/deploy-schedule.component')
             .then(c => c.DeployScheduleComponent)
       },
+      // Contract 20 Session 2 — EPO-organized hub views (D-396 / D-397 / D-398 / D-399)
+      {
+        path: 'epo-summary',
+        loadComponent: () =>
+          import('./epo-summary/epo-summary.component')
+            .then(c => c.EpoSummaryComponent)
+      },
+      {
+        path: 'epo-schedule',
+        loadComponent: () =>
+          import('./epo-schedule/epo-schedule.component')
+            .then(c => c.EpoScheduleComponent)
+      },
+      {
+        path: 'epo-deploy',
+        loadComponent: () =>
+          import('./epo-deploy/epo-deploy.component')
+            .then(c => c.EpoDeployComponent)
+      },
       // ── Full Initiative list (D-188 / D-392: 'cycles' renamed to 'list') ──
       {
         path: 'list',

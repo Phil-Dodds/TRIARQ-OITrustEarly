@@ -1,18 +1,26 @@
 // get_delivery_summary.js — Pathways OI Trust
 // Delivery Cycle Tracking hub summary tool (D-171–D-176).
 //
-// Returns pre-aggregated summary data for three dashboard views:
+// Returns pre-aggregated summary data for four dashboard views:
 //   workstream_summaries — WIP zone counts + gate counts per workstream (D-190)
+//   epo_summaries        — WIP zone counts + alerts per EPO (D-397, Contract 20)
 //   gate_summaries       — upcoming/overdue counts per gate type (D-189)
 //   division_summaries   — active cycle counts per division (D-176)
 //
 // Contract 20 (D-400, CC-20-04): per-workstream WIP exceeded flags removed.
 // WIP discipline is now EPO-scoped via epo_wip_limits — Workstream Summary
-// view shows zone counts only, no over-limit alerts. Removed response fields:
+// view shows zone counts only, no over-limit alerts. epo_summaries carries
+// the over-limit flags now, using each EPO's row from epo_wip_limits or
+// 3/3/3 default when no row exists.
+//
+// Removed from workstream_summaries:
 //   wip_pre_build_limit, wip_build_limit, wip_post_deploy_limit
 //   wip_pre_build_exceeded, wip_build_exceeded, wip_post_deploy_exceeded
-// Preserved response fields: wip_pre_build, wip_build, wip_post_deploy
-// (zone counts) and cycles_by_next_gate (gate counts).
+// Preserved in workstream_summaries: wip_pre_build, wip_build, wip_post_deploy.
+//
+// Added (Contract 20 Session 2): epo_summaries array — one row per EPO with
+//   at least one active Initiative in scope, with three zone counts + limits
+//   + exceeded flags + total_active_cycles. Drives EpoSummaryComponent.
 //
 // Optional param: division_ids (string[]) — filter to specific divisions.
 // Access control: phil/admin see all divisions; others restricted to their memberships.
@@ -24,6 +32,9 @@ const { supabase } = require('../db');
 const {
   NEXT_GATE_BY_STAGE,
   WIP_CATEGORY_BY_STAGE,
+  WIP_LIMIT_PRE_BUILD,
+  WIP_LIMIT_BUILD,
+  WIP_LIMIT_POST_DEPLOY,
   ALL_GATES
 } = require('../lifecycle');
 
@@ -75,12 +86,14 @@ async function get_delivery_summary(params, caller_id) {
 
   // ── Load active delivery cycles ─────────────────────────────────────────────
   // Active = not COMPLETE, not CANCELLED, not soft-deleted (D-190: ON_HOLD is included)
+  // Contract 20 Session 2: assigned_epo_user_id added for epo_summaries.
   let cycleQuery = supabase
     .from('delivery_cycles')
     .select(`
       delivery_cycle_id,
       division_id,
       workstream_id,
+      assigned_epo_user_id,
       current_lifecycle_stage,
       milestone_dates:cycle_milestone_dates(gate_name, target_date, actual_date)
     `)
@@ -92,7 +105,12 @@ async function get_delivery_summary(params, caller_id) {
       // No accessible divisions — return empty summary
       return {
         success: true,
-        data: { workstream_summaries: [], gate_summaries: buildEmptyGateSummary(), division_summaries: [] }
+        data: {
+          workstream_summaries: [],
+          epo_summaries:        [],
+          gate_summaries:       buildEmptyGateSummary(),
+          division_summaries:   []
+        }
       };
     }
     cycleQuery = cycleQuery.in('division_id', effectiveDivisionIds);
@@ -248,14 +266,111 @@ async function get_delivery_summary(params, caller_id) {
     active_cycle_count:  divisionCycleCounts.get(div.id) ?? 0
   }));
 
+  // ── Build EPO summary (D-397, Contract 20 Session 2) ────────────────────
+  // Group active cycles by assigned_epo_user_id and aggregate per-zone counts.
+  // Each summary row includes the EPO's WIP limits (from epo_wip_limits, with
+  // 3/3/3 default for missing rows) and the boolean exceeded flag per zone.
+  // Cycles with assigned_epo_user_id = null are excluded — they appear only in
+  // the workstream_summaries 'No EPO assigned' lens (not built this contract).
+  const epo_summaries = await buildEpoSummaries(cycles ?? []);
+
   return {
     success: true,
     data: {
       workstream_summaries,
+      epo_summaries,
       gate_summaries,
       division_summaries
     }
   };
+}
+
+/**
+ * Aggregate active cycles by EPO and join to epo_wip_limits for limit data.
+ * Returns an array of { user_id, display_name, total_active_cycles,
+ *   wip_pre_build, wip_build, wip_post_deploy,
+ *   wip_pre_build_limit, wip_build_limit, wip_post_deploy_limit,
+ *   wip_pre_build_exceeded, wip_build_exceeded, wip_post_deploy_exceeded }
+ * sorted by total_active_cycles desc, then display_name asc.
+ */
+async function buildEpoSummaries(cycles) {
+  const epoMap = new Map();
+
+  for (const cycle of cycles) {
+    const epoId = cycle.assigned_epo_user_id;
+    if (!epoId) { continue; }
+
+    let entry = epoMap.get(epoId);
+    if (!entry) {
+      entry = {
+        user_id:                  epoId,
+        display_name:             '',
+        total_active_cycles:      0,
+        wip_pre_build:            0,
+        wip_build:                0,
+        wip_post_deploy:          0,
+        wip_pre_build_limit:      WIP_LIMIT_PRE_BUILD,
+        wip_build_limit:          WIP_LIMIT_BUILD,
+        wip_post_deploy_limit:    WIP_LIMIT_POST_DEPLOY,
+        wip_pre_build_exceeded:   false,
+        wip_build_exceeded:       false,
+        wip_post_deploy_exceeded: false
+      };
+      epoMap.set(epoId, entry);
+    }
+
+    entry.total_active_cycles++;
+    const zone = WIP_CATEGORY_BY_STAGE[cycle.current_lifecycle_stage];
+    if (zone === 'pre_build')   { entry.wip_pre_build++;   }
+    if (zone === 'build')       { entry.wip_build++;       }
+    if (zone === 'post_deploy') { entry.wip_post_deploy++; }
+  }
+
+  if (epoMap.size === 0) {
+    return [];
+  }
+
+  // Resolve display names + WIP limits.
+  const epoIds = Array.from(epoMap.keys());
+
+  const { data: epoUsers } = await supabase
+    .from('users')
+    .select('id, display_name')
+    .in('id', epoIds)
+    .is('deleted_at', null);
+
+  for (const u of (epoUsers || [])) {
+    const entry = epoMap.get(u.id);
+    if (entry) { entry.display_name = u.display_name; }
+  }
+
+  const { data: limitRows } = await supabase
+    .from('epo_wip_limits')
+    .select('user_id, pre_build_limit, build_limit, post_deploy_limit')
+    .in('user_id', epoIds);
+
+  for (const row of (limitRows || [])) {
+    const entry = epoMap.get(row.user_id);
+    if (entry) {
+      entry.wip_pre_build_limit   = row.pre_build_limit;
+      entry.wip_build_limit       = row.build_limit;
+      entry.wip_post_deploy_limit = row.post_deploy_limit;
+    }
+  }
+
+  // Compute exceeded flags after limits resolved (count >= limit).
+  for (const entry of epoMap.values()) {
+    entry.wip_pre_build_exceeded   = entry.wip_pre_build   >= entry.wip_pre_build_limit;
+    entry.wip_build_exceeded       = entry.wip_build       >= entry.wip_build_limit;
+    entry.wip_post_deploy_exceeded = entry.wip_post_deploy >= entry.wip_post_deploy_limit;
+  }
+
+  const result = Array.from(epoMap.values());
+  result.sort((a, b) =>
+    b.total_active_cycles - a.total_active_cycles ||
+    (a.display_name || '').localeCompare(b.display_name || '')
+  );
+  return result;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -967,6 +967,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (qp['workstream_id']) { this.filterWorkstream = qp['workstream_id'] as string; this.drillDownFromQp = true; }
     if (qp['next_gate'])     { this.filterNextGate   = qp['next_gate']     as string; this.drillDownFromQp = true; }
     if (qp['division_id'])   { this.filterDivision   = qp['division_id']   as string; this.drillDownFromQp = true; }
+    // Contract 20 Session 2: drill-down from EPO Summary view sets the EPO filter.
+    if (qp['epo'])           { this.filterEpo        = qp['epo']           as string; this.drillDownFromQp = true; }
     // B-94: cycle drill-down from Gate Schedule / Deploy Schedule opens detail panel.
     if (qp['selected_cycle_id']) { this.selectedCycleId = qp['selected_cycle_id'] as string; }
 
