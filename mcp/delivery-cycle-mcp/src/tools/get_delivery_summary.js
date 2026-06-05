@@ -2,9 +2,17 @@
 // Delivery Cycle Tracking hub summary tool (D-171–D-176).
 //
 // Returns pre-aggregated summary data for three dashboard views:
-//   workstream_summaries — WIP counts, exceeded flags, gate counts per workstream (D-190)
+//   workstream_summaries — WIP zone counts + gate counts per workstream (D-190)
 //   gate_summaries       — upcoming/overdue counts per gate type (D-189)
 //   division_summaries   — active cycle counts per division (D-176)
+//
+// Contract 20 (D-400, CC-20-04): per-workstream WIP exceeded flags removed.
+// WIP discipline is now EPO-scoped via epo_wip_limits — Workstream Summary
+// view shows zone counts only, no over-limit alerts. Removed response fields:
+//   wip_pre_build_limit, wip_build_limit, wip_post_deploy_limit
+//   wip_pre_build_exceeded, wip_build_exceeded, wip_post_deploy_exceeded
+// Preserved response fields: wip_pre_build, wip_build, wip_post_deploy
+// (zone counts) and cycles_by_next_gate (gate counts).
 //
 // Optional param: division_ids (string[]) — filter to specific divisions.
 // Access control: phil/admin see all divisions; others restricted to their memberships.
@@ -16,9 +24,6 @@ const { supabase } = require('../db');
 const {
   NEXT_GATE_BY_STAGE,
   WIP_CATEGORY_BY_STAGE,
-  WIP_LIMIT_PRE_BUILD,
-  WIP_LIMIT_BUILD,
-  WIP_LIMIT_POST_DEPLOY,
   ALL_GATES
 } = require('../lifecycle');
 
@@ -147,16 +152,11 @@ async function get_delivery_summary(params, caller_id) {
       home_division_name:      ws?.home_division?.division_name ?? '',
       active_status:           ws ? ws.active_status : true,
       total_active_cycles:     0,
-      // D-WIPLimit-2026-04-06 zone names + per-workstream limits.
+      // D-400 / CC-20-04: zone counts only. Limits and exceeded flags moved
+      // to EPO scope via epo_wip_limits — no per-workstream alerts.
       wip_pre_build:           0,
       wip_build:               0,
       wip_post_deploy:         0,
-      wip_pre_build_limit:     WIP_LIMIT_PRE_BUILD,
-      wip_build_limit:         WIP_LIMIT_BUILD,
-      wip_post_deploy_limit:   WIP_LIMIT_POST_DEPLOY,
-      wip_pre_build_exceeded:  false,
-      wip_build_exceeded:      false,
-      wip_post_deploy_exceeded: false,
       cycles_by_next_gate:     buildEmptyGateCountMap()
     };
   }
@@ -186,13 +186,11 @@ async function get_delivery_summary(params, caller_id) {
     }
   }
 
-  // D-WIPLimit-2026-04-06: zone is "exceeded" when count is at or over the limit.
+  // D-400 / CC-20-04: per-workstream "exceeded" calculation removed. WIP
+  // discipline lives on the EPO, not the Workstream. Workstream Summary view
+  // shows zone counts only.
   const workstream_summaries = [];
   for (const [key, entry] of workstreamMap) {
-    entry.wip_pre_build_exceeded   = entry.wip_pre_build   >= entry.wip_pre_build_limit;
-    entry.wip_build_exceeded       = entry.wip_build       >= entry.wip_build_limit;
-    entry.wip_post_deploy_exceeded = entry.wip_post_deploy >= entry.wip_post_deploy_limit;
-
     // Include real workstreams always; include unassigned bucket only when it has cycles
     if (key !== UNASSIGNED_KEY || entry.total_active_cycles > 0) {
       workstream_summaries.push(entry);

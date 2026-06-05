@@ -366,11 +366,13 @@ export interface PendingApprovalItem {
 
 // ── Build C — Dashboard summary types (D-171–D-176) ──────────────────────────
 
-/** WIP zone counts per workstream (D-WIPLimit-2026-04-06).
+/** WIP zone counts per workstream.
  *  pre_build  = DESIGN, SPEC
  *  build      = BUILD, VALIDATE, UAT
  *  post_deploy = PILOT, RELEASE, OUTCOME
- *  Default limit is 3 per zone per workstream. Future: per-workstream override. */
+ *  Contract 20 (D-400, CC-20-04): per-workstream limits and exceeded flags
+ *  removed. WIP discipline lives on the EPO via epo_wip_limits.
+ *  Workstream Summary view shows zone counts only — no over-limit alerts. */
 export interface WorkstreamSummaryItem {
   workstream_id:             string | null;  // null = cycles with no workstream assigned
   workstream_name:           string;
@@ -381,12 +383,6 @@ export interface WorkstreamSummaryItem {
   wip_pre_build:             number;
   wip_build:                 number;
   wip_post_deploy:           number;
-  wip_pre_build_limit:       number;
-  wip_build_limit:           number;
-  wip_post_deploy_limit:     number;
-  wip_pre_build_exceeded:    boolean;
-  wip_build_exceeded:        boolean;
-  wip_post_deploy_exceeded:  boolean;
   cycles_by_next_gate:       Record<GateName | 'none', number>;
 }
 
@@ -412,4 +408,32 @@ export interface DeliverySummary {
   workstream_summaries: WorkstreamSummaryItem[];
   gate_summaries:       GateSummaryItem[];
   division_summaries:   DivisionSummaryItem[];
+}
+
+// ── Contract 20 — EPO WIP Limit model (D-400, D-401) ─────────────────────────
+
+/** One row per EPO with WIP zone limits. Returned by get_epo_wip_limits;
+ *  updated via update_epo_wip_limits (Admin only). Missing rows are
+ *  auto-created server-side at 3/3/3. */
+export interface EpoWipLimitRow {
+  user_id:                 string;
+  display_name:            string;
+  pre_build_limit:         number;
+  build_limit:             number;
+  post_deploy_limit:       number;
+  updated_at:              string | null;
+  updated_by_display_name: string | null;
+}
+
+/** WIP warning attached to record_gate_decision responses on go_to_build /
+ *  go_to_deploy approval when the EPO's count is at or over their limit
+ *  (D-400 zone-trigger gates). Null when no warning applies. */
+export interface EpoWipWarning {
+  zone:             'pre_build' | 'build' | 'post_deploy';
+  zone_display:     string;
+  count:            number;
+  limit:            number;
+  epo_user_id:      string;
+  epo_display_name: string;
+  message:          string;
 }

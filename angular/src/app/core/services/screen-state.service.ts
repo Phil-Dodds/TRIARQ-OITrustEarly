@@ -34,6 +34,8 @@ export const SCREEN_KEYS = {
   DELIVERY_DEPLOY_SCHEDULE: 'delivery.deploy-schedule',
   ADMIN_USERS:              'admin.users',
   ADMIN_WORKSTREAMS:        'admin.workstreams',
+  // Contract 20 (D-401): EPO WIP Limits admin screen.
+  ADMIN_EPO_WIP:            'admin.epo-wip',
 } as const;
 
 export type ScreenKey = typeof SCREEN_KEYS[keyof typeof SCREEN_KEYS];

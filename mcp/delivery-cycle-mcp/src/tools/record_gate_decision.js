@@ -9,6 +9,12 @@
 //   - Appends TWO event log entries (D-345 §3.2):
 //       1. 'gate_approved' with approver as actor
 //       2. 'stage_advanced' with actor null (system) — only when stage actually advanced
+//   - Contract 20 / D-400: when the approved gate is go_to_build or go_to_deploy
+//     and the cycle has an assigned_epo_user_id, attaches a wip_warning to the
+//     response when the EPO's count in the entered zone is at or over the
+//     EPO's configured limit. Warning is advisory — approval still succeeds.
+//     Per CC-20-02: workstream-scope WIP check never existed in this tool;
+//     EPO WIP check is net-new.
 // On return:
 //   - Sets gate_status = 'returned'
 //   - Requires approver_notes — stored on gate_record only, never in event log metadata (D-345)
@@ -16,13 +22,39 @@
 // Build C: approver defaults to Phil's user_id (see spec Section 4.2). RACI-configured
 // approver assignment is Build B.
 // Supplement Section 1: caller must be Phil or the gate's designated approver_user_id.
-// Source: D-154, D-345, ARCH-12, build-c-spec Section 4.1,
-//   gate-submission-flow-spec-2026-04-19 §3.2, supplement Section 1.
+// Source: D-154, D-345, D-400, D-200 Pattern 2, ARCH-12, build-c-spec Section 4.1,
+//   gate-submission-flow-spec-2026-04-19 §3.2, supplement Section 1, Contract 20.
 
 'use strict';
 
 const { supabase }  = require('../db');
-const { GATE_REQUIRED_TO_ENTER, nextStage } = require('../lifecycle');
+const {
+  GATE_REQUIRED_TO_ENTER,
+  WIP_CATEGORY_BY_STAGE,
+  WIP_LIMIT_PRE_BUILD,
+  WIP_LIMIT_BUILD,
+  WIP_LIMIT_POST_DEPLOY,
+  nextStage
+} = require('../lifecycle');
+
+// D-400: gates whose approval transitions a cycle INTO a counted WIP zone.
+// brief_review transitions BRIEF → DESIGN (pre_build), but Contract 20 spec §2.3
+// names only go_to_build and go_to_deploy as zone-trigger gates. Honor spec.
+const WIP_TRIGGER_GATES = new Set(['go_to_build', 'go_to_deploy']);
+
+// Default WIP limits — applied when an EPO has no row in epo_wip_limits.
+// Per D-400: "No row = 3/3/3 default — never unlimited".
+const WIP_LIMIT_DEFAULTS = {
+  pre_build:   WIP_LIMIT_PRE_BUILD,
+  build:       WIP_LIMIT_BUILD,
+  post_deploy: WIP_LIMIT_POST_DEPLOY
+};
+
+// Stages that count against WIP — every stage whose WIP_CATEGORY_BY_STAGE is
+// non-null. Used in the count query against delivery_cycles.
+const WIP_COUNTED_STAGES = Object.entries(WIP_CATEGORY_BY_STAGE)
+  .filter(([, zone]) => zone !== null)
+  .map(([stage]) => stage);
 
 // Display strings for event_description (D-345 §3.1, §3.2).
 const GATE_NAME_DISPLAY = {
@@ -97,9 +129,10 @@ async function record_gate_decision(params, caller_user_id) {
   }
 
   // ── Fetch cycle ───────────────────────────────────────────────────────────
+  // assigned_epo_user_id added Contract 20 for EPO WIP check (D-400).
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, workstream_id')
+    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, workstream_id, assigned_epo_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -239,13 +272,125 @@ async function record_gate_decision(params, caller_user_id) {
       });
   }
 
+  // ── EPO WIP check (D-400, Contract 20) ────────────────────────────────────
+  // Net-new behavior per CC-20-02 / CC-20-04: no workstream WIP check ever
+  // existed in this tool. Fires only when:
+  //   1. gate is go_to_build or go_to_deploy (zone-trigger gates per spec §2.3)
+  //   2. stage actually advanced (skip if already at target stage)
+  //   3. cycle has assigned_epo_user_id (null → skip per spec)
+  // Warning is advisory — gate approval still succeeds. Angular surfaces
+  // D-200 Pattern 2 (amber) using this payload.
+  let wip_warning = null;
+
+  if (stage_advanced
+      && WIP_TRIGGER_GATES.has(gate_name)
+      && cycle.assigned_epo_user_id) {
+    wip_warning = await computeEpoWipWarning({
+      epo_user_id: cycle.assigned_epo_user_id,
+      new_stage,
+      this_cycle_id: delivery_cycle_id
+    });
+  }
+
   return {
     success: true,
     data: {
       gate_record:    updated_gate,
       stage_advanced,
-      new_stage
+      new_stage,
+      wip_warning   // null when no warning applies; object when at/over limit
     }
+  };
+}
+
+/**
+ * Compute the WIP warning payload for the EPO who owns the just-advanced cycle.
+ * Returns null if the EPO's count in the new stage's zone is below limit.
+ * Returns { zone, count, limit, epo_user_id, epo_display_name, message }
+ * when count >= limit (D-200 Pattern 2 trigger).
+ *
+ * @param {object} args
+ * @param {string} args.epo_user_id    — owner EPO from delivery_cycles
+ * @param {string} args.new_stage      — lifecycle stage the cycle just entered
+ * @param {string} args.this_cycle_id  — the just-advanced cycle (included in count)
+ */
+async function computeEpoWipWarning({ epo_user_id, new_stage, this_cycle_id }) {
+  const zone = WIP_CATEGORY_BY_STAGE[new_stage];
+  if (!zone) {
+    // Stage is not in any counted zone — should not happen for trigger gates,
+    // but guard anyway. No warning.
+    return null;
+  }
+
+  // Resolve the EPO's limit. Missing row → 3/3/3 default per D-400.
+  const { data: limitRow } = await supabase
+    .from('epo_wip_limits')
+    .select('pre_build_limit, build_limit, post_deploy_limit')
+    .eq('user_id', epo_user_id)
+    .maybeSingle();
+
+  const limit =
+    zone === 'pre_build'   ? (limitRow?.pre_build_limit   ?? WIP_LIMIT_DEFAULTS.pre_build)   :
+    zone === 'build'       ? (limitRow?.build_limit       ?? WIP_LIMIT_DEFAULTS.build)       :
+    zone === 'post_deploy' ? (limitRow?.post_deploy_limit ?? WIP_LIMIT_DEFAULTS.post_deploy) :
+    null;
+
+  if (limit === null) {
+    return null;
+  }
+
+  // Count Initiatives assigned to this EPO whose current_lifecycle_stage maps
+  // to the same zone. This count includes the just-advanced cycle (it now
+  // sits in the zone). Excludes deleted cycles.
+  const zoneStages = Object.entries(WIP_CATEGORY_BY_STAGE)
+    .filter(([, z]) => z === zone)
+    .map(([stage]) => stage);
+
+  const { count, error: countErr } = await supabase
+    .from('delivery_cycles')
+    .select('delivery_cycle_id', { count: 'exact', head: true })
+    .eq('assigned_epo_user_id', epo_user_id)
+    .in('current_lifecycle_stage', zoneStages)
+    .is('deleted_at', null);
+
+  if (countErr) {
+    // Non-fatal — log and skip warning rather than break gate approval.
+    console.error(JSON.stringify({
+      tool_name: 'record_gate_decision',
+      step:      'computeEpoWipWarning',
+      epo_user_id,
+      zone,
+      error:     countErr.message
+    }));
+    return null;
+  }
+
+  if ((count ?? 0) < limit) {
+    return null;
+  }
+
+  // At or over limit — build advisory warning. Look up display name for UI.
+  const { data: epo } = await supabase
+    .from('users')
+    .select('display_name')
+    .eq('id', epo_user_id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  const zoneDisplay =
+    zone === 'pre_build'   ? 'Pre-Build'   :
+    zone === 'build'       ? 'Build'       :
+    zone === 'post_deploy' ? 'Post-Deploy' :
+    zone;
+
+  return {
+    zone,
+    zone_display: zoneDisplay,
+    count: count ?? 0,
+    limit,
+    epo_user_id,
+    epo_display_name: epo?.display_name ?? 'EPO',
+    message: `${epo?.display_name ?? 'This EPO'} now has ${count} Initiatives in the ${zoneDisplay} zone — at or over the limit of ${limit}.`
   };
 }
 

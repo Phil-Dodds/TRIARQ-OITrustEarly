@@ -58,9 +58,13 @@ import {
           </button>
         </div>
         <!-- S-015 surface description -->
+        <!-- Contract 20 (D-400): WIP limits moved to EPO scope. Workstream
+             Summary now shows zone throughput only — no per-workstream alerts.
+             EPO Summary view (/initiatives/epo-summary) carries the WIP alert UI. -->
         <p class="ws-subtitle">
-          WIP counts per workstream across Pre-Build, Build, and Post-Deploy
-          stages. Identify workstreams over the {{ defaultLimit }}-cycle WIP limit.
+          WIP throughput per Workstream across Pre-Build, Build, and Post-Deploy
+          stages. WIP limits are configured per EPO — see the EPO Summary view
+          for over-limit alerts.
         </p>
       </div>
 
@@ -72,21 +76,20 @@ import {
         Display only my Divisions
       </label>
 
-      <!-- Column headers — D-196: always rendered, even when list empty -->
+      <!-- Column headers — D-196: always rendered, even when list empty.
+           Contract 20 (D-400): WIP Flag column removed — alerts moved to EPO view. -->
       <div class="ws-grid ws-grid-header">
         <span>Workstream</span>
         <span>Home Division</span>
         <span class="num">Pre-Build WIP</span>
         <span class="num">Build WIP</span>
         <span class="num">Post-Deploy WIP</span>
-        <span class="num">WIP Flag</span>
       </div>
 
       <!-- Skeleton — S-028 Context B / D-178 Tier 1 -->
       <div *ngIf="loading">
         <div *ngFor="let _ of skeletonRows"
              class="ws-grid ws-grid-row">
-          <ion-skeleton-text animated style="height:14px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:14px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:14px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:14px;border-radius:4px;"></ion-skeleton-text>
@@ -134,39 +137,10 @@ import {
             <span *ngIf="!ws.home_division_id" class="ws-division-empty">—</span>
           </span>
 
-          <!-- Pre-Build zone count -->
-          <span class="num"
-                [class.ws-over-limit]="ws.wip_pre_build_exceeded"
-                [title]="ws.wip_pre_build_exceeded
-                  ? 'At or over the Pre-Build WIP limit (' + ws.wip_pre_build_limit + ')'
-                  : ''">
-            {{ ws.wip_pre_build }} / {{ ws.wip_pre_build_limit }}
-          </span>
-
-          <!-- Build zone count -->
-          <span class="num"
-                [class.ws-over-limit]="ws.wip_build_exceeded"
-                [title]="ws.wip_build_exceeded
-                  ? 'At or over the Build WIP limit (' + ws.wip_build_limit + ')'
-                  : ''">
-            {{ ws.wip_build }} / {{ ws.wip_build_limit }}
-          </span>
-
-          <!-- Post-Deploy zone count -->
-          <span class="num"
-                [class.ws-over-limit]="ws.wip_post_deploy_exceeded"
-                [title]="ws.wip_post_deploy_exceeded
-                  ? 'At or over the Post-Deploy WIP limit (' + ws.wip_post_deploy_limit + ')'
-                  : ''">
-            {{ ws.wip_post_deploy }} / {{ ws.wip_post_deploy_limit }}
-          </span>
-
-          <!-- WIP Flag — ⚠ Sunray when any zone is over limit -->
-          <span class="num">
-            <span *ngIf="anyZoneExceeded(ws)" class="ws-flag-icon" title="One or more zones at or over the WIP limit">
-              ⚠
-            </span>
-          </span>
+          <!-- Zone throughput counts — D-400: counts only, no per-workstream limits/alerts. -->
+          <span class="num">{{ ws.wip_pre_build }}</span>
+          <span class="num">{{ ws.wip_build }}</span>
+          <span class="num">{{ ws.wip_post_deploy }}</span>
         </div>
       </ng-container>
 
@@ -215,7 +189,8 @@ import {
 
     .ws-grid {
       display: grid;
-      grid-template-columns: 2fr 1.5fr 110px 100px 130px 80px;
+      /* Contract 20 (D-400): WIP Flag column removed — five columns total. */
+      grid-template-columns: 2fr 1.5fr 110px 100px 130px;
       gap: var(--triarq-space-sm);
       padding: var(--triarq-space-xs) var(--triarq-space-sm);
       align-items: center;
@@ -249,15 +224,8 @@ import {
     .ws-division-chip:hover { background: rgba(37,112,153,0.16); }
     .ws-division-empty { color: var(--triarq-color-text-secondary); }
 
-    /* Oravive when at/over limit (D-WIPLimit-2026-04-06) */
-    .ws-over-limit {
-      color: #E96127; /* Oravive */
-      font-weight: 600;
-    }
-    .ws-flag-icon {
-      color: var(--triarq-color-sunray, #f5a623);
-      font-size: 14px;
-    }
+    /* Contract 20 (D-400): per-workstream over-limit styling removed.
+       EPO Summary view carries WIP alert UI. */
 
     .ws-empty {
       padding: var(--triarq-space-xl);
@@ -284,8 +252,7 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
   workstreamSummaries: WorkstreamSummaryItem[] = [];
   canCreateCycle       = false;
 
-  /** Default WIP limit shown in the surface description text. */
-  readonly defaultLimit = 3;
+  // Contract 20 (D-400): defaultLimit removed — WIP limits live per-EPO.
 
   // S-028 Context B / D-178 Tier 1 skeleton rows
   readonly skeletonRows = [1, 2, 3, 4];
@@ -407,9 +374,7 @@ export class WorkstreamSummaryComponent implements OnInit, OnDestroy {
     );
   }
 
-  anyZoneExceeded(ws: WorkstreamSummaryItem): boolean {
-    return ws.wip_pre_build_exceeded || ws.wip_build_exceeded || ws.wip_post_deploy_exceeded;
-  }
+  // Contract 20 (D-400): anyZoneExceeded removed — per-workstream WIP alerts retired.
 
   drillDown(params: { workstream_id?: string | null }): void {
     const queryParams: Record<string, string> = {};

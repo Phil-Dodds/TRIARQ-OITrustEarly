@@ -16,7 +16,9 @@ import { IonicModule }  from '@ionic/angular';
       { path: '',            loadComponent: () => import('./admin-hub.component').then(c => c.AdminHubComponent) },
       { path: 'divisions',   loadComponent: () => import('./divisions/divisions.component').then(c => c.DivisionsComponent) },
       { path: 'users',       loadComponent: () => import('./users/users.component').then(c => c.UsersComponent) },
-      { path: 'workstreams', loadComponent: () => import('../delivery/workstream-admin/workstream-admin.component').then(c => c.WorkstreamAdminComponent) }
+      { path: 'workstreams', loadComponent: () => import('../delivery/workstream-admin/workstream-admin.component').then(c => c.WorkstreamAdminComponent) },
+      // Contract 20 (D-401): EPO WIP Limits admin screen.
+      { path: 'epo-wip',     loadComponent: () => import('./epo-wip-limits/epo-wip-limits.component').then(c => c.EpoWipLimitsComponent) }
     ])
   ]
 })

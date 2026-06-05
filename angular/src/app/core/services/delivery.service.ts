@@ -22,7 +22,8 @@ import {
   DateStatus,
   PointerStatus,
   DeliverySummary,
-  PendingApprovalItem
+  PendingApprovalItem,
+  EpoWipLimitRow
 } from '../types/database';
 
 @Injectable({ providedIn: 'root' })
@@ -280,12 +281,32 @@ export class DeliveryService {
    * Returns pre-aggregated summary data for all three hub sub-views.
    * Optionally filtered to specific division IDs (pass empty/omit for all accessible).
    * D-173: NEXT_GATE_BY_STAGE computed server-side.
-   * D-174: WIP category counts and exceeded flags computed server-side.
+   * Contract 20 (D-400 / CC-20-04): per-workstream WIP exceeded flags removed.
+   * Zone counts retained.
    */
   getDeliverySummary(params: {
     division_ids?: string[];
   } = {}): Observable<McpResponse<DeliverySummary>> {
     return this.mcp.call<DeliverySummary>('delivery', 'get_delivery_summary', params as Record<string, unknown>);
+  }
+
+  // ── EPO WIP limits (Contract 20, D-400, D-401) ────────────────────────────
+
+  /** Returns one row per active EPO with current limits. Auto-creates 3/3/3
+   *  rows for any EPO missing one. Any authenticated user. */
+  getEpoWipLimits(): Observable<McpResponse<EpoWipLimitRow[]>> {
+    return this.mcp.call<EpoWipLimitRow[]>('delivery', 'get_epo_wip_limits', {});
+  }
+
+  /** Updates one or more limit fields for a single EPO. Admin only.
+   *  Validation: each supplied limit must be an integer ≥ 1. */
+  updateEpoWipLimits(params: {
+    user_id:            string;
+    pre_build_limit?:   number;
+    build_limit?:       number;
+    post_deploy_limit?: number;
+  }): Observable<McpResponse<EpoWipLimitRow>> {
+    return this.mcp.call<EpoWipLimitRow>('delivery', 'update_epo_wip_limits', params as Record<string, unknown>);
   }
 
   // ── Jira sync ──────────────────────────────────────────────────────────────

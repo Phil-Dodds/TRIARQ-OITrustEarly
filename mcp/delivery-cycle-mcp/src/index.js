@@ -51,6 +51,10 @@ const { get_cycle_event_log }            = require('./tools/get_cycle_event_log'
 const { sync_jira_epic }                 = require('./tools/sync_jira_epic');
 const { get_delivery_summary }           = require('./tools/get_delivery_summary');
 
+// Contract 20 (D-400, D-401): EPO WIP limit model.
+const { get_epo_wip_limits }             = require('./tools/get_epo_wip_limits');
+const { update_epo_wip_limits }          = require('./tools/update_epo_wip_limits');
+
 const app  = express();
 const PORT = process.env.PORT || 3003;
 
@@ -96,7 +100,11 @@ const TOOLS = {
   sync_jira_epic,
 
   // Dashboard hub summaries (D-171–D-176)
-  get_delivery_summary
+  get_delivery_summary,
+
+  // Contract 20 — EPO WIP limit model (D-400, D-401)
+  get_epo_wip_limits,
+  update_epo_wip_limits
 };
 
 // ── CORS — allow GitHub Pages and local dev origins ───────────────────────────

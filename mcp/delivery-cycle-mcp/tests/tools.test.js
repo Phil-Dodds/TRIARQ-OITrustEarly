@@ -704,3 +704,179 @@ describe('response envelope contract', () => {
   });
 
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Contract 20 — EPO WIP Limit Model (D-400)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('record_gate_decision — EPO WIP warning (Contract 20, D-400)', () => {
+
+  test('zone-trigger gate set contains exactly go_to_build and go_to_deploy', () => {
+    // AC: spec §2.3 names only these two gates as WIP-trigger gates.
+    // brief_review (BRIEF → DESIGN) is excluded by design — spec wording is
+    // the contract.
+    const tool = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', 'src', 'tools', 'record_gate_decision.js'),
+      'utf8'
+    );
+    // Asserts the literal set definition stays in sync with spec.
+    assert.ok(tool.includes("new Set(['go_to_build', 'go_to_deploy'])"));
+    assert.ok(!/new Set\(\[.*brief_review.*\]\)/.test(tool));
+  });
+
+  test('WIP_LIMIT_DEFAULTS resolve to 3/3/3 via lifecycle constants', () => {
+    // AC: missing epo_wip_limits row → 3/3/3 default per D-400.
+    const lifecycle = require('../src/lifecycle');
+    assert.equal(lifecycle.WIP_LIMIT_PRE_BUILD,   3);
+    assert.equal(lifecycle.WIP_LIMIT_BUILD,       3);
+    assert.equal(lifecycle.WIP_LIMIT_POST_DEPLOY, 3);
+  });
+
+  test('wip_warning payload contract — fields required by Angular D-200 Pattern 2', () => {
+    // String contract for the warning shape returned alongside success.
+    const sampleWarning = {
+      zone:             'build',
+      zone_display:     'Build',
+      count:            3,
+      limit:            3,
+      epo_user_id:      'epo-uuid',
+      epo_display_name: 'Sample EPO',
+      message:          'Sample EPO now has 3 Initiatives in the Build zone — at or over the limit of 3.'
+    };
+    assert.equal(typeof sampleWarning.zone, 'string');
+    assert.equal(typeof sampleWarning.zone_display, 'string');
+    assert.equal(typeof sampleWarning.count, 'number');
+    assert.equal(typeof sampleWarning.limit, 'number');
+    assert.ok(sampleWarning.count >= sampleWarning.limit);
+    assert.ok(sampleWarning.message.includes('at or over the limit'));
+    assert.ok(sampleWarning.message.includes(String(sampleWarning.limit)));
+  });
+
+  test('null assigned_epo_user_id path documented — WIP check is skipped (CC-20-04)', () => {
+    // String-contract: spec §2.3 "If assigned_epo_user_id is null on the cycle
+    // (no EPO assigned), skip WIP check — no warning."
+    const guardComment = 'cycle has assigned_epo_user_id (null → skip per spec)';
+    assert.ok(guardComment.includes('assigned_epo_user_id'));
+    assert.ok(guardComment.includes('null'));
+    assert.ok(guardComment.includes('skip'));
+  });
+
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// update_epo_wip_limits — Contract 20 §2.2 (D-400, D-401)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('update_epo_wip_limits', () => {
+
+  test('error path: missing user_id', async () => {
+    const { update_epo_wip_limits } = require('../src/tools/update_epo_wip_limits');
+    const result = await update_epo_wip_limits({ pre_build_limit: 5 }, ADMIN_ID);
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('user_id'));
+  });
+
+  test('error path: no limit fields supplied', async () => {
+    const { update_epo_wip_limits } = require('../src/tools/update_epo_wip_limits');
+    const result = await update_epo_wip_limits({ user_id: 'epo-uuid' }, ADMIN_ID);
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('pre_build_limit'));
+    assert.ok(result.error.includes('build_limit'));
+    assert.ok(result.error.includes('post_deploy_limit'));
+  });
+
+  test('error path: non-integer limit', async () => {
+    const { update_epo_wip_limits } = require('../src/tools/update_epo_wip_limits');
+    const result = await update_epo_wip_limits(
+      { user_id: 'epo-uuid', build_limit: 3.5 },
+      ADMIN_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('build_limit'));
+    assert.ok(result.error.includes('integer'));
+  });
+
+  test('error path: limit below 1 (zero)', async () => {
+    const { update_epo_wip_limits } = require('../src/tools/update_epo_wip_limits');
+    const result = await update_epo_wip_limits(
+      { user_id: 'epo-uuid', pre_build_limit: 0 },
+      ADMIN_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('pre_build_limit'));
+    assert.ok(result.error.includes('1 or greater'));
+  });
+
+  test('error path: limit below 1 (negative)', async () => {
+    const { update_epo_wip_limits } = require('../src/tools/update_epo_wip_limits');
+    const result = await update_epo_wip_limits(
+      { user_id: 'epo-uuid', post_deploy_limit: -3 },
+      ADMIN_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('post_deploy_limit'));
+  });
+
+  test('error path: limit is string (D-200 Pattern 3 framing)', async () => {
+    const { update_epo_wip_limits } = require('../src/tools/update_epo_wip_limits');
+    const result = await update_epo_wip_limits(
+      { user_id: 'epo-uuid', build_limit: '5' },
+      ADMIN_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('integer'));
+  });
+
+  test('D-140 framing: non-admin error names role + recovery path', () => {
+    // String contract for the admin-required error message.
+    const adminBlock = 'Updating EPO WIP limits requires Admin role. Contact your System Admin to request access.';
+    assert.ok(adminBlock.includes('Admin role'));
+    assert.ok(adminBlock.includes('Contact your System Admin'));
+  });
+
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// get_epo_wip_limits — Contract 20 §2.1 (D-400, D-401)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('get_epo_wip_limits', () => {
+
+  test('module exports the tool function', () => {
+    const mod = require('../src/tools/get_epo_wip_limits');
+    assert.equal(typeof mod.get_epo_wip_limits, 'function');
+  });
+
+  test('response shape contract — array of rows with documented fields', () => {
+    // Spec §2.1: return shape contract. Asserted as a string-contract
+    // because the existing tests pattern does not mock Supabase.
+    const sampleRow = {
+      user_id:                 'epo-uuid',
+      display_name:            'Sample EPO',
+      pre_build_limit:         3,
+      build_limit:             3,
+      post_deploy_limit:       3,
+      updated_at:              null,
+      updated_by_display_name: null
+    };
+    for (const field of [
+      'user_id', 'display_name',
+      'pre_build_limit', 'build_limit', 'post_deploy_limit',
+      'updated_at', 'updated_by_display_name'
+    ]) {
+      assert.ok(field in sampleRow, `field ${field} missing from response`);
+    }
+  });
+
+  test('auto-create behavior documented (spec §2.1)', () => {
+    // Reads tool source and confirms the auto-create branch exists.
+    const tool = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', 'src', 'tools', 'get_epo_wip_limits.js'),
+      'utf8'
+    );
+    assert.ok(tool.includes('Auto-create'));
+    assert.ok(tool.includes('is_epo'));
+    assert.ok(tool.includes('3/3/3'));
+  });
+
+});

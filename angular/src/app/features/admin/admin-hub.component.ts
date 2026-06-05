@@ -38,6 +38,14 @@ const ADMIN_CARDS: AdminCard[] = [
     who:         'Phil and Admin',
     route:       'workstreams',
     icon:        '⬡'
+  },
+  // Contract 20 (D-401): fourth admin card — EPO WIP Limits.
+  {
+    title:       'EPO WIP Limits',
+    description: 'Configure WIP zone limits for each EPO across Pre-Build, Build, and Post-Deploy. Defaults are 3 per zone. Lower limits enforce tighter focus; higher limits open capacity. Changes take effect on the next gate approval.',
+    who:         'Phil and Admin',
+    route:       'epo-wip',
+    icon:        '◐'
   }
 ];
 
