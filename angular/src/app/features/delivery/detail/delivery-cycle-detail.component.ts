@@ -150,15 +150,27 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         (cancelled)="onEditCancelled()">
       </app-delivery-cycle-edit-panel>
 
-      <!-- D-291: sticky outer wrapper — B-11 fix: close button + header card both sticky.
-           Close button was a separate non-sticky element above the card; scrolled away
-           leaving × inaccessible. Now both are inside one sticky container. Source: D-291. -->
+      <!-- D-291: sticky outer wrapper — B-11 fix: close button + header card both sticky. -->
       <div style="position:sticky;top:0;z-index:5;background:#fff;">
 
-      <!-- Close X moved into the cycle-header right cluster (B-76).
-           Previously rendered above the card on its own row, which placed it visually
-           higher than the title. Now sits inline with the action buttons in the card
-           header, vertically centred with the title. Source: Contract 12 §3 B-76. -->
+      <!-- Contract 19 hotfix: dedicated close X at top-right of sticky header.
+           Previously buried in the action button row (B-76), where it was easy to miss
+           when 4+ action buttons crowded the same line and visual hierarchy obscured it.
+           Now sits in its own row above the cycle-header card. Always visible in panel mode. -->
+      <div *ngIf="panelMode"
+           style="display:flex;justify-content:flex-end;
+                  padding:var(--triarq-space-xs) 0;">
+        <button (click)="close.emit()"
+                title="Close panel"
+                aria-label="Close panel"
+                style="background:#fff;border:1px solid var(--triarq-color-border);
+                       border-radius:5px;cursor:pointer;
+                       color:var(--triarq-color-text-secondary);
+                       font-size:18px;line-height:1;padding:4px 10px;">
+          ✕
+        </button>
+      </div>
+
 
       <!-- ── Cycle Header ───────────────────────────────────────────────── -->
       <!-- D-291: in sticky outer wrapper. Source: D-291. -->
@@ -268,14 +280,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               ↺ Un-cancel Initiative
             </button>
 
-            <!-- B-76: Close X aligned within the panel header (was a separate row above). -->
-            <button *ngIf="panelMode"
-                    (click)="close.emit()"
-                    title="Close panel"
-                    aria-label="Close panel"
-                    style="background:none;border:none;cursor:pointer;
-                           color:var(--triarq-color-text-secondary);font-size:20px;
-                           line-height:1;padding:4px 8px;margin-left:var(--triarq-space-xs);">✕</button>
+            <!-- Contract 19 hotfix: close X relocated to its own row above the card header.
+                 The previous inline placement got buried when 4+ action buttons crowded the row. -->
 
           </div>
         </div>
