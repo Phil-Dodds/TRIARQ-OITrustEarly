@@ -290,11 +290,21 @@ async function get_delivery_summary(params, caller_id) {
  * Returns an array of { user_id, display_name, total_active_cycles,
  *   wip_pre_build, wip_build, wip_post_deploy,
  *   wip_pre_build_limit, wip_build_limit, wip_post_deploy_limit,
- *   wip_pre_build_exceeded, wip_build_exceeded, wip_post_deploy_exceeded }
+ *   wip_pre_build_exceeded, wip_build_exceeded, wip_post_deploy_exceeded,
+ *   overdue_count, upcoming_count } (CC-20-08)
  * sorted by total_active_cycles desc, then display_name asc.
+ *
+ * overdue_count / upcoming_count match the EPO Gate Schedule screen's
+ * classification: for each EPO-assigned cycle, look at the next gate from
+ * NEXT_GATE_BY_STAGE, find that gate's milestone target_date, and bucket as
+ * overdue (target_date < today, no actual_date) or upcoming (today <=
+ * target_date <= today + 7d, no actual_date). Cycles without a next gate or
+ * without a target date are ignored — same rule as the screen.
  */
 async function buildEpoSummaries(cycles) {
   const epoMap = new Map();
+  const today    = new Date().toISOString().slice(0, 10);
+  const in7Days  = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
 
   for (const cycle of cycles) {
     const epoId = cycle.assigned_epo_user_id;
@@ -314,7 +324,9 @@ async function buildEpoSummaries(cycles) {
         wip_post_deploy_limit:    WIP_LIMIT_POST_DEPLOY,
         wip_pre_build_exceeded:   false,
         wip_build_exceeded:       false,
-        wip_post_deploy_exceeded: false
+        wip_post_deploy_exceeded: false,
+        overdue_count:            0,   // CC-20-08
+        upcoming_count:           0    // CC-20-08
       };
       epoMap.set(epoId, entry);
     }
@@ -324,6 +336,20 @@ async function buildEpoSummaries(cycles) {
     if (zone === 'pre_build')   { entry.wip_pre_build++;   }
     if (zone === 'build')       { entry.wip_build++;       }
     if (zone === 'post_deploy') { entry.wip_post_deploy++; }
+
+    // CC-20-08: per-EPO overdue + upcoming classification (mirrors
+    // EpoScheduleComponent.classify so the hub headline matches the screen).
+    const nextGate = NEXT_GATE_BY_STAGE[cycle.current_lifecycle_stage];
+    if (nextGate) {
+      const milestone = (cycle.milestone_dates ?? []).find(m => m.gate_name === nextGate);
+      if (milestone?.target_date && !milestone.actual_date) {
+        if (milestone.target_date < today) {
+          entry.overdue_count++;
+        } else if (milestone.target_date <= in7Days) {
+          entry.upcoming_count++;
+        }
+      }
+    }
   }
 
   if (epoMap.size === 0) {

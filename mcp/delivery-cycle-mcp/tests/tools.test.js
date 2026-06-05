@@ -890,6 +890,7 @@ describe('get_delivery_summary — epo_summaries shape (Contract 20 Session 2)',
   test('response envelope contract — epo_summaries row fields documented', () => {
     // String-contract for the per-EPO summary row shape returned alongside
     // workstream_summaries. Mocking Supabase is out of scope per existing pattern.
+    // overdue_count + upcoming_count added per CC-20-08.
     const sampleEpoRow = {
       user_id:                  'epo-uuid',
       display_name:             'Sample EPO',
@@ -902,13 +903,16 @@ describe('get_delivery_summary — epo_summaries shape (Contract 20 Session 2)',
       wip_post_deploy_limit:    3,
       wip_pre_build_exceeded:   false,
       wip_build_exceeded:       true,
-      wip_post_deploy_exceeded: false
+      wip_post_deploy_exceeded: false,
+      overdue_count:            2,
+      upcoming_count:           1
     };
     for (const field of [
       'user_id', 'display_name', 'total_active_cycles',
       'wip_pre_build', 'wip_build', 'wip_post_deploy',
       'wip_pre_build_limit', 'wip_build_limit', 'wip_post_deploy_limit',
-      'wip_pre_build_exceeded', 'wip_build_exceeded', 'wip_post_deploy_exceeded'
+      'wip_pre_build_exceeded', 'wip_build_exceeded', 'wip_post_deploy_exceeded',
+      'overdue_count', 'upcoming_count'
     ]) {
       assert.ok(field in sampleEpoRow, `field ${field} missing from epo_summaries row`);
     }

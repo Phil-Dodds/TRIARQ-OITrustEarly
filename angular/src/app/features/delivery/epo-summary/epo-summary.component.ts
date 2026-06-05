@@ -383,7 +383,10 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
         wip_post_deploy_limit:    l.post_deploy_limit,
         wip_pre_build_exceeded:   false,
         wip_build_exceeded:       false,
-        wip_post_deploy_exceeded: false
+        wip_post_deploy_exceeded: false,
+        // CC-20-08: zero-Initiative EPOs have nothing to schedule.
+        overdue_count:            0,
+        upcoming_count:           0
       }))
       .sort((a, b) => a.display_name.localeCompare(b.display_name));
     this.rows = [...this.activeRows, ...zeroRows];

@@ -408,7 +408,10 @@ export interface DivisionSummaryItem {
  *  build      = BUILD, VALIDATE, UAT
  *  post_deploy = PILOT, RELEASE, OUTCOME
  *  Limits come from epo_wip_limits (3/3/3 default when no row).
- *  Returned only for EPOs with at least one active Initiative in scope. */
+ *  Returned only for EPOs with at least one active Initiative in scope.
+ *
+ *  overdue_count / upcoming_count added per CC-20-08 so the EPO Gate Schedule
+ *  hub headline can scope to EPO-assigned cycles only — matches the screen. */
 export interface EpoSummaryItem {
   user_id:                  string;
   display_name:             string;
@@ -422,6 +425,8 @@ export interface EpoSummaryItem {
   wip_pre_build_exceeded:   boolean;
   wip_build_exceeded:       boolean;
   wip_post_deploy_exceeded: boolean;
+  overdue_count:            number;   // CC-20-08
+  upcoming_count:           number;   // CC-20-08
 }
 
 /** Full summary response from get_delivery_summary MCP tool. */

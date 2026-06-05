@@ -300,17 +300,21 @@ export class DeliveryHubComponent implements OnInit {
    * Derive headline text + tone for each EPO card per spec §4 table.
    *
    * EPO Summary — total active EPOs + count with any zone exceeded.
-   * EPO Gate Schedule — sum overdue + upcoming counts across all gate types.
+   * EPO Gate Schedule — sum overdue + upcoming counts across EPO-assigned
+   *   cycles only (CC-20-08). Matches what the EPO Gate Schedule screen
+   *   shows. The previous implementation summed gate_summaries which is
+   *   all-Initiative scope including unassigned EPOs.
    * EPO Deploy by Quarter — per CC-20-06, simplified to total active EPOs
    *   only. Full spec wording ("X with prior-quarter misses") requires a
    *   per-cycle deploy-gate target-date check that get_delivery_summary does
    *   not currently surface — recorded as a follow-on item.
    */
   private buildHeadlines(summary: DeliverySummary): void {
-    const eposExceeded = (summary.epo_summaries ?? []).filter(e =>
+    const epoRows = summary.epo_summaries ?? [];
+    const eposExceeded = epoRows.filter(e =>
       e.wip_pre_build_exceeded || e.wip_build_exceeded || e.wip_post_deploy_exceeded
     ).length;
-    const epoCount = (summary.epo_summaries ?? []).length;
+    const epoCount = epoRows.length;
 
     this.headlines['epo-summary'] = epoCount === 0
       ? { text: 'No EPOs with active Initiatives', tone: 'green' }
@@ -318,15 +322,16 @@ export class DeliveryHubComponent implements OnInit {
         ? { text: `${epoCount} EPOs · No WIP alerts`, tone: 'green' }
         : { text: `${epoCount} EPOs · ${eposExceeded} with active WIP alerts`, tone: 'amber' };
 
-    const overdueTotal  = (summary.gate_summaries ?? [])
-      .reduce((sum, g) => sum + (g.overdue_count ?? 0), 0);
-    const upcomingTotal = (summary.gate_summaries ?? [])
-      .reduce((sum, g) => sum + (g.upcoming_count ?? 0), 0);
+    // CC-20-08: EPO-scoped overdue/upcoming. Sum the per-EPO counts so the
+    // headline matches the EPO Gate Schedule screen exactly. Pre-CC-20-08
+    // this read from gate_summaries which includes unassigned-EPO cycles.
+    const overdueTotal  = epoRows.reduce((sum, e) => sum + (e.overdue_count  ?? 0), 0);
+    const upcomingTotal = epoRows.reduce((sum, e) => sum + (e.upcoming_count ?? 0), 0);
 
     this.headlines['epo-schedule'] = overdueTotal > 0
       ? {
           text: `${overdueTotal} overdue · ${upcomingTotal} due in 7 days`,
-          tone: overdueTotal > 0 ? 'red' : 'amber'
+          tone: 'red'
         }
       : {
           text: `No overdue gates · ${upcomingTotal} due in 7 days`,
