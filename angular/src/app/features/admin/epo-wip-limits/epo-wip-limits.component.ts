@@ -251,209 +251,48 @@ const SAVED_TICK_FADE_MS = 1500;
     </div>
   `,
   styles: [`
-    .ewl-shell {
-      max-width: 1100px;
-      margin: var(--triarq-space-2xl) auto;
-      padding: 0 var(--triarq-space-md);
-    }
-
-    .ewl-back-link {
-      font-size: var(--triarq-text-small);
-      color: var(--triarq-color-primary);
-      text-decoration: none;
-    }
-
+    .ewl-shell { max-width: 1100px; margin: var(--triarq-space-2xl) auto; padding: 0 var(--triarq-space-md); }
+    .ewl-back-link { font-size: var(--triarq-text-small); color: var(--triarq-color-primary); text-decoration: none; }
     .ewl-header { margin-bottom: var(--triarq-space-md); }
-    .ewl-header-row {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: var(--triarq-space-md);
-      margin: 8px 0 4px 0;
-    }
+    .ewl-header-row { display: flex; align-items: center; justify-content: space-between; gap: var(--triarq-space-md); margin: 8px 0 4px 0; }
     .ewl-title { margin: 0; }
-
-    .ewl-bulk-reset-btn {
-      background: transparent;
-      color: var(--triarq-color-primary, #257099);
-      border: 1px solid var(--triarq-color-primary, #257099);
-      border-radius: 5px;
-      padding: 6px 14px;
-      font-size: var(--triarq-text-small);
-      cursor: pointer;
-    }
+    .ewl-bulk-reset-btn { background: transparent; color: var(--triarq-color-primary, #257099); border: 1px solid var(--triarq-color-primary, #257099); border-radius: 5px; padding: 6px 14px; font-size: var(--triarq-text-small); cursor: pointer; }
     .ewl-bulk-reset-btn:hover { background: rgba(37,112,153,0.08); }
-
-    .ewl-bulk-confirm {
-      display: flex; align-items: center; gap: 10px;
-      padding: 8px 12px;
-      background: rgba(245,166,35,0.08);
-      border-left: 3px solid var(--triarq-color-sunray, #f5a623);
-      border-radius: 5px;
-    }
-    .ewl-bulk-confirm-msg {
-      font-size: var(--triarq-text-small);
-      color: var(--triarq-color-text-primary);
-    }
-
-    .ewl-confirm-primary {
-      background: var(--triarq-color-primary, #257099);
-      color: #fff;
-      border: none; border-radius: 5px;
-      padding: 4px 12px; font-size: 12px; cursor: pointer;
-    }
+    .ewl-bulk-confirm, .ewl-row-confirm, .ewl-blocked { background: rgba(245,166,35,0.08); border-left: 3px solid var(--triarq-color-sunray, #f5a623); border-radius: 5px; }
+    .ewl-bulk-confirm { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+    .ewl-bulk-confirm-msg { font-size: var(--triarq-text-small); color: var(--triarq-color-text-primary); }
+    .ewl-confirm-primary { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 5px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
     .ewl-confirm-primary:disabled { opacity: 0.6; cursor: wait; }
-    .ewl-confirm-ghost {
-      background: transparent;
-      color: var(--triarq-color-text-secondary);
-      border: 1px solid var(--triarq-color-border, #ccc);
-      border-radius: 5px;
-      padding: 4px 12px; font-size: 12px; cursor: pointer;
-    }
-
-    /* S-015 */
-    .ewl-subtitle {
-      margin: 4px 0 12px 0;
-      font-size: 11px; font-style: italic; color: #5A5A5A;
-      max-width: 720px; line-height: 1.6;
-    }
-
-    .ewl-grid {
-      display: grid;
-      grid-template-columns: 1.8fr 130px 130px 150px 1.5fr 160px;
-      gap: var(--triarq-space-sm);
-      padding: var(--triarq-space-xs) var(--triarq-space-sm);
-      align-items: center;
-    }
-    .ewl-grid-header {
-      font-size: var(--triarq-text-small); font-weight: 500;
-      color: var(--triarq-color-text-secondary);
-      border-bottom: 2px solid var(--triarq-color-border);
-    }
-    .ewl-grid-row {
-      border-bottom: 1px solid var(--triarq-color-border);
-      font-size: var(--triarq-text-small);
-      min-height: 44px;
-    }
+    .ewl-confirm-ghost { background: transparent; color: var(--triarq-color-text-secondary); border: 1px solid var(--triarq-color-border, #ccc); border-radius: 5px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+    .ewl-subtitle { margin: 4px 0 12px 0; font-size: 11px; font-style: italic; color: #5A5A5A; max-width: 720px; line-height: 1.6; }
+    .ewl-grid { display: grid; grid-template-columns: 1.8fr 130px 130px 150px 1.5fr 160px; gap: var(--triarq-space-sm); padding: var(--triarq-space-xs) var(--triarq-space-sm); align-items: center; }
+    .ewl-grid-header { font-size: var(--triarq-text-small); font-weight: 500; color: var(--triarq-color-text-secondary); border-bottom: 2px solid var(--triarq-color-border); }
+    .ewl-grid-row { border-bottom: 1px solid var(--triarq-color-border); font-size: var(--triarq-text-small); min-height: 44px; }
     .num { text-align: center; }
     .ewl-sort-trigger { cursor: pointer; user-select: none; }
     .ewl-sort-trigger:hover { color: var(--triarq-color-primary); }
-
-    .ewl-epo-name {
-      font-weight: 500;
-      color: var(--triarq-color-text-primary);
-    }
-
-    .ewl-cell {
-      display: inline-flex; align-items: center; justify-content: center;
-      gap: 6px; flex-wrap: wrap;
-    }
-    .ewl-input {
-      width: 64px;
-      padding: 4px 6px;
-      border: 1px solid var(--triarq-color-border, #ccc);
-      border-radius: 5px;
-      font-size: var(--triarq-text-small);
-      text-align: center;
-    }
-    .ewl-input:focus {
-      outline: none;
-      border-color: var(--triarq-color-primary, #257099);
-    }
-    /* D-200 Pattern 3 — error border on validation failure */
-    .ewl-input-error {
-      border: 2px solid var(--triarq-color-error, #c0392b);
-    }
-
-    .ewl-status {
-      font-size: 11px; color: var(--triarq-color-text-secondary);
-    }
-    .ewl-saved {
-      color: var(--triarq-color-success, #2c8a3a);
-      animation: ewlFade ${SAVED_TICK_FADE_MS}ms ease-out forwards;
-    }
-    @keyframes ewlFade {
-      0%   { opacity: 1; }
-      80%  { opacity: 1; }
-      100% { opacity: 0; }
-    }
-
-    /* D-200 Pattern 3 — error message under field */
-    .ewl-field-error {
-      flex-basis: 100%;
-      font-size: 11px;
-      color: var(--triarq-color-error, #c0392b);
-      margin-top: 2px;
-    }
-
-    .ewl-updated {
-      font-size: 11px;
-      color: var(--triarq-color-stone, #5A5A5A);
-    }
-
-    .ewl-reset-cell {
-      display: inline-flex; align-items: center;
-      gap: 6px;
-    }
-    .ewl-reset-link {
-      color: var(--triarq-color-stone, #5A5A5A);
-      font-size: 11px;
-      cursor: pointer;
-      text-decoration: underline;
-    }
+    .ewl-epo-name { font-weight: 500; color: var(--triarq-color-text-primary); }
+    .ewl-cell { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
+    .ewl-input { width: 64px; padding: 4px 6px; border: 1px solid var(--triarq-color-border, #ccc); border-radius: 5px; font-size: var(--triarq-text-small); text-align: center; }
+    .ewl-input:focus { outline: none; border-color: var(--triarq-color-primary, #257099); }
+    .ewl-input-error { border: 2px solid var(--triarq-color-error, #c0392b); }
+    .ewl-status { font-size: 11px; color: var(--triarq-color-text-secondary); }
+    .ewl-saved { color: var(--triarq-color-success, #2c8a3a); animation: ewlFade ${SAVED_TICK_FADE_MS}ms ease-out forwards; }
+    @keyframes ewlFade { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
+    .ewl-field-error { flex-basis: 100%; font-size: 11px; color: var(--triarq-color-error, #c0392b); margin-top: 2px; }
+    .ewl-updated, .ewl-reset-link { font-size: 11px; color: var(--triarq-color-stone, #5A5A5A); }
+    .ewl-reset-cell { display: inline-flex; align-items: center; gap: 6px; }
+    .ewl-reset-link { cursor: pointer; text-decoration: underline; }
     .ewl-reset-link:hover { color: var(--triarq-color-primary); }
-
-    .ewl-row-confirm {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-size: 11px;
-      color: var(--triarq-color-text-primary);
-      padding: 4px 6px;
-      background: rgba(245,166,35,0.08);
-      border-left: 3px solid var(--triarq-color-sunray, #f5a623);
-      border-radius: 5px;
-    }
-
-    .ewl-empty {
-      padding: var(--triarq-space-xl);
-      text-align: center;
-    }
-    .ewl-empty-primary {
-      font-size: var(--triarq-text-body);
-      color: var(--triarq-color-text-primary);
-      margin-bottom: 4px;
-    }
-    .ewl-empty-secondary {
-      font-size: var(--triarq-text-small);
-      color: var(--triarq-color-text-secondary);
-    }
-    .ewl-empty-link {
-      color: var(--triarq-color-primary);
-      text-decoration: underline;
-    }
-
+    .ewl-row-confirm { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--triarq-color-text-primary); padding: 4px 6px; }
+    .ewl-empty { padding: var(--triarq-space-xl); text-align: center; }
+    .ewl-empty-primary { font-size: var(--triarq-text-body); color: var(--triarq-color-text-primary); margin-bottom: 4px; }
+    .ewl-empty-secondary, .ewl-error-secondary, .ewl-blocked-secondary { font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); }
+    .ewl-empty-link { color: var(--triarq-color-primary); text-decoration: underline; }
     .ewl-error { padding: var(--triarq-space-md); max-width: 560px; }
-    .ewl-error-primary {
-      color: var(--triarq-color-error); font-weight: 500; margin-bottom: 4px;
-    }
-    .ewl-error-secondary {
-      font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary);
-    }
-
-    /* D-140 — blocked-action UX */
-    .ewl-blocked {
-      max-width: 560px;
-      padding: var(--triarq-space-md);
-      background: rgba(245,166,35,0.08);
-      border-left: 3px solid var(--triarq-color-sunray, #f5a623);
-      border-radius: 5px;
-    }
-    .ewl-blocked-primary {
-      font-weight: 500;
-      color: var(--triarq-color-text-primary);
-      margin-bottom: 4px;
-    }
-    .ewl-blocked-secondary {
-      font-size: var(--triarq-text-small);
-      color: var(--triarq-color-text-secondary);
-    }
+    .ewl-error-primary { color: var(--triarq-color-error); font-weight: 500; margin-bottom: 4px; }
+    .ewl-blocked { max-width: 560px; padding: var(--triarq-space-md); }
+    .ewl-blocked-primary { font-weight: 500; color: var(--triarq-color-text-primary); margin-bottom: 4px; }
   `]
 })
 export class EpoWipLimitsComponent implements OnInit, OnDestroy {
