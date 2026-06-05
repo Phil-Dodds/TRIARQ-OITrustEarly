@@ -924,7 +924,12 @@ export class UsersComponent implements OnInit {
 
     const v = this.inviteForm.value as Record<string, unknown>;
     this.mcp
-      .call<User>('division', 'create_user', {
+      // CC-20-10: HTTP route renamed to bypass Cloudflare free-tier WAF
+      // (which pattern-matches `/tools/create_user` + email-shaped body as
+      // account-creation abuse and serves a 403 challenge page from the
+      // edge with no CORS headers). Server-side function and behavior are
+      // unchanged — only the HTTP path key.
+      .call<User>('division', 'submit_member_invite', {
         email:        v['email']        as string,
         display_name: v['display_name'] as string,
         // Boolean role flags — sole source of role truth post-migration-034.

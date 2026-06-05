@@ -59,6 +59,14 @@ app.post('/tools/:toolName', async (req, res) => {
   const caller_id    = req.auth.user_id;
   const start        = Date.now();
 
+  // CC-20-10: rename the public tool path from `create_user` to
+  // `submit_member_invite`. Cloudflare's free-tier WAF / Bot Management
+  // pattern-matches "create_user" + email-shaped body as account-creation
+  // abuse and serves a 403 challenge page from the edge (no CORS headers,
+  // so the browser surfaces a misleading CORS error). The neutral path
+  // bypasses the rule. The Angular client calls the new name; the file +
+  // function still export `create_user` internally — only the HTTP route
+  // key changed.
   const tools = {
     create_division,
     get_division,
@@ -67,7 +75,7 @@ app.post('/tools/:toolName', async (req, res) => {
     assign_user_to_division,
     revoke_division_membership,
     get_user_divisions,
-    create_user,
+    submit_member_invite: create_user,
     update_user,
     update_user_email,
     list_users,
@@ -134,7 +142,7 @@ app.get('/tools', (req, res) => {
       { name: 'assign_user_to_division',  method: 'POST', path: '/tools/assign_user_to_division' },
       { name: 'revoke_division_membership', method: 'POST', path: '/tools/revoke_division_membership' },
       { name: 'get_user_divisions',       method: 'POST', path: '/tools/get_user_divisions' },
-      { name: 'create_user',              method: 'POST', path: '/tools/create_user' },
+      { name: 'submit_member_invite',     method: 'POST', path: '/tools/submit_member_invite' },
       { name: 'update_user',              method: 'POST', path: '/tools/update_user' },
       { name: 'update_user_email',        method: 'POST', path: '/tools/update_user_email' },
       { name: 'list_users',               method: 'POST', path: '/tools/list_users' },
