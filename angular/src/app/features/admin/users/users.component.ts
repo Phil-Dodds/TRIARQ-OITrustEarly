@@ -736,7 +736,13 @@ export class UsersComponent implements OnInit {
 
     const filter = saved.filter_state as { roleFilter?: string } | null;
     const sort   = saved.sort_state   as { nameSortDir?: 'asc' | 'desc' } | null;
-    if (filter?.roleFilter)   { this.roleFilter  = filter.roleFilter; }
+    // Contract 19 (Part 1e): validate the restored roleFilter against the new flag set.
+    // Sessions saved before Contract 19 used legacy system_role values ('dcs', 'phil', ...)
+    // which would silently filter every user out. Stale values fall back to 'all'.
+    if (filter?.roleFilter) {
+      const valid: string[] = ['all', ...ALL_ROLE_FLAGS];
+      this.roleFilter = valid.includes(filter.roleFilter) ? filter.roleFilter : 'all';
+    }
     if (sort?.nameSortDir)    { this.nameSortDir = sort.nameSortDir; }
     this.cdr.markForCheck();
   }
