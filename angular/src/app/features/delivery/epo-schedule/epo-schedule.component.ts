@@ -1,22 +1,23 @@
 // epo-schedule.component.ts — EpoScheduleComponent
 // Route: /initiatives/epo-schedule (D-398, Contract 20 Session 2)
 //
-// Gate urgency view organized by EPO. Parallel to Gate Schedule
-// (/initiatives/gates) but pivot dimension is EPO person.
+// EPO-organized gate urgency view. Parallel to the workstream Gate Schedule
+// view but pivot dimension is EPO. Top-level: every EPO with at least one
+// overdue or upcoming gate as a row with inline counts + expand chevron.
+// Multiple rows expandable simultaneously (no accordion). Each expansion
+// shows two section groups:
 //
-// MVP scope vs spec (D-398) — deltas recorded as CC-20-05:
-//   - Shipped:    Two sections (Overdue, Upcoming 7-day window), each shows
-//                 EPO rows with Initiative counts. Click an EPO row to drill
-//                 to /initiatives/list?epo=user_id pre-filtered. Pattern 2
-//                 amber callout banner when any overdue Initiatives exist.
-//                 'Display only my Divisions' toggle (DCS/EPO/DOL default ON).
-//                 D-171 persistence for the toggle.
-//   - Deferred:   Slide-in filter panel (Division / EPO picker / Gate Status /
-//                 Lifecycle Stage / Tier), active filter chips, embedded full
-//                 Initiative grid below the two sections, gate type narrow
-//                 dropdown, role-aware EPO filter default, in-panel drill-down
-//                 per-row to detail panel. Spec sections 6.2 + 6.3 + 6.4
-//                 partially honored. Full implementation in a follow-up.
+//   1. Overdue                — Initiatives whose next gate target_date is
+//                                in the past, no actual_date.
+//   2. Upcoming (next 7 days) — Initiatives whose next gate target_date is
+//                                within the next 7 days, no actual_date.
+//
+// D-200 Pattern 2 banner at top of view persists until overall overdue
+// count = 0. Window is fixed at 7 days per D-DeliveryHub-GateSummary.
+//
+// CC-20-05 expansion shipped: the in-place expanded EPO row with two
+// section groups + embedded Initiative grid was the deferred spec
+// behaviour. Row click opens a right-panel detail per D-308 / S-018.
 
 import {
   Component,
@@ -38,11 +39,13 @@ import {
   ScreenStateService,
   SCREEN_KEYS
 } from '../../../core/services/screen-state.service';
+import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 import {
   DeliveryCycle,
   GateName,
   Division,
-  LifecycleStage
+  LifecycleStage,
+  CycleMilestoneDate
 } from '../../../core/types/database';
 
 const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
@@ -57,19 +60,33 @@ const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
   OUTCOME:  'close_review'
 };
 
-interface EpoBucket {
+const GATE_DISPLAY: Record<GateName, string> = {
+  brief_review:  'Brief Review',
+  go_to_build:   'Go to Build',
+  go_to_deploy:  'Go to Deploy',
+  go_to_release: 'Go to Release',
+  close_review:  'Close Review'
+};
+
+interface EpoGroup {
   user_id:      string;
   display_name: string;
-  cycle_count:  number;
+  overdue:      DeliveryCycle[];
+  upcoming:     DeliveryCycle[];
 }
 
 @Component({
   selector:        'app-epo-schedule',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, RouterModule, FormsModule, IonicModule],
+  imports: [
+    CommonModule, RouterModule, FormsModule, IonicModule,
+    DeliveryCycleDetailComponent
+  ],
   template: `
-    <div class="esch-shell">
+    <div style="display:flex;min-height:calc(100vh - 56px);">
+
+    <div class="esch-shell" [style.flex]="selectedCycleId ? '0 0 40%' : '1 1 100%'">
 
       <div class="esch-header">
         <a routerLink="/initiatives" class="esch-back-link">← Initiative Tracking</a>
@@ -79,7 +96,8 @@ interface EpoBucket {
         </div>
         <p class="esch-subtitle">
           Initiatives with gates due in the next 7 days or already overdue,
-          organized by EPO. Click an EPO row to see their matching Initiatives.
+          organized by EPO. Click an EPO row to expand. Click an EPO name to
+          filter the full dashboard to their Initiatives.
         </p>
       </div>
 
@@ -97,12 +115,10 @@ interface EpoBucket {
         Display only my Divisions
       </label>
 
-      <!-- Skeleton -->
       <div *ngIf="loading">
-        <div class="esch-section-title">Overdue</div>
-        <div class="esch-grid esch-grid-row" *ngFor="let _ of skeletonRows">
-          <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
+        <div class="esch-row-skeleton" *ngFor="let _ of skeletonRows">
+          <ion-skeleton-text animated style="height:14px;border-radius:4px;width:60%;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:14px;border-radius:4px;width:30%;"></ion-skeleton-text>
         </div>
       </div>
 
@@ -113,28 +129,101 @@ interface EpoBucket {
 
       <ng-container *ngIf="!loading && !loadError">
 
-        <!-- Overdue section -->
-        <div class="esch-section">
-          <div class="esch-section-title">Overdue ({{ overdueTotal }})</div>
-          <div *ngIf="overdueBuckets.length === 0" class="esch-empty">No overdue Initiatives.</div>
-          <div *ngFor="let b of overdueBuckets; trackBy: trackByUserId" class="esch-grid esch-grid-row">
-            <a (click)="drillDown(b.user_id)" class="esch-epo-link">{{ b.display_name }}</a>
-            <span class="num esch-over">{{ b.cycle_count }}</span>
+        <div *ngFor="let group of epoGroups; trackBy: trackByUserId">
+
+          <button class="esch-row" type="button" (click)="toggle(group.user_id)">
+            <span class="esch-chevron"
+                  [style.transform]="isExpanded(group.user_id) ? 'rotate(0)' : 'rotate(-90deg)'">▼</span>
+            <span class="esch-epo-name"
+                  (click)="$event.stopPropagation(); drillDown(group.user_id)">
+              {{ group.display_name }}
+            </span>
+            <span class="esch-counts">
+              <span [class.esch-over]="group.overdue.length > 0">
+                Overdue: {{ group.overdue.length }}
+              </span>
+              · Upcoming: {{ group.upcoming.length }}
+            </span>
+          </button>
+
+          <!-- Expanded body — two sections -->
+          <div *ngIf="isExpanded(group.user_id)" class="esch-body">
+
+            <section class="esch-section">
+              <div class="esch-section-header esch-section-overdue">Overdue</div>
+              <div class="esch-grid esch-grid-header">
+                <span>Initiative</span>
+                <span>Stage</span>
+                <span>Next Gate</span>
+                <span>Target Date</span>
+              </div>
+              <ng-container *ngIf="group.overdue.length > 0; else overdueEmpty">
+                <div *ngFor="let c of group.overdue; trackBy: trackByCycleId"
+                     class="esch-grid esch-grid-row"
+                     (click)="openCycle(c.delivery_cycle_id)">
+                  <span class="esch-cycle-title">{{ c.cycle_title }}</span>
+                  <span class="esch-meta">{{ c.current_lifecycle_stage }}</span>
+                  <span>{{ nextGateLabel(c) }}</span>
+                  <span class="esch-over">{{ nextGateTarget(c) }}</span>
+                </div>
+              </ng-container>
+              <ng-template #overdueEmpty>
+                <div class="esch-row-empty">No overdue Initiatives.</div>
+              </ng-template>
+            </section>
+
+            <section class="esch-section">
+              <div class="esch-section-header">Upcoming (next 7 days)</div>
+              <div class="esch-grid esch-grid-header">
+                <span>Initiative</span>
+                <span>Stage</span>
+                <span>Next Gate</span>
+                <span>Target Date</span>
+              </div>
+              <ng-container *ngIf="group.upcoming.length > 0; else upcomingEmpty">
+                <div *ngFor="let c of group.upcoming; trackBy: trackByCycleId"
+                     class="esch-grid esch-grid-row"
+                     (click)="openCycle(c.delivery_cycle_id)">
+                  <span class="esch-cycle-title">{{ c.cycle_title }}</span>
+                  <span class="esch-meta">{{ c.current_lifecycle_stage }}</span>
+                  <span>{{ nextGateLabel(c) }}</span>
+                  <span>{{ nextGateTarget(c) }}</span>
+                </div>
+              </ng-container>
+              <ng-template #upcomingEmpty>
+                <div class="esch-row-empty">No upcoming gates in the next 7 days.</div>
+              </ng-template>
+            </section>
+
           </div>
         </div>
 
-        <!-- Upcoming section -->
-        <div class="esch-section">
-          <div class="esch-section-title">Upcoming (next 7 days) ({{ upcomingTotal }})</div>
-          <div *ngIf="upcomingBuckets.length === 0" class="esch-empty">No upcoming gates in the next 7 days.</div>
-          <div *ngFor="let b of upcomingBuckets; trackBy: trackByUserId" class="esch-grid esch-grid-row">
-            <a (click)="drillDown(b.user_id)" class="esch-epo-link">{{ b.display_name }}</a>
-            <span class="num">{{ b.cycle_count }}</span>
-          </div>
+        <div *ngIf="epoGroups.length === 0" class="esch-empty">
+          No EPOs with overdue or upcoming gates in scope.
         </div>
 
       </ng-container>
 
+    </div>
+
+    <div *ngIf="selectedCycleId"
+         style="width:60%;border-left:1px solid #E0E0E0;background:#fff;
+                position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0;"
+         [style.z-index]="showEditScrim ? '100' : '5'">
+      <app-delivery-cycle-detail
+        [cycleId]="selectedCycleId"
+        [cancelEditSignal]="cancelEditSignal"
+        (close)="closePanel()"
+        (editPanelOpened)="onEditPanelOpened()"
+        (editPanelClosed)="onEditPanelClosed()">
+      </app-delivery-cycle-detail>
+    </div>
+
+    </div><!-- /flex -->
+
+    <div *ngIf="showEditScrim"
+         style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,0.32);pointer-events:all;"
+         (click)="onScrimClick()">
     </div>
   `,
   styles: [`
@@ -149,15 +238,26 @@ interface EpoBucket {
     .esch-banner-overdue { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(245,166,35,0.08); border-left: 3px solid var(--triarq-color-sunray, #f5a623); border-radius: 5px; margin-bottom: var(--triarq-space-md); font-size: var(--triarq-text-small); }
     .esch-banner-icon { color: var(--triarq-color-sunray, #f5a623); font-size: 16px; }
     .esch-toggle { display: flex; align-items: center; gap: 8px; font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); margin-bottom: var(--triarq-space-md); cursor: pointer; }
-    .esch-section { margin-bottom: var(--triarq-space-lg); }
-    .esch-section-title { font-size: var(--triarq-text-small); font-weight: 600; color: var(--triarq-color-text-secondary); text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; border-bottom: 2px solid var(--triarq-color-border); }
-    .esch-grid { display: grid; grid-template-columns: 1fr 100px; gap: var(--triarq-space-sm); padding: var(--triarq-space-xs) var(--triarq-space-sm); align-items: center; }
-    .esch-grid-row { border-bottom: 1px solid var(--triarq-color-border); font-size: var(--triarq-text-small); }
-    .num { text-align: center; }
-    .esch-epo-link { color: var(--triarq-color-text-primary); font-weight: 500; cursor: pointer; }
-    .esch-epo-link:hover { text-decoration: underline; }
-    .esch-over { color: #E96127; font-weight: 600; }
-    .esch-empty { padding: var(--triarq-space-md); color: var(--triarq-color-text-secondary); font-size: var(--triarq-text-small); font-style: italic; }
+    .esch-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--triarq-color-background-subtle); border: none; border-radius: 6px; margin: 8px 0 4px 0; cursor: pointer; font-size: 13px; }
+    .esch-row:hover { background: rgba(37,112,153,0.06); }
+    .esch-chevron { font-size: 11px; color: var(--triarq-color-text-secondary); transition: transform 0.15s; flex-shrink: 0; }
+    .esch-epo-name { font-weight: 600; color: var(--triarq-color-primary); cursor: pointer; flex: 1; text-align: left; }
+    .esch-epo-name:hover { text-decoration: underline; }
+    .esch-counts { font-size: 12px; color: var(--triarq-color-text-secondary); }
+    .esch-over { color: #D32F2F; font-weight: 600; }
+    .esch-body { padding: 0 12px var(--triarq-space-md) 12px; }
+    .esch-section { margin-top: var(--triarq-space-md); }
+    .esch-section-header { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 4px; background: rgba(37,112,153,0.06); color: var(--triarq-color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+    .esch-section-overdue { background: rgba(211,47,47,0.08); color: #D32F2F; }
+    .esch-grid { display: grid; grid-template-columns: 3fr 1fr 1.4fr 1.4fr; gap: var(--triarq-space-sm); padding: 8px 12px; align-items: center; font-size: var(--triarq-text-small); }
+    .esch-grid-header { font-weight: 500; color: var(--triarq-color-text-secondary); border-bottom: 2px solid var(--triarq-color-border); }
+    .esch-grid-row { border-bottom: 1px solid var(--triarq-color-border); cursor: pointer; }
+    .esch-grid-row:hover { background: var(--triarq-color-background-subtle); }
+    .esch-cycle-title { font-weight: 500; color: var(--triarq-color-text-primary); }
+    .esch-meta { color: var(--triarq-color-text-secondary); }
+    .esch-row-empty { padding: 10px 12px; color: var(--triarq-color-text-secondary); font-size: var(--triarq-text-small); font-style: italic; text-align: center; border-bottom: 1px solid var(--triarq-color-border); }
+    .esch-row-skeleton { display: flex; gap: 16px; padding: 10px 12px; border-bottom: 1px solid var(--triarq-color-border); }
+    .esch-empty { padding: var(--triarq-space-xl); text-align: center; font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); }
     .esch-error { padding: var(--triarq-space-md); max-width: 560px; }
     .esch-error-primary { color: var(--triarq-color-error); font-weight: 500; margin-bottom: 4px; }
     .esch-error-secondary { font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); }
@@ -172,14 +272,18 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
   userDivisionIds:     string[] = [];
   canCreateCycle       = false;
 
-  overdueBuckets:  EpoBucket[] = [];
-  upcomingBuckets: EpoBucket[] = [];
-  overdueTotal     = 0;
-  upcomingTotal    = 0;
+  cycles: DeliveryCycle[] = [];
+
+  // Expansion state.
+  expanded: Set<string> = new Set();
+
+  // D-308 / S-018: right-panel detail state.
+  selectedCycleId: string | null = null;
+  cancelEditSignal = 0;
+  showEditScrim    = false;
 
   readonly skeletonRows = [1, 2, 3];
 
-  private currentUserId       = '';
   private readonly profileSub = new Subscription();
 
   constructor(
@@ -197,7 +301,7 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
         filter((p): p is NonNullable<typeof p> => p !== null),
         take(1)
       ).subscribe(async profile => {
-        this.currentUserId  = profile.id ?? '';
+        const userId = profile.id ?? '';
         this.isPrivileged   = profile.is_admin === true;
         this.canCreateCycle =
           profile.is_admin === true ||
@@ -211,7 +315,7 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
         }
 
         if (!this.isPrivileged) {
-          await this.loadUserDivisions(this.currentUserId);
+          await this.loadUserDivisions(userId);
         }
         this.loadCycles();
       })
@@ -239,10 +343,16 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
     this.loadError = '';
     this.cdr.markForCheck();
 
-    this.delivery.listCycles({}).subscribe({
+    const params: { division_id?: string; include_child_divisions?: boolean } = {};
+    if (!this.isPrivileged && this.showMyDivisionsOnly && this.userDivisionIds.length === 1) {
+      params.division_id = this.userDivisionIds[0];
+      params.include_child_divisions = true;
+    }
+
+    this.delivery.listCycles(params).subscribe({
       next: (res) => {
         if (res.success && res.data) {
-          this.classify(res.data);
+          this.cycles = res.data;
         } else {
           this.loadError = res.error ?? 'Unable to reach the server.';
         }
@@ -257,58 +367,6 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
     });
   }
 
-  private classify(cycles: DeliveryCycle[]): void {
-    const today    = new Date().toISOString().slice(0, 10);
-    const in7Days  = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-    const accessible = !this.isPrivileged && this.showMyDivisionsOnly
-      ? new Set(this.userDivisionIds)
-      : null;
-
-    const overdueMap  = new Map<string, EpoBucket>();
-    const upcomingMap = new Map<string, EpoBucket>();
-
-    for (const c of cycles) {
-      if (accessible && (!c.division_id || !accessible.has(c.division_id))) { continue; }
-      if (!c.assigned_epo_user_id) { continue; }
-      if (!c.current_lifecycle_stage) { continue; }
-
-      const nextGate = NEXT_GATE_BY_STAGE[c.current_lifecycle_stage as LifecycleStage];
-      if (!nextGate) { continue; }
-
-      const milestone = (c.milestone_dates ?? []).find(m => m.gate_name === nextGate);
-      if (!milestone?.target_date || milestone.actual_date) { continue; }
-
-      const targetMap =
-        milestone.target_date < today  ? overdueMap  :
-        milestone.target_date <= in7Days ? upcomingMap :
-        null;
-      if (!targetMap) { continue; }
-
-      const epoId = c.assigned_epo_user_id;
-      let bucket = targetMap.get(epoId);
-      if (!bucket) {
-        bucket = {
-          user_id:      epoId,
-          display_name: c.assigned_epo_display_name ?? 'EPO',
-          cycle_count:  0
-        };
-        targetMap.set(epoId, bucket);
-      }
-      bucket.cycle_count++;
-    }
-
-    const sortBuckets = (m: Map<string, EpoBucket>) =>
-      Array.from(m.values()).sort((a, b) =>
-        b.cycle_count - a.cycle_count ||
-        a.display_name.localeCompare(b.display_name)
-      );
-
-    this.overdueBuckets  = sortBuckets(overdueMap);
-    this.upcomingBuckets = sortBuckets(upcomingMap);
-    this.overdueTotal    = this.overdueBuckets.reduce((s, b) => s + b.cycle_count, 0);
-    this.upcomingTotal   = this.upcomingBuckets.reduce((s, b) => s + b.cycle_count, 0);
-  }
-
   onToggleChange(): void {
     this.screenState.save(
       SCREEN_KEYS.INITIATIVES_EPO_SCHEDULE,
@@ -316,6 +374,113 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
       {}
     );
     this.loadCycles();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  private nextGate(c: DeliveryCycle): GateName | null {
+    return NEXT_GATE_BY_STAGE[c.current_lifecycle_stage as LifecycleStage] ?? null;
+  }
+
+  private nextMilestone(c: DeliveryCycle): CycleMilestoneDate | null {
+    const g = this.nextGate(c);
+    if (!g) return null;
+    return c.milestone_dates?.find(m => m.gate_name === g) ?? null;
+  }
+
+  nextGateLabel(c: DeliveryCycle): string {
+    const g = this.nextGate(c);
+    return g ? GATE_DISPLAY[g] : '—';
+  }
+
+  nextGateTarget(c: DeliveryCycle): string {
+    return this.nextMilestone(c)?.target_date ?? '—';
+  }
+
+  // ── Grouping ──────────────────────────────────────────────────────────────
+
+  get epoGroups(): EpoGroup[] {
+    const today   = new Date().toISOString().slice(0, 10);
+    const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+
+    const byEpo = new Map<string, EpoGroup>();
+
+    for (const c of this.cycles) {
+      if (!c.assigned_epo_user_id) continue;
+      const m = this.nextMilestone(c);
+      if (!m?.target_date || m.actual_date) continue;
+
+      let bucket: 'overdue' | 'upcoming' | null = null;
+      if (m.target_date < today) bucket = 'overdue';
+      else if (m.target_date <= in7Days) bucket = 'upcoming';
+      if (!bucket) continue;
+
+      let group = byEpo.get(c.assigned_epo_user_id);
+      if (!group) {
+        group = {
+          user_id:      c.assigned_epo_user_id,
+          display_name: c.assigned_epo_display_name ?? 'EPO',
+          overdue:      [],
+          upcoming:     []
+        };
+        byEpo.set(c.assigned_epo_user_id, group);
+      }
+      group[bucket].push(c);
+    }
+
+    return Array.from(byEpo.values()).sort((a, b) =>
+      (b.overdue.length + b.upcoming.length) -
+      (a.overdue.length + a.upcoming.length) ||
+      a.display_name.localeCompare(b.display_name)
+    );
+  }
+
+  get overdueTotal(): number {
+    return this.epoGroups.reduce((sum, g) => sum + g.overdue.length, 0);
+  }
+
+  // ── Expansion ─────────────────────────────────────────────────────────────
+
+  toggle(userId: string): void {
+    if (this.expanded.has(userId)) {
+      this.expanded.delete(userId);
+    } else {
+      this.expanded.add(userId);
+    }
+    this.cdr.markForCheck();
+  }
+
+  isExpanded(userId: string): boolean {
+    return this.expanded.has(userId);
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  openCycle(cycleId: string): void {
+    if (this.selectedCycleId === cycleId) return;
+    this.selectedCycleId = cycleId;
+    this.cdr.markForCheck();
+  }
+
+  closePanel(): void {
+    this.selectedCycleId = null;
+    this.showEditScrim   = false;
+    this.cdr.markForCheck();
+  }
+
+  onScrimClick(): void {
+    this.cancelEditSignal++;
+    this.cdr.markForCheck();
+  }
+
+  onEditPanelOpened(): void {
+    this.showEditScrim = true;
+    this.cdr.markForCheck();
+  }
+
+  onEditPanelClosed(): void {
+    this.showEditScrim = false;
+    this.cdr.markForCheck();
   }
 
   drillDown(epoUserId: string): void {
@@ -326,5 +491,6 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
     this.router.navigate(['/initiatives/list'], { queryParams: { new: 'true' } });
   }
 
-  trackByUserId(_: number, b: EpoBucket): string { return b.user_id; }
+  trackByUserId(_: number, g: EpoGroup): string { return g.user_id; }
+  trackByCycleId(_: number, c: DeliveryCycle): string { return c.delivery_cycle_id; }
 }
