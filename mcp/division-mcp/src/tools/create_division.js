@@ -7,18 +7,48 @@
 
 const { supabase } = require('../db');
 
+// Contract 10 §6 B-48 (migration 030): display_name_short is NOT NULL on
+// the divisions table, max 10 chars. When the caller does not supply one,
+// derive a sensible default from the division name. Phil can rename later
+// via update_division.
+const DISPLAY_NAME_SHORT_MAX = 10;
+
+function deriveShortName(divisionName) {
+  return divisionName.trim().slice(0, DISPLAY_NAME_SHORT_MAX).trim();
+}
+
 /**
  * @param {object} params
  * @param {string} params.division_name
+ * @param {string} [params.display_name_short]
  * @param {string} [params.parent_division_id]
  * @param {string} [params.division_type_label]
  * @param {string} caller_user_id - from JWT sub claim
  */
 async function create_division(params, caller_user_id) {
   const { division_name, parent_division_id, division_type_label } = params;
+  let   { display_name_short } = params;
 
   if (!division_name || !division_name.trim()) {
     return { success: false, error: 'division_name is required.' };
+  }
+
+  // Validate / default display_name_short. Migration 030 made it NOT NULL.
+  if (display_name_short !== undefined && display_name_short !== null) {
+    if (typeof display_name_short !== 'string') {
+      return { success: false, error: 'display_name_short must be a string of 10 characters or fewer.' };
+    }
+    display_name_short = display_name_short.trim();
+    if (display_name_short.length === 0) {
+      display_name_short = deriveShortName(division_name);
+    } else if (display_name_short.length > DISPLAY_NAME_SHORT_MAX) {
+      return {
+        success: false,
+        error: `display_name_short must be ${DISPLAY_NAME_SHORT_MAX} characters or fewer.`
+      };
+    }
+  } else {
+    display_name_short = deriveShortName(division_name);
   }
 
   // Verify caller is Admin — Contract 19 (D-394, CC-19-01).
@@ -83,6 +113,7 @@ async function create_division(params, caller_user_id) {
     .from('divisions')
     .insert({
       division_name:       division_name.trim(),
+      display_name_short,
       parent_division_id:  parent_division_id || null,
       division_level,
       division_type_label: division_type_label || null,
