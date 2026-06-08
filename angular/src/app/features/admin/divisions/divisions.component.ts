@@ -199,6 +199,8 @@ const TYPE_LABELS: Record<number, string> = {
             Create {{ levelLabel }}{{ isAtRoot ? '' : ' under "' + currentParentName + '"' }}
           </h4>
           <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
+
+            <!-- Full Name -->
             <div>
               <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
                 {{ levelLabel }} Name *
@@ -214,7 +216,32 @@ const TYPE_LABELS: Record<number, string> = {
                 style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
               >{{ levelLabel }} name is required.</div>
             </div>
-            <div style="margin-top:var(--triarq-space-sm);display:flex;gap:var(--triarq-space-sm);align-items:center;">
+
+            <!-- Short Name (Migration 030 / Contract 10 §6 B-48) -->
+            <div style="margin-top:var(--triarq-space-sm);">
+              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
+                Short Name *
+              </label>
+              <input
+                formControlName="display_name_short"
+                class="oi-input"
+                maxlength="10"
+                placeholder="e.g. Revenue Cy"
+                style="width:100%;max-width:420px;"
+              />
+              <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:2px;">
+                {{ createDisplayNameShortCount }}/10
+              </div>
+              <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:2px;font-style:italic;">
+                10 characters max. Used in grids and filter chips.
+              </div>
+              <div
+                *ngIf="createForm.get('display_name_short')?.invalid && createForm.get('display_name_short')?.touched"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
+              >Short name is required.</div>
+            </div>
+
+            <div style="margin-top:var(--triarq-space-md);display:flex;gap:var(--triarq-space-sm);align-items:center;">
               <!-- D-178 Tier 2: button spinner while creating -->
               <button type="submit" class="oi-btn-primary" [disabled]="createForm.invalid || creating">
                 <ion-spinner *ngIf="creating" name="crescent"
@@ -266,8 +293,20 @@ const TYPE_LABELS: Record<number, string> = {
           onmouseenter="this.style.background='var(--triarq-color-background-subtle)'"
           onmouseleave="this.style.background=''"
         >
-          <div style="font-weight:500;color:var(--triarq-color-text-primary);">
-            {{ div.division_name }}
+          <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);min-width:0;">
+            <div style="font-weight:500;color:var(--triarq-color-text-primary);">
+              {{ div.division_name }}
+            </div>
+            <!-- Short Name chip — applies at every level (Trust, Service Line, Function). -->
+            <span
+              *ngIf="div.display_name_short"
+              class="oi-pill"
+              style="background:rgba(37,112,153,0.08);
+                     color:var(--triarq-color-primary);
+                     font-size:11px;
+                     font-weight:500;"
+              title="Short Name (used in grids and filter chips)"
+            >{{ div.display_name_short }}</span>
           </div>
           <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);">
             <span
@@ -326,7 +365,11 @@ export class DivisionsComponent implements OnInit {
 
   ngOnInit(): void {
     this.createForm = this.fb.group({
-      division_name: ['', [Validators.required, Validators.maxLength(120)]]
+      division_name:      ['', [Validators.required, Validators.maxLength(120)]],
+      // Short Name required at creation per Migration 030 NOT NULL constraint.
+      // Was previously omitted from the form (server fell back to first 10
+      // chars of name); admins asked to set it explicitly.
+      display_name_short: ['', [Validators.required, Validators.maxLength(10)]]
     });
     this.editDivisionForm = this.fb.group({
       division_name:      ['', [Validators.required, Validators.maxLength(120)]],
@@ -469,6 +512,7 @@ export class DivisionsComponent implements OnInit {
 
     const params: Record<string, unknown> = {
       division_name:       this.createForm.value.division_name as string,
+      display_name_short:  (this.createForm.value.display_name_short as string).trim(),
       parent_division_id:  this.currentParentId,
       // Auto-set type label from level — no manual selection needed (D-L2/L3 interim).
       division_type_label: TYPE_LABELS[this.currentLevel] ?? ''
@@ -551,9 +595,14 @@ export class DivisionsComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
-  /** B-63 helper: char count for "N/10" counter. */
+  /** B-63 helper: char count for "N/10" counter on the Edit form. */
   get displayNameShortCount(): number {
     return ((this.editDivisionForm?.get('display_name_short')?.value as string) ?? '').length;
+  }
+
+  /** Same counter for the Create form. */
+  get createDisplayNameShortCount(): number {
+    return ((this.createForm?.get('display_name_short')?.value as string) ?? '').length;
   }
 
   submitEditDivision(): void {
