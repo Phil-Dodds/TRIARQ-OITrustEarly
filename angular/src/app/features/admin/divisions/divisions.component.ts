@@ -484,16 +484,27 @@ export class DivisionsComponent implements OnInit {
             this.createForm.reset();
             this.loadDivisions(this.currentParentId);
           } else {
-            // B-80: never expose MCP field names or raw tool errors in the UI.
+            // D-140: surface the server message — it carries the unblock
+            // path ("Contact your System Admin to request access"). B-80
+            // was previously read as "swallow every server error"; the
+            // server errors here are written D-140-compliant for direct
+            // display. Generic fallback only when res.error is empty.
             console.warn('[divisions] create_division failed:', res.error);
-            this.createError = 'Unable to save changes. Please try again.';
+            this.createError = res.error?.trim()
+              ? res.error
+              : 'Unable to save changes. Please try again.';
           }
           this.creating = false;
           this.cdr.markForCheck();
         },
         error: (err: { error?: string }) => {
           console.warn('[divisions] create_division HTTP error:', err);
-          this.createError = 'Unable to save changes. Please try again.';
+          // Network / non-2xx — fall back to generic. The McpService
+          // catchError pipeline already produces a D-140-shaped string
+          // when the server responded with one.
+          this.createError = err?.error?.trim()
+            ? err.error
+            : 'Unable to save changes. Please try again.';
           this.creating    = false;
           this.cdr.markForCheck();
         }
@@ -576,16 +587,21 @@ export class DivisionsComponent implements OnInit {
             this.editAttempted = false;
             this.editDivisionForm.reset();
           } else {
-            // B-80: never expose MCP field names or raw tool errors in the UI.
+            // D-140: surface the server message when present (server errors
+            // are written D-140-compliant). Generic fallback only when empty.
             console.warn('[divisions] update_division failed:', res.error);
-            this.editDivisionError = 'Unable to save changes. Please try again.';
+            this.editDivisionError = res.error?.trim()
+              ? res.error
+              : 'Unable to save changes. Please try again.';
           }
           this.savingDivision = false;
           this.cdr.markForCheck();
         },
         error: (err: { error?: string }) => {
           console.warn('[divisions] update_division HTTP error:', err);
-          this.editDivisionError = 'Unable to save changes. Please try again.';
+          this.editDivisionError = err?.error?.trim()
+            ? err.error
+            : 'Unable to save changes. Please try again.';
           this.savingDivision    = false;
           this.cdr.markForCheck();
         }
