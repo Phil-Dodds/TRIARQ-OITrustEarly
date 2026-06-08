@@ -22,9 +22,11 @@ async function create_division(params, caller_user_id) {
   }
 
   // Verify caller is Admin — Contract 19 (D-394, CC-19-01).
+  // is_super_admin (CC-19-06 option B) bypasses the parent-membership check
+  // below — super-admins administer the entire system, not a downward slice.
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('id, is_admin, is_active')
+    .select('id, is_admin, is_active, is_super_admin')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -57,13 +59,21 @@ async function create_division(params, caller_user_id) {
       return { success: false, error: 'parent_division_id not found or has been deleted.' };
     }
 
-    // Verify caller has admin access to the parent Division (downward-only model)
-    const hasAccess = await callerHasDivisionAccess(caller_user_id, parent_division_id);
-    if (!hasAccess) {
-      return {
-        success: false,
-        error: 'You do not have admin access to the parent Division. You can only create child Divisions within Divisions you administer.'
-      };
+    // Downward-only model: a regular Admin can only create children inside
+    // branches they administer (direct membership in the parent). Super-admin
+    // bypasses this — CC-19-06 option B: super-admin holds system-wide
+    // authority. Without this bypass, even a freshly seeded super-admin can't
+    // build out the initial hierarchy because no membership rows exist yet.
+    if (caller.is_super_admin !== true) {
+      const hasAccess = await callerHasDivisionAccess(caller_user_id, parent_division_id);
+      if (!hasAccess) {
+        return {
+          success: false,
+          error: 'You do not have admin access to the parent Division. ' +
+                 'You can only create child Divisions within Divisions you administer. ' +
+                 'Ask a Super-Admin to create it, or have an Admin add you as a member of the parent Division first.'
+        };
+      }
     }
 
     division_level = parent.division_level + 1;
