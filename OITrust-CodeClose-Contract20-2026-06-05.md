@@ -1,5 +1,6 @@
-# OITrust CodeClose — Contract 20 (Units 1–7 + Polish Pass)
-Date: 2026-06-05 | Build C | Sessions 1 + 2 + 3 (combined CodeClose)
+# OITrust CodeClose — Contract 20 (Units 1–7 + Polish + UAT-Driven Followups)
+Date: 2026-06-05 | Build C | Sessions 1 + 2 + 3 + 4 (combined CodeClose)
+Last session HEAD at close: **b553d6c**
 
 ---
 
@@ -28,8 +29,30 @@ All four new views ship as MVP — see CC-20-05 for spec deltas.
 - Item 4 — "Show all EPOs" toggle on EPO Summary view (D-397 §5.2)
 - Item 5 — Async hub headlines for the three new EPO cards (D-396 / spec §4)
 
-Three CC-20-05 deferrals remain — slide-in filter panel, expanded EPO row
-with embedded grid, role-aware EPO filter default.
+**Session 4 — UAT-driven follow-ups:**
+- EPO row expansion across all three EPO views (closes the largest CC-20-05
+  deferral). Click-to-expand with chevron, multi-expand, embedded Initiative
+  grid per zone/quarter/section, right-panel detail per D-308 / S-018.
+- `create_division` super-admin bypass — Phil couldn't create Service Lines
+  because the parent-membership check ignored `is_super_admin`.
+- `divisions.component.ts` D-140 vs B-80 fix — surface server messages
+  instead of swallowing them. The swallowed message had hidden the real
+  cause of today's `create_division` bug for ~30 minutes.
+- `create_division` `display_name_short` default + Create-form Short Name
+  field + list-row Short Name chip. Migration 030 NOT NULL constraint
+  had been violated by the tool ever since the migration shipped.
+- CC-20-10 stopgap: rename `create_user` HTTP path to `submit_member_invite`
+  to bypass Cloudflare's Bot Management / WAF block on POSTs to
+  account-creation-shaped routes.
+- Contract 20 CC-20-08: EPO Gate Schedule hub headline scope corrected
+  (counts now match the screen — EPO-assigned only).
+- CC-20-09 operational cache-busting: `<meta http-equiv="Cache-Control">`
+  on index.html + `version.json` + VersionCheckService + sticky "Update
+  available" banner. Designed for static-hosting deploys.
+- Sidebar stage check: Contact an Admin advanced `uat → pilot` (S-020).
+
+After Session 4 only two of the original six CC-20-05 deferrals remain:
+slide-in filter panel + role-aware EPO filter default.
 
 ---
 
@@ -91,6 +114,28 @@ Sequence complete: CC-20-01, CC-20-02, CC-20-03, CC-20-04, CC-20-05, CC-20-06, C
 - `angular/src/app/features/delivery/workstream-summary/workstream-summary.component.ts` — subtitle "EPO Summary view" → `routerLink` to `/initiatives/epo-summary`
 - `angular/src/app/features/delivery/epo-summary/epo-summary.component.ts` — add `Show all EPOs` toggle that lazy-loads `get_epo_wip_limits` and merges zero-Initiative EPOs into the row set (D-397 §5.2)
 - `angular/src/app/features/delivery/hub/delivery-hub.component.ts` — add async headline strips for the three new EPO cards (D-396 / spec §4); single `getDeliverySummary` call on mount; skeleton during load; tone-driven color (green / amber / red)
+
+### New — Session 4
+- `angular/scripts/write-version.js` — postbuild script writing `dist/.../browser/version.json` with current git SHA (CC-20-09)
+- `angular/src/app/core/services/version-check.service.ts` — polls `version.json` on boot + every 5 minutes + on `NavigationEnd`; exposes `updateAvailable$` (CC-20-09)
+
+### Modified (logic-touching) — Session 4
+- `mcp/division-mcp/src/index.js` — register `submit_member_invite` mapped to `create_user` (CC-20-10 Cloudflare workaround); `create_user` legacy path retired from tool registry
+- `mcp/division-mcp/src/tools/create_division.js` — super-admin bypass on parent-membership check + accept optional `display_name_short` + first-10-char fallback when omitted
+- `mcp/delivery-cycle-mcp/src/tools/get_delivery_summary.js` — `epo_summaries` rows gain `overdue_count` + `upcoming_count` (CC-20-08)
+- `mcp/delivery-cycle-mcp/tests/tools.test.js` — shape-contract test for the new `epo_summaries` fields
+- `angular/src/app/features/delivery/epo-summary/epo-summary.component.ts` — full rewrite to mirror Workstream Deploy Schedule pattern: cycle data sourced from `listCycles` + `getEpoWipLimits` join, expansion with three zone sections + embedded Initiative grid, right-panel detail per D-308 / S-018, `includeEposWithNoWip` toggle preserved
+- `angular/src/app/features/delivery/epo-schedule/epo-schedule.component.ts` — same expansion pattern; two sections (Overdue red header, Upcoming default), embedded grid per section, right-panel detail
+- `angular/src/app/features/delivery/epo-deploy/epo-deploy.component.ts` — same expansion pattern; three quarter sections (Prior, Current, Other) with prior-quarter-miss detection mirroring `deploy-schedule.component.ts` (D-PilotSchedule-2026-04-06)
+- `angular/src/app/features/delivery/hub/delivery-hub.component.ts` — EPO Gate Schedule headline now sums from `epo_summaries[]` rather than `gate_summaries[]` (CC-20-08 scope correction)
+- `angular/src/app/features/delivery/dashboard/delivery-cycle-dashboard.component.ts` — accept `?epo=` query param for EPO drill-down filter pre-population (Session 2; recorded here for completeness)
+- `angular/src/index.html` — Cache-Control / Pragma / Expires meta tags (CC-20-09 belt-and-suspenders against stale-HTML cache)
+- `angular/src/app/app.component.ts` — render sticky Vital-Blue "A new version of Pathways is available. Reload." banner driven by `VersionCheckService.updateAvailable$`; calls `init()` on bootstrap
+- `angular/src/app/features/admin/users/users.component.ts` — MCP call site updated from `'create_user'` to `'submit_member_invite'` (CC-20-10)
+- `angular/src/app/features/admin/divisions/divisions.component.ts` — Create form gains Short Name field with N/10 counter + validation; list-row Short Name chip; both error paths now surface server `res.error` when D-140-shaped (drops the previous B-80 blanket swallow)
+- `angular/src/app/core/types/database.ts` — `EpoSummaryItem` gains `overdue_count` + `upcoming_count` (CC-20-08)
+- `angular/src/app/shared/components/sidebar/sidebar.component.ts` — Contact an Admin `devStatus: 'uat' → 'pilot'` (S-020)
+- `angular/package.json` — `build` + `build:prod` chain to `node scripts/write-version.js` (CC-20-09)
 
 ---
 
@@ -292,9 +337,44 @@ Run after MCP + Angular deploy. Binary pass/fail. Run as Phil (Admin + Super-Adm
 52. Open `/initiatives`. **Pass:** the three EPO cards (positions 2, 3, 4) each show a short skeleton-line immediately under the title. **Fail:** no skeleton.
 53. Within ~1s, each card's skeleton replaces with a headline string and tone color (green / amber / red). **Pass:**
     - **EPO Summary** card → "N EPOs · No WIP alerts" (green) or "N EPOs · X with active WIP alerts" (amber)
-    - **EPO Gate Schedule** card → "No overdue gates · Y due in 7 days" (green) or "X overdue · Y due in 7 days" (red)
+    - **EPO Gate Schedule** card → "No overdue gates · Y due in 7 days" (green) or "X overdue · Y due in 7 days" (red). EPO-scoped (only EPO-assigned cycles count) after CC-20-08.
     - **EPO Deploy by Quarter** card → "N EPOs · Deploy cadence loaded" (green) — per CC-20-06, full spec wording deferred
 54. Click any of the three cards — navigation succeeds, headline state is irrelevant to the click target. **Pass.** **Fail:** card unclickable while headline loads.
+
+### Surface 13 — Divisions admin Short Name + D-140 — Session 4
+
+55. Open `/admin/divisions`. **Pass:** each Trust row shows a Vital-Blue Short Name chip to the right of the full name. Legacy rows with no `display_name_short` show no chip. **Fail:** no chip, or chip shown for null rows.
+56. Drill into a Trust → list of Service Lines. **Pass:** Service Line rows also show Short Name chips. Same at the Function level (3rd level down). **Fail:** chip missing at the Service Line / Function level.
+57. Click "+ New Service Line" under any Trust. **Pass:** Create form has TWO required fields: Service Line Name + Short Name. Short Name has a `N/10` counter and italic hint. **Fail:** missing field, no counter, or no hint.
+58. Submit with Short Name empty → Save button disabled (Validators.required keeps `createForm.invalid` true). **Pass.** **Fail:** Save enabled with empty Short Name.
+59. Submit with valid name + short name → success. New row appears in the list with both name and Short Name chip. **Fail:** save fails or chip missing on new row.
+60. Force a server error (e.g. as a regular admin who is not a member of the parent Trust, try to Create under it). **Pass:** the form surfaces the actual server message including the "Ask a Super-Admin to create it, or have an Admin add you as a member of the parent Division first." text. **Fail:** generic "Unable to save changes. Please try again." (regression of CC-20-10's sibling D-140 fix).
+
+### Surface 14 — EPO row expansion across three views — Session 4
+
+61. Open `/initiatives/epo-deploy`. **Pass:** each EPO row has a chevron on the left, the EPO name in the middle (Primary-color, underlines on hover), and the Prior/Current/Other count summary on the right.
+62. Click the EPO row body (not the name) → row expands in place, chevron rotates to ▼. Three quarter sections appear (Prior Quarter, Current Quarter, Other Active) each with header + Initiative grid. Initiatives whose Go to Deploy is in the relevant quarter appear in the grid; status dot shows pilot-status color. **Fail:** does not expand, sections missing, or grid empty when Initiatives exist in scope.
+63. Expand a second EPO. **Pass:** both rows stay expanded (multi-expand, no accordion). **Fail:** first collapses.
+64. Click an Initiative row inside the expanded section. **Pass:** right-panel detail (`DeliveryCycleDetailComponent`) opens at 60% width; the EPO list shrinks to 40% but keeps both EPOs expanded. **Fail:** navigates away or collapses.
+65. Close the detail panel. **Pass:** list returns to 100% width, expansion state preserved. **Fail:** state lost.
+66. Repeat 61-65 on `/initiatives/epo-summary`. Three zone sections (Pre-Build, Build, Post-Deploy). Amber section header when that zone is at or over the EPO's configured WIP limit. **Fail:** sections wrong, no amber header on over-limit zones.
+67. Repeat 61-65 on `/initiatives/epo-schedule`. Two sections (Overdue with red header, Upcoming with default header). **Fail:** missing red header, missing 7-day window filter.
+68. Click the EPO NAME (not the row body) on any of the three views. **Pass:** navigates to `/initiatives/list?epo=<user_id>` with the EPO filter chip pre-applied. Row expansion is not triggered (stopPropagation). **Fail:** triggers expansion or wrong navigation.
+
+### Surface 15 — Cloudflare workaround on user invitation — Session 4 (CC-20-10)
+
+69. As Admin, open `/admin/users` and invite a new user with a fresh email. **Pass:** request goes to `https://division-mcp.onrender.com/tools/submit_member_invite` (not `/tools/create_user`); 200 response; user appears in the list with "Invited — awaiting code entry" status. **Fail:** 403 Forbidden or "Unable to reach the server."
+70. With Network tab open, confirm the request URL contains `submit_member_invite`. **Pass.** **Fail:** still calling `create_user`.
+
+### Surface 16 — Cache-busting + version banner — Session 4 (CC-20-09)
+
+71. Open the app. With DevTools Network tab open, look for a request to `version.json`. **Pass:** GET with `cache: no-store` succeeds; payload includes `build_version` (git SHA) + `built_at`. **Fail:** 404 (version.json missing from deploy) or no request at all.
+72. View `index.html` source. **Pass:** `<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">` plus Pragma + Expires meta tags present. **Fail:** missing.
+73. After a fresh deploy (next time you push gh-pages), wait up to 5 minutes with the app open. **Pass:** sticky Vital-Blue banner appears at the top of viewport with text "A new version of Pathways is available." and a Reload button. Click Reload → page refreshes with the new bundle. **Fail:** banner does not appear, or appears but Reload does not refresh.
+
+### Surface 17 — Sidebar stage check — Session 4
+
+74. Open the sidebar. **Pass:** "Contact an Admin" annotation reads `** Pilot` (light blue) instead of `** UAT` (amber). **Fail:** still UAT.
 
 ---
 
@@ -313,6 +393,20 @@ Per Rule 16:
 ---
 
 ## Stage Check (S-020)
+
+**Sidebar advance shipped this session (b553d6c):**
+- **Contact an Admin: `uat → pilot`** — Phil signed off in UAT. devStatus chip in the sidebar reads `** Pilot` (light blue).
+
+**Stage-check candidates not yet advanced:**
+
+| Feature | Current | Suggested next | Why not advanced today |
+|---|---|---|---|
+| Home | uat | pilot | No explicit Phil UAT sign-off recorded |
+| Initiative Tracking | uat | pilot | Many sub-surfaces; recommend full UAT pass first |
+| Admin | uat | pilot | New EPO WIP Limits + Divisions + Users — sweep UAT first |
+
+**Original stage check (kept for history):**
+
 
 | Feature | Current devStatus | Suggested advance | Reason |
 |---|---|---|---|
@@ -347,17 +441,61 @@ Per memory rule (always state full Windows path at session close):
 
 ---
 
-## Follow-On Contract — Remaining CC-20-05 Deferrals
+## Pending Items at Session Close
 
-After Session 3, three items still remain. Priority order:
+Phil's instruction: "document all these as pending and session close."
+The following items are open. Code session is closing here — these
+are inputs for the next Code session, Design Session, or Phil
+deployment activity, as labelled.
 
-1. **Slide-in filter panel for all three EPO views** — Division, EPO picker, Lifecycle Stage, Tier, Gate Status. Use existing dashboard's filter panel as the source pattern. Active filter chips bar. **(Biggest user value.)**
-2. **Role-aware EPO filter default** — `is_epo = true` users default to self on first load when no stored screen state in 7 days. Depends on (1).
-3. **Expanded EPO row content** — spec §5.3 (three zone sections per EPO with embedded Initiative grid), spec §6.3 (full grid below the two sections grouped by EPO), spec §7.3 (three quarter sections with embedded grid). **(Biggest implementation lift.)**
+### CODE — could ship in a follow-on contract
 
-Plus the standalone:
-- **CC-20-06 recovery** — extend `get_delivery_summary.epo_summaries` rows with `prior_quarter_miss_count` and update the EPO Deploy headline to "N EPOs · X with prior-quarter misses" per spec §4.
+| Item | Owner | Source | Effort | Notes |
+|---|---|---|---|---|
+| Slide-in filter panel on all three EPO views | Code | CC-20-05 (deferral remaining) | ~2 hrs | Division / EPO picker / Lifecycle Stage / Tier / Gate Status. Pattern: existing dashboard filter panel. Active-filter chip bar. **Largest remaining lift.** |
+| Role-aware EPO filter default | Code | CC-20-05 (deferral remaining) | ~30 min | `is_epo = true` users default the EPO filter to self on first load (no stored state within 7 days). Depends on the slide-in filter panel above. |
+| CC-20-06 recovery — "prior-quarter misses" headline | Code | CC-20-06 | ~45 min | Extend `get_delivery_summary.epo_summaries` with `prior_quarter_miss_count`. Update hub `buildHeadlines` for the EPO Deploy card: "N EPOs · X with prior-quarter misses" (amber) or "N EPOs · On track" (green). Requires Render redeploy. |
+| Duplicate-email UX enhancements | Code | Discussed today (Phil did not pick) | A=30m / B=1hr / C=30m | A: surface existing user's display name + status in the error. B: orphaned-auth auto-recovery when `auth.users` exists but `public.users` doesn't. C: "Suggest: edit existing user [link]" affordance on the form. |
+| Add `'live'` to `DevStatus` type + label + color | Code | Today (sidebar stage check) | 2 min when needed | Currently the type is `'new' \| 'uat' \| 'pilot' \| 'not-started'`. Add `'live'` + `'** Live'` label + a green color rule before the first feature advances past pilot. |
+| Backfill `display_name_short` for legacy Trust rows | Code (migration) | Today | 5 min | Existing Trusts created before Migration 030 carry `display_name_short = null`. One-line migration: `UPDATE divisions SET display_name_short = LEFT(division_name, 10) WHERE display_name_short IS NULL;` |
+| Preemptive Cloudflare-path rename sweep | Code | CC-20-10 risk pattern | ~20 min | Other `create_*` MCP routes (`create_delivery_workstream`, `create_delivery_cycle`, `create_division`) are likely candidates for the same Cloudflare WAF block once admins start using them. Rename to neutral paths (`add_delivery_workstream`, `submit_initiative`, etc.) before the next block lands. |
 
-Each item ships as a small contract; no D-number changes required since the
-deferrals trace to D-396 / D-397 / D-398 / D-399 (already built per
-impl_status with the CC-20-05 partial-coverage note).
+### DESIGN — decisions Code cannot make
+
+| Item | Source | Why it matters |
+|---|---|---|
+| **Off-Render-free-tier path** | CC-20-10 | Stopgap rename works for today but Cloudflare will flag the next pattern it doesn't like. Options: paid Render tier, custom subdomain pointed at Render, move to GCP Cloud Run or Fly.io. Should decide before port time. |
+| **CC-20-09 cache-busting as Active Standard** | CC-20-09 CC FOR DESIGN | Should the `version.json + banner` pattern be formalized as a standing rule for every TRIARQ Angular app on static hosting? Cheap and reusable. |
+| **D-number assignments** for CC-20-01 through CC-20-10 | Process | Code does not assign D-numbers (D-317). Design Session decides which (if any) become locked D-decisions versus stay as CC-history in this CodeClose. |
+| **impl_status advances** in `decisions-active.md` | S-027 | D-396 / D-397 / D-398 / D-399 / D-400 / D-401 → `built` with partial-coverage note per CC-20-05. |
+| **B-80 wording across the wider system** | Today's diagnosis | The "swallow every server error" reading of B-80 had been hiding real D-140-compliant messages. Should B-80 be rewritten to scope to technical errors only? |
+| **Service Line / Function naming finalization** | Pre-existing (`divisions.component.ts` comment cites "interim pending Mike confirmation of D-L2/L3") | Display labels and DB type_labels are interim. |
+
+### PHIL — operational
+
+| Item | Effort | Notes |
+|---|---|---|
+| **Run UAT checklist** (74 steps, Surfaces 1–17) | ~30 min focused | Phil has tested piecemeal today. No comprehensive sign-off recorded. |
+| **Final CodeClose hand-off** to Design | Read + ship | This file (`OITrust-CodeClose-Contract20-2026-06-05.md`) is current through commit `b553d6c`. Hand to Design Session along with the master HEAD ref. |
+| **Validator-Close zip** for next Code session | Standard zip-up | When a new spec is ready, drop into Downloads as `OITrust-ValidatorClose-YYYY-MM-DD-for-ClaudeCode.zip`. Same intake pattern as this session. |
+| **Render paid-tier decision** | $$ + admin time | See Design item above. If/when paid, can re-enable `create_user` path name and drop the `submit_member_invite` rename. |
+
+### COMPLETED in Contract 20 — for reference
+
+- Units 1–7 per spec
+- All six CC-20-05 deferrals: 4 of 6 shipped (Items 4 / 5 / 6 in Session 3 polish, Item 3 expansion in Session 4); 2 remain (filter panel + role-aware default)
+- Operational fixes that emerged in UAT: super-admin bypass, error-surfacing, display_name_short, Cloudflare workaround, cache-busting, EPO Gate Schedule scope correction
+- Toggle rename (CC-20-07: Include EPOs with no WIP)
+- Contact an Admin → pilot (S-020 stage check)
+
+---
+
+## Session Close Status
+
+**Master HEAD:** `b553d6c`
+**gh-pages HEAD:** `61c82b8`
+**Render division-mcp:** auto-deploying from `b553d6c` (Angular-only changes since last MCP touch at `3a69fb5`; redeploy will pick up Cloudflare workaround + super-admin bypass + display_name_short fallback)
+**Render delivery-cycle-mcp:** last MCP source change at `dd29148` (CC-20-08 epo_summaries shape)
+**Supabase:** migration 035 applied; no further migrations this session
+**Session output file (this document):**
+`C:\Users\PhilipDodds\OneDrive - Triarq Health\Desktop\OI Trust Project Keepsakes\OI TRUST Early Builds\OITrust-CodeClose-Contract20-2026-06-05.md`
