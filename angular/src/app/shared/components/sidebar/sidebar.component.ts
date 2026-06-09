@@ -29,7 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started' },
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'uat'         },
   { label: 'Chat',                 route: '/chat',           devStatus: 'not-started' },
-  { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'uat'         },
+  { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'pilot'       },
   { label: 'Admin',                route: '/admin',          requiresFlag: 'is_admin', devStatus: 'uat' },
 ];
 
