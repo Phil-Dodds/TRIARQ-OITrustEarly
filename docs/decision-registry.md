@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.28 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.43 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-372**
+**Next available: D-415**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -274,6 +274,48 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-369 | Multi-User System-Level Admin Model | Claude Chat | 2026-05-09 | Active |
 | D-370 | user_screen_state Table Build Assignment | Claude Chat | 2026-05-09 | Active |
 | D-371 | CSS Budget Warnings: Quality Discipline Not Ceiling Raise | Claude Chat | 2026-05-09 | Active |
+| D-372 | Rule 29 Amendment: Deployment Confirmation Before UAT Readiness | Claude Chat | 2026-05-09 | Active |
+| D-373 | Code Session Autonomous Decision Threshold | Claude Chat | 2026-05-15 | Active |
+| D-374 | Rule 31: Worktree Branch Sanity Check at Session Open | Claude Chat | 2026-05-16 | Active |
+| D-375 | Rule 32: Single-Value Spec Source Check — Deferred (Design-side fix; see deferred-items.md) | Claude Chat | 2026-05-16 | Deferred |
+| D-377 | Rule 34: Schema-First SQL Authoring | Claude Chat | 2026-05-16 | Active |
+| D-378 | Validator Section-H Physical Enumeration | Claude Chat | 2026-05-16 | Active |
+| D-379 | CLAUDE.src.md Not a Code Target | Claude Chat | 2026-05-16 | Active |
+| D-380 | Arch-1 Exception Ruling: user_screen_state Unauthorized; Option B — Build Screen-State MCP Tool | Claude Chat | 2026-05-16 | Active |
+| D-381 | Arch-1 Violations Are Rule 2 Flag-and-Stop — Rule 30 Does Not Apply to Security Boundaries | Claude Chat | 2026-05-16 | Active |
+| D-382 | RLS Policy Audit — Confirm Anon-Key Denial on All Tables Except Authorized Exceptions | Claude Chat | 2026-05-16 | Active |
+| D-383 | CMOS Bootstrap Review: CP Process Adopted | LOCKED | 2026-05-20 |
+| D-384 | Validator Standing Exceptions Migrated to project-briefing.md | LOCKED | 2026-05-20 |
+| D-385 | scenarios.md Activation Deferred to MSOF Consultation | LOCKED | 2026-05-20 |
+| D-386 | cmos-standards.md Not Adopted Into OITrust Canonical Set | LOCKED | 2026-05-20 |
+| D-387 | Bootstrap SESSION ACTIVE RULES Not Adopted | LOCKED | 2026-05-20 |
+| D-388 | companion/ Subfolder for Non-Canonical Session Files | LOCKED | 2026-05-21 | Governance | companion/ subfolder added to for-DesignSession.zip delivery chain; Document Author places non-canonical session files there; Validator passes through unchanged |
+| D-389 | Role Label Rename: DS → Domain Capability Strategist (DCS) | LOCKED | 2026-06-02 | Design | DS retired; DCS is replacement; assigned_ds_user_id → assigned_dcs_user_id; system_role 'ds' → 'dcs'; same contract as D-390/391/393 |
+| D-390 | Role Label Rename: CB → Engineering Product Owner (EPO) | LOCKED | 2026-06-02 | Design | CB retired; EPO is replacement; assigned_cb_user_id → assigned_epo_user_id; system_role 'cb' → 'epo'; same contract as D-389/391/393 |
+| D-391 | New Role and Initiative Field: Domain Outcome Lead (DOL) | LOCKED | 2026-06-02 | Design | New first-class role parallel to DCS; assigned_dol_user_id on delivery_cycles; Brief Review gate pre-check; CE has no per-Initiative field |
+| D-392 | Entity Rename: Delivery Cycle → Initiative | LOCKED | 2026-06-02 | Design | Display + routes renamed; /delivery/* → /initiatives/*; DB table delivery_cycles retained |
+| D-393 | DB Column Rename Policy and Path B Centralization | LOCKED | 2026-06-02 | Design | Columns renamed same contract; Path B: core/constants/roles.ts central module first; stale terms "Delivery Specialist" and "Coach" retired |
+| D-394 | Boolean Role Flags Replace system_role Column | 2026-06-04 | specced |
+| D-395 | User Division Membership Model | 2026-06-04 | specced |
+| D-396 | Initiatives Hub Landing Page — Seven Cards | LOCKED | 2026-06-04 | Spec | Hub expands to 7 cards; EPO views (2–4) precede Workstream views (5–7); amends D-DeliveryHub-FourViews |
+| D-397 | EPO Summary View | LOCKED | 2026-06-04 | Spec | EPO-organized WIP zone view; parallel to Workstream Summary; role-aware EPO filter default |
+| D-398 | EPO Gate Schedule View | LOCKED | 2026-06-04 | Spec | EPO-organized gate urgency view; parallel to Gate Schedule; role-aware EPO filter default |
+| D-399 | EPO Deploy Gate by Quarter View | LOCKED | 2026-06-04 | Spec | EPO-organized deploy cadence view; parallel to Deploy Gate by Quarter; role-aware EPO filter default |
+| D-400 | EPO WIP Limit Model | LOCKED | 2026-06-04 | Spec | Supersedes D-WIPLimit-2026-04-06; WIP limits per EPO not per Workstream; epo_wip_limits table; default 3/3/3 |
+| D-401 | EPO WIP Limits Admin Screen | LOCKED | 2026-06-04 | Spec | /admin/epo-wip; inline edit; amends D-311 to 4 Admin hub cards; update_epo_wip_limits MCP tool |
+| D-402 | Session Close Spec Routing Check | LOCKED | 2026-06-04 | Governance | Every specced decision must have Section F build-c-spec.md instruction or Section H doc before packaging |
+| D-403 | Retro Before Zip | LOCKED | 2026-06-04 | Governance | Packaging is final act of close; zip not produced until retro complete and all proposals dispositioned |
+| D-404 | Rule 29: Focus and Scope Drift | LOCKED | 2026-06-08 | project-instructions.md |
+| D-405 | Rule 30: Stall Detection | LOCKED | 2026-06-08 | project-instructions.md |
+| D-406 | Rule 31: Session Length Warning | LOCKED | 2026-06-08 | project-instructions.md |
+| D-407 | Rule 32: Proactive Coaching | LOCKED | 2026-06-08 | project-instructions.md |
+| D-408 | Session Close Self-Review Step | LOCKED | 2026-06-08 | project-instructions.md |
+| D-409 | Non-Canonical DA Inputs Must Travel in the For-DocumentAuthor Zip | LOCKED | 2026-06-08b | project-instructions.md |
+| D-410 | User Management Standard Grid+Filter+View+Edit Pattern | LOCKED | 2026-06-09 | Spec | Admin Users screen adopts standard grid+filter+right-panel; role tab strip removed; Assign Divisions and Resend in panel only |
+| D-411 | User Management Division Display | LOCKED | 2026-06-09 | Spec | Division display stays in sub-line position under name; 0="No Division"/1-2=names/3+="N Divisions" |
+| D-412 | Outlook Paste-Parse on New User Form | LOCKED | 2026-06-09 | Spec | Email field parses Outlook-format paste; auto-fills Name; hint text below field |
+| D-413 | Division Management Tree Grid Pattern | LOCKED | 2026-06-09 | Spec | Single tree grid replacing drill-in; three indent levels; active_status column; amber band on inactive rows |
+| D-414 | Division Management Right Panel: Member Management, Name Edit, Deactivation | LOCKED | 2026-06-09 | Spec | Members add/remove in View panel; Name edit in Edit panel; soft-block deactivation per S-032 |
 
 ---
 
@@ -298,6 +340,7 @@ D-141 through D-142: Pre-existing decisions not yet entered in this registry.
 D-145 through D-147: Pre-existing decisions not yet entered in this registry.
 D-149 through D-150: Pre-existing decisions not yet entered in this registry.
 D-152 through D-153: Pre-existing decisions not yet entered in this registry.
+D-376: Not assigned — Rule 33 absorbed into Rule 31 (D-374). 2026-05-16.
 D-156 through D-162: Pre-existing or open decisions not yet entered in this registry.
 
 D-163 through D-169: Numbers occupied in decisions-active.md by pre-existing decisions. Registry rows corrected 2026-04-14 to reflect decisions-active content. Prior registry entries for these numbers (Workflow Entry Point Completeness, Admin Hub Consolidation, Workstream optional, Division filter, Workstream filter, Claude Code debate, source tagging) are now registered as D-310 through D-315 and D-201.

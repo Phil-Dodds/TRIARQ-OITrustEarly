@@ -39,7 +39,7 @@ async function get_user_divisions(params, caller_user_id) {
   if (user.is_admin === true) {
     const { data: allDivisions, error: allErr } = await supabase
       .from('divisions')
-      .select('id, division_name, division_level, parent_division_id, division_type_label')
+      .select('id, division_name, division_level, parent_division_id, division_type_label, active_status')
       .is('deleted_at', null)
       .order('division_level')
       .order('division_name');
@@ -94,7 +94,7 @@ async function get_user_divisions(params, caller_user_id) {
   // Fetch details for directly assigned Divisions
   const { data: directDivisions, error: directErr } = await supabase
     .from('divisions')
-    .select('id, division_name, division_level, parent_division_id, division_type_label')
+    .select('id, division_name, division_level, parent_division_id, division_type_label, active_status')
     .in('id', directIds)
     .is('deleted_at', null);
 
@@ -110,7 +110,7 @@ async function get_user_divisions(params, caller_user_id) {
 
   const { data: allDivisions, error: allErr } = await supabase
     .from('divisions')
-    .select('id, division_name, division_level, parent_division_id, division_type_label')
+    .select('id, division_name, division_level, parent_division_id, division_type_label, active_status')
     .in('id', allIds)
     .is('deleted_at', null)
     .order('division_level')

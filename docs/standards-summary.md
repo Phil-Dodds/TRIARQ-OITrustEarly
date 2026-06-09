@@ -1,5 +1,7 @@
+
+
 # Standards Summary — Pathways OI Trust
-docs/standards-summary.md | v1.6 | May 2026 | CONFIDENTIAL
+docs/standards-summary.md | v1.7 | June 2026 | CONFIDENTIAL
 
 Read this file at every session start. Active Standards carry the same force as
 Non-Negotiable Architectural Rules. A spec element that conflicts with an Active
@@ -689,3 +691,28 @@ are explicitly async. No other exceptions without a locked design decision.
 **CodeClose-applicable:** Yes.
 
 **Governing decisions:** D-371 (CSS Budget Warnings: Quality Discipline Not Ceiling Raise)
+
+---
+
+### S-032 — Entity Deactivation as Soft Block on New Work
+
+**Rule:** When an entity supports Active/Inactive state with soft-block semantics: (1) New dependent entities cannot reference a deactivated entity — pickers exclude inactive entities, not selectable even when revealed. (2) Existing entities referencing a deactivated entity continue normally — no retroactive disruption. Administrative actions on the entity itself (including removal of members) remain permitted. Reactivation always permitted, no confirmation required. (3) Visual: inactive grid row carries amber warning band (D-200 Pattern 2) with consequence statement. Active Status column/pill on grid and panel. (4) Deactivation confirmation (D-183): "Deactivate [Entity Name]? [Consequence.] Existing [dependent entities] are unaffected." (5) Schema: `active_status boolean NOT NULL DEFAULT true`. Migration required on existing tables. Distinguished from Workstream inactivation (ARCH-23) which blocks gate advancement.
+
+**Conformance test:** Does any new dependent entity reference an inactive entity in pickers? (No = pass.) Does deactivation use D-183 two-step with consequence statement? (Yes = pass.) Does inactive entity row show amber warning band per D-200 Pattern 2? (Yes = pass.) Is `active_status` column present on any entity governed by this standard? (Yes = pass.) Any failure = violation.
+
+**Exceptions:** Reactivation requires no confirmation. Administrative removal operations (e.g., `remove_user_from_division`) permitted on inactive entities.
+
+**CodeClose-applicable:** Yes — declare S-032 conformance in the CodeClose Verification Pass (Rule 29) for any contract touching an entity governed by this standard.
+
+---
+
+### S-033 — Cache-Busting and Version Banner for Static-Hosted Angular Apps
+
+**Rule:** Every TRIARQ Angular app deployed to static hosting must implement: (1) Cache-control meta tags on `index.html` (no-cache, no-store, must-revalidate + Pragma + Expires). (2) `version.json` written at build time with git SHA and `built_at` timestamp. (3) `VersionCheckService` fetching `version.json` on bootstrap (no-store + cache-buster), polling every 5 minutes and on every `NavigationEnd`, exposing `updateAvailable$` observable. (4) Sticky banner in `AppComponent` when deployed SHA differs from boot-time SHA: "A new version of Pathways is available. Reload." with Reload button — user-controlled, preserves in-flight work. (5) `npm run build:prod` chains the version-writer. Applies to all new static-hosted Angular deployments. Existing apps: retrofit when next contract touches `angular/package.json` or `angular/src/index.html`.
+
+**Conformance test:** Are cache-control meta tags present on `index.html`? (Yes = pass.) Does a `version.json` postbuild script exist? (Yes = pass.) Is `VersionCheckService` present, polling on boot + 5min + `NavigationEnd`? (Yes = pass.) Is the sticky version banner present in `AppComponent`? (Yes = pass.) Does `npm run build:prod` chain the version-writer? (Yes = pass.) Any failure = violation.
+
+**Exceptions:** Applies to static-hosted deployments only. Server-rendered or dynamically-hosted apps may use server-side cache headers instead.
+
+**CodeClose-applicable:** Yes — declare S-033 conformance on any contract that introduces a new static-hosted Angular deployment or modifies the build pipeline.
+

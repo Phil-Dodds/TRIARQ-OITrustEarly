@@ -92,10 +92,29 @@ async function list_users(params, caller_user_id) {
     namesByUser.set(row.user_id, list);
   }
 
-  const enriched = users.map(u => ({
-    ...u,
-    division_names: (namesByUser.get(u.id) ?? []).sort()
-  }));
+  // Contract 21 (D-411): pre-compute the Division summary so the grid renders
+  // a single string per row without client-side counting logic.
+  //   0 divisions       → "No Division"
+  //   1 or 2 divisions  → division names, comma-separated
+  //   3 or more         → "N Divisions"
+  const enriched = users.map(u => {
+    const names = (namesByUser.get(u.id) ?? []).sort();
+    const count = names.length;
+    let summary;
+    if (count === 0) {
+      summary = 'No Division';
+    } else if (count <= 2) {
+      summary = names.join(', ');
+    } else {
+      summary = `${count} Divisions`;
+    }
+    return {
+      ...u,
+      division_names:   names,
+      division_count:   count,
+      division_summary: summary
+    };
+  });
 
   return { success: true, data: enriched };
 }

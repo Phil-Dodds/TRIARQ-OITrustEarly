@@ -115,16 +115,25 @@ async function create_delivery_cycle(params, caller_user_id) {
     workstream = ws;
   }
 
-  // ── Verify division exists ────────────────────────────────────────────────
+  // ── Verify division exists and is active (Contract 21 / S-032) ────────────
   const { data: division, error: divErr } = await supabase
     .from('divisions')
-    .select('id')
+    .select('id, division_name, active_status')
     .eq('id', division_id)
     .is('deleted_at', null)
     .single();
 
   if (divErr || !division) {
     return { success: false, error: 'division_id not found or has been deleted.' };
+  }
+
+  // S-032 soft-block: new Initiatives cannot be created in an inactive Division.
+  // D-140 message names the block AND what would unblock it.
+  if (division.active_status === false) {
+    return {
+      success: false,
+      error: `${division.division_name} is inactive. New Initiatives cannot be created in an inactive Division. Reactivate the Division to create Initiatives in it.`
+    };
   }
 
   // ── Verify provided assignees exist ───────────────────────────────────────

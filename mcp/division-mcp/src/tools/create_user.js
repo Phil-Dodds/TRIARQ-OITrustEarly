@@ -28,18 +28,21 @@ const INVITE_REDIRECT_URL =
   'https://phil-dodds.github.io/TRIARQ-OITrustEarly/login';
 
 /**
- * @param {object} params
- * @param {string} params.email
- * @param {string} params.display_name
- * @param {boolean} [params.is_admin]
- * @param {boolean} [params.is_dcs]
- * @param {boolean} [params.is_epo]
- * @param {boolean} [params.is_dol]
- * @param {boolean} [params.is_ce]
+ * @param {object}    params
+ * @param {string}    params.email
+ * @param {string}    params.display_name
+ * @param {boolean}  [params.is_admin]
+ * @param {boolean}  [params.is_dcs]
+ * @param {boolean}  [params.is_epo]
+ * @param {boolean}  [params.is_dol]
+ * @param {boolean}  [params.is_ce]
+ * @param {string[]} [params.division_ids]  - Optional initial Division assignments (Contract 21).
+ *                                            Inactive Divisions are skipped silently (S-032);
+ *                                            their IDs come back in `skipped_division_ids`.
  * @param {string} caller_user_id
  */
 async function create_user(params, caller_user_id) {
-  const { email, display_name } = params;
+  const { email, display_name, division_ids } = params;
 
   if (!email)        return { success: false, error: 'email is required.' };
   if (!display_name) return { success: false, error: 'display_name is required.' };
@@ -148,9 +151,49 @@ async function create_user(params, caller_user_id) {
     };
   }
 
+  // Contract 21: optional Division assignments. Skip inactive Divisions
+  // silently per S-032; surface the skipped IDs so the UI can render a
+  // single combined toast if needed.
+  let assigned_division_ids = [];
+  let skipped_division_ids  = [];
+
+  if (Array.isArray(division_ids) && division_ids.length > 0) {
+    const { data: divisions, error: divErr } = await supabase
+      .from('divisions')
+      .select('id, active_status')
+      .in('id', division_ids)
+      .is('deleted_at', null);
+
+    if (!divErr && divisions) {
+      const activeIds = divisions
+        .filter(d => d.active_status === true)
+        .map(d => d.id);
+      skipped_division_ids = division_ids.filter(id => !activeIds.includes(id));
+
+      if (activeIds.length > 0) {
+        const rows = activeIds.map(division_id => ({
+          user_id:     auth_user_id,
+          division_id,
+          assigned_by: caller_user_id
+        }));
+        const { error: assignErr } = await supabase
+          .from('division_memberships')
+          .insert(rows);
+
+        // Membership assignment is best-effort — user record already exists.
+        // A failure here is logged via the response shape but does not roll back the user.
+        if (!assignErr) {
+          assigned_division_ids = activeIds;
+        }
+      }
+    }
+  }
+
   return {
     success: true,
     data:    newUser,
+    assigned_division_ids,
+    skipped_division_ids,
     message: `User created and invitation sent to ${normalizedEmail}.`
   };
 }

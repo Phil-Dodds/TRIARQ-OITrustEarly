@@ -75,7 +75,8 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
                     [class.cp-input--error]="f['division_id'].invalid && f['division_id'].touched"
                     (change)="onDivisionChange()">
               <option value="">— Select Division —</option>
-              <option *ngFor="let d of divisions" [value]="d.id">{{ d.division_name }}</option>
+              <!-- S-032: pickers exclude inactive Divisions from new selections. -->
+              <option *ngFor="let d of selectableDivisions" [value]="d.id">{{ d.division_name }}</option>
             </select>
             <div *ngIf="f['division_id'].invalid && f['division_id'].touched"
                  class="cp-field-error">Division is required.</div>
@@ -421,6 +422,12 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
 })
 export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnChanges {
   @Input() divisions:    Division[] = [];
+
+  /** S-032 (Contract 21): exclude inactive Divisions from new Initiative selection.
+   *  Existing cycles still resolve Division names from the full `divisions` array. */
+  get selectableDivisions(): Division[] {
+    return this.divisions.filter(d => d.active_status !== false);
+  }
   // D-292: Dashboard increments to signal cancel (ESC or scrim click). Source: D-292.
   @Input() cancelSignal = 0;
 

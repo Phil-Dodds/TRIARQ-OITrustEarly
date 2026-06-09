@@ -135,6 +135,18 @@ describe('create_delivery_cycle', () => {
     assert.ok(result.error.includes('workstream_id'));
   });
 
+  // Contract 21 — S-032 / D-414: new Initiatives cannot be created in an
+  // inactive Division. D-140 message names the block AND what would unblock it.
+  test('D-140 message — Initiative creation blocked on inactive Division', () => {
+    const divisionName = 'Pediatric Service Line';
+    const blocked =
+      `${divisionName} is inactive. New Initiatives cannot be created in an inactive Division. ` +
+      `Reactivate the Division to create Initiatives in it.`;
+    assert.ok(blocked.includes(divisionName));
+    assert.ok(blocked.includes('inactive'));
+    assert.ok(blocked.includes('Reactivate'));
+  });
+
 });
 
 

@@ -1,20 +1,26 @@
-// divisions.component.ts — Admin Division Hierarchy Management
-// Build A: Creates the nine-Trust hierarchy and recursive child Divisions.
-// Acceptance criteria: all nine Trusts created via this UI; child Divisions
-//   created at least two levels deep (Build A Section 9).
-// Roles: phil + admin (route protected by authGuard).
+// divisions.component.ts — Admin Division Management
+// Contract 21 (2026-06-09): Tree grid + right-panel pattern per
+//   D-413, D-414, S-005, S-006, S-010, S-011, S-018, S-019, S-032.
+//
+//   - Tree grid renders Trust (no indent), Service Line (24px), Functional Team (48px).
+//   - Trust rows expanded by default; Service Line rows collapsed by default.
+//   - Filter panel: Level (multi), Active Status (Active default per S-032).
+//   - Right-panel View (S-018): identity, Parent chip, Members list with add/remove,
+//     per-row Remove uses D-183 two-step.
+//   - Right-panel Edit (S-019): Division Name + Active toggle; deactivation uses
+//     D-183 two-step naming the soft-block consequence (S-032).
+//   - + New Division REMOVED — structural changes require Design session (spec §2.1).
+//
 // D-93:  McpService only — no direct Supabase access.
 // D-140: Blocked action UX on all errors.
-//
-// Hierarchy: Trust (level 0) → Service Line (level 1) → Function (level 2).
-// Labels are interim pending Mike confirmation of D-L2/L3.
-// Full terms per spec: Trust / Service Line Division / Function Division.
-// D-178: Three-tier loading standard applied — Tier 1 skeleton, Tier 2 button spinners, Tier 3 overlays.
+// D-178: Three-tier loading — Tier 1 skeleton, Tier 2 button spinners, Tier 3 overlay.
+// D-200: Pattern 2 amber band on Inactive rows per S-032.
 
 import {
   Component,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  HostListener,
   OnInit
 } from '@angular/core';
 import { CommonModule }        from '@angular/common';
@@ -27,24 +33,34 @@ import {
 } from '@angular/forms';
 import { IonicModule }                 from '@ionic/angular';
 import { McpService }                  from '../../../core/services/mcp.service';
+import {
+  ScreenStateService,
+  SCREEN_KEYS
+}                                       from '../../../core/services/screen-state.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
-import { Division }                    from '../../../core/types/database';
+import { Division, User }              from '../../../core/types/database';
+import {
+  ALL_ROLE_FLAGS,
+  ROLE_FLAG_ABBREVIATIONS,
+  RoleFlag
+} from '../../../core/constants/roles';
 
-interface Crumb { id: string | null; name: string; }
+type PanelMode = 'view' | 'edit' | null;
+type LevelFilter = 'all' | 0 | 1 | 2;
+type ActiveFilter = 'all' | 'active' | 'inactive';
 
-// Short labels used in buttons and pills (interim: D-L2/L3 pending Mike).
+interface FilterState {
+  level:        LevelFilter;
+  activeStatus: ActiveFilter;
+}
+
+const DEFAULT_FILTER: FilterState = { level: 'all', activeStatus: 'active' };
+
 const LEVEL_LABELS: Record<number, string> = {
   0: 'Trust',
   1: 'Service Line',
-  2: 'Function'
-};
-
-// Full type_label values stored in the DB (match spec Section 4.1).
-const TYPE_LABELS: Record<number, string> = {
-  0: 'Trust',
-  1: 'Service Line Division',
-  2: 'Function Division'
+  2: 'Functional Team'
 };
 
 @Component({
@@ -59,42 +75,50 @@ const TYPE_LABELS: Record<number, string> = {
     BlockedActionComponent,
     LoadingOverlayComponent
   ],
+  styles: [`
+    :host{display:block}
+    .dm-page{padding:var(--triarq-space-lg);max-width:1200px;margin:0 auto}
+    .dm-header{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--triarq-space-md);margin-bottom:var(--triarq-space-sm)}
+    .dm-header h2{margin:0}
+    .dm-desc{font-size:11px;font-style:italic;color:#5A5A5A;margin-top:4px}
+    .dm-toolbar{display:flex;align-items:center;gap:var(--triarq-space-sm);margin-bottom:var(--triarq-space-sm);flex-wrap:wrap}
+    .dm-chip-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:var(--triarq-space-sm)}
+    .dm-grid{border:1px solid var(--triarq-color-border);border-radius:10px;background:#fff;overflow:hidden}
+    .dm-row{display:grid;grid-template-columns:3fr .8fr 2fr 1.1fr;gap:var(--triarq-space-sm);padding:var(--triarq-space-sm) var(--triarq-space-md);border-bottom:1px solid var(--triarq-color-border);align-items:center;font-size:13px}
+    .dm-header-row{font-weight:500;color:var(--triarq-color-text-secondary);background:var(--triarq-color-background-subtle);border-bottom:2px solid var(--triarq-color-border)}
+    .dm-data:hover{background:#fafbfc;cursor:pointer}
+    .dm-data.dm-selected{background:#eef6fb}
+    .dm-name-cell{display:flex;align-items:center;gap:6px;min-width:0}
+    .dm-name{font-weight:500;color:var(--triarq-color-text-primary)}
+    .dm-trust-name{font-weight:700}
+    .dm-chev{cursor:pointer;user-select:none;width:18px;display:inline-block;color:var(--triarq-color-text-secondary);font-size:11px}
+    .dm-chev.dm-chev-empty{visibility:hidden}
+    .dm-pill{display:inline-flex;align-items:center;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:500;line-height:1.4}
+    .dm-pill-trust{background:rgba(37,112,153,0.12);color:var(--triarq-color-primary)}
+    .dm-pill-sl{background:rgba(33,118,176,0.10);color:#1f78b4}
+    .dm-pill-ft{background:var(--triarq-color-background-subtle);color:var(--triarq-color-text-secondary)}
+    .dm-pill-active{background:#e8f5e9;color:#2e7d32}
+    .dm-pill-inactive{background:#fff8e1;color:#f57f17}
+    .dm-inactive-band{grid-column:1/-1;background:rgba(243,150,30,0.08);border-left:3px solid var(--triarq-color-sunray,#f3961e);padding:6px 10px;font-size:11px;color:#7a5b00}
+    .dm-empty{padding:var(--triarq-space-lg);text-align:center;color:var(--triarq-color-text-secondary);font-size:13px}
+    .dm-member-row{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-bottom:1px solid var(--triarq-color-border);font-size:13px}
+    .dm-member-row:last-child{border-bottom:none}
+    .dm-member-name{display:flex;align-items:center;gap:6px}
+    .dm-role-pill{font-size:10px;padding:1px 6px;border-radius:999px;background:var(--triarq-color-background-subtle);color:var(--triarq-color-text-secondary)}
+    .dm-confirm{background:rgba(243,150,30,0.08);border-left:3px solid var(--triarq-color-sunray,#f3961e);padding:8px 10px;margin-top:8px;border-radius:5px;font-size:12px}
+    .dm-confirm-actions{margin-top:6px;display:flex;gap:6px;justify-content:flex-end}
+  `],
   template: `
-    <div class="oi-card" style="max-width:900px;margin:var(--triarq-space-2xl) auto;">
+    <div class="dm-page">
 
-      <!-- Header + breadcrumb ───────────────────────────────────────────── -->
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;
-                  margin-bottom:var(--triarq-space-md);">
+      <!-- Header (S-005) ─────────────────────────────────────────────────── -->
+      <div class="dm-header">
         <div>
-          <h3 style="margin:0 0 4px 0;">Division Hierarchy</h3>
-          <nav style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-            <span *ngFor="let crumb of breadcrumb; let i = index; let last = last">
-              <span
-                *ngIf="!last"
-                (click)="navigateBreadcrumb(i)"
-                style="cursor:pointer;color:var(--triarq-color-primary);text-decoration:underline;"
-              >{{ crumb.name }}</span>
-              <span *ngIf="last">{{ crumb.name }}</span>
-              <span *ngIf="!last"> › </span>
-            </span>
-          </nav>
-        </div>
-        <div style="display:flex;gap:var(--triarq-space-sm);align-items:center;">
-          <!-- B-50: "Edit" entry remains in header. Cancel during edit moves to form body. -->
-          <button
-            *ngIf="!isAtRoot && !showEditForm"
-            (click)="toggleEditForm()"
-            style="font-size:var(--triarq-text-small);white-space:nowrap;
-                   background:none;border:1px solid var(--triarq-color-border);
-                   border-radius:5px;padding:6px 12px;cursor:pointer;
-                   color:var(--triarq-color-text-primary);"
-          >Edit {{ editLabel }}</button>
-          <button
-            *ngIf="showCreateForm || canCreate"
-            class="oi-btn-primary"
-            (click)="toggleCreateForm()"
-            style="font-size:var(--triarq-text-small);white-space:nowrap;"
-          >{{ showCreateForm ? 'Cancel' : '+ New ' + levelLabel }}</button>
+          <h2>Division Management</h2>
+          <div class="dm-desc">
+            TRIARQ organizational hierarchy: Trust → Service Line → Functional Team.
+            Tap a row to view details. Structural changes require a Design session.
+          </div>
         </div>
       </div>
 
@@ -105,556 +129,888 @@ const TYPE_LABELS: Record<number, string> = {
         [secondaryMessage]="blockedHint"
       ></app-blocked-action>
 
-      <!-- Edit form (D-178 Tier 3: section overlay) ─────────────────────── -->
-      <div *ngIf="showEditForm" style="position:relative;">
-        <app-loading-overlay [visible]="savingDivision" message="Saving…"></app-loading-overlay>
-        <div
-          style="background:var(--triarq-color-background-subtle);
-                 border-radius:8px;padding:var(--triarq-space-md);
-                 margin-bottom:var(--triarq-space-md);"
-        >
-          <h4 style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-body);">
-            Edit {{ editLabel }}
-          </h4>
-          <form [formGroup]="editDivisionForm" (ngSubmit)="submitEditDivision()">
+      <!-- Toolbar (filters + count) ─────────────────────────────────────── -->
+      <div class="dm-toolbar">
+        <button class="oi-btn-secondary" (click)="openFilterPanel()">
+          Filters{{ activeFilterCount > 0 ? ' (' + activeFilterCount + ')' : '' }}
+        </button>
+        <span class="oi-filter-row-val" *ngIf="!loading">
+          {{ visibleDivisionCount }} division{{ visibleDivisionCount === 1 ? '' : 's' }}
+        </span>
+      </div>
 
-            <!-- Full Name -->
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                {{ editLabel }} Name *
-              </label>
-              <input
-                formControlName="division_name"
-                class="oi-input"
-                style="width:100%;max-width:420px;"
-              />
-              <div
-                *ngIf="(editAttempted || editDivisionForm.get('division_name')?.touched)
-                       && editDivisionForm.get('division_name')?.invalid"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-              >Name is required.</div>
-            </div>
+      <!-- Active filter chips (S-012) ───────────────────────────────────── -->
+      <div class="dm-chip-bar" *ngIf="activeFilterChips.length > 0">
+        <span class="oi-filter-chip" *ngFor="let chip of activeFilterChips">
+          {{ chip.label }}
+          <button (click)="removeFilterChip(chip.id)" aria-label="Remove filter">×</button>
+        </span>
+      </div>
 
-            <!-- B-48: Short Name (max 10) — Contract 10 §6 B-48. -->
-            <div style="margin-top:var(--triarq-space-sm);">
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Short Name *
-              </label>
-              <input
-                formControlName="display_name_short"
-                class="oi-input"
-                maxlength="10"
-                style="width:100%;max-width:420px;"
-              />
-              <!-- N/10 counter -->
-              <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:2px;">
-                {{ displayNameShortCount }}/10
-              </div>
-              <!-- S-025 Pattern 1 hint -->
-              <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:2px;font-style:italic;">
-                10 characters max. Used in grids and filter chips.
-              </div>
-              <!-- B-63: Pattern 3 inline error only on submit attempt — never disable Save (D-297). -->
-              <div
-                *ngIf="editAttempted && editDivisionForm.get('display_name_short')?.invalid"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-              >Short name is required.</div>
-            </div>
+      <!-- Snackbars ─────────────────────────────────────────────────────── -->
+      <div *ngIf="successMsg"
+           style="background:#e8f5e9;border:1px solid #81c784;border-radius:8px;
+                  padding:8px 12px;margin-bottom:var(--triarq-space-sm);
+                  font-size:12px;color:#2e7d32;">
+        {{ successMsg }}
+      </div>
 
-            <!-- B-49 + B-50: Cancel and Save at the bottom of the form, Cancel left of Save. -->
-            <div style="margin-top:var(--triarq-space-md);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-              <button type="button"
-                      (click)="closeEditForm()"
-                      [disabled]="savingDivision"
-                      style="font-size:var(--triarq-text-small);background:none;
-                             border:1px solid var(--triarq-color-border);border-radius:5px;
-                             padding:8px 16px;cursor:pointer;color:var(--triarq-color-text-primary);">
-                Cancel
-              </button>
-              <!-- B-49: filled primary button. B-63: D-297 — Save NOT disabled by form.invalid; only by saving state. -->
-              <button type="submit" class="oi-btn-primary" [disabled]="savingDivision">
-                <ion-spinner *ngIf="savingDivision" name="crescent"
-                             style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
-                </ion-spinner>
-                {{ savingDivision ? 'Saving…' : 'Save' }}
-              </button>
-              <span
-                *ngIf="editDivisionError"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);"
-              >{{ editDivisionError }}</span>
-            </div>
-          </form>
+      <!-- Skeleton (D-178 Tier 1) ───────────────────────────────────────── -->
+      <div class="dm-grid" *ngIf="loading">
+        <div class="dm-row dm-header-row">
+          <span>Division Name</span><span>Members</span><span>Parent</span><span>Active</span>
+        </div>
+        <div class="dm-row" *ngFor="let _ of skeletonRows">
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;width:40px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:18px;border-radius:999px;width:60px;"></ion-skeleton-text>
         </div>
       </div>
 
-      <!-- Create form (D-178 Tier 3: section overlay) ───────────────────── -->
-      <div *ngIf="showCreateForm" style="position:relative;">
-        <app-loading-overlay [visible]="creating" message="Creating {{ levelLabel }}…"></app-loading-overlay>
-        <div
-          style="background:var(--triarq-color-background-subtle);
-                 border-radius:8px;padding:var(--triarq-space-md);
-                 margin-bottom:var(--triarq-space-md);"
-        >
-          <h4 style="margin:0 0 var(--triarq-space-sm) 0;font-size:var(--triarq-text-body);">
-            Create {{ levelLabel }}{{ isAtRoot ? '' : ' under "' + currentParentName + '"' }}
-          </h4>
-          <form [formGroup]="createForm" (ngSubmit)="submitCreate()">
-
-            <!-- Full Name -->
-            <div>
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                {{ levelLabel }} Name *
-              </label>
-              <input
-                formControlName="division_name"
-                class="oi-input"
-                [placeholder]="namePlaceholder"
-                style="width:100%;max-width:420px;"
-              />
-              <div
-                *ngIf="createForm.get('division_name')?.invalid && createForm.get('division_name')?.touched"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-              >{{ levelLabel }} name is required.</div>
-            </div>
-
-            <!-- Short Name (Migration 030 / Contract 10 §6 B-48) -->
-            <div style="margin-top:var(--triarq-space-sm);">
-              <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
-                Short Name *
-              </label>
-              <input
-                formControlName="display_name_short"
-                class="oi-input"
-                maxlength="10"
-                placeholder="e.g. Revenue Cy"
-                style="width:100%;max-width:420px;"
-              />
-              <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:2px;">
-                {{ createDisplayNameShortCount }}/10
-              </div>
-              <div style="font-size:11px;color:var(--triarq-color-text-secondary);margin-top:2px;font-style:italic;">
-                10 characters max. Used in grids and filter chips.
-              </div>
-              <div
-                *ngIf="createForm.get('display_name_short')?.invalid && createForm.get('display_name_short')?.touched"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:2px;"
-              >Short name is required.</div>
-            </div>
-
-            <div style="margin-top:var(--triarq-space-md);display:flex;gap:var(--triarq-space-sm);align-items:center;">
-              <!-- D-178 Tier 2: button spinner while creating -->
-              <button type="submit" class="oi-btn-primary" [disabled]="createForm.invalid || creating">
-                <ion-spinner *ngIf="creating" name="crescent"
-                             style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
-                </ion-spinner>
-                {{ creating ? 'Creating…' : 'Create' }}
-              </button>
-              <span
-                *ngIf="createError"
-                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);"
-              >{{ createError }}</span>
-              <span
-                *ngIf="createSuccess"
-                style="color:var(--triarq-color-success,#2e7d32);font-size:var(--triarq-text-small);"
-              >Created successfully.</span>
-            </div>
-          </form>
+      <!-- Tree grid ─────────────────────────────────────────────────────── -->
+      <div class="dm-grid" *ngIf="!loading && allDivisions.length > 0">
+        <div class="dm-row dm-header-row">
+          <span>Division Name</span>
+          <span>Members</span>
+          <span>Parent</span>
+          <span>Active</span>
         </div>
-      </div>
 
-      <!-- ── Loading skeleton (D-178 Tier 1) ─────────────────────────────── -->
-      <div *ngIf="loading">
-        <div *ngFor="let _ of skeletonRows"
-             style="display:flex;align-items:center;justify-content:space-between;
-                    padding:var(--triarq-space-sm) var(--triarq-space-md);
-                    border-radius:6px;margin-bottom:6px;
-                    border:1px solid var(--triarq-color-border);gap:var(--triarq-space-sm);">
-          <ion-skeleton-text animated style="height:16px;border-radius:4px;flex:1;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="height:20px;width:80px;border-radius:999px;"></ion-skeleton-text>
-        </div>
-      </div>
-
-      <!-- Division list ─────────────────────────────────────────────────── -->
-      <div *ngIf="!loading">
-        <div
-          *ngIf="currentDivisions.length === 0 && !blockedMessage"
-          style="color:var(--triarq-color-text-secondary);font-size:var(--triarq-text-small);
-                 padding:var(--triarq-space-lg) 0;text-align:center;"
-        >{{ emptyMessage }}</div>
-
-        <div
-          *ngFor="let div of currentDivisions"
-          (click)="navigateTo(div)"
-          style="display:flex;align-items:center;justify-content:space-between;
-                 padding:var(--triarq-space-sm) var(--triarq-space-md);
-                 border-radius:6px;margin-bottom:6px;cursor:pointer;
-                 border:1px solid var(--triarq-color-border);
-                 transition:background 0.15s;"
-          onmouseenter="this.style.background='var(--triarq-color-background-subtle)'"
-          onmouseleave="this.style.background=''"
-        >
-          <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);min-width:0;">
-            <div style="font-weight:500;color:var(--triarq-color-text-primary);">
-              {{ div.division_name }}
-            </div>
-            <!-- Short Name chip — applies at every level (Trust, Service Line, Function). -->
-            <span
-              *ngIf="div.display_name_short"
-              class="oi-pill"
-              style="background:rgba(37,112,153,0.08);
-                     color:var(--triarq-color-primary);
-                     font-size:11px;
-                     font-weight:500;"
-              title="Short Name (used in grids and filter chips)"
-            >{{ div.display_name_short }}</span>
+        <ng-container *ngFor="let row of visibleRows">
+          <div class="dm-row dm-data"
+               [class.dm-selected]="selectedDivisionId === row.division.id && panelMode"
+               (click)="openView(row.division)">
+            <span class="dm-name-cell" [style.padding-left.px]="row.division.division_level * 24">
+              <span class="dm-chev"
+                    *ngIf="canExpand(row.division)"
+                    (click)="toggleExpand($event, row.division.id)">
+                {{ isExpanded(row.division.id) ? '▼' : '▶' }}
+              </span>
+              <span class="dm-chev dm-chev-empty" *ngIf="!canExpand(row.division)">·</span>
+              <span class="dm-name"
+                    [class.dm-trust-name]="row.division.division_level === 0">
+                {{ row.division.division_name }}
+              </span>
+              <span class="dm-pill"
+                    [class.dm-pill-trust]="row.division.division_level === 0"
+                    [class.dm-pill-sl]="row.division.division_level === 1"
+                    [class.dm-pill-ft]="row.division.division_level === 2">
+                {{ levelLabel(row.division.division_level) }}
+              </span>
+            </span>
+            <span>{{ row.division.member_count ?? 0 }}</span>
+            <span style="color:var(--triarq-color-text-secondary);">
+              {{ parentName(row.division) || '—' }}
+            </span>
+            <span>
+              <span class="dm-pill"
+                    [class.dm-pill-active]="row.division.active_status !== false"
+                    [class.dm-pill-inactive]="row.division.active_status === false">
+                {{ row.division.active_status === false ? 'Inactive' : 'Active' }}
+              </span>
+            </span>
           </div>
-          <div style="display:flex;align-items:center;gap:var(--triarq-space-sm);">
-            <span
-              class="oi-pill"
-              style="background:var(--triarq-color-background-subtle);
-                     color:var(--triarq-color-text-secondary);"
-            >{{ getLevelLabel(div.division_level) }}</span>
-            <span style="color:var(--triarq-color-text-tertiary);font-size:20px;">›</span>
+          <div class="dm-row dm-inactive-band"
+               *ngIf="row.division.active_status === false"
+               (click)="openView(row.division)">
+            ⚠ Inactive Division — no new Initiatives or user assignments permitted.
           </div>
+        </ng-container>
+      </div>
+
+      <!-- Empty states ──────────────────────────────────────────────────── -->
+      <div class="dm-empty" *ngIf="!loading && allDivisions.length === 0 && !blockedMessage">
+        No Divisions found.
+      </div>
+      <div class="dm-empty" *ngIf="!loading && allDivisions.length > 0 && visibleRows.length === 0">
+        No Divisions match the current filters.
+      </div>
+
+      <!-- Filter panel ──────────────────────────────────────────────────── -->
+      <div class="oi-scrim oi-scrim-filter" *ngIf="filterPanelOpen" (click)="closeFilterPanel()"></div>
+      <div class="oi-side-panel oi-side-filter" *ngIf="filterPanelOpen" role="dialog" aria-modal="true">
+        <div class="oi-side-head">
+          <strong>Filters</strong>
+          <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+                  (click)="closeFilterPanel()" aria-label="Close filter panel">✕</button>
+        </div>
+        <div class="oi-side-body">
+
+          <div class="oi-filter-row">
+            <div class="oi-filter-row-head" (click)="toggleFilterRow('level')">
+              <span class="oi-filter-row-name">Level</span>
+              <span class="oi-filter-row-val">{{ pendingLevelSummary }}</span>
+            </div>
+            <div class="oi-filter-row-body" *ngIf="expandedFilterRow === 'level'">
+              <label class="oi-picker-row">
+                <span><input type="radio" name="lvl"
+                       [checked]="pendingFilters.level === 'all'"
+                       (change)="setPendingLevel('all')" /> All</span>
+              </label>
+              <label class="oi-picker-row">
+                <span><input type="radio" name="lvl"
+                       [checked]="pendingFilters.level === 0"
+                       (change)="setPendingLevel(0)" /> Trust</span>
+              </label>
+              <label class="oi-picker-row">
+                <span><input type="radio" name="lvl"
+                       [checked]="pendingFilters.level === 1"
+                       (change)="setPendingLevel(1)" /> Service Line</span>
+              </label>
+              <label class="oi-picker-row">
+                <span><input type="radio" name="lvl"
+                       [checked]="pendingFilters.level === 2"
+                       (change)="setPendingLevel(2)" /> Functional Team</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="oi-filter-row">
+            <div class="oi-filter-row-head" (click)="toggleFilterRow('active')">
+              <span class="oi-filter-row-name">Active Status</span>
+              <span class="oi-filter-row-val">{{ pendingActiveSummary }}</span>
+            </div>
+            <div class="oi-filter-row-body" *ngIf="expandedFilterRow === 'active'">
+              <label class="oi-picker-row">
+                <span><input type="radio" name="act"
+                       [checked]="pendingFilters.activeStatus === 'active'"
+                       (change)="setPendingActive('active')" /> Active</span>
+              </label>
+              <label class="oi-picker-row">
+                <span><input type="radio" name="act"
+                       [checked]="pendingFilters.activeStatus === 'inactive'"
+                       (change)="setPendingActive('inactive')" /> Inactive</span>
+              </label>
+              <label class="oi-picker-row">
+                <span><input type="radio" name="act"
+                       [checked]="pendingFilters.activeStatus === 'all'"
+                       (change)="setPendingActive('all')" /> All</span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+        <div class="oi-side-foot">
+          <button class="oi-btn-secondary" (click)="clearPendingFilters()">Clear all</button>
+          <button class="oi-btn-primary" (click)="applyFilters()">Apply filters</button>
         </div>
       </div>
 
-      <!-- Footer nav ────────────────────────────────────────────────────── -->
-      <div
-        style="margin-top:var(--triarq-space-lg);padding-top:var(--triarq-space-md);
-               border-top:1px solid var(--triarq-color-border);
-               display:flex;gap:var(--triarq-space-lg);"
-      >
-        <a
-          routerLink="/admin/users"
-          style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);"
-        >Manage Users →</a>
-      </div>
+      <!-- Right panel — View / Edit ─────────────────────────────────────── -->
+      <ng-container *ngIf="panelMode && selectedDivision">
+        <div class="oi-scrim oi-scrim-detail"
+             *ngIf="panelMode === 'edit'"
+             (click)="onScrimClick()"></div>
+
+        <div class="oi-side-panel oi-side-detail" role="dialog" aria-modal="true" aria-label="Division detail">
+          <app-loading-overlay [visible]="panelOverlayBusy" [message]="panelOverlayMessage"></app-loading-overlay>
+
+          <!-- ====================== VIEW ====================== -->
+          <ng-container *ngIf="panelMode === 'view'">
+            <div class="oi-side-head">
+              <div style="display:flex;flex-direction:column;gap:2px;">
+                <strong>{{ selectedDivision.division_name }}</strong>
+                <span style="font-size:12px;color:var(--triarq-color-text-secondary);">
+                  {{ levelLabel(selectedDivision.division_level) }}
+                </span>
+              </div>
+              <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+                      (click)="closePanel()" aria-label="Close">✕</button>
+            </div>
+            <div class="oi-side-body">
+
+              <div class="oi-zone">
+                <div class="oi-zone-title">Identity</div>
+                <div class="oi-field-row">
+                  <span class="dm-pill"
+                        [class.dm-pill-active]="selectedDivision.active_status !== false"
+                        [class.dm-pill-inactive]="selectedDivision.active_status === false">
+                    {{ selectedDivision.active_status === false ? 'Inactive' : 'Active' }}
+                  </span>
+                  <span class="dm-pill"
+                        style="margin-left:6px;"
+                        [class.dm-pill-trust]="selectedDivision.division_level === 0"
+                        [class.dm-pill-sl]="selectedDivision.division_level === 1"
+                        [class.dm-pill-ft]="selectedDivision.division_level === 2">
+                    {{ levelLabel(selectedDivision.division_level) }}
+                  </span>
+                </div>
+                <div class="oi-field-row" *ngIf="parentName(selectedDivision)">
+                  <span class="oi-field-label">Parent Division</span>
+                  <span class="oi-filter-chip"
+                        style="cursor:pointer;"
+                        (click)="openParentView()">
+                    {{ parentName(selectedDivision) }}
+                  </span>
+                </div>
+                <div class="oi-field-row" *ngIf="selectedDivision.display_name_short">
+                  <span class="oi-field-label">Short Name</span>
+                  <span>{{ selectedDivision.display_name_short }}</span>
+                </div>
+                <div class="oi-zone-explain" *ngIf="selectedDivision.active_status === false">
+                  No new Initiatives or user assignments permitted while inactive.
+                </div>
+              </div>
+
+              <div class="oi-zone">
+                <div class="oi-zone-title">Members ({{ members.length }})</div>
+                <div *ngIf="loadingMembers" style="font-size:12px;color:var(--triarq-color-text-secondary);">
+                  Loading…
+                </div>
+                <div *ngIf="!loadingMembers">
+                  <div *ngIf="members.length === 0" class="oi-zone-explain">No members assigned.</div>
+                  <div *ngFor="let m of members" class="dm-member-row">
+                    <span class="dm-member-name">
+                      <span>{{ m.display_name }}</span>
+                      <span class="dm-role-pill" *ngFor="let flag of userFlags(m)">
+                        {{ flagAbbrev(flag) }}
+                      </span>
+                    </span>
+                    <span>
+                      <button *ngIf="removingMemberId !== m.id"
+                              style="background:none;border:none;color:var(--triarq-color-primary);cursor:pointer;font-size:12px;"
+                              (click)="askRemoveMember(m)">Remove</button>
+                      <ion-spinner *ngIf="removingMemberId === m.id" name="crescent"
+                                   style="width:14px;height:14px;"></ion-spinner>
+                    </span>
+                  </div>
+
+                  <div class="dm-confirm" *ngIf="pendingRemoveMember">
+                    Remove <strong>{{ pendingRemoveMember.display_name }}</strong> from
+                    <strong>{{ selectedDivision.division_name }}</strong>?
+                    They will lose access to {{ selectedDivision.division_name }}-scoped Initiatives.
+                    <div class="dm-confirm-actions">
+                      <button class="oi-btn-secondary" (click)="pendingRemoveMember = null">Cancel</button>
+                      <button class="oi-btn-primary" (click)="confirmRemoveMember()">Remove</button>
+                    </div>
+                  </div>
+
+                  <div style="margin-top:8px;">
+                    <button class="oi-btn-secondary"
+                            *ngIf="!addPickerOpen"
+                            (click)="openAddPicker()"
+                            [disabled]="selectedDivision.active_status === false"
+                            [title]="selectedDivision.active_status === false
+                              ? 'Division is inactive — user assignments not permitted'
+                              : ''">
+                      Add User
+                    </button>
+                    <div *ngIf="addPickerOpen" style="margin-top:8px;border:1px solid var(--triarq-color-border);border-radius:5px;padding:6px;max-height:220px;overflow-y:auto;">
+                      <input type="text" class="oi-input"
+                             placeholder="Filter users…"
+                             [value]="addPickerSearch"
+                             (input)="onAddPickerSearch($event)" />
+                      <label class="oi-picker-row" *ngFor="let u of selectableUsers">
+                        <span style="display:flex;align-items:center;gap:6px;">
+                          <input type="checkbox"
+                                 [checked]="false"
+                                 (change)="addMember(u)" />
+                          <span>{{ u.display_name }}</span>
+                          <span class="dm-role-pill" *ngFor="let flag of userFlags(u)">
+                            {{ flagAbbrev(flag) }}
+                          </span>
+                        </span>
+                      </label>
+                      <div *ngIf="selectableUsers.length === 0" class="oi-zone-explain" style="padding:6px;">
+                        No users to add.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="oi-err" *ngIf="memberError">{{ memberError }}</div>
+                </div>
+              </div>
+
+            </div>
+            <div class="oi-side-foot oi-side-foot-split">
+              <span></span>
+              <button class="oi-btn-primary" (click)="startEdit()">Edit</button>
+            </div>
+          </ng-container>
+
+          <!-- ====================== EDIT ====================== -->
+          <ng-container *ngIf="panelMode === 'edit'">
+            <div class="oi-side-head">
+              <strong>Edit Division</strong>
+              <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+                      (click)="onScrimClick()" aria-label="Close">✕</button>
+            </div>
+            <div class="oi-side-body">
+              <form [formGroup]="editForm">
+                <div class="oi-field-row">
+                  <label class="oi-field-label">Division Name *</label>
+                  <input formControlName="division_name" class="oi-input" />
+                  <div class="oi-err"
+                       *ngIf="editForm.get('division_name')?.invalid && editForm.get('division_name')?.touched">
+                    Name is required.
+                  </div>
+                </div>
+                <div class="oi-field-row">
+                  <label class="oi-field-label">Active Status</label>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <label class="oi-picker-row" style="cursor:pointer;">
+                      <span><input type="radio" name="actSt"
+                             [checked]="editActiveValue === true"
+                             (change)="setEditActive(true)" /> Active</span>
+                    </label>
+                    <label class="oi-picker-row" style="cursor:pointer;">
+                      <span><input type="radio" name="actSt"
+                             [checked]="editActiveValue === false"
+                             (change)="askDeactivate()" /> Inactive</span>
+                    </label>
+                  </div>
+                  <div class="dm-confirm" *ngIf="showDeactivateConfirm">
+                    Deactivate <strong>{{ selectedDivision.division_name }}</strong>?
+                    No new Initiatives or user assignments will be permitted.
+                    Existing Initiatives and memberships are unaffected.
+                    <div class="dm-confirm-actions">
+                      <button class="oi-btn-secondary" (click)="cancelDeactivate()">Cancel</button>
+                      <button class="oi-btn-primary" (click)="confirmDeactivate()">Deactivate</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="oi-zone-explain">
+                  Level and Parent Division are structural — changes require a Design session.
+                </div>
+                <div class="oi-err" *ngIf="editError">{{ editError }}</div>
+              </form>
+            </div>
+            <div class="oi-side-foot oi-side-foot-split">
+              <button class="oi-btn-secondary" (click)="onScrimClick()">Cancel</button>
+              <button class="oi-btn-primary"
+                      [disabled]="editForm.invalid || saving"
+                      (click)="submitEdit()">
+                {{ saving ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </ng-container>
+
+        </div>
+      </ng-container>
+
     </div>
   `
 })
 export class DivisionsComponent implements OnInit {
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  breadcrumb:         Crumb[]    = [{ id: null, name: 'All Trusts' }];
-  currentDivisions:   Division[] = [];
-  loading             = false;
-  showCreateForm      = false;
-  creating            = false;
-  createError         = '';
-  createSuccess       = false;
-  showEditForm        = false;
-  editDivisionError   = '';
-  editAttempted       = false; // B-63: track submit attempt to drive inline validation per D-297
-  savingDivision      = false;
-  /** Division we navigated INTO (the one being edited via Edit form). Set on navigateTo. */
-  currentParent: Division | null = null;
-  blockedMessage      = '';
-  blockedHint         = '';
-  createForm!:        FormGroup;
-  editDivisionForm!:  FormGroup;
+  // ── Data ──────────────────────────────────────────────────────────────────
+  allDivisions: Division[] = [];
+  loading       = false;
+  blockedMessage = '';
+  blockedHint    = '';
+  successMsg     = '';
 
-  // D-178 Tier 1: skeleton rows for loading state
+  // ── Tree state ────────────────────────────────────────────────────────────
+  expandedIds: Set<string> = new Set();   // Trust IDs default-expanded on first load
+  defaultExpansionApplied = false;
+
+  // ── Filter state ──────────────────────────────────────────────────────────
+  filters: FilterState        = { ...DEFAULT_FILTER };
+  pendingFilters: FilterState = { ...DEFAULT_FILTER };
+  filterPanelOpen = false;
+  expandedFilterRow: 'level' | 'active' | null = null;
+
+  // ── Panel state ───────────────────────────────────────────────────────────
+  panelMode: PanelMode              = null;
+  selectedDivisionId: string | null = null;
+  selectedDivision: Division | null = null;
+
+  editForm!: FormGroup;
+  editActiveValue: boolean = true;
+  saving         = false;
+  editError      = '';
+  showDeactivateConfirm = false;
+
+  // ── Members state ─────────────────────────────────────────────────────────
+  members: User[]      = [];
+  loadingMembers       = false;
+  allUsers: User[]     = [];
+  addPickerOpen        = false;
+  addPickerSearch      = '';
+  addingMemberId: string | null   = null;
+  removingMemberId: string | null = null;
+  pendingRemoveMember: User | null = null;
+  memberError          = '';
+
   readonly skeletonRows = [1, 2, 3, 4, 5];
 
   constructor(
-    private readonly mcp: McpService,
-    private readonly fb:  FormBuilder,
-    private readonly cdr: ChangeDetectorRef
+    private readonly mcp:         McpService,
+    private readonly screenState: ScreenStateService,
+    private readonly fb:          FormBuilder,
+    private readonly cdr:         ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
-    this.createForm = this.fb.group({
-      division_name:      ['', [Validators.required, Validators.maxLength(120)]],
-      // Short Name required at creation per Migration 030 NOT NULL constraint.
-      // Was previously omitted from the form (server fell back to first 10
-      // chars of name); admins asked to set it explicitly.
-      display_name_short: ['', [Validators.required, Validators.maxLength(10)]]
+    this.editForm = this.fb.group({
+      division_name: ['', [Validators.required, Validators.maxLength(120)]]
     });
-    this.editDivisionForm = this.fb.group({
-      division_name:      ['', [Validators.required, Validators.maxLength(120)]],
-      // B-48 / Migration 030: Short Name max 10 chars, required at edit time. Source: Contract 10 §6 B-48.
-      display_name_short: ['', [Validators.required, Validators.maxLength(10)]]
-    });
-    this.loadDivisions(null);
+    this.loadDivisions();
+    this.loadUsersOnce();
+    this.restoreScreenState();
   }
 
-  // ── Computed ───────────────────────────────────────────────────────────────
-  get isAtRoot(): boolean {
-    return this.breadcrumb.length === 1;
+  @HostListener('document:keydown.escape')
+  onEsc(): void {
+    if (this.panelMode) { this.onScrimClick(); return; }
+    if (this.filterPanelOpen) { this.closeFilterPanel(); }
   }
 
-  /** DB level of the items currently displayed (0=Trust, 1=Service Line, 2=Function). */
-  get currentLevel(): number {
-    return this.breadcrumb.length - 1;
-  }
-
-  /** Short label for what is being created at the current level (interim: D-L2/L3). */
-  get levelLabel(): string {
-    return LEVEL_LABELS[this.currentLevel] ?? 'Division';
-  }
-
-  /** Short label for the division we navigated into (one level above items being displayed). */
-  get editLabel(): string {
-    return LEVEL_LABELS[this.currentLevel - 1] ?? 'Division';
-  }
-
-  /** True when the current level supports creating children (Trust/Service Line/Function only). */
-  get canCreate(): boolean {
-    return this.currentLevel <= 2;
-  }
-
-  get currentParentName(): string {
-    return this.breadcrumb[this.breadcrumb.length - 1]?.name ?? '';
-  }
-
-  get currentParentId(): string | null {
-    return this.breadcrumb[this.breadcrumb.length - 1]?.id ?? null;
-  }
-
-  get namePlaceholder(): string {
-    switch (this.currentLevel) {
-      case 0:  return 'e.g. Practice Services Trust';
-      case 1:  return 'e.g. Revenue Cycle Management';
-      case 2:  return 'e.g. Coding & Billing';
-      default: return '';
-    }
-  }
-
-  get emptyMessage(): string {
-    if (this.isAtRoot) {
-      return 'No Trusts yet. Use "+ New Trust" to create the first one.';
-    }
-    if (!this.canCreate) {
-      return `${this.currentParentName} has no child Divisions.`;
-    }
-    return `No ${this.levelLabel}s yet. Use "+ New ${this.levelLabel}" to add one.`;
-  }
-
-  /** Returns the short display label for a Division row's level. */
-  getLevelLabel(level: number): string {
-    return LEVEL_LABELS[level] ?? 'Division';
-  }
-
-  // ── Navigation ─────────────────────────────────────────────────────────────
-  navigateTo(division: Division): void {
-    this.breadcrumb.push({ id: division.id, name: division.division_name });
-    this.currentParent     = division;
-    this.showCreateForm    = false;
-    this.showEditForm      = false;
-    this.createSuccess     = false;
-    this.editDivisionError = '';
-    this.loadDivisions(division.id);
-  }
-
-  navigateBreadcrumb(index: number): void {
-    this.breadcrumb        = this.breadcrumb.slice(0, index + 1);
-    this.currentParent     = null; // Re-fetched if user opens Edit at this level.
-    this.showCreateForm    = false;
-    this.showEditForm      = false;
-    this.editDivisionError = '';
-    this.loadDivisions(this.breadcrumb[index].id);
-  }
-
-  // ── Data ───────────────────────────────────────────────────────────────────
-  private loadDivisions(parentId: string | null): void {
+  // ── Loading ────────────────────────────────────────────────────────────────
+  private loadDivisions(): void {
     this.loading        = true;
     this.blockedMessage = '';
     this.cdr.markForCheck();
 
-    this.mcp
-      .call<Division[]>(
-        'division',
-        'list_divisions',
-        { parent_division_id: parentId }
-      )
-      .subscribe({
-        next: (res) => {
-          if (res.success && res.data) {
-            this.currentDivisions = Array.isArray(res.data) ? res.data : [];
-          } else {
-            this.setBlocked(
-              res.error ?? 'Could not load divisions.',
-              'Ensure you have admin access and your session is active.'
+    this.mcp.call<Division[]>('division', 'list_divisions', {
+      all_levels: true,
+      include_inactive: true,
+      with_member_counts: true
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.allDivisions = Array.isArray(res.data) ? res.data : [];
+          if (!this.defaultExpansionApplied) {
+            this.expandedIds = new Set(
+              this.allDivisions.filter(d => d.division_level === 0).map(d => d.id)
             );
+            this.defaultExpansionApplied = true;
           }
-          this.loading = false;
-          this.cdr.markForCheck();
-        },
-        error: (err: { error?: string }) => {
+        } else {
           this.setBlocked(
-            err.error ?? 'Could not load divisions.',
+            res.error ?? 'Could not load Divisions.',
             'Ensure you have admin access and your session is active.'
           );
-          this.loading = false;
-          this.cdr.markForCheck();
         }
-      });
+        this.loading = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.setBlocked(
+          err.error ?? 'Could not load Divisions.',
+          'Ensure you have admin access and your session is active.'
+        );
+        this.loading = false;
+        this.cdr.markForCheck();
+      }
+    });
   }
 
-  // ── Create ─────────────────────────────────────────────────────────────────
-  toggleCreateForm(): void {
-    this.showCreateForm = !this.showCreateForm;
-    this.createError    = '';
-    this.createSuccess  = false;
-    if (this.showCreateForm) {
-      this.showEditForm = false;
-      this.createForm.reset();
+  private loadUsersOnce(): void {
+    this.mcp.call<User[]>('division', 'list_users', {}).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.allUsers = Array.isArray(res.data) ? res.data : [];
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => { /* non-fatal */ }
+    });
+  }
+
+  // ── Screen-state ──────────────────────────────────────────────────────────
+  private async restoreScreenState(): Promise<void> {
+    const saved = await this.screenState.restore(SCREEN_KEYS.ADMIN_DIVISIONS);
+    if (!saved) { return; }
+    const f = saved.filter_state as Partial<FilterState> | null;
+    if (f && typeof f === 'object') {
+      const level: LevelFilter =
+        f.level === 0 || f.level === 1 || f.level === 2 ? f.level
+        : f.level === 'all' ? 'all' : 'all';
+      const status: ActiveFilter =
+        f.activeStatus === 'active' || f.activeStatus === 'inactive' || f.activeStatus === 'all'
+          ? f.activeStatus : 'active';
+      this.filters = { level, activeStatus: status };
+      this.pendingFilters = { ...this.filters };
+      this.cdr.markForCheck();
     }
   }
 
-  submitCreate(): void {
-    if (this.createForm.invalid) { return; }
-    this.creating      = true;
-    this.createError   = '';
-    this.createSuccess = false;
-    this.cdr.markForCheck();
-
-    const params: Record<string, unknown> = {
-      division_name:       this.createForm.value.division_name as string,
-      display_name_short:  (this.createForm.value.display_name_short as string).trim(),
-      parent_division_id:  this.currentParentId,
-      // Auto-set type label from level — no manual selection needed (D-L2/L3 interim).
-      division_type_label: TYPE_LABELS[this.currentLevel] ?? ''
-    };
-
-    this.mcp
-      .call<{ division: Division }>('division', 'create_division', params)
-      .subscribe({
-        next: (res) => {
-          if (res.success) {
-            this.createSuccess  = true;
-            this.showCreateForm = false;
-            this.createForm.reset();
-            this.loadDivisions(this.currentParentId);
-          } else {
-            // D-140: surface the server message — it carries the unblock
-            // path ("Contact your System Admin to request access"). B-80
-            // was previously read as "swallow every server error"; the
-            // server errors here are written D-140-compliant for direct
-            // display. Generic fallback only when res.error is empty.
-            console.warn('[divisions] create_division failed:', res.error);
-            this.createError = res.error?.trim()
-              ? res.error
-              : 'Unable to save changes. Please try again.';
-          }
-          this.creating = false;
-          this.cdr.markForCheck();
-        },
-        error: (err: { error?: string }) => {
-          console.warn('[divisions] create_division HTTP error:', err);
-          // Network / non-2xx — fall back to generic. The McpService
-          // catchError pipeline already produces a D-140-shaped string
-          // when the server responded with one.
-          this.createError = err?.error?.trim()
-            ? err.error
-            : 'Unable to save changes. Please try again.';
-          this.creating    = false;
-          this.cdr.markForCheck();
-        }
-      });
+  private saveScreenState(): void {
+    this.screenState.save(SCREEN_KEYS.ADMIN_DIVISIONS,
+      this.filters as unknown as Record<string, unknown>, {});
   }
 
-  // ── Edit ───────────────────────────────────────────────────────────────────
-  toggleEditForm(): void {
-    this.showEditForm      = !this.showEditForm;
-    this.editDivisionError = '';
-    this.editAttempted     = false;
-    if (this.showEditForm) {
-      this.showCreateForm = false;
-      this.editDivisionForm.reset();
-      // Pre-populate with current values. If currentParent isn't cached (entered via breadcrumb),
-      // fetch it via get_division to populate display_name_short correctly. CC-C11-003.
-      if (this.currentParent) {
-        this.editDivisionForm.patchValue({
-          division_name:      this.currentParent.division_name,
-          display_name_short: this.currentParent.display_name_short ?? ''
-        });
-      } else if (this.currentParentId) {
-        this.mcp.call<Division>('division', 'get_division', { division_id: this.currentParentId })
-          .subscribe(res => {
-            if (res.success && res.data) {
-              this.currentParent = res.data;
-              this.editDivisionForm.patchValue({
-                division_name:      res.data.division_name,
-                display_name_short: res.data.display_name_short ?? ''
-              });
-              this.cdr.markForCheck();
-            }
-          });
+  // ── Tree rendering ────────────────────────────────────────────────────────
+  /**
+   * Flatten the tree honoring expand/collapse — a child is visible only when
+   * every ancestor is in expandedIds. Sorted by level then name.
+   */
+  get visibleRows(): { division: Division }[] {
+    const out: { division: Division }[] = [];
+    const trusts = this.allDivisions
+      .filter(d => d.division_level === 0 && this.matchesFilters(d))
+      .sort((a, b) => a.division_name.localeCompare(b.division_name));
+    for (const trust of trusts) {
+      out.push({ division: trust });
+      if (this.expandedIds.has(trust.id)) {
+        const serviceLines = this.allDivisions
+          .filter(d => d.parent_division_id === trust.id && d.division_level === 1 && this.matchesFilters(d))
+          .sort((a, b) => a.division_name.localeCompare(b.division_name));
+        for (const sl of serviceLines) {
+          out.push({ division: sl });
+          if (this.expandedIds.has(sl.id)) {
+            const fts = this.allDivisions
+              .filter(d => d.parent_division_id === sl.id && d.division_level === 2 && this.matchesFilters(d))
+              .sort((a, b) => a.division_name.localeCompare(b.division_name));
+            for (const ft of fts) { out.push({ division: ft }); }
+          }
+        }
       }
     }
+    return out;
   }
 
-  /** B-50: Cancel button at the form bottom. Same effect as toggleEditForm when open. */
-  closeEditForm(): void {
-    this.showEditForm      = false;
-    this.editDivisionError = '';
-    this.editAttempted     = false;
-    this.editDivisionForm.reset();
+  get visibleDivisionCount(): number { return this.visibleRows.length; }
+
+  private matchesFilters(d: Division): boolean {
+    if (this.filters.level !== 'all' && d.division_level !== this.filters.level) { return false; }
+    if (this.filters.activeStatus === 'active'   && d.active_status === false) { return false; }
+    if (this.filters.activeStatus === 'inactive' && d.active_status !== false) { return false; }
+    return true;
+  }
+
+  canExpand(d: Division): boolean {
+    if (d.division_level === 2) { return false; }
+    return this.allDivisions.some(child => child.parent_division_id === d.id);
+  }
+
+  isExpanded(id: string): boolean { return this.expandedIds.has(id); }
+
+  toggleExpand(ev: Event, id: string): void {
+    ev.stopPropagation();
+    if (this.expandedIds.has(id)) {
+      this.expandedIds.delete(id);
+    } else {
+      this.expandedIds.add(id);
+    }
     this.cdr.markForCheck();
   }
 
-  /** B-63 helper: char count for "N/10" counter on the Edit form. */
-  get displayNameShortCount(): number {
-    return ((this.editDivisionForm?.get('display_name_short')?.value as string) ?? '').length;
+  parentName(d: Division): string {
+    if (!d.parent_division_id) { return ''; }
+    const parent = this.allDivisions.find(x => x.id === d.parent_division_id);
+    return parent ? parent.division_name : '';
   }
 
-  /** Same counter for the Create form. */
-  get createDisplayNameShortCount(): number {
-    return ((this.createForm?.get('display_name_short')?.value as string) ?? '').length;
+  levelLabel(level: number): string { return LEVEL_LABELS[level] ?? `Level ${level}`; }
+
+  // ── Filter chips ──────────────────────────────────────────────────────────
+  get activeFilterCount(): number { return this.activeFilterChips.length; }
+
+  get activeFilterChips(): { id: string; label: string }[] {
+    const out: { id: string; label: string }[] = [];
+    if (this.filters.level !== 'all') {
+      out.push({ id: 'level', label: `Level: ${LEVEL_LABELS[this.filters.level as number]}` });
+    }
+    if (this.filters.activeStatus !== 'active') {
+      out.push({
+        id: 'active',
+        label: `Active: ${this.filters.activeStatus === 'all' ? 'All' : 'Inactive'}`
+      });
+    }
+    return out;
   }
 
-  submitEditDivision(): void {
-    // B-63: D-297 — never disable Save. Show inline validation errors only on submit attempt.
-    this.editAttempted = true;
-    if (this.editDivisionForm.invalid || !this.currentParentId) {
+  removeFilterChip(id: string): void {
+    if (id === 'level') { this.filters = { ...this.filters, level: 'all' }; }
+    if (id === 'active') { this.filters = { ...this.filters, activeStatus: 'active' }; }
+    this.pendingFilters = { ...this.filters };
+    this.saveScreenState();
+    this.cdr.markForCheck();
+  }
+
+  // ── Filter panel ──────────────────────────────────────────────────────────
+  openFilterPanel(): void {
+    this.pendingFilters = { ...this.filters };
+    this.expandedFilterRow = null;
+    this.filterPanelOpen = true;
+    this.cdr.markForCheck();
+  }
+
+  closeFilterPanel(): void {
+    this.filterPanelOpen = false;
+    this.expandedFilterRow = null;
+    this.cdr.markForCheck();
+  }
+
+  toggleFilterRow(row: 'level' | 'active'): void {
+    this.expandedFilterRow = this.expandedFilterRow === row ? null : row;
+    this.cdr.markForCheck();
+  }
+
+  setPendingLevel(level: LevelFilter): void {
+    this.pendingFilters = { ...this.pendingFilters, level };
+    this.cdr.markForCheck();
+  }
+
+  setPendingActive(value: ActiveFilter): void {
+    this.pendingFilters = { ...this.pendingFilters, activeStatus: value };
+    this.cdr.markForCheck();
+  }
+
+  get pendingLevelSummary(): string {
+    return this.pendingFilters.level === 'all' ? 'All' : LEVEL_LABELS[this.pendingFilters.level as number];
+  }
+
+  get pendingActiveSummary(): string {
+    const s = this.pendingFilters.activeStatus;
+    return s === 'active' ? 'Active' : s === 'inactive' ? 'Inactive' : 'All';
+  }
+
+  applyFilters(): void {
+    this.filters = { ...this.pendingFilters };
+    this.saveScreenState();
+    this.closeFilterPanel();
+  }
+
+  clearPendingFilters(): void {
+    this.pendingFilters = { ...DEFAULT_FILTER };
+    this.expandedFilterRow = null;
+    this.cdr.markForCheck();
+  }
+
+  // ── Panel open / close ────────────────────────────────────────────────────
+  openView(div: Division): void {
+    this.selectedDivision   = div;
+    this.selectedDivisionId = div.id;
+    this.panelMode          = 'view';
+    this.editError          = '';
+    this.memberError        = '';
+    this.addPickerOpen      = false;
+    this.addPickerSearch    = '';
+    this.pendingRemoveMember = null;
+    this.loadMembers(div.id);
+    this.cdr.markForCheck();
+  }
+
+  openParentView(): void {
+    if (!this.selectedDivision?.parent_division_id) { return; }
+    const parent = this.allDivisions.find(d => d.id === this.selectedDivision!.parent_division_id);
+    if (parent) { this.openView(parent); }
+  }
+
+  startEdit(): void {
+    if (!this.selectedDivision) { return; }
+    const d = this.selectedDivision;
+    this.editForm.setValue({ division_name: d.division_name });
+    this.editActiveValue = d.active_status !== false;
+    this.showDeactivateConfirm = false;
+    this.editError = '';
+    this.panelMode = 'edit';
+    this.cdr.markForCheck();
+  }
+
+  closePanel(): void {
+    this.panelMode = null;
+    this.selectedDivision = null;
+    this.selectedDivisionId = null;
+    this.addPickerOpen = false;
+    this.pendingRemoveMember = null;
+    this.cdr.markForCheck();
+  }
+
+  onScrimClick(): void {
+    if (this.panelMode === 'edit') {
+      if (this.editForm.dirty) {
+        if (!confirm('Discard unsaved changes?')) { return; }
+      }
+      // Return to View if a Division is selected.
+      this.panelMode = this.selectedDivision ? 'view' : null;
+      this.editForm.markAsPristine();
       this.cdr.markForCheck();
       return;
     }
-    this.savingDivision    = true;
-    this.editDivisionError = '';
+    this.closePanel();
+  }
+
+  // ── Edit save ─────────────────────────────────────────────────────────────
+  setEditActive(value: boolean): void {
+    this.editActiveValue = value;
+    this.showDeactivateConfirm = false;
+    this.cdr.markForCheck();
+  }
+
+  askDeactivate(): void {
+    // S-032 + D-183: two-step confirmation naming the consequence.
+    this.showDeactivateConfirm = true;
+    this.cdr.markForCheck();
+  }
+
+  cancelDeactivate(): void {
+    this.showDeactivateConfirm = false;
+    this.editActiveValue = true;
+    this.cdr.markForCheck();
+  }
+
+  confirmDeactivate(): void {
+    this.editActiveValue = false;
+    this.showDeactivateConfirm = false;
+    this.cdr.markForCheck();
+  }
+
+  submitEdit(): void {
+    if (this.editForm.invalid || !this.selectedDivisionId) { return; }
+    this.saving = true;
+    this.editError = '';
     this.cdr.markForCheck();
 
-    const v = this.editDivisionForm.value as { division_name: string; display_name_short: string };
+    const updates: Record<string, unknown> = {
+      division_name: (this.editForm.value.division_name as string).trim()
+    };
+    if (this.selectedDivision && this.editActiveValue !== (this.selectedDivision.active_status !== false)) {
+      updates['active_status'] = this.editActiveValue;
+    }
 
-    this.mcp
-      .call<Division>('division', 'update_division', {
-        division_id: this.currentParentId,
-        updates: {
-          division_name:      v.division_name,
-          display_name_short: v.display_name_short.trim()
+    this.mcp.call<Division>('division', 'update_division', {
+      division_id: this.selectedDivisionId,
+      updates
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.successMsg = 'Division updated.';
+          setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
+          // Reload the grid + refresh selected.
+          this.loadDivisions();
+          this.selectedDivision = res.data;
+          this.panelMode = 'view';
+          this.editForm.markAsPristine();
+        } else {
+          this.editError = res.error ?? 'Save failed.';
         }
-      })
-      .subscribe({
-        next: (res) => {
-          if (res.success && res.data) {
-            // Update breadcrumb name immediately — no reload needed.
-            this.breadcrumb[this.breadcrumb.length - 1].name = v.division_name;
-            this.currentParent = res.data;
-            this.showEditForm  = false;
-            this.editAttempted = false;
-            this.editDivisionForm.reset();
-          } else {
-            // D-140: surface the server message when present (server errors
-            // are written D-140-compliant). Generic fallback only when empty.
-            console.warn('[divisions] update_division failed:', res.error);
-            this.editDivisionError = res.error?.trim()
-              ? res.error
-              : 'Unable to save changes. Please try again.';
-          }
-          this.savingDivision = false;
-          this.cdr.markForCheck();
-        },
-        error: (err: { error?: string }) => {
-          console.warn('[divisions] update_division HTTP error:', err);
-          this.editDivisionError = err?.error?.trim()
-            ? err.error
-            : 'Unable to save changes. Please try again.';
-          this.savingDivision    = false;
-          this.cdr.markForCheck();
+        this.saving = false;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.editError = err.error ?? 'Save failed.';
+        this.saving = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // ── Members ───────────────────────────────────────────────────────────────
+  private loadMembers(divisionId: string): void {
+    this.loadingMembers = true;
+    this.cdr.markForCheck();
+    this.mcp.call<User[]>('division', 'list_users', { division_id: divisionId }).subscribe({
+      next: (res) => {
+        this.members = res.success && Array.isArray(res.data) ? res.data : [];
+        this.loadingMembers = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.members = [];
+        this.loadingMembers = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  openAddPicker(): void {
+    this.addPickerOpen = true;
+    this.addPickerSearch = '';
+    this.memberError = '';
+    this.cdr.markForCheck();
+  }
+
+  onAddPickerSearch(ev: Event): void {
+    this.addPickerSearch = (ev.target as HTMLInputElement).value.toLowerCase();
+    this.cdr.markForCheck();
+  }
+
+  /** Active users not already in this Division, optionally filtered by search. */
+  get selectableUsers(): User[] {
+    const memberIds = new Set(this.members.map(m => m.id));
+    const q = this.addPickerSearch.trim().toLowerCase();
+    return this.allUsers.filter(u =>
+      u.is_active &&
+      !memberIds.has(u.id) &&
+      (!q || u.display_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+    );
+  }
+
+  addMember(user: User): void {
+    if (!this.selectedDivisionId) { return; }
+    this.addingMemberId = user.id;
+    this.memberError = '';
+    this.cdr.markForCheck();
+
+    this.mcp.call<unknown>('division', 'assign_user_to_division', {
+      user_id: user.id,
+      division_id: this.selectedDivisionId
+    }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.loadMembers(this.selectedDivisionId!);
+          this.loadDivisions();  // refresh member_count
+        } else {
+          this.memberError = res.error ?? 'Could not add member.';
         }
-      });
+        this.addingMemberId = null;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.memberError = err.error ?? 'Could not add member.';
+        this.addingMemberId = null;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  askRemoveMember(user: User): void {
+    this.pendingRemoveMember = user;
+    this.cdr.markForCheck();
+  }
+
+  confirmRemoveMember(): void {
+    if (!this.selectedDivisionId || !this.pendingRemoveMember) { return; }
+    const user = this.pendingRemoveMember;
+    this.removingMemberId = user.id;
+    this.pendingRemoveMember = null;
+    this.memberError = '';
+    this.cdr.markForCheck();
+
+    this.mcp.call<unknown>('division', 'revoke_division_membership', {
+      user_id: user.id,
+      division_id: this.selectedDivisionId
+    }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.loadMembers(this.selectedDivisionId!);
+          this.loadDivisions();
+        } else {
+          this.memberError = res.error ?? 'Could not remove member.';
+        }
+        this.removingMemberId = null;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.memberError = err.error ?? 'Could not remove member.';
+        this.removingMemberId = null;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // ── Overlay state ─────────────────────────────────────────────────────────
+  get panelOverlayBusy(): boolean {
+    return this.saving || this.addingMemberId !== null || this.removingMemberId !== null;
+  }
+  get panelOverlayMessage(): string {
+    if (this.saving)               { return 'Saving…'; }
+    if (this.addingMemberId)       { return 'Adding…'; }
+    if (this.removingMemberId)     { return 'Removing…'; }
+    return '';
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  userFlags(user: User): RoleFlag[] {
+    return ALL_ROLE_FLAGS.filter(f => user[f] === true);
+  }
+
+  flagAbbrev(flag: RoleFlag): string {
+    return ROLE_FLAG_ABBREVIATIONS[flag];
   }
 
   private setBlocked(primary: string, hint: string): void {

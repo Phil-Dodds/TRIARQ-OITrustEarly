@@ -33,6 +33,10 @@ export interface User {
   // Active Division memberships, present on list_users responses that omit a
   // division_id filter (D-395, CC-19-02). Empty array = no memberships.
   division_names?:                       string[];
+  // Contract 21 (D-411): pre-computed Division summary string for grid display.
+  // "No Division" (0) / names comma-separated (1–2) / "N Divisions" (3+).
+  division_count?:                       number;
+  division_summary?:                     string;
 }
 
 export interface Division {
@@ -45,6 +49,12 @@ export interface Division {
   division_level:     number;
   division_type_label: string | null;
   owner_user_id:      string | null;
+  // Contract 21 (D-413/D-414/S-032): soft-block flag added by Migration 036.
+  // When false, new Initiatives and new user assignments are blocked at MCP.
+  active_status?:     boolean;
+  // Contract 21 (D-413): member_count is surfaced by list_divisions when
+  // with_member_counts is requested. Optional because not every caller asks.
+  member_count?:      number;
   created_by:         string;
   created_at:         string;
   updated_at:         string;

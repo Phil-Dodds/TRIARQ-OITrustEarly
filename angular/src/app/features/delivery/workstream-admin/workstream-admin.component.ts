@@ -871,9 +871,10 @@ export class WorkstreamAdminComponent implements OnInit {
   get inactiveCount(): number { return this.workstreams.filter(w => !w.active_status).length; }
 
   get activeDivisions(): Division[] {
-    // Divisions returned from list_divisions are already non-deleted; no
-    // additional active flag exists on Division. Surface all returned rows.
-    return this.divisions;
+    // S-032 (Contract 21): exclude inactive Divisions from the selectable set.
+    // Existing rows referencing an inactive Division continue to display via
+    // divisionName(id) which still searches the full list.
+    return this.divisions.filter(d => d.active_status !== false);
   }
   get activeUsers(): User[] {
     return this.users.filter(u => u.is_active);

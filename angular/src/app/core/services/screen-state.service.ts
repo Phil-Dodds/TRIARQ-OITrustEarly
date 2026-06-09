@@ -33,6 +33,7 @@ export const SCREEN_KEYS = {
   DELIVERY_GATES:           'delivery.gates',
   DELIVERY_DEPLOY_SCHEDULE: 'delivery.deploy-schedule',
   ADMIN_USERS:              'admin.users',
+  ADMIN_DIVISIONS:          'admin.divisions',
   ADMIN_WORKSTREAMS:        'admin.workstreams',
   // Contract 20 (D-401): EPO WIP Limits admin screen.
   ADMIN_EPO_WIP:            'admin.epo-wip',

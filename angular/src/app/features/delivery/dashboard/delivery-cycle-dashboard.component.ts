@@ -1400,8 +1400,13 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   private loadDivisions(): void {
     // all_levels:true returns all divisions across the hierarchy, not just root trusts.
-    // Needed so the Owner Division create-form dropdown has a full list to choose from.
-    this.mcp.call<Division[]>('division', 'list_divisions', { all_levels: true }).subscribe({
+    // include_inactive:true so existing cycles whose Division was deactivated still
+    // render the Division name and the admin filter can surface inactive entries.
+    // Per-picker rendering filters inactive at the dropdown level (S-032).
+    this.mcp.call<Division[]>('division', 'list_divisions', {
+      all_levels: true,
+      include_inactive: true
+    }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
           this.divisions = Array.isArray(res.data) ? res.data : [];

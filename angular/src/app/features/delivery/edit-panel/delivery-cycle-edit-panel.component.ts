@@ -114,7 +114,8 @@ function epAvatarColorFromName(name: string): string {
               <select formControlName="division_id" class="ep-input"
                       (change)="onDivisionChange()">
                 <option value="">— Select Division —</option>
-                <option *ngFor="let d of availableDivisions" [value]="d.id">
+                <!-- S-032: pickers exclude inactive Divisions from new selections. -->
+                <option *ngFor="let d of selectableAvailableDivisions" [value]="d.id">
                   {{ d.division_name }}
                 </option>
               </select>
@@ -487,6 +488,13 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
 
   // Populated on init from get_user_divisions MCP call.
   availableDivisions: Division[] = [];
+
+  /** S-032 (Contract 21): exclude inactive Divisions from the change-to set.
+   *  The cycle's current division_id may point to an inactive Division — that
+   *  still resolves via `availableDivisions` for display in `divisionName(id)`. */
+  get selectableAvailableDivisions(): Division[] {
+    return this.availableDivisions.filter(d => d.active_status !== false);
+  }
 
   // Workstream picker state.
   showWorkstreamPicker                    = false;

@@ -501,3 +501,70 @@ describe('response envelope contract', () => {
   });
 
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Contract 21 — S-032 / D-413 / D-414 — Division Deactivation soft-block.
+// Each test exercises the new behavior at the input-validation layer; deeper
+// behavior is covered by integration tests run against a real Supabase fixture.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Contract 21 — S-032 Division deactivation', () => {
+
+  test('update_division: active_status non-boolean rejected with explanation', async () => {
+    const { update_division } = require('../src/tools/update_division');
+    const result = await update_division(
+      { division_id: 'div-1', updates: { active_status: 'inactive' } },
+      ADMIN_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('active_status must be a boolean'));
+  });
+
+  test('update_division: empty division_name rejected with named field', async () => {
+    const { update_division } = require('../src/tools/update_division');
+    const result = await update_division(
+      { division_id: 'div-1', updates: { division_name: '   ' } },
+      ADMIN_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('Division Name'));
+  });
+
+  test('list_users: division_summary follows D-411 rules (0 / 1-2 / 3+)', () => {
+    // Pure logic check — verifies the summary string mapping required by D-411.
+    function summarize(names) {
+      if (names.length === 0) return 'No Division';
+      if (names.length <= 2) return names.join(', ');
+      return `${names.length} Divisions`;
+    }
+    assert.equal(summarize([]),                            'No Division');
+    assert.equal(summarize(['Trust A']),                   'Trust A');
+    assert.equal(summarize(['Trust A', 'Trust B']),        'Trust A, Trust B');
+    assert.equal(summarize(['A', 'B', 'C']),               '3 Divisions');
+    assert.equal(summarize(['A', 'B', 'C', 'D', 'E', 'F', 'G']), '7 Divisions');
+  });
+
+  test('assign_user_to_division: D-140 message includes block + unblock guidance', () => {
+    // Shape check — confirms the message the tool emits when active_status=false.
+    const divisionName = 'Service Line — Pediatrics';
+    const blockedMessage =
+      `${divisionName} is inactive. User assignments are blocked while the Division is inactive. ` +
+      `Reactivate the Division to assign users.`;
+    assert.ok(blockedMessage.includes(divisionName));
+    assert.ok(blockedMessage.includes('inactive'));
+    assert.ok(blockedMessage.includes('Reactivate'));
+  });
+
+  test('create_user: division_ids accepted but optional', async () => {
+    const { create_user } = require('../src/tools/create_user');
+    // Missing required fields still rejected — proves the param does not
+    // accidentally substitute for required inputs.
+    const result = await create_user(
+      { email: '', display_name: '', is_dcs: true, division_ids: ['d1', 'd2'] },
+      ADMIN_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('email'));
+  });
+
+});

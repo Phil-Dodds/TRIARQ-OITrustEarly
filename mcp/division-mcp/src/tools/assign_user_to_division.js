@@ -48,16 +48,25 @@ async function assign_user_to_division(params, caller_user_id) {
     return { success: false, error: 'Target user not found.' };
   }
 
-  // Verify Division exists
+  // Verify Division exists and is active (Contract 21 / S-032 / D-414).
   const { data: division, error: divErr } = await supabase
     .from('divisions')
-    .select('id, division_name')
+    .select('id, division_name, active_status')
     .eq('id', division_id)
     .is('deleted_at', null)
     .single();
 
   if (divErr || !division) {
     return { success: false, error: 'Division not found.' };
+  }
+
+  // S-032 soft-block: new user assignments are blocked on inactive Divisions.
+  // D-140 message names the block AND what would unblock it.
+  if (division.active_status === false) {
+    return {
+      success: false,
+      error: `${division.division_name} is inactive. User assignments are blocked while the Division is inactive. Reactivate the Division to assign users.`
+    };
   }
 
   // Check for existing active membership

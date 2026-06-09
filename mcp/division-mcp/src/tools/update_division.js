@@ -2,12 +2,13 @@
 // Updates mutable fields on a Division. Admin-only.
 // division_level and parent_division_id are not mutable after creation.
 // display_name_short added Migration 030 + Contract 10 §6 B-48 / Contract 11 §B-48.
+// active_status added Migration 036 + Contract 21 / D-414 / S-032 (soft-block deactivation).
 
 'use strict';
 
 const { supabase } = require('../db');
 
-const MUTABLE_FIELDS = ['division_name', 'display_name_short', 'division_type_label', 'owner_user_id'];
+const MUTABLE_FIELDS = ['division_name', 'display_name_short', 'division_type_label', 'owner_user_id', 'active_status'];
 
 // Contract 10 §6 B-48: max 10 chars on display_name_short.
 const DISPLAY_NAME_SHORT_MAX = 10;
@@ -35,6 +36,19 @@ async function update_division(params, caller_user_id) {
       success: false,
       error: `The following fields cannot be updated: ${immutableAttempts.join(', ')}. Mutable fields: ${MUTABLE_FIELDS.join(', ')}.`
     };
+  }
+
+  // Validate active_status — must be boolean (Contract 21 / S-032).
+  if (updates.active_status !== undefined && typeof updates.active_status !== 'boolean') {
+    return { success: false, error: 'active_status must be a boolean.' };
+  }
+
+  // Validate division_name — non-empty string when provided.
+  if (updates.division_name !== undefined) {
+    if (typeof updates.division_name !== 'string' || updates.division_name.trim().length === 0) {
+      return { success: false, error: 'Division Name is required and cannot be empty.' };
+    }
+    updates.division_name = updates.division_name.trim();
   }
 
   // Validate display_name_short — non-empty string ≤ 10 chars (Contract 10 §6 B-48).
