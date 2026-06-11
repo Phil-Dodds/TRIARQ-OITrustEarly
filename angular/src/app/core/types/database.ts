@@ -30,6 +30,9 @@ export interface User {
   created_at:                            string;
   updated_at:                            string;
   deleted_at:                            string | null;
+  // D-422 / D-166 — last successful JWT validation against this user.
+  // Stamped by division-mcp JWT middleware. Migration 037. Nullable; "Never logged in" UX.
+  last_login_at?:                        string | null;
   // Active Division memberships, present on list_users responses that omit a
   // division_id filter (D-395, CC-19-02). Empty array = no memberships.
   division_names?:                       string[];

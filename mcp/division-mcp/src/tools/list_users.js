@@ -53,9 +53,11 @@ async function list_users(params, caller_user_id) {
   }
 
   // No division_id — return all non-deleted users, enriched with active Division memberships.
+  // D-422: last_login_at surfaced for User Management grid Last Login column +
+  // User View panel Login Activity zone.
   const { data: users, error } = await supabase
     .from('users')
-    .select('id, email, display_name, is_admin, is_dcs, is_epo, is_dol, is_ce, is_super_admin, is_active, allow_both_admin_and_functional_roles, created_at')
+    .select('id, email, display_name, is_admin, is_dcs, is_epo, is_dol, is_ce, is_super_admin, is_active, allow_both_admin_and_functional_roles, created_at, last_login_at')
     .is('deleted_at', null)
     .order('display_name');
 

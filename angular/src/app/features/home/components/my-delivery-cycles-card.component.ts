@@ -1,7 +1,16 @@
 // my-delivery-cycles-card.component.ts
-// Home screen card — My Initiatives summary (D-392).
+// Home screen card — My Initiatives summary (D-392, D-423).
 // Shows active Initiatives where the caller is the assigned DCS, EPO, or DOL (D-391).
 // Server scopes via assigned_to_current_user.
+//
+// D-423 deltas (per D-252 — applied as delta on existing implementation):
+//   - 5 rows visible (was 3)
+//   - Division short name chip per D-203
+//   - Status dot per D-419 walkback (Go to Deploy → Go to Build → Brief Review)
+//   - Sort by updated_at desc
+//   - "View all [N] →" navigates to All Initiatives with Assigned Person filter
+//   - Visible to all roles (home.component.ts toggle)
+//
 // D-93: DeliveryService only — no direct Supabase.
 // Rule 2: Presentation only.
 
@@ -16,33 +25,23 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { IonicModule }  from '@ionic/angular';
 import { DeliveryService } from '../../../core/services/delivery.service';
-import { DeliveryCycle, LifecycleStage, GateName, TierClassification } from '../../../core/types/database';
+import { DeliveryCycle, LifecycleStage, GateName, DateStatus } from '../../../core/types/database';
+
+// D-419 walkback chain — first gate with non-default status wins the row dot.
+const WALKBACK_CHAIN: readonly GateName[] = ['go_to_deploy', 'go_to_build', 'brief_review'];
+
+const STATUS_COLOR: Record<DateStatus, string> = {
+  not_started: '#9E9E9E',
+  on_track:    '#22c55e',
+  at_risk:     '#F2A620',
+  behind:      '#E96127',
+  complete:    '#257099'
+};
 
 const STAGE_LABEL: Partial<Record<LifecycleStage, string>> = {
   BRIEF: 'Brief', DESIGN: 'Design', SPEC: 'Spec', BUILD: 'Build',
   VALIDATE: 'Validate', UAT: 'UAT', PILOT: 'Pilot', RELEASE: 'Release',
   OUTCOME: 'Outcome', COMPLETE: 'Complete', CANCELLED: 'Cancelled', ON_HOLD: 'On Hold'
-};
-
-const GATE_LABEL: Record<GateName, string> = {
-  brief_review:  'Brief Review',
-  go_to_build:   'Go to Build',
-  go_to_deploy:  'Go to Deploy',
-  go_to_release: 'Go to Release',
-  close_review:  'Close Review'
-};
-
-// D-189: next gate derived from stage — mirrors NEXT_GATE_BY_STAGE in delivery-cycle-detail
-const NEXT_GATE_BY_STAGE: Partial<Record<LifecycleStage, GateName>> = {
-  BRIEF:    'brief_review',
-  DESIGN:   'go_to_build',
-  SPEC:     'go_to_build',
-  BUILD:    'go_to_deploy',
-  VALIDATE: 'go_to_deploy',
-  PILOT:    'go_to_release',
-  UAT:      'go_to_release',
-  RELEASE:  'close_review',
-  OUTCOME:  'close_review'
 };
 
 const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
@@ -59,9 +58,9 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
         <h4 style="margin:0;font-size:var(--triarq-text-h4);">My Initiatives</h4>
       </div>
 
-      <!-- D-178 Tier 1: Skeleton for initial load -->
+      <!-- D-178 Tier 1: Skeleton for initial load — D-423 async load per D-346. -->
       <div *ngIf="loading">
-        <div *ngFor="let _ of [1,2,3]"
+        <div *ngFor="let _ of [1,2,3,4,5]"
              style="padding:var(--triarq-space-xs) 0;
                     border-bottom:1px solid var(--triarq-color-border);">
           <ion-skeleton-text animated style="width:60%;height:14px;border-radius:4px;margin-bottom:4px;"></ion-skeleton-text>
@@ -69,22 +68,13 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
         </div>
       </div>
 
-      <!-- Attention banner -->
-      <div *ngIf="!loading && attentionCount > 0"
-           style="background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
-                  border-radius:0 6px 6px 0;padding:var(--triarq-space-xs) var(--triarq-space-sm);
-                  font-size:var(--triarq-text-small);font-weight:500;
-                  margin-bottom:var(--triarq-space-sm);">
-        ⚠ {{ attentionCount }} Initiative{{ attentionCount === 1 ? '' : 's' }} need{{ attentionCount === 1 ? 's' : '' }} attention
-      </div>
-
-      <!-- Active cycle list — S6: next gate + target date + tier badge per row -->
+      <!-- Active Initiative list — D-423 row layout: name + Division short + stage + status dot. -->
       <div *ngIf="!loading && activeCycles.length > 0">
         <div *ngFor="let cycle of activeCycles"
              style="padding:var(--triarq-space-xs) 0;
                     border-bottom:1px solid var(--triarq-color-border);">
 
-          <!-- Row 1: cycle title + stage badge + tier badge + attention indicator -->
+          <!-- Row 1: Initiative title (tappable) + Division short + Stage badge + Status dot per D-423 -->
           <div style="display:flex;align-items:center;gap:var(--triarq-space-xs);
                       margin-bottom:2px;flex-wrap:wrap;">
             <a [routerLink]="['/initiatives', cycle.delivery_cycle_id]"
@@ -95,64 +85,44 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
                [title]="cycle.cycle_title">
               {{ cycle.cycle_title }}
             </a>
-            <!-- Stage badge — S6 -->
+            <!-- D-423 + D-203: Division short name. Falls back to division_name. -->
+            <span *ngIf="divisionShort(cycle)"
+                  style="font-size:9px;color:#5A5A5A;flex-shrink:0;
+                         max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                  [title]="cycle.division_name ?? ''">
+              {{ divisionShort(cycle) }}
+            </span>
+            <!-- Stage badge -->
             <span class="oi-pill"
                   style="font-size:9px;flex-shrink:0;
                          background:var(--triarq-color-background-subtle);">
               {{ STAGE_LABEL[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
             </span>
-            <!-- Tier badge — S6 -->
-            <span class="oi-pill"
-                  [style.background]="tierPillBg(cycle.tier_classification)"
-                  style="font-size:9px;flex-shrink:0;">
-              T{{ tierShort(cycle.tier_classification) }}
-            </span>
-            <span *ngIf="needsAttention(cycle)"
-                  style="color:var(--triarq-color-sunray,#f5a623);flex-shrink:0;font-size:12px;"
-                  title="Needs attention">⚠</span>
-          </div>
-
-          <!-- Row 2: next gate + target date (S6) -->
-          <div style="font-size:10px;color:var(--triarq-color-text-secondary);
-                      display:flex;align-items:center;gap:var(--triarq-space-xs);">
-            <span *ngIf="nextGateLabel(cycle)" style="display:flex;align-items:center;gap:4px;">
-              <span style="font-weight:500;color:var(--triarq-color-text-primary);">
-                {{ nextGateLabel(cycle) }}
-              </span>
-              <span *ngIf="nextGateTargetDate(cycle)"
-                    [style.color]="nextGateDateColor(cycle)">
-                · {{ nextGateTargetDate(cycle) }}
-              </span>
-              <span *ngIf="!nextGateTargetDate(cycle)"
-                    style="font-style:italic;">— no target date set</span>
-            </span>
-            <span *ngIf="!nextGateLabel(cycle)"
-                  style="font-style:italic;">
-              {{ STAGE_LABEL[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
-            </span>
+            <!-- D-423: Status dot per D-419 walkback. -->
+            <span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;"
+                  [style.background]="statusDotColor(cycle)"
+                  [title]="statusDotLabel(cycle)"></span>
           </div>
 
         </div>
       </div>
 
-      <!-- Empty state -->
+      <!-- Empty state — D-423: "No Initiatives assigned to you yet." -->
       <div *ngIf="!loading && activeCycles.length === 0"
            style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-        No active Initiatives assigned to you.
-        <a routerLink="/initiatives/list"
-           style="display:block;margin-top:var(--triarq-space-xs);
-                  color:var(--triarq-color-primary);text-decoration:none;">
-          + Start an Initiative
-        </a>
+        No Initiatives assigned to you yet.
       </div>
 
-      <!-- Footer: "View all [N] Initiatives →" -->
-      <div style="margin-top:var(--triarq-space-sm);padding-top:var(--triarq-space-xs);
+      <!-- Footer — D-423: "View all [N] →" navigates to All Initiatives with
+           Assigned Person filter set to "My Initiatives". -->
+      <div *ngIf="!loading && totalActive > 0"
+           style="margin-top:var(--triarq-space-sm);padding-top:var(--triarq-space-xs);
                   border-top:1px solid var(--triarq-color-border);">
-        <a routerLink="/initiatives"
+        <a [routerLink]="['/initiatives/list']"
+           [queryParams]="{ assigned_person: 'me' }"
            style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                   text-decoration:none;">
-          View all {{ totalActive > 0 ? totalActive + ' ' : '' }}Initiative{{ totalActive === 1 ? '' : 's' }} →
+          View all {{ totalActive }} →
         </a>
       </div>
     </div>
@@ -167,7 +137,7 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
   totalActive  = 0;
 
   readonly STAGE_LABEL = STAGE_LABEL;
-  private readonly MAX_SHOWN = 3;
+  private readonly MAX_SHOWN = 5;   // D-423: 5 rows visible.
   private readonly TODAY = new Date().toISOString().slice(0, 10);
 
   constructor(
@@ -180,7 +150,13 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
       next: (res) => {
         if (res.success && res.data) {
           const all = Array.isArray(res.data) ? res.data : [];
-          const active = all.filter(c => !TERMINAL.includes(c.current_lifecycle_stage));
+          // D-423: Active only (also exclude ON_HOLD per spec).
+          const active = all.filter(c =>
+            !TERMINAL.includes(c.current_lifecycle_stage) &&
+            c.current_lifecycle_stage !== 'ON_HOLD'
+          );
+          // D-423: Sort by updated_at descending (most recently updated first).
+          active.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
           this.totalActive  = active.length;
           this.activeCycles = active.slice(0, this.MAX_SHOWN);
         }
@@ -194,53 +170,38 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
     });
   }
 
-  get attentionCount(): number {
-    return this.activeCycles.filter(c => this.needsAttention(c)).length;
+  /** D-423 + D-203 — short Division name for the row chip. */
+  divisionShort(cycle: DeliveryCycle): string | null {
+    const c = cycle as unknown as { display_name_short?: string; division_name?: string };
+    return c.display_name_short ?? c.division_name ?? null;
   }
 
-  needsAttention(cycle: DeliveryCycle): boolean {
-    if (cycle.gate_records?.some(g => g.gate_status === 'blocked')) { return true; }
-    if (cycle.milestone_dates?.some(m => m.target_date && !m.actual_date && m.target_date < this.TODAY)) {
-      return true;
+  /** D-423 — status dot color via D-419 walkback. */
+  statusDotColor(cycle: DeliveryCycle): string {
+    const m = this.walkbackMilestone(cycle);
+    return STATUS_COLOR[m?.date_status ?? 'not_started'] ?? STATUS_COLOR.not_started;
+  }
+
+  /** D-423 — tooltip label matching the walkback'd milestone status. */
+  statusDotLabel(cycle: DeliveryCycle): string {
+    const m = this.walkbackMilestone(cycle);
+    if (!m) { return 'Not Started'; }
+    const map: Record<DateStatus, string> = {
+      not_started: 'Not Started',
+      on_track:    'On Track',
+      at_risk:     'At Risk',
+      behind:      'Behind',
+      complete:    'Complete'
+    };
+    return map[m.date_status];
+  }
+
+  /** D-419 walkback: Go to Deploy → Go to Build → Brief Review. */
+  private walkbackMilestone(cycle: DeliveryCycle) {
+    for (const gate of WALKBACK_CHAIN) {
+      const m = cycle.milestone_dates?.find(x => x.gate_name === gate);
+      if (m && m.date_status && m.date_status !== 'not_started') { return m; }
     }
-    return false;
-  }
-
-  /** S6: next gate name label for this cycle, null when terminal */
-  nextGateLabel(cycle: DeliveryCycle): string | null {
-    const gate = NEXT_GATE_BY_STAGE[cycle.current_lifecycle_stage];
-    return gate ? GATE_LABEL[gate] : null;
-  }
-
-  /** S6: target date for the next gate's milestone row */
-  nextGateTargetDate(cycle: DeliveryCycle): string | null {
-    const gate = NEXT_GATE_BY_STAGE[cycle.current_lifecycle_stage];
-    if (!gate) { return null; }
-    return cycle.milestone_dates?.find(m => m.gate_name === gate)?.target_date ?? null;
-  }
-
-  /** S6: color the target date based on proximity to today */
-  nextGateDateColor(cycle: DeliveryCycle): string {
-    const date = this.nextGateTargetDate(cycle);
-    if (!date) { return 'var(--triarq-color-text-secondary)'; }
-    if (date < this.TODAY) { return 'var(--triarq-color-error)'; }
-    // Within 7 days → amber
-    const daysAway = (new Date(date).getTime() - new Date(this.TODAY).getTime()) / 86_400_000;
-    if (daysAway <= 7) { return 'var(--triarq-color-sunray,#f5a623)'; }
-    return 'var(--triarq-color-text-secondary)';
-  }
-
-  /** S6: tier badge pill color */
-  tierPillBg(tier: TierClassification): string {
-    return tier === 'tier_1'
-      ? '#e8f5e9'
-      : tier === 'tier_2'
-        ? '#fff8e1'
-        : '#fce4ec';
-  }
-
-  /** S6: tier short label "1" | "2" | "3" */
-  tierShort(tier: TierClassification): string {
-    return tier.replace('tier_', '');
+    return null;
   }
 }

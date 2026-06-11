@@ -29,7 +29,8 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   HostListener,
-  OnInit
+  OnInit,
+  ViewChild
 } from '@angular/core';
 import { CommonModule }        from '@angular/common';
 import { RouterModule }        from '@angular/router';
@@ -52,6 +53,8 @@ import {
 }                                       from '../../../core/services/screen-state.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
+import { UserCreateFormComponent }     from '../../../shared/components/user-create-form/user-create-form.component';
+import { DivisionTreePickerComponent } from '../../../shared/pickers/division-tree-picker/division-tree-picker.component';
 import { User, Division }              from '../../../core/types/database';
 import {
   ALL_ROLE_FLAGS,
@@ -64,7 +67,8 @@ type ActiveRoleFlag = RoleFlag;
 
 type PanelMode = 'view' | 'edit' | 'create' | null;
 type ActiveFilter = 'all' | 'active' | 'inactive';
-type DivisionFilterMode = 'mine' | 'all' | 'single';
+// D-410 Amend 2: 'no-assigned' = users with zero division_memberships rows.
+type DivisionFilterMode = 'all' | 'no-assigned' | 'mine' | 'single';
 
 /** get_user_divisions response shape */
 interface UserDivisionsData {
@@ -81,9 +85,11 @@ interface FilterState {
   activeStatus:     ActiveFilter;
 }
 
+// D-410 Amend 1: Division filter default = All on User Management (admin surface).
+// Filter memory per D-171 wins after first visit.
 const DEFAULT_FILTER: FilterState = {
   roleFlags:    [],
-  divisionMode: 'mine',
+  divisionMode: 'all',
   divisionId:   null,
   activeStatus: 'all'
 };
@@ -112,7 +118,9 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
     ReactiveFormsModule,
     IonicModule,
     BlockedActionComponent,
-    LoadingOverlayComponent
+    LoadingOverlayComponent,
+    UserCreateFormComponent,
+    DivisionTreePickerComponent
   ],
   styles: [`
     :host{display:block}
@@ -122,14 +130,17 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
     .um-desc{font-size:11px;font-style:italic;color:#5A5A5A;margin-top:4px}
     .um-toolbar{display:flex;align-items:center;gap:var(--triarq-space-sm);margin-bottom:var(--triarq-space-sm);flex-wrap:wrap}
     .um-chip-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:var(--triarq-space-sm)}
-    .um-grid{border:1px solid var(--triarq-color-border);border-radius:10px;background:#fff;overflow:hidden}
-    .um-row{display:grid;grid-template-columns:2fr 2fr 1.4fr .9fr 1.3fr;gap:var(--triarq-space-sm);padding:var(--triarq-space-sm) var(--triarq-space-md);border-bottom:1px solid var(--triarq-color-border);align-items:center;font-size:13px}
-    .um-header-row{font-weight:500;color:var(--triarq-color-text-secondary);background:var(--triarq-color-background-subtle);border-bottom:2px solid var(--triarq-color-border)}
-    .um-data:hover{background:#fafbfc;cursor:pointer}
-    .um-data.um-selected{background:#eef6fb}
-    .um-name-cell{display:flex;flex-direction:column;gap:2px}
+    /* Grid container — Initiative grid look. Header is sticky Deep Navy uppercase. */
+    .um-grid{border:1px solid var(--triarq-color-border);border-radius:6px;background:#fff;overflow:hidden}
+    /* D-422: 6 columns — Name | Email | Role | Active | Last Login | Invite. */
+    .um-row{display:grid;grid-template-columns:2fr 2fr 1.4fr .9fr 1.1fr 1.1fr;gap:var(--triarq-space-sm);padding:6px var(--triarq-space-md);border-bottom:1px solid #E8E8E8;align-items:center;font-size:13px;border-left:3px solid transparent}
+    /* Header row — matches Initiative grid: Deep Navy bg, white uppercase, sticky. */
+    .um-header-row{font-weight:500;color:#fff;background:#12274A;text-transform:uppercase;letter-spacing:0.3px;font-size:13px;padding:8px var(--triarq-space-md);position:sticky;top:0;z-index:3;border-left:none;border-bottom:none}
+    .um-data:hover{background:#F0F4F8;cursor:pointer}
+    .um-data.um-selected{background:#E8F0FE;border-left:3px solid var(--triarq-color-primary,#257099)}
+    .um-name-cell{display:flex;flex-direction:column;gap:1px;min-width:0}
     .um-name{font-weight:500;color:var(--triarq-color-text-primary)}
-    .um-subline{font-size:11px;color:var(--triarq-color-text-secondary)}
+    .um-subline{font-size:11px;color:#5A5A5A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .um-no-div{font-style:italic}
     .um-pill{display:inline-flex;align-items:center;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:500;line-height:1.4}
     .um-role-pills{display:flex;flex-wrap:wrap;gap:4px}
@@ -138,6 +149,13 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
     .um-role-check{display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:6px 10px;border:1px solid var(--triarq-color-border);border-radius:5px;background:#fff;user-select:none}
     .um-div-chip{display:inline-flex;align-items:center;gap:6px;background:var(--triarq-color-primary);color:#fff;border-radius:999px;padding:4px 12px;font-size:12px;margin:0 6px 6px 0}
     .um-div-chip .um-x{background:none;border:none;color:#fff;cursor:pointer;font-size:14px;line-height:1;padding:0}
+    /* D-421 / D-200 Pattern 2 — amber warning band for missing Division assignment. */
+    .um-warn-band{display:flex;gap:8px;background:rgba(243,150,30,0.08);border-left:3px solid var(--triarq-color-sunray,#F3961E);padding:8px 10px;border-radius:5px;margin-bottom:8px;align-items:flex-start}
+    .um-warn-icon{color:#F3961E;font-size:14px;line-height:1.4;flex-shrink:0}
+    .um-warn-primary{font-size:13px;font-weight:500;color:var(--triarq-color-text-primary);margin-bottom:2px}
+    .um-warn-secondary{font-size:12px;color:#5A5A5A;line-height:1.4}
+    .um-warn-action{background:none;border:none;color:#257099;cursor:pointer;font-size:12px;font-weight:500;padding:4px 0 0 0;text-align:left}
+    .um-warn-action:hover{text-decoration:underline}
   `],
   template: `
     <div class="um-page">
@@ -187,8 +205,8 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
       <!-- Loading skeleton (D-178 Tier 1) ───────────────────────────────── -->
       <div class="um-grid" *ngIf="loading">
         <div class="um-row um-header-row">
-          <span>Name</span><span>Email</span><span>Role</span>
-          <span>Active</span><span>Invite</span>
+          <span>User Name</span><span>Email</span><span>Roles</span>
+          <span>Active Status</span><span>Last Login</span><span>Invite Status</span>
         </div>
         <div class="um-row" *ngFor="let _ of skeletonRows">
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
@@ -196,17 +214,24 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
           <ion-skeleton-text animated style="height:18px;border-radius:999px;width:80px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:18px;border-radius:999px;width:50px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
         </div>
       </div>
 
       <!-- Grid (D-196: header always rendered) ──────────────────────────── -->
       <div class="um-grid" *ngIf="!loading && users.length > 0">
         <div class="um-row um-header-row">
-          <span>Name</span>
+          <span>User Name</span>
           <span>Email</span>
-          <span>Role</span>
-          <span>Active</span>
-          <span>Invite</span>
+          <span>Roles</span>
+          <span>Active Status</span>
+          <!-- D-422: Last Login is sortable. Tap header toggles sort on/off; on = desc. -->
+          <span (click)="toggleLastLoginSort()"
+                style="cursor:pointer;user-select:none;"
+                [title]="sortByLastLogin ? 'Sorted by Last Login (most recent first). Tap to clear.' : 'Tap to sort by Last Login (most recent first).'">
+            Last Login{{ sortByLastLogin ? ' ▼' : '' }}
+          </span>
+          <span>Invite Status</span>
         </div>
 
         <div
@@ -250,6 +275,18 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                     ? 'var(--triarq-color-text-secondary)'
                     : 'var(--triarq-color-error)'">
               {{ user.is_active ? 'Active' : 'Inactive' }}
+            </span>
+          </span>
+          <!-- D-422: Last Login — relative time, ISO tooltip, "Never logged in" stone italic. -->
+          <span>
+            <span *ngIf="user.last_login_at"
+                  [title]="user.last_login_at"
+                  style="color:#5A5A5A;">
+              {{ relativeFromNow(user.last_login_at) }}
+            </span>
+            <span *ngIf="!user.last_login_at"
+                  style="color:#5A5A5A;font-style:italic;">
+              Never logged in
             </span>
           </span>
           <span>
@@ -305,17 +342,24 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
               <span class="oi-filter-row-val">{{ pendingDivisionSummary }}</span>
             </div>
             <div class="oi-filter-row-body" *ngIf="expandedFilterRow === 'division'">
+              <!-- D-410 Amend 1+2: order is All (default), No Division Assigned, My Divisions, Select single. -->
+              <label class="oi-picker-row">
+                <input type="radio" name="divMode"
+                       [checked]="pendingFilters.divisionMode === 'all'"
+                       (change)="setPendingDivisionMode('all')" />
+                <span>All</span>
+              </label>
+              <label class="oi-picker-row">
+                <input type="radio" name="divMode"
+                       [checked]="pendingFilters.divisionMode === 'no-assigned'"
+                       (change)="setPendingDivisionMode('no-assigned')" />
+                <span>No Division Assigned</span>
+              </label>
               <label class="oi-picker-row">
                 <input type="radio" name="divMode"
                        [checked]="pendingFilters.divisionMode === 'mine'"
                        (change)="setPendingDivisionMode('mine')" />
                 <span>My Divisions</span>
-              </label>
-              <label class="oi-picker-row">
-                <input type="radio" name="divMode"
-                       [checked]="pendingFilters.divisionMode === 'all'"
-                       (change)="setPendingDivisionMode('all')" />
-                <span>All Divisions</span>
               </label>
               <label class="oi-picker-row">
                 <input type="radio" name="divMode"
@@ -389,72 +433,12 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                       (click)="onScrimClick()" aria-label="Close">✕</button>
             </div>
             <div class="oi-side-body">
-              <form [formGroup]="inviteForm" (ngSubmit)="submitInvite()">
-                <div class="oi-field-row">
-                  <label class="oi-field-label">Email Address *</label>
-                  <input formControlName="email" type="email" class="oi-input"
-                         placeholder="user@triarqhealth.com"
-                         (paste)="onEmailPaste($event)" />
-                  <div class="oi-hint">
-                    Tip: paste directly from Outlook — e.g.
-                    <em>Philip Dodds &lt;pdodds&#64;triarqhealth.com&gt;</em>.
-                    Name and email will be parsed automatically.
-                  </div>
-                  <div class="oi-err"
-                       *ngIf="inviteForm.get('email')?.invalid && inviteForm.get('email')?.touched">
-                    Valid email is required.
-                  </div>
-                </div>
-                <div class="oi-field-row">
-                  <label class="oi-field-label">Name *</label>
-                  <input formControlName="display_name" class="oi-input" placeholder="First Last" />
-                  <div class="oi-err"
-                       *ngIf="inviteForm.get('display_name')?.invalid && inviteForm.get('display_name')?.touched">
-                    Name is required.
-                  </div>
-                </div>
-                <div class="oi-field-row">
-                  <label class="oi-field-label">Roles * (one or more)</label>
-                  <div class="um-role-checkboxes" [formGroup]="inviteForm">
-                    <label class="um-role-check" *ngFor="let flag of ALL_ROLE_FLAGS">
-                      <input type="checkbox" [formControlName]="flag" />
-                      <span>{{ flagAbbrev(flag) }} — {{ flagDisplay(flag) }}</span>
-                    </label>
-                  </div>
-                  <div class="oi-err"
-                       *ngIf="inviteForm.errors?.['noRoleSelected'] && inviteForm.touched">
-                    Select at least one role.
-                  </div>
-                </div>
-                <div class="oi-field-row">
-                  <label class="oi-field-label">Divisions (optional)</label>
-                  <div class="oi-zone-explain">Inactive Divisions are excluded.</div>
-                  <div style="max-height:160px;overflow-y:auto;border:1px solid var(--triarq-color-border);
-                              border-radius:5px; padding: 4px; margin-top: 6px;">
-                    <label class="oi-picker-row" *ngFor="let div of selectableDivisions">
-                      <span>
-                        <input type="checkbox"
-                               [checked]="createDivisionIds.includes(div.id)"
-                               (change)="toggleCreateDivision(div.id)" />
-                        {{ div.division_name }}
-                      </span>
-                    </label>
-                    <div *ngIf="selectableDivisions.length === 0"
-                         style="padding: 6px; font-size: 12px; color: var(--triarq-color-text-secondary);">
-                      No active Divisions available.
-                    </div>
-                  </div>
-                </div>
-                <div class="oi-err" *ngIf="inviteError">{{ inviteError }}</div>
-              </form>
-            </div>
-            <div class="oi-side-foot oi-side-foot-split">
-              <button class="oi-btn-secondary" (click)="onScrimClick()">Cancel</button>
-              <button class="oi-btn-primary"
-                      [disabled]="inviteForm.invalid || inviting"
-                      (click)="submitInvite()">
-                {{ inviting ? 'Creating…' : 'Create User' }}
-              </button>
+              <!-- S-007 — shared Create form component, reused by D-420 picker inline Add User. -->
+              <app-user-create-form
+                [allDivisions]="allDivisions"
+                (userCreated)="onUserCreated($event)"
+                (cancelled)="onScrimClick()">
+              </app-user-create-form>
             </div>
           </ng-container>
 
@@ -496,52 +480,74 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                 </div>
               </div>
 
-              <!-- Divisions zone -->
+              <!-- Divisions zone — D-417: hierarchical tree picker replaces flat list.
+                   Chips remain read-only — management happens in the modal tree picker. -->
               <div class="oi-zone">
                 <div class="oi-zone-title">Divisions</div>
                 <div *ngIf="loadingMemberships" style="font-size:12px;color:var(--triarq-color-text-secondary);">
                   Loading…
                 </div>
                 <div *ngIf="!loadingMemberships">
-                  <div *ngIf="userDirectDivisions.length === 0"
-                       class="oi-zone-explain">
-                    No Divisions assigned.
+                  <!-- D-421: D-200 Pattern 2 warning when user has zero Division assignments. -->
+                  <div *ngIf="userDirectDivisions.length === 0" class="um-warn-band">
+                    <span class="um-warn-icon">⚠</span>
+                    <div>
+                      <div class="um-warn-primary">No Division assigned.</div>
+                      <div class="um-warn-secondary">
+                        This user will not appear in Division-scoped views or Initiative
+                        pickers until a Division is assigned.
+                      </div>
+                      <button type="button" class="um-warn-action"
+                              (click)="openTreePicker()"
+                              [disabled]="treePickerBusy">
+                        Assign Division →
+                      </button>
+                    </div>
                   </div>
                   <div *ngIf="userDirectDivisions.length > 0" style="margin-bottom: 6px;">
                     <span class="um-div-chip" *ngFor="let div of userDirectDivisions">
                       {{ div.division_name }}
-                      <button class="um-x"
-                              (click)="revokeAssignment(div.id)"
-                              [disabled]="revokingDivisionId === div.id"
-                              title="Remove">×</button>
                     </span>
                   </div>
                   <button class="oi-btn-secondary"
-                          (click)="toggleAssignPicker()"
+                          *ngIf="userDirectDivisions.length > 0"
+                          (click)="openTreePicker()"
+                          [disabled]="treePickerBusy"
                           style="margin-top: 6px;">
-                    {{ assignPickerOpen ? 'Close picker' : 'Assign Divisions' }}
+                    {{ treePickerBusy ? 'Saving…' : 'Assign Divisions' }}
                   </button>
-                  <div *ngIf="assignPickerOpen"
-                       style="margin-top: 8px; max-height: 220px; overflow-y: auto;
-                              border:1px solid var(--triarq-color-border); border-radius: 5px;
-                              padding: 4px;">
-                    <label class="oi-picker-row" *ngFor="let div of selectableDivisions">
-                      <span>
-                        <input type="checkbox"
-                               [checked]="isAssigned(div.id)"
-                               (change)="onPickerToggle(div.id, !isAssigned(div.id))" />
-                        {{ div.division_name }}
-                      </span>
-                      <span class="oi-filter-row-val" *ngIf="div.division_level !== undefined">
-                        L{{ div.division_level }}
-                      </span>
-                    </label>
-                    <div *ngIf="selectableDivisions.length === 0"
-                         class="oi-zone-explain" style="padding: 6px;">
-                      No active Divisions available.
-                    </div>
-                  </div>
                   <div class="oi-err" *ngIf="assignError">{{ assignError }}</div>
+                </div>
+              </div>
+
+              <!-- D-422 Login Activity zone — below Roles/Divisions, above Invite -->
+              <div class="oi-zone">
+                <div class="oi-zone-title">Login Activity</div>
+                <div style="display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:12px;">
+                  <span style="color:var(--triarq-color-text-secondary);">Last Login</span>
+                  <span *ngIf="selectedUser.last_login_at"
+                        [title]="selectedUser.last_login_at"
+                        style="color:var(--triarq-color-text-primary);">
+                    {{ formatDateTime(selectedUser.last_login_at) }}
+                    <span style="color:#5A5A5A;">({{ relativeFromNow(selectedUser.last_login_at) }})</span>
+                  </span>
+                  <span *ngIf="!selectedUser.last_login_at"
+                        style="color:#5A5A5A;font-style:italic;">Never logged in</span>
+
+                  <span style="color:var(--triarq-color-text-secondary);">Account Created</span>
+                  <span style="color:var(--triarq-color-text-primary);"
+                        [title]="selectedUser.created_at">
+                    {{ formatDateTime(selectedUser.created_at) }}
+                  </span>
+
+                  <span style="color:var(--triarq-color-text-secondary);">Invite Status</span>
+                  <span>
+                    <span class="um-pill"
+                          [style.background]="inviteBadgeBg(inviteStatusFor(selectedUser.id))"
+                          [style.color]="inviteBadgeColor(inviteStatusFor(selectedUser.id))">
+                      {{ inviteBadgeLabel(inviteStatusFor(selectedUser.id)) }}
+                    </span>
+                  </span>
                 </div>
               </div>
 
@@ -625,6 +631,15 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
         </div>
       </ng-container>
 
+      <!-- D-417 — Division Assignment hierarchical tree picker modal -->
+      <app-division-tree-picker
+        *ngIf="treePickerOpen"
+        [allDivisions]="allDivisions"
+        [currentlyAssignedIds]="currentlyAssignedDivisionIds"
+        (confirmed)="onTreePickerConfirmed($event)"
+        (cancelled)="onTreePickerCancelled()">
+      </app-division-tree-picker>
+
     </div>
   `
 })
@@ -658,26 +673,25 @@ export class UsersComponent implements OnInit {
   selectedUserId: string | null = null;
   selectedUser: User | null     = null;
 
-  // Forms
-  inviteForm!:     FormGroup;
+  // Forms — Create form moved to shared UserCreateFormComponent (D-420 reuse). Edit stays inline.
   editForm!:       FormGroup;
-  inviting         = false;
-  inviteError      = '';
   saving           = false;
   editError        = '';
   emailDuplicateError = false;
   editingUserOriginalEmail = '';
+  /** ViewChild for the shared Create form — used for S-017 dirty-state check on scrim close. */
+  @ViewChild(UserCreateFormComponent) private userCreateForm?: UserCreateFormComponent;
 
   // Division assignment state (within View panel)
   userDirectDivisions: Division[] = [];
   loadingMemberships  = false;
-  assigning           = false;
-  revokingDivisionId: string | null = null;
   assignError         = '';
-  assignPickerOpen    = false;
+  treePickerOpen      = false;   // D-417 hierarchical tree picker modal
+  treePickerBusy      = false;   // batch MCP diff in flight
 
-  // Create state
-  createDivisionIds: string[] = [];
+  // D-422 — Last Login sort. Off = alphabetical by display_name (server default).
+  // Tap column header → on, sorts by last_login_at desc with nulls last.
+  sortByLastLogin     = false;
 
   // Template-accessible constants.
   readonly ALL_ROLE_FLAGS = ALL_ROLE_FLAGS;
@@ -693,16 +707,6 @@ export class UsersComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.inviteForm = this.fb.group({
-      email:        ['', [Validators.required, Validators.email]],
-      display_name: ['', Validators.required],
-      is_admin:     [false],
-      is_dcs:       [false],
-      is_epo:       [false],
-      is_dol:       [false],
-      is_ce:        [false]
-    }, { validators: atLeastOneRoleValidator });
-
     this.editForm = this.fb.group({
       display_name: ['', Validators.required],
       email:        ['', [Validators.required, Validators.email]],
@@ -738,8 +742,9 @@ export class UsersComponent implements OnInit {
         ? f.roleFlags.filter(valid) as ActiveRoleFlag[]
         : [];
       const mode: DivisionFilterMode =
-        f.divisionMode === 'all' || f.divisionMode === 'single' || f.divisionMode === 'mine'
-          ? f.divisionMode : 'mine';
+        f.divisionMode === 'all' || f.divisionMode === 'single'
+        || f.divisionMode === 'mine' || f.divisionMode === 'no-assigned'
+          ? f.divisionMode : 'all';
       const status: ActiveFilter =
         f.activeStatus === 'active' || f.activeStatus === 'inactive' || f.activeStatus === 'all'
           ? f.activeStatus : 'all';
@@ -845,7 +850,52 @@ export class UsersComponent implements OnInit {
 
   // ── Filtering ──────────────────────────────────────────────────────────────
   get filteredUsers(): User[] {
-    return this.users.filter(u => this.matches(u));
+    const list = this.users.filter(u => this.matches(u));
+    if (!this.sortByLastLogin) { return list; }
+    // D-422: descending by last_login_at, nulls last (never-logged-in users go to bottom).
+    return [...list].sort((a, b) => {
+      const av = a.last_login_at ?? null;
+      const bv = b.last_login_at ?? null;
+      if (av && bv) { return bv.localeCompare(av); }
+      if (av) { return -1; }
+      if (bv) { return 1; }
+      return (a.display_name || '').localeCompare(b.display_name || '');
+    });
+  }
+
+  toggleLastLoginSort(): void {
+    this.sortByLastLogin = !this.sortByLastLogin;
+    this.cdr.markForCheck();
+  }
+
+  /** D-422 relative time formatter — coarse buckets, no external lib. */
+  relativeFromNow(iso: string | null | undefined): string {
+    if (!iso) { return ''; }
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) { return ''; }
+    const diffMs = Date.now() - t;
+    if (diffMs < 0) { return 'just now'; }
+    const min = Math.floor(diffMs / 60000);
+    if (min < 1)     { return 'just now'; }
+    if (min < 60)    { return `${min} minute${min === 1 ? '' : 's'} ago`; }
+    const hr = Math.floor(min / 60);
+    if (hr  < 24)    { return `${hr} hour${hr  === 1 ? '' : 's'} ago`; }
+    const day = Math.floor(hr / 24);
+    if (day < 7)     { return `${day} day${day === 1 ? '' : 's'} ago`; }
+    if (day < 30)    { return `${Math.floor(day / 7)} week${Math.floor(day / 7) === 1 ? '' : 's'} ago`; }
+    if (day < 365)   { return `${Math.floor(day / 30)} month${Math.floor(day / 30) === 1 ? '' : 's'} ago`; }
+    return `${Math.floor(day / 365)} year${Math.floor(day / 365) === 1 ? '' : 's'} ago`;
+  }
+
+  /** D-422 zone date formatter — locale short datetime, e.g. "Jun 11, 2026, 3:42 PM". */
+  formatDateTime(iso: string | null | undefined): string {
+    if (!iso) { return ''; }
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) { return ''; }
+    return new Date(t).toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit'
+    });
   }
 
   private matches(user: User): boolean {
@@ -870,6 +920,11 @@ export class UsersComponent implements OnInit {
       const names = user.division_names ?? [];
       if (myNames.size > 0 && !names.some(n => myNames.has(n))) { return false; }
     }
+    // D-410 Amend 2: 'no-assigned' — only users with zero Division memberships.
+    if (f.divisionMode === 'no-assigned') {
+      const count = user.division_count ?? (user.division_names?.length ?? 0);
+      if (count > 0) { return false; }
+    }
     return true;
   }
 
@@ -882,7 +937,11 @@ export class UsersComponent implements OnInit {
       out.push({ id: `role:${flag}`, label: `Role: ${flagAbbrevFor(flag)}` });
     }
     if (this.filters.divisionMode === 'all') {
-      out.push({ id: 'division:all', label: 'Division: All' });
+      // 'all' is the default — no chip needed since it's the default behavior.
+    } else if (this.filters.divisionMode === 'no-assigned') {
+      out.push({ id: 'division:no-assigned', label: 'Division: None assigned' });
+    } else if (this.filters.divisionMode === 'mine') {
+      out.push({ id: 'division:mine', label: 'Division: My Divisions' });
     } else if (this.filters.divisionMode === 'single' && this.filters.divisionId) {
       const d = this.allDivisions.find(x => x.id === this.filters.divisionId);
       out.push({ id: 'division:single', label: `Division: ${d ? d.division_name : 'Selected'}` });
@@ -903,8 +962,10 @@ export class UsersComponent implements OnInit {
         ...this.filters,
         roleFlags: this.filters.roleFlags.filter(f => f !== flag)
       };
-    } else if (id === 'division:all' || id === 'division:single') {
-      this.filters = { ...this.filters, divisionMode: 'mine', divisionId: null };
+    } else if (id === 'division:all' || id === 'division:single'
+            || id === 'division:no-assigned' || id === 'division:mine') {
+      // D-410 Amend 1: removing any non-default division chip returns to default 'all'.
+      this.filters = { ...this.filters, divisionMode: 'all', divisionId: null };
     } else if (id.startsWith('active:')) {
       this.filters = { ...this.filters, activeStatus: 'all' };
     }
@@ -970,8 +1031,9 @@ export class UsersComponent implements OnInit {
 
   get pendingDivisionSummary(): string {
     const f = this.pendingFilters;
-    if (f.divisionMode === 'mine') { return 'My Divisions'; }
-    if (f.divisionMode === 'all')  { return 'All'; }
+    if (f.divisionMode === 'all')          { return 'All'; }
+    if (f.divisionMode === 'no-assigned')  { return 'None assigned'; }
+    if (f.divisionMode === 'mine')         { return 'My Divisions'; }
     if (f.divisionId) {
       const d = this.allDivisions.find(x => x.id === f.divisionId);
       return d ? d.division_name : 'Single';
@@ -1001,7 +1063,6 @@ export class UsersComponent implements OnInit {
     this.selectedUser   = user;
     this.selectedUserId = user.id;
     this.panelMode      = 'view';
-    this.assignPickerOpen = false;
     this.assignError    = '';
     this.userDirectDivisions = [];
     this.loadMemberships(user.id);
@@ -1029,15 +1090,24 @@ export class UsersComponent implements OnInit {
   }
 
   openCreate(): void {
-    this.inviteForm.reset({
-      email: '', display_name: '',
-      is_admin: false, is_dcs: false, is_epo: false, is_dol: false, is_ce: false
-    });
-    this.inviteError = '';
-    this.createDivisionIds = [];
     this.selectedUser = null;
     this.selectedUserId = null;
     this.panelMode = 'create';
+    this.cdr.markForCheck();
+  }
+
+  /** Called by UserCreateFormComponent on successful invite. Loaded user
+   *  transitions panel to View state so the D-421 no-Division warning lands. */
+  onUserCreated(newUser: User): void {
+    this.successMsg = `User invited. Invite email sent to ${newUser.email}.`;
+    this.loadUsers();
+    // Switch to View on the new user so D-421 warning fires inline if no Division.
+    this.selectedUser = newUser;
+    this.selectedUserId = newUser.id;
+    this.userDirectDivisions = [];
+    this.loadMemberships(newUser.id);
+    this.panelMode = 'view';
+    setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
     this.cdr.markForCheck();
   }
 
@@ -1045,7 +1115,6 @@ export class UsersComponent implements OnInit {
     this.panelMode = null;
     this.selectedUser = null;
     this.selectedUserId = null;
-    this.assignPickerOpen = false;
     this.userDirectDivisions = [];
     this.cdr.markForCheck();
   }
@@ -1066,7 +1135,7 @@ export class UsersComponent implements OnInit {
       return;
     }
     if (this.panelMode === 'create') {
-      if (this.inviteForm.dirty || this.createDivisionIds.length > 0) {
+      if (this.userCreateForm?.isDirty) {
         if (!confirm('Discard unsaved changes?')) { return; }
       }
       this.closePanel();
@@ -1099,144 +1168,87 @@ export class UsersComponent implements OnInit {
       });
   }
 
-  toggleAssignPicker(): void {
-    this.assignPickerOpen = !this.assignPickerOpen;
+  // ── D-417 hierarchical tree picker integration ─────────────────────────────
+  // Per-row assign/revoke (flat picker) retired; D-417 tree picker batch diff is the
+  // single management entry point. revokeAssignment / onPickerToggle removed.
+
+  get currentlyAssignedDivisionIds(): string[] {
+    return this.userDirectDivisions.map(d => d.id);
+  }
+
+  openTreePicker(): void {
     this.assignError = '';
+    this.treePickerOpen = true;
     this.cdr.markForCheck();
   }
 
-  /** Divisions selectable in pickers — excludes inactive per S-032. */
-  get selectableDivisions(): Division[] {
-    return this.allDivisions.filter(d => (d as { active_status?: boolean }).active_status !== false);
+  onTreePickerCancelled(): void {
+    this.treePickerOpen = false;
+    this.cdr.markForCheck();
   }
 
-  isAssigned(divisionId: string): boolean {
-    return this.userDirectDivisions.some(d => d.id === divisionId);
-  }
-
-  onPickerToggle(divisionId: string, shouldAssign: boolean): void {
+  onTreePickerConfirmed(diff: { toAdd: string[]; toRemove: string[] }): void {
+    this.treePickerOpen = false;
     if (!this.selectedUserId) { return; }
-    const userId = this.selectedUserId;
-    this.assignError = '';
-    this.cdr.markForCheck();
-
-    if (shouldAssign) {
-      this.mcp.call<unknown>('division', 'assign_user_to_division', {
-        user_id: userId, division_id: divisionId
-      }).subscribe({
-        next: (res) => {
-          if (res.success) {
-            this.loadMemberships(userId);
-            this.loadUsers();  // refresh division_summary on grid
-          } else {
-            this.assignError = res.error ?? 'Assignment failed.';
-          }
-          this.cdr.markForCheck();
-        },
-        error: (err: { error?: string }) => {
-          this.assignError = err.error ?? 'Assignment failed.';
-          this.cdr.markForCheck();
-        }
-      });
-    } else {
-      this.revokeAssignment(divisionId);
-    }
-  }
-
-  revokeAssignment(divisionId: string): void {
-    if (!this.selectedUserId) { return; }
-    const userId = this.selectedUserId;
-    this.revokingDivisionId = divisionId;
-    this.assignError = '';
-    this.cdr.markForCheck();
-
-    this.mcp.call<unknown>('division', 'revoke_division_membership', {
-      user_id: userId, division_id: divisionId
-    }).subscribe({
-      next: (res) => {
-        if (res.success) {
-          this.loadMemberships(userId);
-          this.loadUsers();
-        } else {
-          this.assignError = res.error ?? 'Remove failed.';
-        }
-        this.revokingDivisionId = null;
-        this.cdr.markForCheck();
-      },
-      error: (err: { error?: string }) => {
-        this.assignError = err.error ?? 'Remove failed.';
-        this.revokingDivisionId = null;
-        this.cdr.markForCheck();
-      }
-    });
-  }
-
-  // ── Create form ────────────────────────────────────────────────────────────
-  toggleCreateDivision(id: string): void {
-    if (this.createDivisionIds.includes(id)) {
-      this.createDivisionIds = this.createDivisionIds.filter(x => x !== id);
-    } else {
-      this.createDivisionIds = [...this.createDivisionIds, id];
-    }
-    this.cdr.markForCheck();
-  }
-
-  /** D-412: Outlook paste-parse. */
-  onEmailPaste(ev: ClipboardEvent): void {
-    const raw = ev.clipboardData?.getData('text') ?? '';
-    const match = raw.match(/^\s*([^<]+?)\s*<\s*([^>\s]+)\s*>\s*$/);
-    if (!match) { return; }
-    ev.preventDefault();
-    const displayName = match[1].trim();
-    const emailValue  = match[2].trim();
-    this.inviteForm.patchValue({
-      display_name: this.inviteForm.value.display_name || displayName,
-      email:        emailValue
-    });
-    this.cdr.markForCheck();
-  }
-
-  submitInvite(): void {
-    if (this.inviteForm.invalid) {
-      this.inviteForm.markAllAsTouched();
+    if (diff.toAdd.length === 0 && diff.toRemove.length === 0) {
       this.cdr.markForCheck();
       return;
     }
-    this.inviting    = true;
-    this.inviteError = '';
-    this.cdr.markForCheck();
 
-    const v = this.inviteForm.value as Record<string, unknown>;
-    this.mcp.call<User>('division', 'submit_member_invite', {
-      email:        v['email']        as string,
-      display_name: v['display_name'] as string,
-      is_admin:     v['is_admin'] === true,
-      is_dcs:       v['is_dcs']   === true,
-      is_epo:       v['is_epo']   === true,
-      is_dol:       v['is_dol']   === true,
-      is_ce:        v['is_ce']    === true,
-      division_ids: this.createDivisionIds.length > 0 ? [...this.createDivisionIds] : undefined
+    const userId = this.selectedUserId;
+    type Op = { tool: 'assign_user_to_division' | 'revoke_division_membership'; divisionId: string };
+    const ops: Op[] = [
+      ...diff.toAdd.map((id): Op    => ({ tool: 'assign_user_to_division',     divisionId: id })),
+      ...diff.toRemove.map((id): Op => ({ tool: 'revoke_division_membership',  divisionId: id })),
+    ];
+
+    this.treePickerBusy = true;
+    this.assignError    = '';
+    this.cdr.markForCheck();
+    this.runDivisionOpsSequentially(userId, ops, 0);
+  }
+
+  /** Sequential MCP calls for batched division assignment changes per D-417. */
+  private runDivisionOpsSequentially(
+    userId: string,
+    ops: { tool: 'assign_user_to_division' | 'revoke_division_membership'; divisionId: string }[],
+    index: number
+  ): void {
+    if (index >= ops.length) {
+      this.treePickerBusy = false;
+      this.loadMemberships(userId);
+      this.loadUsers();
+      this.cdr.markForCheck();
+      return;
+    }
+    const op = ops[index];
+    this.mcp.call<unknown>('division', op.tool, {
+      user_id: userId, division_id: op.divisionId
     }).subscribe({
       next: (res) => {
-        if (res.success) {
-          this.successMsg = (res as { message?: string }).message
-            ?? `User invited. Invite email sent to ${v['email']}.`;
-          this.closePanel();
+        if (!res.success) {
+          this.assignError = res.error ?? 'Division change failed.';
+          this.treePickerBusy = false;
+          this.loadMemberships(userId);
           this.loadUsers();
-          setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
-        } else {
-          this.inviteError = res.error ?? 'Create failed.';
+          this.cdr.markForCheck();
+          return;
         }
-        this.inviting = false;
-        this.cdr.markForCheck();
+        this.runDivisionOpsSequentially(userId, ops, index + 1);
       },
       error: (err: { error?: string }) => {
-        this.inviteError = err.error ?? 'Create failed.';
-        this.inviting    = false;
+        this.assignError = err.error ?? 'Division change failed.';
+        this.treePickerBusy = false;
+        this.loadMemberships(userId);
+        this.loadUsers();
         this.cdr.markForCheck();
       }
     });
   }
+
+  // Create form mechanics moved to shared UserCreateFormComponent (S-007, D-420 reuse).
+  // Parent retains: openCreate(), onUserCreated(), onScrimClick() dirty-state check
+  // delegated to ViewChild's isDirty getter.
 
   // ── Edit save ──────────────────────────────────────────────────────────────
   get emailFieldInvalid(): boolean {
@@ -1384,14 +1396,13 @@ export class UsersComponent implements OnInit {
   }
 
   // ── Panel overlay (D-178 Tier 3) ───────────────────────────────────────────
+  // Inviting is owned by the shared UserCreateFormComponent; it shows its own busy state.
+  // Tree picker batch operations show busy via treePickerBusy on the Assign Divisions button.
   get panelOverlayBusy(): boolean {
-    return this.saving || this.inviting || this.assigning || this.revokingDivisionId !== null;
+    return this.saving;
   }
   get panelOverlayMessage(): string {
-    if (this.saving)               { return 'Saving…'; }
-    if (this.inviting)             { return 'Creating User…'; }
-    if (this.assigning)            { return 'Assigning…'; }
-    if (this.revokingDivisionId)   { return 'Removing…'; }
+    if (this.saving) { return 'Saving…'; }
     return '';
   }
 

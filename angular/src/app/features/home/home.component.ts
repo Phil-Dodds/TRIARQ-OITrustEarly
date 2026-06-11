@@ -73,9 +73,10 @@ export class HomeComponent implements OnInit {
   get showSystemHealth():    boolean { return this.isAdmin; }
   get showDivisions():       boolean { return this.isAdmin; }
   get showUserManagement():  boolean { return this.isAdmin; }
-  // My Initiatives card — Contract 19 Part 3f: visible when caller holds any functional role,
-  //   regardless of also holding Admin. Multi-role users (e.g. Craig as Admin + DCS) see the card.
-  get showDeliveryCycles():  boolean { return this.isDCS || this.isEPO || this.isDOL; }
+  // My Initiatives card — D-423: visible to ALL roles. Admin without functional
+  // role still sees the card; renders empty-state when no Initiatives are
+  // assigned. Was previously gated by DCS/EPO/DOL flags.
+  get showDeliveryCycles():  boolean { return this.profile !== null; }
 
   // Admin always sees the main cards — needs the Divisions card to bootstrap.
   // Other roles see the onboarding message until an admin assigns a Division.

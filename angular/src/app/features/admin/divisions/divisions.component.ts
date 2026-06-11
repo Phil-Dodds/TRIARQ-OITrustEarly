@@ -83,11 +83,12 @@ const LEVEL_LABELS: Record<number, string> = {
     .dm-desc{font-size:11px;font-style:italic;color:#5A5A5A;margin-top:4px}
     .dm-toolbar{display:flex;align-items:center;gap:var(--triarq-space-sm);margin-bottom:var(--triarq-space-sm);flex-wrap:wrap}
     .dm-chip-bar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:var(--triarq-space-sm)}
-    .dm-grid{border:1px solid var(--triarq-color-border);border-radius:10px;background:#fff;overflow:hidden}
-    .dm-row{display:grid;grid-template-columns:3fr .8fr 2fr 1.1fr;gap:var(--triarq-space-sm);padding:var(--triarq-space-sm) var(--triarq-space-md);border-bottom:1px solid var(--triarq-color-border);align-items:center;font-size:13px}
-    .dm-header-row{font-weight:500;color:var(--triarq-color-text-secondary);background:var(--triarq-color-background-subtle);border-bottom:2px solid var(--triarq-color-border)}
-    .dm-data:hover{background:#fafbfc;cursor:pointer}
-    .dm-data.dm-selected{background:#eef6fb}
+    /* Grid container — Initiative grid look. Header is sticky Deep Navy uppercase. */
+    .dm-grid{border:1px solid var(--triarq-color-border);border-radius:6px;background:#fff;overflow:hidden}
+    .dm-row{display:grid;grid-template-columns:3fr .8fr 2fr 1.1fr;gap:var(--triarq-space-sm);padding:6px var(--triarq-space-md);border-bottom:1px solid #E8E8E8;align-items:center;font-size:13px;border-left:3px solid transparent}
+    .dm-header-row{font-weight:500;color:#fff;background:#12274A;text-transform:uppercase;letter-spacing:0.3px;font-size:13px;padding:8px var(--triarq-space-md);position:sticky;top:0;z-index:3;border-left:none;border-bottom:none}
+    .dm-data:hover{background:#F0F4F8;cursor:pointer}
+    .dm-data.dm-selected{background:#E8F0FE;border-left:3px solid var(--triarq-color-primary,#257099)}
     .dm-name-cell{display:flex;align-items:center;gap:6px;min-width:0}
     .dm-name{font-weight:500;color:var(--triarq-color-text-primary)}
     .dm-trust-name{font-weight:700}
@@ -158,7 +159,7 @@ const LEVEL_LABELS: Record<number, string> = {
       <!-- Skeleton (D-178 Tier 1) ───────────────────────────────────────── -->
       <div class="dm-grid" *ngIf="loading">
         <div class="dm-row dm-header-row">
-          <span>Division Name</span><span>Members</span><span>Parent</span><span>Active</span>
+          <span>Division Name</span><span>Members</span><span>Parent Division</span><span>Active Status</span>
         </div>
         <div class="dm-row" *ngFor="let _ of skeletonRows">
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
@@ -173,8 +174,8 @@ const LEVEL_LABELS: Record<number, string> = {
         <div class="dm-row dm-header-row">
           <span>Division Name</span>
           <span>Members</span>
-          <span>Parent</span>
-          <span>Active</span>
+          <span>Parent Division</span>
+          <span>Active Status</span>
         </div>
 
         <ng-container *ngFor="let row of visibleRows">

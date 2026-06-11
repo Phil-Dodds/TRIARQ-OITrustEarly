@@ -50,14 +50,18 @@ import {
 } from '../../../core/types/database';
 
 const DEPLOY_GATE = 'go_to_deploy';
+// D-419 walkback chain — Go to Deploy → Go to Build → Brief Review.
+const WALKBACK_CHAIN: readonly string[] = ['go_to_deploy', 'go_to_build', 'brief_review'];
 
 interface WorkstreamGroup {
   workstream_id:    string | null;
   workstream_name:  string;
-  // Cycles in this workstream by section
+  // D-419 four-section model.
   prior:            DeliveryCycle[];
   current:          DeliveryCycle[];
-  other:            DeliveryCycle[];
+  nextQ1:           DeliveryCycle[];
+  nextQ2:           DeliveryCycle[];
+  unscheduled:      DeliveryCycle[];
 }
 
 interface QuarterLabel {
@@ -126,37 +130,34 @@ interface QuarterLabel {
                   (click)="$event.stopPropagation(); openWorkstream(group.workstream_id)">
               {{ group.workstream_name }}
             </span>
+            <!-- D-419 four counts. -->
             <span class="ds-counts">
               Prior: {{ group.prior.length }}
               · Current: {{ group.current.length }}
-              · Other: {{ group.other.length }}
+              · Next 2Q: {{ group.nextQ1.length + group.nextQ2.length }}
+              · Unscheduled: {{ group.unscheduled.length }}
             </span>
           </button>
 
-          <!-- Expanded body — three sections -->
+          <!-- D-419 four-section body. -->
           <div *ngIf="isExpanded(group.workstream_id)" class="ds-ws-body">
 
-            <!-- Prior Quarter -->
+            <!-- Section 1 — Prior Quarter Actual -->
             <section class="ds-section">
               <div class="ds-section-header">
                 Prior Quarter — {{ priorQuarter.label }} Actual
               </div>
               <div class="ds-grid ds-grid-header">
-                <span>Initiative</span>
-                <span>Stage</span>
-                <span>Pilot Start</span>
-                <span>Status</span>
+                <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
               </div>
               <ng-container *ngIf="group.prior.length > 0; else priorEmpty">
                 <div *ngFor="let c of group.prior; trackBy: trackByCycleId"
-                     class="ds-grid ds-grid-row"
-                     (click)="openCycle(c.delivery_cycle_id)">
+                     class="ds-grid ds-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="ds-cycle-title">{{ c.cycle_title }}</span>
                   <span class="ds-meta">{{ c.current_lifecycle_stage }}</span>
                   <span>{{ pilotStartDisplay(c) }}</span>
                   <span>
-                    <span class="ds-dot"
-                          [style.background]="pilotStatusColor(c)"
+                    <span class="ds-dot" [style.background]="pilotStatusColor(c)"
                           [title]="pilotStatusLabel(c)"></span>
                     <span class="ds-status-text" [style.color]="pilotStatusColor(c)">
                       {{ pilotStatusLabel(c) }}
@@ -164,32 +165,25 @@ interface QuarterLabel {
                   </span>
                 </div>
               </ng-container>
-              <ng-template #priorEmpty>
-                <div class="ds-row-empty">No Initiatives.</div>
-              </ng-template>
+              <ng-template #priorEmpty><div class="ds-row-empty">No Initiatives.</div></ng-template>
             </section>
 
-            <!-- Current Quarter -->
+            <!-- Section 2 — Current Quarter -->
             <section class="ds-section">
               <div class="ds-section-header">
                 Current Quarter — {{ currentQuarter.label }} Planned/Actual
               </div>
               <div class="ds-grid ds-grid-header">
-                <span>Initiative</span>
-                <span>Stage</span>
-                <span>Pilot Start</span>
-                <span>Status</span>
+                <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
               </div>
               <ng-container *ngIf="group.current.length > 0; else currentEmpty">
                 <div *ngFor="let c of group.current; trackBy: trackByCycleId"
-                     class="ds-grid ds-grid-row"
-                     (click)="openCycle(c.delivery_cycle_id)">
+                     class="ds-grid ds-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="ds-cycle-title">{{ c.cycle_title }}</span>
                   <span class="ds-meta">{{ c.current_lifecycle_stage }}</span>
                   <span>{{ pilotStartDisplay(c) }}</span>
                   <span>
-                    <span class="ds-dot"
-                          [style.background]="pilotStatusColor(c)"
+                    <span class="ds-dot" [style.background]="pilotStatusColor(c)"
                           [title]="pilotStatusLabel(c)"></span>
                     <span class="ds-status-text" [style.color]="pilotStatusColor(c)">
                       {{ pilotStatusLabel(c) }}
@@ -197,30 +191,26 @@ interface QuarterLabel {
                   </span>
                 </div>
               </ng-container>
-              <ng-template #currentEmpty>
-                <div class="ds-row-empty">No Initiatives.</div>
-              </ng-template>
+              <ng-template #currentEmpty><div class="ds-row-empty">No Initiatives.</div></ng-template>
             </section>
 
-            <!-- Other Active -->
+            <!-- Section 3 — Next Two Quarters (sub-grouped Q+1 then Q+2) -->
             <section class="ds-section">
-              <div class="ds-section-header">Other Active</div>
-              <div class="ds-grid ds-grid-header">
-                <span>Initiative</span>
-                <span>Stage</span>
-                <span>Pilot Start</span>
-                <span>Status</span>
+              <div class="ds-section-header">
+                Next Two Quarters — {{ nextQ1.label }} / {{ nextQ2.label }} Targeted
               </div>
-              <ng-container *ngIf="group.other.length > 0; else otherEmpty">
-                <div *ngFor="let c of group.other; trackBy: trackByCycleId"
-                     class="ds-grid ds-grid-row"
-                     (click)="openCycle(c.delivery_cycle_id)">
+              <div class="ds-grid ds-grid-header">
+                <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
+              </div>
+              <div class="ds-subgroup">{{ nextQ1.label }}</div>
+              <ng-container *ngIf="group.nextQ1.length > 0; else q1Empty">
+                <div *ngFor="let c of group.nextQ1; trackBy: trackByCycleId"
+                     class="ds-grid ds-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="ds-cycle-title">{{ c.cycle_title }}</span>
                   <span class="ds-meta">{{ c.current_lifecycle_stage }}</span>
                   <span>{{ pilotStartDisplay(c) }}</span>
                   <span>
-                    <span class="ds-dot"
-                          [style.background]="pilotStatusColor(c)"
+                    <span class="ds-dot" [style.background]="pilotStatusColor(c)"
                           [title]="pilotStatusLabel(c)"></span>
                     <span class="ds-status-text" [style.color]="pilotStatusColor(c)">
                       {{ pilotStatusLabel(c) }}
@@ -228,9 +218,48 @@ interface QuarterLabel {
                   </span>
                 </div>
               </ng-container>
-              <ng-template #otherEmpty>
-                <div class="ds-row-empty">No Initiatives.</div>
-              </ng-template>
+              <ng-template #q1Empty><div class="ds-row-empty">No Initiatives.</div></ng-template>
+              <div class="ds-subgroup">{{ nextQ2.label }}</div>
+              <ng-container *ngIf="group.nextQ2.length > 0; else q2Empty">
+                <div *ngFor="let c of group.nextQ2; trackBy: trackByCycleId"
+                     class="ds-grid ds-grid-row" (click)="openCycle(c.delivery_cycle_id)">
+                  <span class="ds-cycle-title">{{ c.cycle_title }}</span>
+                  <span class="ds-meta">{{ c.current_lifecycle_stage }}</span>
+                  <span>{{ pilotStartDisplay(c) }}</span>
+                  <span>
+                    <span class="ds-dot" [style.background]="pilotStatusColor(c)"
+                          [title]="pilotStatusLabel(c)"></span>
+                    <span class="ds-status-text" [style.color]="pilotStatusColor(c)">
+                      {{ pilotStatusLabel(c) }}
+                    </span>
+                  </span>
+                </div>
+              </ng-container>
+              <ng-template #q2Empty><div class="ds-row-empty">No Initiatives.</div></ng-template>
+            </section>
+
+            <!-- Section 4 — Unscheduled Active -->
+            <section class="ds-section">
+              <div class="ds-section-header">Unscheduled Active</div>
+              <div class="ds-grid ds-grid-header">
+                <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
+              </div>
+              <ng-container *ngIf="group.unscheduled.length > 0; else unschedEmpty">
+                <div *ngFor="let c of group.unscheduled; trackBy: trackByCycleId"
+                     class="ds-grid ds-grid-row" (click)="openCycle(c.delivery_cycle_id)">
+                  <span class="ds-cycle-title">{{ c.cycle_title }}</span>
+                  <span class="ds-meta">{{ c.current_lifecycle_stage }}</span>
+                  <span>{{ pilotStartDisplay(c) }}</span>
+                  <span>
+                    <span class="ds-dot" [style.background]="pilotStatusColor(c)"
+                          [title]="pilotStatusLabel(c)"></span>
+                    <span class="ds-status-text" [style.color]="pilotStatusColor(c)">
+                      {{ pilotStatusLabel(c) }}
+                    </span>
+                  </span>
+                </div>
+              </ng-container>
+              <ng-template #unschedEmpty><div class="ds-row-empty">No Initiatives.</div></ng-template>
             </section>
 
           </div>
@@ -335,6 +364,7 @@ interface QuarterLabel {
       color: var(--triarq-color-text-secondary);
       text-transform: uppercase; letter-spacing: 0.04em;
     }
+    .ds-subgroup { font-size: 11px; font-weight: 600; color: var(--triarq-color-text-secondary); padding: 6px 10px 4px; text-transform: uppercase; letter-spacing: 0.04em; }
 
     .ds-grid {
       display: grid;
@@ -547,16 +577,30 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
     return { ...q, label: `Q${q.q} ${q.year}` };
   }
 
-  get priorQuarter(): QuarterLabel {
+  get priorQuarter(): QuarterLabel { return this.shiftedQuarter(-1); }
+  get nextQ1(): QuarterLabel       { return this.shiftedQuarter(1); }
+  get nextQ2(): QuarterLabel       { return this.shiftedQuarter(2); }
+
+  private shiftedQuarter(offset: number): QuarterLabel {
     const now = this.quarterOf(new Date());
-    let q = now.q - 1, year = now.year;
-    if (q < 1) { q = 4; year -= 1; }
+    let q = now.q + offset;
+    let year = now.year;
+    while (q < 1) { q += 4; year -= 1; }
+    while (q > 4) { q -= 4; year += 1; }
     return { year, q, label: `Q${q} ${year}` };
   }
 
   private inQuarter(iso: string | null | undefined, target: QuarterLabel): boolean {
     const q = this.quarterFromIso(iso);
     return !!q && q.year === target.year && q.q === target.q;
+  }
+
+  private quarterIndex(q: { year: number; q: number }): number {
+    return q.year * 4 + q.q;
+  }
+  private isoQuarterIndex(iso: string | null | undefined): number | null {
+    const q = this.quarterFromIso(iso);
+    return q ? this.quarterIndex(q) : null;
   }
 
   // ── Pilot Start helpers ───────────────────────────────────────────────────
@@ -573,9 +617,18 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
     return '—';
   }
 
+  /** D-419 walkback: first gate in WALKBACK_CHAIN with non-default status wins. */
+  private walkbackMilestone(c: DeliveryCycle): CycleMilestoneDate | null {
+    for (const gate of WALKBACK_CHAIN) {
+      const m = c.milestone_dates?.find(x => x.gate_name === gate);
+      if (m && m.date_status && m.date_status !== 'not_started') { return m; }
+    }
+    return null;
+  }
+
   pilotStatusLabel(c: DeliveryCycle): string {
-    const m = this.pilotMilestone(c);
-    if (!m) return '—';
+    const m = this.walkbackMilestone(c);
+    if (!m) return 'Not Started';
     const map: Record<DateStatus, string> = {
       not_started: 'Not Started',
       on_track:    'On Track',
@@ -586,13 +639,14 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
     return map[m.date_status] ?? '—';
   }
 
+  /** D-419 + D-205 colors. */
   pilotStatusColor(c: DeliveryCycle): string {
-    const m = this.pilotMilestone(c);
+    const m = this.walkbackMilestone(c);
     const colors: Record<string, string> = {
       not_started: '#9E9E9E',
-      on_track:    '#2E7D32',
+      on_track:    '#22c55e',
       at_risk:     '#F2A620',
-      behind:      '#D32F2F',
+      behind:      '#E96127',
       complete:    '#257099'
     };
     return colors[m?.date_status ?? 'not_started'] ?? '#9E9E9E';
@@ -626,55 +680,58 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
           workstream_name: id === '__none__' ? '(No workstream assigned)' : id
         }));
 
+    const q1 = this.nextQ1;
+    const q2 = this.nextQ2;
+    const q2Index = this.quarterIndex(q2);
+
     return wsList.map(ws => {
       const cycles = byWs.get(ws.workstream_id) ?? [];
       const priorList:   DeliveryCycle[] = [];
       const currentList: DeliveryCycle[] = [];
-      const otherList:   DeliveryCycle[] = [];
+      const nextQ1List:  DeliveryCycle[] = [];
+      const nextQ2List:  DeliveryCycle[] = [];
+      const unschedList: DeliveryCycle[] = [];
 
       const isActive = (c: DeliveryCycle) =>
         c.current_lifecycle_stage !== 'COMPLETE' &&
-        c.current_lifecycle_stage !== 'CANCELLED';
+        c.current_lifecycle_stage !== 'CANCELLED' &&
+        c.current_lifecycle_stage !== 'ON_HOLD';
 
       for (const c of cycles) {
         const m = this.pilotMilestone(c);
         const actualInPrior   = !!m?.actual_date && this.inQuarter(m.actual_date, prior);
         const actualInCurrent = !!m?.actual_date && this.inQuarter(m.actual_date, current);
-        const targetInCurrent = !!m?.target_date && this.inQuarter(m.target_date, current);
-        const targetInPrior   = !!m?.target_date && !m.actual_date && this.inQuarter(m.target_date, prior);
+        const targetInCurrent = !m?.actual_date && !!m?.target_date && this.inQuarter(m.target_date, current);
+        const actualInNext1   = !!m?.actual_date && this.inQuarter(m.actual_date, q1);
+        const actualInNext2   = !!m?.actual_date && this.inQuarter(m.actual_date, q2);
+        const targetInNext1   = !m?.actual_date && !!m?.target_date && this.inQuarter(m.target_date, q1);
+        const targetInNext2   = !m?.actual_date && !!m?.target_date && this.inQuarter(m.target_date, q2);
+        const targetInPriorMiss = !!m?.target_date && !m?.actual_date && this.inQuarter(m.target_date, prior);
 
         let placed = false;
-
-        // Prior actual — includes COMPLETE cycles per spec.
-        if (actualInPrior) {
-          priorList.push(c);
-          placed = true;
+        if (actualInPrior) { priorList.push(c); placed = true; }
+        if (actualInCurrent || targetInCurrent) { currentList.push(c); placed = true; }
+        if (isActive(c)) {
+          if (actualInNext1 || targetInNext1) { nextQ1List.push(c); placed = true; }
+          if (actualInNext2 || targetInNext2) { nextQ2List.push(c); placed = true; }
         }
-
-        // Current actual or target.
-        if (actualInCurrent || targetInCurrent) {
-          currentList.push(c);
-          placed = true;
-        }
-
-        // Prior-quarter miss detection — also surface in Other Active.
-        if (targetInPrior && isActive(c)) {
-          priorList.push(c);
-          otherList.push(c);
-          placed = true;
-        }
-
+        if (targetInPriorMiss && isActive(c)) { priorList.push(c); placed = true; }
         if (!placed && isActive(c)) {
-          otherList.push(c);
+          const tIdx = m?.target_date ? this.isoQuarterIndex(m.target_date) : null;
+          if (tIdx === null || tIdx > q2Index) {
+            unschedList.push(c);
+          }
         }
       }
 
       return {
         workstream_id:   ws.workstream_id,
         workstream_name: ws.workstream_name,
-        prior:   priorList,
-        current: currentList,
-        other:   otherList
+        prior:       priorList,
+        current:     currentList,
+        nextQ1:      nextQ1List,
+        nextQ2:      nextQ2List,
+        unscheduled: unschedList
       };
     }).sort((a, b) => a.workstream_name.localeCompare(b.workstream_name));
   }

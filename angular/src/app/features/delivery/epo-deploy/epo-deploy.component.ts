@@ -65,13 +65,19 @@ import {
 } from '../../../core/types/database';
 
 const DEPLOY_GATE = 'go_to_deploy';
+// D-419 walkback chain — Go to Deploy → Go to Build → Brief Review. First gate
+// with non-default status wins the row dot. See walkbackMilestone().
+const WALKBACK_CHAIN: readonly string[] = ['go_to_deploy', 'go_to_build', 'brief_review'];
 
 interface EpoGroup {
   user_id:      string;
   display_name: string;
+  // D-419 four-section model. `other` retired, replaced by next2Q + unscheduled.
   prior:        DeliveryCycle[];
   current:      DeliveryCycle[];
-  other:        DeliveryCycle[];
+  nextQ1:       DeliveryCycle[];  // Q+1
+  nextQ2:       DeliveryCycle[];  // Q+2
+  unscheduled:  DeliveryCycle[];
 }
 
 interface QuarterLabel {
@@ -136,37 +142,34 @@ interface QuarterLabel {
                   (click)="$event.stopPropagation(); drillDown(group.user_id)">
               {{ group.display_name }}
             </span>
+            <!-- D-419: four counts replace three. -->
             <span class="edp-counts">
               Prior: {{ group.prior.length }}
               · Current: {{ group.current.length }}
-              · Other: {{ group.other.length }}
+              · Next 2Q: {{ group.nextQ1.length + group.nextQ2.length }}
+              · Unscheduled: {{ group.unscheduled.length }}
             </span>
           </button>
 
-          <!-- Expanded body — three quarter sections -->
+          <!-- D-419 four-section body. -->
           <div *ngIf="isExpanded(group.user_id)" class="edp-body">
 
-            <!-- Prior Quarter -->
+            <!-- Section 1 — Prior Quarter Actual -->
             <section class="edp-section">
               <div class="edp-section-header">
                 Prior Quarter — {{ priorQuarter.label }} Actual
               </div>
               <div class="edp-grid edp-grid-header">
-                <span>Initiative</span>
-                <span>Stage</span>
-                <span>Deploy Date</span>
-                <span>Status</span>
+                <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
               </div>
               <ng-container *ngIf="group.prior.length > 0; else priorEmpty">
                 <div *ngFor="let c of group.prior; trackBy: trackByCycleId"
-                     class="edp-grid edp-grid-row"
-                     (click)="openCycle(c.delivery_cycle_id)">
+                     class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="edp-cycle-title">{{ c.cycle_title }}</span>
                   <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
                   <span>{{ deployDisplay(c) }}</span>
                   <span>
-                    <span class="edp-dot"
-                          [style.background]="deployStatusColor(c)"
+                    <span class="edp-dot" [style.background]="deployStatusColor(c)"
                           [title]="deployStatusLabel(c)"></span>
                     <span class="edp-status-text" [style.color]="deployStatusColor(c)">
                       {{ deployStatusLabel(c) }}
@@ -174,32 +177,25 @@ interface QuarterLabel {
                   </span>
                 </div>
               </ng-container>
-              <ng-template #priorEmpty>
-                <div class="edp-row-empty">No Initiatives.</div>
-              </ng-template>
+              <ng-template #priorEmpty><div class="edp-row-empty">No Initiatives.</div></ng-template>
             </section>
 
-            <!-- Current Quarter -->
+            <!-- Section 2 — Current Quarter Planned/Actual -->
             <section class="edp-section">
               <div class="edp-section-header">
                 Current Quarter — {{ currentQuarter.label }} Planned/Actual
               </div>
               <div class="edp-grid edp-grid-header">
-                <span>Initiative</span>
-                <span>Stage</span>
-                <span>Deploy Date</span>
-                <span>Status</span>
+                <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
               </div>
               <ng-container *ngIf="group.current.length > 0; else currentEmpty">
                 <div *ngFor="let c of group.current; trackBy: trackByCycleId"
-                     class="edp-grid edp-grid-row"
-                     (click)="openCycle(c.delivery_cycle_id)">
+                     class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="edp-cycle-title">{{ c.cycle_title }}</span>
                   <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
                   <span>{{ deployDisplay(c) }}</span>
                   <span>
-                    <span class="edp-dot"
-                          [style.background]="deployStatusColor(c)"
+                    <span class="edp-dot" [style.background]="deployStatusColor(c)"
                           [title]="deployStatusLabel(c)"></span>
                     <span class="edp-status-text" [style.color]="deployStatusColor(c)">
                       {{ deployStatusLabel(c) }}
@@ -207,30 +203,27 @@ interface QuarterLabel {
                   </span>
                 </div>
               </ng-container>
-              <ng-template #currentEmpty>
-                <div class="edp-row-empty">No Initiatives.</div>
-              </ng-template>
+              <ng-template #currentEmpty><div class="edp-row-empty">No Initiatives.</div></ng-template>
             </section>
 
-            <!-- Other Active -->
+            <!-- Section 3 — Next Two Quarters Targeted (sub-grouped Q+1 then Q+2) -->
             <section class="edp-section">
-              <div class="edp-section-header">Other Active</div>
-              <div class="edp-grid edp-grid-header">
-                <span>Initiative</span>
-                <span>Stage</span>
-                <span>Deploy Date</span>
-                <span>Status</span>
+              <div class="edp-section-header">
+                Next Two Quarters — {{ nextQ1.label }} / {{ nextQ2.label }} Targeted
               </div>
-              <ng-container *ngIf="group.other.length > 0; else otherEmpty">
-                <div *ngFor="let c of group.other; trackBy: trackByCycleId"
-                     class="edp-grid edp-grid-row"
-                     (click)="openCycle(c.delivery_cycle_id)">
+              <div class="edp-grid edp-grid-header">
+                <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
+              </div>
+              <!-- Q+1 sub-section -->
+              <div class="edp-subgroup">{{ nextQ1.label }}</div>
+              <ng-container *ngIf="group.nextQ1.length > 0; else q1Empty">
+                <div *ngFor="let c of group.nextQ1; trackBy: trackByCycleId"
+                     class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="edp-cycle-title">{{ c.cycle_title }}</span>
                   <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
                   <span>{{ deployDisplay(c) }}</span>
                   <span>
-                    <span class="edp-dot"
-                          [style.background]="deployStatusColor(c)"
+                    <span class="edp-dot" [style.background]="deployStatusColor(c)"
                           [title]="deployStatusLabel(c)"></span>
                     <span class="edp-status-text" [style.color]="deployStatusColor(c)">
                       {{ deployStatusLabel(c) }}
@@ -238,9 +231,49 @@ interface QuarterLabel {
                   </span>
                 </div>
               </ng-container>
-              <ng-template #otherEmpty>
-                <div class="edp-row-empty">No Initiatives.</div>
-              </ng-template>
+              <ng-template #q1Empty><div class="edp-row-empty">No Initiatives.</div></ng-template>
+              <!-- Q+2 sub-section -->
+              <div class="edp-subgroup">{{ nextQ2.label }}</div>
+              <ng-container *ngIf="group.nextQ2.length > 0; else q2Empty">
+                <div *ngFor="let c of group.nextQ2; trackBy: trackByCycleId"
+                     class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
+                  <span class="edp-cycle-title">{{ c.cycle_title }}</span>
+                  <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
+                  <span>{{ deployDisplay(c) }}</span>
+                  <span>
+                    <span class="edp-dot" [style.background]="deployStatusColor(c)"
+                          [title]="deployStatusLabel(c)"></span>
+                    <span class="edp-status-text" [style.color]="deployStatusColor(c)">
+                      {{ deployStatusLabel(c) }}
+                    </span>
+                  </span>
+                </div>
+              </ng-container>
+              <ng-template #q2Empty><div class="edp-row-empty">No Initiatives.</div></ng-template>
+            </section>
+
+            <!-- Section 4 — Unscheduled Active -->
+            <section class="edp-section">
+              <div class="edp-section-header">Unscheduled Active</div>
+              <div class="edp-grid edp-grid-header">
+                <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
+              </div>
+              <ng-container *ngIf="group.unscheduled.length > 0; else unschedEmpty">
+                <div *ngFor="let c of group.unscheduled; trackBy: trackByCycleId"
+                     class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
+                  <span class="edp-cycle-title">{{ c.cycle_title }}</span>
+                  <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
+                  <span>{{ deployDisplay(c) }}</span>
+                  <span>
+                    <span class="edp-dot" [style.background]="deployStatusColor(c)"
+                          [title]="deployStatusLabel(c)"></span>
+                    <span class="edp-status-text" [style.color]="deployStatusColor(c)">
+                      {{ deployStatusLabel(c) }}
+                    </span>
+                  </span>
+                </div>
+              </ng-container>
+              <ng-template #unschedEmpty><div class="edp-row-empty">No Initiatives.</div></ng-template>
             </section>
 
           </div>
@@ -295,6 +328,7 @@ interface QuarterLabel {
     .edp-body { padding: 0 12px var(--triarq-space-md) 12px; }
     .edp-section { margin-top: var(--triarq-space-md); }
     .edp-section-header { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 4px; background: rgba(37,112,153,0.06); color: var(--triarq-color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+    .edp-subgroup { font-size: 11px; font-weight: 600; color: var(--triarq-color-text-secondary); padding: 6px 10px 4px; text-transform: uppercase; letter-spacing: 0.04em; }
     .edp-grid { display: grid; grid-template-columns: 3fr 1fr 1.4fr 1.4fr; gap: var(--triarq-space-sm); padding: 8px 12px; align-items: center; font-size: var(--triarq-text-small); }
     .edp-grid-header { font-weight: 500; color: var(--triarq-color-text-secondary); border-bottom: 2px solid var(--triarq-color-border); }
     .edp-grid-row { border-bottom: 1px solid var(--triarq-color-border); cursor: pointer; }
@@ -443,15 +477,34 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
   }
 
   get priorQuarter(): QuarterLabel {
+    return this.shiftedQuarter(-1);
+  }
+
+  /** D-419 — next two quarters. nextQ1 = current + 1; nextQ2 = current + 2. */
+  get nextQ1(): QuarterLabel { return this.shiftedQuarter(1); }
+  get nextQ2(): QuarterLabel { return this.shiftedQuarter(2); }
+
+  private shiftedQuarter(offset: number): QuarterLabel {
     const now = this.quarterOf(new Date());
-    let q = now.q - 1, year = now.year;
-    if (q < 1) { q = 4; year -= 1; }
+    let q = now.q + offset;
+    let year = now.year;
+    while (q < 1)  { q += 4; year -= 1; }
+    while (q > 4)  { q -= 4; year += 1; }
     return { year, q, label: `Q${q} ${year}` };
   }
 
   private inQuarter(iso: string | null | undefined, target: QuarterLabel): boolean {
     const q = this.quarterFromIso(iso);
     return !!q && q.year === target.year && q.q === target.q;
+  }
+
+  /** True if the calendar quarter for `iso` is at or beyond `target` (Q+2). */
+  private quarterIndex(q: { year: number; q: number }): number {
+    return q.year * 4 + q.q;
+  }
+  private isoQuarterIndex(iso: string | null | undefined): number | null {
+    const q = this.quarterFromIso(iso);
+    return q ? this.quarterIndex(q) : null;
   }
 
   // ── Deploy gate helpers ───────────────────────────────────────────────────
@@ -468,9 +521,18 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
     return '—';
   }
 
+  /** D-419 — walkback: first gate in WALKBACK_CHAIN with non-default status wins. */
+  private walkbackMilestone(c: DeliveryCycle): CycleMilestoneDate | null {
+    for (const gate of WALKBACK_CHAIN) {
+      const m = c.milestone_dates?.find(x => x.gate_name === gate);
+      if (m && m.date_status && m.date_status !== 'not_started') { return m; }
+    }
+    return null;
+  }
+
   deployStatusLabel(c: DeliveryCycle): string {
-    const m = this.deployMilestone(c);
-    if (!m) return '—';
+    const m = this.walkbackMilestone(c);
+    if (!m) return 'Not Started';
     const map: Record<DateStatus, string> = {
       not_started: 'Not Started',
       on_track:    'On Track',
@@ -481,13 +543,14 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
     return map[m.date_status] ?? '—';
   }
 
+  /** D-419 + D-205 colors — On Track #22c55e, Behind #E96127. */
   deployStatusColor(c: DeliveryCycle): string {
-    const m = this.deployMilestone(c);
+    const m = this.walkbackMilestone(c);
     const colors: Record<string, string> = {
       not_started: '#9E9E9E',
-      on_track:    '#2E7D32',
+      on_track:    '#22c55e',
       at_risk:     '#F2A620',
-      behind:      '#D32F2F',
+      behind:      '#E96127',
       complete:    '#257099'
     };
     return colors[m?.date_status ?? 'not_started'] ?? '#9E9E9E';
@@ -496,10 +559,15 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
   // ── Grouping ──────────────────────────────────────────────────────────────
 
   /**
-   * Group cycles by assigned_epo_user_id, then classify each into Prior /
-   * Current / Other. Same prior-quarter-miss rule as WorkstreamDeploySchedule
-   * (D-PilotSchedule-2026-04-06): a cycle with target-in-prior + no actual +
-   * still active surfaces in BOTH Prior and Other.
+   * D-419 four-section grouping by EPO:
+   *   1. Prior Quarter Actual           — actual in prior Q (includes COMPLETE).
+   *                                       Plus prior-quarter miss (target in prior,
+   *                                       no actual, still active) — appears here
+   *                                       AND in Next Two if its target shifted forward.
+   *   2. Current Quarter Planned/Actual — actual or target in current Q (COMPLETE if actual).
+   *   3. Next Two Quarters Targeted     — target in Q+1 or Q+2 (no actual), or actual
+   *                                       falling in Q+1/Q+2. Active only. Sub-grouped Q+1, Q+2.
+   *   4. Unscheduled Active             — active, target null OR target beyond Q+2.
    */
   get epoGroups(): EpoGroup[] {
     const byEpo = new Map<string, { display_name: string; cycles: DeliveryCycle[] }>();
@@ -515,56 +583,77 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
 
     const prior   = this.priorQuarter;
     const current = this.currentQuarter;
+    const q1      = this.nextQ1;
+    const q2      = this.nextQ2;
+    const q2Index = this.quarterIndex(q2);
 
     const isActive = (c: DeliveryCycle) =>
       c.current_lifecycle_stage !== 'COMPLETE' &&
-      c.current_lifecycle_stage !== 'CANCELLED';
+      c.current_lifecycle_stage !== 'CANCELLED' &&
+      c.current_lifecycle_stage !== 'ON_HOLD';
 
     const groups: EpoGroup[] = [];
     for (const [user_id, entry] of byEpo) {
       const priorList:   DeliveryCycle[] = [];
       const currentList: DeliveryCycle[] = [];
-      const otherList:   DeliveryCycle[] = [];
+      const nextQ1List:  DeliveryCycle[] = [];
+      const nextQ2List:  DeliveryCycle[] = [];
+      const unschedList: DeliveryCycle[] = [];
 
       for (const c of entry.cycles) {
         const m = this.deployMilestone(c);
         const actualInPrior   = !!m?.actual_date && this.inQuarter(m.actual_date, prior);
         const actualInCurrent = !!m?.actual_date && this.inQuarter(m.actual_date, current);
-        const targetInCurrent = !!m?.target_date && this.inQuarter(m.target_date, current);
-        const targetInPrior   = !!m?.target_date && !m.actual_date && this.inQuarter(m.target_date, prior);
+        const targetInCurrent = !m?.actual_date && !!m?.target_date && this.inQuarter(m.target_date, current);
+        const actualInNext1   = !!m?.actual_date && this.inQuarter(m.actual_date, q1);
+        const actualInNext2   = !!m?.actual_date && this.inQuarter(m.actual_date, q2);
+        const targetInNext1   = !m?.actual_date && !!m?.target_date && this.inQuarter(m.target_date, q1);
+        const targetInNext2   = !m?.actual_date && !!m?.target_date && this.inQuarter(m.target_date, q2);
+        const targetInPriorMiss = !!m?.target_date && !m?.actual_date && this.inQuarter(m.target_date, prior);
 
         let placed = false;
 
-        if (actualInPrior) {
+        // Section 1: Prior actual (any lifecycle stage including COMPLETE).
+        if (actualInPrior) { priorList.push(c); placed = true; }
+
+        // Section 2: Current quarter (actual or target).
+        if (actualInCurrent || targetInCurrent) { currentList.push(c); placed = true; }
+
+        // Section 3: Next two quarters (active only).
+        if (isActive(c)) {
+          if (actualInNext1 || targetInNext1) { nextQ1List.push(c); placed = true; }
+          if (actualInNext2 || targetInNext2) { nextQ2List.push(c); placed = true; }
+        }
+
+        // Section 1 also: prior-quarter miss surfaced inline with red dot.
+        if (targetInPriorMiss && isActive(c)) {
           priorList.push(c);
           placed = true;
         }
-        if (actualInCurrent || targetInCurrent) {
-          currentList.push(c);
-          placed = true;
-        }
-        if (targetInPrior && isActive(c)) {
-          priorList.push(c);
-          otherList.push(c);
-          placed = true;
-        }
+
+        // Section 4: Unscheduled Active — active and (no target, target before prior, or beyond Q+2).
         if (!placed && isActive(c)) {
-          otherList.push(c);
+          const tIdx = m?.target_date ? this.isoQuarterIndex(m.target_date) : null;
+          if (tIdx === null || tIdx > q2Index) {
+            unschedList.push(c);
+          }
         }
       }
 
       groups.push({
         user_id,
         display_name: entry.display_name,
-        prior:   priorList,
-        current: currentList,
-        other:   otherList
+        prior:       priorList,
+        current:     currentList,
+        nextQ1:      nextQ1List,
+        nextQ2:      nextQ2List,
+        unscheduled: unschedList
       });
     }
 
     return groups.sort((a, b) =>
-      (b.prior.length + b.current.length + b.other.length) -
-      (a.prior.length + a.current.length + a.other.length) ||
+      (b.prior.length + b.current.length + b.nextQ1.length + b.nextQ2.length + b.unscheduled.length) -
+      (a.prior.length + a.current.length + a.nextQ1.length + a.nextQ2.length + a.unscheduled.length) ||
       a.display_name.localeCompare(b.display_name)
     );
   }

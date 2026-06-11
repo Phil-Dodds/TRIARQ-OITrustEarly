@@ -30,8 +30,10 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
 import { McpService } from '../../../core/services/mcp.service';
+import { UserProfileService } from '../../../core/services/user-profile.service';
 import { User } from '../../../core/types/database';
 import { SYSTEM_ROLES, SystemRole, ROLE_DISPLAY_NAMES, userRoleToFlag } from '../../../core/constants/roles';
+import { UserCreateFormComponent } from '../../components/user-create-form/user-create-form.component';
 
 type UserPickerScope = 'division' | 'all';
 
@@ -62,7 +64,7 @@ function avatarColorFromName(name: string): string {
 @Component({
   selector:        'app-user-picker',
   standalone:      true,
-  imports:         [CommonModule, ReactiveFormsModule],
+  imports:         [CommonModule, ReactiveFormsModule, UserCreateFormComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="up-overlay" (click)="onOverlayClick($event)">
@@ -133,19 +135,17 @@ function avatarColorFromName(name: string): string {
                [class.up-row-selectable]="row.isSelectable"
                (click)="onRowClick(row)">
 
-            <!-- Avatar -->
+            <!-- Avatar — S-034: 32px -->
             <div class="up-avatar"
                  [style.background]="row.avatarColor">
               {{ row.initials }}
             </div>
 
-            <!-- Name + detail -->
+            <!-- Name + role pill — S-034: inline on same horizontal line -->
             <div class="up-row-body">
-              <div class="up-row-name">{{ row.display_name }}</div>
-              <div class="up-row-meta">
-                <span class="up-role-badge">{{ roleLabel }}</span>
-                <span *ngIf="!row.is_active" class="up-inactive-badge">⊘ Inactive</span>
-              </div>
+              <span class="up-row-name">{{ row.display_name }}</span>
+              <span class="up-role-badge">{{ roleLabel }}</span>
+              <span *ngIf="!row.is_active" class="up-inactive-badge">⊘ Inactive</span>
             </div>
 
             <!-- Blocked message (inline, only shown on click for inactive) -->
@@ -153,6 +153,14 @@ function avatarColorFromName(name: string): string {
                  class="up-blocked-msg" role="alert">
               {{ row.blockedReason }}
             </div>
+          </div>
+
+          <!-- D-420 — Admin-only "+ Add User" link below the last result row.
+               Opens an inline Create User overlay over the picker. -->
+          <div *ngIf="callerIsAdmin" class="up-add-user-row">
+            <button type="button" class="up-add-user-link" (click)="openCreateOverlay()">
+              + Add User
+            </button>
           </div>
         </div>
 
@@ -182,144 +190,86 @@ function avatarColorFromName(name: string): string {
           </button>
         </div>
       </div>
+
+      <!-- D-420 — Create User overlay (modal over picker, Admin-only).
+           Reuses .up-overlay + .up-modal chrome with .up-overlay-create z-bump.
+           Form is the shared UserCreateFormComponent (S-007). -->
+      <div *ngIf="createOverlayOpen" class="up-overlay up-overlay-create"
+           (click)="$event.stopPropagation()">
+        <div class="up-modal" role="dialog" aria-modal="true" aria-label="Add User">
+          <div class="up-header">
+            <h2 class="up-title">Add {{ roleLabel }}</h2>
+            <button class="up-close" type="button"
+                    (click)="onCreateCancelled()" aria-label="Close add user">✕</button>
+          </div>
+          <div class="up-body-padded">
+            <p class="up-create-explain">
+              New user receives an invite email and gets the {{ roleLabel }} role.
+              Assign Divisions via User Management after the invite.
+            </p>
+            <app-user-create-form
+              [allDivisions]="[]"
+              [defaultRoleFlag]="defaultRoleFlagForPicker"
+              (userCreated)="onUserCreated($event)"
+              (cancelled)="onCreateCancelled()">
+            </app-user-create-form>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
-    .up-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.55);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 1100;
-    }
-    .up-modal {
-      background: #fff; border-radius: 10px;
-      width: 540px; max-width: 95vw; max-height: 80vh;
-      display: flex; flex-direction: column; overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-    }
-    .up-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 20px; background: #12274A;
-    }
-    .up-title { margin: 0; font: 600 18px/1.2 Roboto, sans-serif; color: #fff; }
-    .up-close {
-      background: none; border: none; color: rgba(255,255,255,0.7);
-      font-size: 18px; cursor: pointer; padding: 4px 8px;
-    }
-    .up-close:hover { color: #fff; }
-
-    .up-scope-row {
-      display: flex; align-items: center; gap: 16px;
-      padding: 12px 20px; border-bottom: 1px solid #E8E8E8;
-      background: #F5F5F5;
-    }
-    .up-scope-label { font: 500 13px/1 Roboto, sans-serif; color: #5A5A5A; white-space: nowrap; }
-    .up-scope-option {
-      display: flex; align-items: center; gap: 6px;
-      font: 400 13px/1 Roboto, sans-serif; color: #262626; cursor: pointer;
-    }
-
+    .up-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 1100; }
+    .up-modal { background: #fff; border-radius: 10px; width: 540px; max-width: 95vw; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .up-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: #12274A; }
+    .up-title { margin: 0; font: 600 18px/1.2 Roboto; color: #fff; }
+    .up-close { background: none; border: none; color: #fff; font-size: 18px; cursor: pointer; padding: 4px 8px; }
+    .up-scope-row { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid #E8E8E8; background: #F5F5F5; }
+    .up-scope-label { font: 500 13px/1 Roboto; color: #5A5A5A; white-space: nowrap }
+    .up-scope-option { display: flex; align-items: center; gap: 6px; font: 400 13px/1 Roboto; color: #262626; cursor: pointer }
     .up-search-row { padding: 12px 20px; border-bottom: 1px solid #E8E8E8; }
-    .up-search-input {
-      width: 100%; box-sizing: border-box;
-      border: 1.5px solid #D0D0D0; border-radius: 5px;
-      padding: 8px 12px; font: 400 14px Roboto, sans-serif; color: #262626;
-    }
-    .up-search-input:focus {
-      outline: none; border-color: #257099;
-      box-shadow: 0 0 0 3px rgba(37,112,153,0.15);
-    }
-
-    /* D-299/B-13: Shown inline when user selects "This Division" scope with no Division on cycle.
-       Does not block the list — list still loads below this message. Source: D-299. */
-    .up-no-division-msg {
-      padding: 24px 20px; text-align: center;
-      font: 400 14px Roboto, sans-serif; color: #5A5A5A; font-style: italic;
-    }
-
-    .up-load-error {
-      padding: 16px 20px; display: flex; flex-direction: column; gap: 4px;
-    }
-    .up-error-primary { font: 500 14px Roboto, sans-serif; color: #C62828; }
-    .up-error-secondary { font: 400 12px Roboto, sans-serif; color: #5A5A5A; }
-
-    .up-loading { padding: 24px 20px; text-align: center; font: 400 14px Roboto, sans-serif; color: #5A5A5A; }
-
+    .up-search-input { width: 100%; box-sizing: border-box; border: 1.5px solid #D0D0D0; border-radius: 5px; padding: 8px 12px; font: 400 14px Roboto; }
+    .up-search-input:focus { outline: none; border-color: #257099; }
+    .up-no-division-msg { padding: 24px 20px; text-align: center; font: italic 14px Roboto; color: #5A5A5A; }
+    .up-load-error { padding: 16px 20px; display: flex; flex-direction: column; gap: 4px; }
+    .up-error-primary { font: 500 14px Roboto; color: #C62828; }
+    .up-loading,.up-error-secondary,.up-empty { color: #5A5A5A; }
+    .up-error-secondary { font: 400 12px Roboto; }
+    .up-loading { padding: 24px 20px; text-align: center; font: 400 14px Roboto }
     .up-list-container { overflow-y: auto; flex: 1; padding: 8px 0; }
-    .up-empty {
-      padding: 20px 20px; font: 400 14px Roboto, sans-serif; color: #5A5A5A;
-      display: flex; flex-direction: column; gap: 6px;
-    }
-    .up-expand-hint { font: 400 12px Roboto, sans-serif; color: #257099; }
-
-    .up-row {
-      display: flex; align-items: flex-start; gap: 12px;
-      padding: 12px 20px; border-bottom: 1px solid #F0F0F0;
-      cursor: pointer; flex-wrap: wrap;
-    }
+    .up-empty { padding: 20px; font: 400 14px Roboto; display: flex; flex-direction: column; gap: 6px; }
+    .up-expand-hint { font: 400 12px Roboto; color: #257099; }
+    .up-row { display: flex; align-items: center; gap: 12px; padding: 8px 20px; border-bottom: 1px solid #F0F0F0; cursor: pointer; flex-wrap: wrap; }
     .up-row:hover { background: #F0F4F8; }
     .up-row-selected { background: #E8F0FE !important; }
     .up-row-inactive { opacity: 0.55; }
-    .up-row-selectable { cursor: pointer; }
     .up-row:not(.up-row-selectable) { cursor: default; }
-
-    .up-avatar {
-      width: 36px; height: 36px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font: 600 14px/1 Roboto, sans-serif; color: #fff; flex-shrink: 0;
-    }
-    .up-row-body { flex: 1; }
-    .up-row-name { font: 500 14px/1.3 Roboto, sans-serif; color: #1E1E1E; margin-bottom: 4px; }
-    .up-row-meta { display: flex; align-items: center; gap: 8px; }
-    .up-role-badge {
-      background: #E3F2FD; color: #1565C0; border-radius: 4px;
-      padding: 2px 7px; font: 500 11px Roboto, sans-serif;
-    }
-    .up-inactive-badge {
-      background: #F5F5F5; color: #757575; border-radius: 4px;
-      padding: 2px 7px; font: 500 11px Roboto, sans-serif;
-    }
-    .up-blocked-msg {
-      width: 100%; padding: 8px 12px; margin-top: 4px;
-      background: #FFF8E1; border-left: 3px solid #F2A620;
-      border-radius: 4px; font: 400 12px Roboto, sans-serif; color: #5A5A5A;
-    }
-
-    .up-echo-section {
-      padding: 12px 20px; border-top: 1px solid #E8E8E8;
-      background: #FAFAFA;
-    }
-    .up-echo-label { font: 500 12px Roboto, sans-serif; color: #5A5A5A; margin-bottom: 6px; }
-    .up-echo-chip {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(37,112,153,0.08); border-radius: 999px;
-      padding: 4px 12px 4px 6px;
-    }
-    .up-echo-avatar {
-      width: 24px; height: 24px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font: 600 10px Roboto, sans-serif; color: #fff;
-    }
-    .up-echo-name { font: 400 13px Roboto, sans-serif; color: #262626; }
-    .up-echo-none { font: 400 13px italic Roboto, sans-serif; color: #9E9E9E; }
-
-    .up-footer {
-      display: flex; justify-content: flex-end; gap: 12px;
-      padding: 14px 20px; border-top: 1px solid #E8E8E8;
-    }
-    .up-btn-cancel {
-      background: #fff; border: 1.5px solid #D0D0D0; border-radius: 5px;
-      padding: 8px 20px; font: 500 14px Roboto, sans-serif; color: #5A5A5A;
-      cursor: pointer;
-    }
+    .up-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 600 13px/1 Roboto; color: #fff; flex-shrink: 0; }
+    .up-row-body { flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .up-row-name { font: 500 14px/1.3 Roboto; color: #1E1E1E; }
+    .up-role-badge, .up-inactive-badge { border-radius: 4px; padding: 2px 7px; font: 500 11px Roboto; }
+    .up-role-badge { background: #E3F2FD; color: #1565C0; }
+    .up-inactive-badge { background: #F5F5F5; color: #757575; }
+    .up-blocked-msg { width: 100%; padding: 8px 12px; margin-top: 4px; background: #FFF8E1; border-left: 3px solid #F2A620; border-radius: 4px; font: 400 12px Roboto; }
+    .up-echo-section { padding: 12px 20px; border-top: 1px solid #E8E8E8; background: #FAFAFA; }
+    .up-echo-label { font: 500 12px Roboto; color: #5A5A5A; margin-bottom: 6px; }
+    .up-echo-chip { display: inline-flex; align-items: center; gap: 8px; background: rgba(37,112,153,0.08); border-radius: 999px; padding: 4px 12px 4px 6px; }
+    .up-echo-avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 600 10px Roboto; color: #fff; }
+    .up-echo-name { font: 400 13px Roboto; color: #262626; }
+    .up-echo-none { font: 400 italic 13px Roboto; color: #9E9E9E; }
+    .up-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 14px 20px; border-top: 1px solid #E8E8E8; }
+    .up-btn-cancel { background: #fff; border: 1.5px solid #D0D0D0; border-radius: 5px; padding: 8px 20px; font: 500 14px Roboto; color: #5A5A5A; cursor: pointer; }
     .up-btn-cancel:hover { background: #F5F5F5; }
-    .up-btn-confirm {
-      background: #257099; border: none; border-radius: 5px;
-      padding: 8px 24px; font: 500 14px Roboto, sans-serif; color: #fff;
-      cursor: pointer;
-    }
+    .up-btn-confirm { background: #257099; border: none; border-radius: 5px; padding: 8px 24px; font: 500 14px Roboto; color: #fff; cursor: pointer; }
     .up-btn-confirm:hover:not(:disabled) { background: #1d5878; }
     .up-btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; }
+    /* D-420 */
+    .up-add-user-row { padding: 8px 20px; border-top: 1px solid #F0F0F0; }
+    .up-add-user-link { background: none; border: none; cursor: pointer; color: #257099; font: 500 13px Roboto; padding: 4px 0; }
+    .up-add-user-link:hover { text-decoration: underline; }
+    .up-overlay-create { z-index: 1200; background: rgba(0,0,0,0.65); }
+    .up-body-padded { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .up-create-explain { margin: 0 0 16px; font: 400 italic 12px Roboto; color: #5A5A5A; }
   `]
 })
 export class UserPickerComponent implements OnInit, OnDestroy {
@@ -351,21 +301,34 @@ export class UserPickerComponent implements OnInit, OnDestroy {
 
   scopeOptions: { value: UserPickerScope; label: string }[] = [];
 
+  // D-420 — Admin inline + Add User. Derived from UserProfileService at init.
+  callerIsAdmin     = false;
+  createOverlayOpen = false;
+
   get roleLabel(): string {
     return ROLE_DISPLAY_NAMES[this.userRole] ?? this.userRole;
+  }
+
+  /** D-420 — role flag for the shared Create form's default pre-check. */
+  get defaultRoleFlagForPicker(): import('../../../core/constants/roles').RoleFlag {
+    return userRoleToFlag(this.userRole);
   }
 
   private subs = new Subscription();
 
   constructor(
-    private readonly mcp: McpService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly mcp:         McpService,
+    private readonly userProfile: UserProfileService,
+    private readonly cdr:         ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
     // D-299 fix: when no Division set on cycle, default scope to 'all' and load immediately.
     // Previous behavior: noDivisionMessage = true blocked all loading. Source: D-299.
     // D-297: "This Division" scope with no divisionId shows inline inform message (not a blocker).
+
+    // D-420 — caller admin detection drives + Add User link visibility.
+    this.callerIsAdmin = this.userProfile.getCurrentProfile()?.is_admin === true;
 
     // Build scope options — D-182: tightest scope first
     this.scopeOptions = [
@@ -511,5 +474,30 @@ export class UserPickerComponent implements OnInit, OnDestroy {
   confirm(): void {
     if (!this.selectedRow?.isSelectable) { return; }
     this.userSelected.emit(this.selectedRow as User);
+  }
+
+  // ── D-420 — Admin inline + Add User ────────────────────────────────────────
+
+  openCreateOverlay(): void {
+    this.createOverlayOpen = true;
+    this.cdr.markForCheck();
+  }
+
+  onCreateCancelled(): void {
+    this.createOverlayOpen = false;
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * On successful invite: close overlay, reload picker list, pre-select the new user
+   * so the existing selectedRow lookup picks it up after loadUsers finishes.
+   * D-421 no-Division warning surfaces on the User View panel next time the
+   * admin opens the user in User Management — Division assignment is not part of
+   * the picker-side mini-form.
+   */
+  onUserCreated(newUser: User): void {
+    this.createOverlayOpen = false;
+    this.selectedUserId    = newUser.id;
+    this.loadUsers();
   }
 }

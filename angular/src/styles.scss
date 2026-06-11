@@ -173,10 +173,23 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
   &.status-superseded { background: rgba(92,99,112,0.12); color: var(--triarq-color-text-disabled); }
 }
 
-// ── Home screen card grid ─────────────────────────────────────────────────────
+// ── Home screen layout — Bug 1 (S-006 viewport-adaptive). Wrap container fills
+// available width up to 1400px so the card grid spans multiple columns on desktop.
+.oi-home-screen {
+  max-width: 1400px;
+  margin:    0 auto;
+  padding:   var(--triarq-space-lg);
+}
+.oi-home-loading {
+  padding: var(--triarq-space-2xl) var(--triarq-space-lg);
+  text-align: center;
+  color: var(--triarq-color-text-secondary);
+}
+
+// Card grid — Bug 1: minmax tuned to give 4 columns at ≥1280px wide viewport.
 .oi-card-grid {
   display:               grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap:                   var(--triarq-space-md);
 }
 

@@ -150,26 +150,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         (cancelled)="onEditCancelled()">
       </app-delivery-cycle-edit-panel>
 
-      <!-- D-291: sticky outer wrapper — B-11 fix: close button + header card both sticky. -->
+      <!-- D-291 (amended by D-416): sticky outer wrapper. × close button lives
+           INSIDE the cycle-header card action bar at the far-right end, at the same
+           vertical position as the panel title. Destructive actions are visually
+           segregated from non-destructive by an Oravive fill + 1px fog vertical
+           rule per D-416 Rule 2. -->
       <div style="position:sticky;top:0;z-index:5;background:#fff;">
-
-      <!-- Contract 19 hotfix: dedicated close X at top-right of sticky header.
-           Previously buried in the action button row (B-76), where it was easy to miss
-           when 4+ action buttons crowded the same line and visual hierarchy obscured it.
-           Now sits in its own row above the cycle-header card. Always visible in panel mode. -->
-      <div *ngIf="panelMode"
-           style="display:flex;justify-content:flex-end;
-                  padding:var(--triarq-space-xs) 0;">
-        <button (click)="close.emit()"
-                title="Close panel"
-                aria-label="Close panel"
-                style="background:#fff;border:1px solid var(--triarq-color-border);
-                       border-radius:5px;cursor:pointer;
-                       color:var(--triarq-color-text-secondary);
-                       font-size:18px;line-height:1;padding:4px 10px;">
-          ✕
-        </button>
-      </div>
 
 
       <!-- ── Cycle Header ───────────────────────────────────────────────── -->
@@ -262,16 +248,23 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               ↩ Regress Stage
             </button>
 
-            <!-- 4. Cancel Cycle — not terminal, D-183 two-step inline confirm -->
+            <!-- D-416 Rule 2: 1px fog vertical rule separating non-destructive from
+                 destructive actions. Renders only when destructive action is present. -->
+            <div *ngIf="canCancelCycle && !cancelConfirming"
+                 style="width:1px;align-self:stretch;background:#A6A6A6;
+                        margin:0 12px;flex-shrink:0;"></div>
+
+            <!-- 4. Cancel Initiative — destructive. D-416: Oravive fill, far right of
+                 action bar. D-183 two-step inline confirm preserved. -->
             <button *ngIf="canCancelCycle && !cancelConfirming"
                     (click)="cancelConfirming = true"
-                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-error);
-                           background:none;border:1px solid var(--triarq-color-error);
-                           border-radius:5px;padding:3px 8px;cursor:pointer;">
+                    style="white-space:nowrap;font-size:11px;color:#fff;
+                           background:#E96127;border:none;
+                           border-radius:5px;padding:3px 10px;cursor:pointer;font-weight:500;">
               Cancel Initiative
             </button>
 
-            <!-- 5. Un-cancel Initiative — CANCELLED stage only -->
+            <!-- 5. Un-cancel Initiative — constructive (reverses cancellation). CANCELLED stage only. -->
             <button *ngIf="cycle.current_lifecycle_stage === 'CANCELLED' && !uncancelConfirming"
                     (click)="uncancelConfirming = true"
                     style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
@@ -280,8 +273,18 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               ↺ Un-cancel Initiative
             </button>
 
-            <!-- Contract 19 hotfix: close X relocated to its own row above the card header.
-                 The previous inline placement got buried when 4+ action buttons crowded the row. -->
+            <!-- D-416 Rule 1: × close button in sticky panel header, far right,
+                 at title vertical center. Replaces the Contract 19 dedicated row above. -->
+            <button *ngIf="panelMode"
+                    (click)="close.emit()"
+                    title="Close panel"
+                    aria-label="Close panel"
+                    style="background:#fff;border:1px solid var(--triarq-color-border);
+                           border-radius:5px;cursor:pointer;
+                           color:var(--triarq-color-text-secondary);
+                           font-size:18px;line-height:1;padding:2px 10px;margin-left:4px;">
+              ✕
+            </button>
 
           </div>
         </div>
@@ -894,9 +897,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     [style.color]="group.isFuture ? 'var(--triarq-color-text-secondary)' : 'var(--triarq-color-primary)'">
                 {{ group.stage }}
               </span>
+              <!-- D-418: future stage label is orientation-only; attach is still available. -->
               <span *ngIf="group.isFuture"
                     style="font-size:10px;color:var(--triarq-color-text-secondary);font-style:italic;">
-                — Available when cycle reaches {{ group.stage }}
+                — Future stage
               </span>
             </span>
             <span style="font-size:10px;color:var(--triarq-color-text-secondary);">
@@ -978,16 +982,22 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     </div>
                   </div>
 
-                  <!-- Empty slot placeholder -->
-                  <div *ngIf="!slot.external_url && !slot.oi_library_artifact_id"
+                  <!-- Empty slot placeholder — D-418: distinct text for future stage slots. -->
+                  <div *ngIf="!slot.external_url && !slot.oi_library_artifact_id && !group.isFuture"
                        style="margin-top:4px;font-size:10px;color:var(--triarq-color-text-secondary);
                               font-style:italic;">
                     Not yet attached
                   </div>
+                  <div *ngIf="!slot.external_url && !slot.oi_library_artifact_id && group.isFuture"
+                       style="margin-top:4px;font-size:10px;color:var(--triarq-color-text-secondary);
+                              font-style:italic;">
+                    Attach early — slots are available at any stage.
+                  </div>
                 </div>
 
-                <!-- Action column: Attach / Replace + → OI Library -->
-                <div *ngIf="!group.isFuture"
+                <!-- Action column: Attach / Replace + → OI Library.
+                     D-418: action available at all lifecycle stages. Future slots dim via opacity. -->
+                <div [style.opacity]="group.isFuture ? '0.6' : '1'"
                      style="display:flex;flex-direction:column;align-items:flex-end;
                             gap:4px;flex-shrink:0;">
                   <button *ngIf="!slot.external_url"
@@ -1061,8 +1071,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
             </div><!-- end slot rows -->
 
-            <!-- Ad hoc attach link at bottom of each expanded stage (not future) -->
-            <div *ngIf="!group.isFuture"
+            <!-- Ad hoc attach link at bottom of each expanded stage. D-418: available
+                 at any stage; future slots dim via opacity. -->
+            <div [style.opacity]="group.isFuture ? '0.6' : '1'"
                  style="padding:var(--triarq-space-xs) var(--triarq-space-xs);">
               <!-- Ad hoc form open for this stage -->
               <div *ngIf="showAttachForm && attachingForTypeId === '__adhoc__' + group.stage"
@@ -1122,11 +1133,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
         </div><!-- end stage group loop -->
 
-        <!-- Empty state per build-c-view-correction-spec-2026-04-09 Section 2.6 -->
+        <!-- Empty state — D-418: removed "slots become available as the cycle advances"
+             text; that gating no longer applies. Attach is available at any stage. -->
         <div *ngIf="artifactsByStage.length === 0"
              style="font-size:14px;font-style:italic;font-family:Roboto,sans-serif;
                     color:#9E9E9E;padding:16px;">
-          No artifacts attached yet. Artifact slots become available as the cycle advances through stages.
+          No artifacts attached yet.
         </div>
       </div>
 

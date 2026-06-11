@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.43 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.44 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-415**
+**Next available: D-424**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -316,6 +316,17 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-412 | Outlook Paste-Parse on New User Form | LOCKED | 2026-06-09 | Spec | Email field parses Outlook-format paste; auto-fills Name; hint text below field |
 | D-413 | Division Management Tree Grid Pattern | LOCKED | 2026-06-09 | Spec | Single tree grid replacing drill-in; three indent levels; active_status column; amber band on inactive rows |
 | D-414 | Division Management Right Panel: Member Management, Name Edit, Deactivation | LOCKED | 2026-06-09 | Spec | Members add/remove in View panel; Name edit in Edit panel; soft-block deactivation per S-032 |
+| D-415 | Compact Person Row Layout — 32px avatar, role pill inline, 8px padding; system-wide; S-034 | LOCKED | 2026-06-09 | Spec | specced |
+| D-416 | Panel Header: × in sticky header; destructive actions Oravive fill + far right + fog rule separator | LOCKED | 2026-06-09 | Spec | specced |
+| D-417 | Division Assignment Picker — hierarchical tree multi-select replacing flat Trust dropdown | LOCKED | 2026-06-09 | Spec | specced |
+| D-418 | Artifact Attach Action available at all lifecycle stages; future slots dimmed but functional | LOCKED | 2026-06-09 | Spec | specced |
+| D-419 | EPO Deploy Gate by Quarter — four sections; status dot walkback rule; parallel apply to Deploy Gate Schedule | LOCKED | 2026-06-09 | Spec | specced |
+| D-410-Amend-1 | User Management Division filter default = All (not My Divisions) | LOCKED | 2026-06-09 | Spec | specced |
+| D-410-Amend-2 | User Management Division filter adds "No Division Assigned" fourth option | LOCKED | 2026-06-09 | Spec | specced |
+| D-420 | EntityPicker inline Add User for Admins — + Add User link opens Create User modal over picker | LOCKED | 2026-06-09 | Spec | specced |
+| D-421 | No-Division warning on user creation — D-200 Pattern 2 + Assign Division → link | LOCKED | 2026-06-09 | Spec | specced |
+| D-422 | Last Login column in User Management grid + Login Activity zone in User View panel | LOCKED | 2026-06-09 | Spec | specced |
+| D-423 | Home Screen My Initiatives Card — all roles, 5 rows, async, status dot per D-419 | LOCKED | 2026-06-09 | Spec | specced |
 
 ---
 

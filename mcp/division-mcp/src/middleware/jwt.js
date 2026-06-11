@@ -42,6 +42,15 @@ async function validateJwt(req, res, next) {
       email:   data.user.email || null
     };
 
+    // D-422 / D-166: stamp users.last_login_at on every validated JWT. Fire-and-forget —
+    // failures here must not block the request. Surfaced by list_users + User View panel
+    // Login Activity zone. Column added by Migration 037.
+    supabase
+      .from('users')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', data.user.id)
+      .then(() => {}, () => {});
+
     next();
   } catch (err) {
     // Never log the token value.
