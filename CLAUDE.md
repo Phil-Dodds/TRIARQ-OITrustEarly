@@ -1,6 +1,6 @@
 
 
-# CLAUDE.md — Pathways OI Trust | v2.6 | May 2026 | CONFIDENTIAL
+# CLAUDE.md — Pathways OI Trust | v2.7 | June 2026 | CONFIDENTIAL
 
 ---
 
@@ -18,9 +18,31 @@ Read decision-registry.md for content lookup only. Never claim or assign a D-num
 
 ## Build and Test Commands
 
-- Build: `ng build`
+### Local dev
+- Run dev server: `npm start` (ng serve)
 - Test: `ng test`
-- Deploy: push to master → GitHub Pages auto-deploys; Render deploys on push
+
+### Deploy build
+- ALWAYS use `npm run build` (or `npm run build:prod`) — the postbuild step writes
+  `dist/.../browser/version.json` with the current git SHA. Skipping it (e.g.
+  `npx ng build`) deploys with no version.json and the S-033 "new version
+  available" banner never fires — users keep their cached SPA forever.
+- Look for `[write-version] wrote …/version.json (build_version=<sha>)` in
+  stdout to confirm the postbuild ran.
+
+### Deploy procedure
+- **MCP (Render):** `git push origin master` — Render auto-deploys on push.
+- **Angular (GitHub Pages):** does NOT auto-deploy from master. Deploy explicitly:
+  1. `npm run build` (writes version.json)
+  2. Copy `angular/dist/pathways-oi-trust/browser/` to a staging dir OUTSIDE the
+     worktree (e.g. `/c/tmp/oi-deploy-c{NN}-{date}/`) — inherited GIT_DIR breaks
+     angular-cli-ghpages silently
+  3. Inside the staging dir, `cp index.html 404.html` and `touch .nojekyll`
+  4. `git init -b gh-pages && git add -A && git commit -m "..."`
+  5. `git remote add origin https://github.com/Phil-Dodds/TRIARQ-OITrustEarly.git`
+  6. `git push --force origin gh-pages`
+- After deploy: GitHub Pages CDN propagates in 30–60s; the S-033 banner
+  surfaces the update on existing tabs within 5 min (or on next route change).
 
 ---
 
@@ -359,4 +381,11 @@ maintenance mode off). Report the result explicitly:
 
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | May 2026 | v2.6*
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | June 2026 | v2.7*
+
+**v2.7 (2026-06-11)** — Build and Test Commands section rewritten. `ng build`
+replaced with `npm run build` (postbuild writes `version.json` for S-033
+banner). Deploy procedure corrected — Angular GitHub Pages does NOT auto-deploy
+from master; explicit gh-pages copy + force push required. MCP Render auto-deploy
+on master push unchanged. Triggered by Contract 22 deploy: `npx ng build` produced
+dist without version.json, S-033 banner stayed silent, Phil hit stale SPA.

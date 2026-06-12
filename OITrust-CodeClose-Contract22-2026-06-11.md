@@ -337,6 +337,52 @@ Do not advance `devStatus` without explicit confirmation per S-020.
 
 ---
 
+## L1. Post-CodeClose Amendment — CLAUDE.md Build/Deploy Section Rewrite
+
+**Trigger:** Contract 22 deploy ran `npx ng build` instead of `npm run build`.
+The postbuild step `scripts/write-version.js` only fires through the npm chain
+(`"build": "ng build && node scripts/write-version.js"`). Skipping it deployed
+fresh dist with no `version.json` regeneration. The S-033 `VersionCheckService`
+silently failed on every poll (`res.ok` false on the missing file → no
+`bootVersion` captured → banner never fires). Phil hit stale `index.html` from
+browser cache and had to discover the issue manually.
+
+**Action taken (with Phil's explicit go-ahead):**
+- Edited `CLAUDE.md` — replaced the three-line "Build and Test Commands" block
+  with a structured Local dev / Deploy build / Deploy procedure section that:
+  - mandates `npm run build` (or `:prod`) for any deploy build;
+  - lists the explicit gh-pages copy + force-push procedure (worktree GIT_DIR
+    contamination is the silent failure mode here);
+  - clarifies that Render auto-deploys MCP on master push but GitHub Pages does
+    NOT — Angular needs the explicit gh-pages dance.
+- Bumped CLAUDE.md from v2.6 (May 2026) to v2.7 (June 2026) with a Version
+  History entry naming the trigger and citing S-033.
+- Added a personal `~/.claude/` memory pointer (`deploy_use_npm_run_build.md`)
+  so the same Code session on this machine self-corrects. Personal memory does
+  NOT propagate to other agents or Validator sessions — the CLAUDE.md edit
+  above is the durable artifact.
+
+**Validator / Design notes:**
+1. CLAUDE.md is now v2.7. The Build and Test Commands section is the authoritative
+   deploy reference — every future Code session reads it at session init.
+2. S-033 retrofit is **not required** as a separate work item — the standard's
+   trigger condition ("retrofit when next contract touches `angular/package.json`
+   or `angular/src/index.html`") was already satisfied in Contract 20 (CC-20-09).
+   The infrastructure exists end-to-end; the gap was procedural (build command
+   misuse during deploy), now closed in CLAUDE.md.
+3. Personal memory is per-machine, per-tool. Anything operationally durable
+   should land in `CLAUDE.md` or `docs/` so it survives a fresh repo clone, a
+   new agent, or a Validator pass.
+
+**Why this matters for Design:** the deploy banner is the contract between a
+deployed build and a user who already has the SPA open. S-033 was designed to
+make that contract reliable. Contract 22's deploy briefly broke it because the
+procedural step (use the npm script) was implicit. Documenting it explicitly in
+CLAUDE.md is the smallest change that prevents recurrence across all future
+sessions and tooling.
+
+---
+
 ## M. Session Output Location
 
 Full Windows path to this file:
