@@ -337,7 +337,26 @@ Do not advance `devStatus` without explicit confirmation per S-020.
 
 ---
 
-## L1. Post-CodeClose Amendment — CLAUDE.md Build/Deploy Section Rewrite
+## L1. Contract 22.1 — Post-Close Amendment (2026-06-11, same day)
+
+Three issues surfaced during UAT immediately after the initial CodeClose was
+written. All three are bundled here as Contract 22.1 — same Validator pass,
+no separate spec.
+
+### L1.1 — Commits
+
+```
+046eae1  CLAUDE.md v2.7: rewrite Build and Test Commands section
+b5780eb  Fix: milestone_dates missing in list_delivery_cycles + S-008 parent refresh on edit close
+2c4633b  Home: My Initiatives card leads the grid + dashboard reads assigned_person=me
+```
+
+Each commit pushed to `master` (Render auto-redeploys MCP for b5780eb). Angular
+redeployed to `gh-pages` after each commit using `npm run build` + the explicit
+copy/force-push procedure. `version.json` on the live site now reflects
+`2c4633b…`.
+
+### L1.2 — Fix 1: CLAUDE.md Build and Test Commands rewrite (commit 046eae1)
 
 **Trigger:** Contract 22 deploy ran `npx ng build` instead of `npm run build`.
 The postbuild step `scripts/write-version.js` only fires through the npm chain
@@ -347,39 +366,155 @@ silently failed on every poll (`res.ok` false on the missing file → no
 `bootVersion` captured → banner never fires). Phil hit stale `index.html` from
 browser cache and had to discover the issue manually.
 
-**Action taken (with Phil's explicit go-ahead):**
-- Edited `CLAUDE.md` — replaced the three-line "Build and Test Commands" block
-  with a structured Local dev / Deploy build / Deploy procedure section that:
+**Action:**
+- `CLAUDE.md` v2.6 → v2.7. Replaced the three-line "Build and Test Commands"
+  block with a structured Local dev / Deploy build / Deploy procedure section:
   - mandates `npm run build` (or `:prod`) for any deploy build;
   - lists the explicit gh-pages copy + force-push procedure (worktree GIT_DIR
-    contamination is the silent failure mode here);
-  - clarifies that Render auto-deploys MCP on master push but GitHub Pages does
-    NOT — Angular needs the explicit gh-pages dance.
-- Bumped CLAUDE.md from v2.6 (May 2026) to v2.7 (June 2026) with a Version
-  History entry naming the trigger and citing S-033.
-- Added a personal `~/.claude/` memory pointer (`deploy_use_npm_run_build.md`)
-  so the same Code session on this machine self-corrects. Personal memory does
-  NOT propagate to other agents or Validator sessions — the CLAUDE.md edit
-  above is the durable artifact.
+    contamination is the silent failure mode there);
+  - clarifies Render auto-deploys MCP on master push, GitHub Pages does NOT
+    auto-deploy — Angular needs the explicit gh-pages branch update.
+- Added personal `~/.claude/` memory pointer (`deploy_use_npm_run_build.md`).
+  Personal memory does NOT propagate to other agents or Validator sessions —
+  CLAUDE.md is the durable artifact.
 
-**Validator / Design notes:**
-1. CLAUDE.md is now v2.7. The Build and Test Commands section is the authoritative
+### L1.3 — Fix 2: `milestone_dates` missing in `list_delivery_cycles` MCP (commit b5780eb)
+
+**Trigger:** On `/initiatives/epo-deploy`, the "New Initiative" with Go to
+Deploy target `2026-06-18` (current Q2 2026, status `on_track`) landed in
+**Unscheduled Active** instead of **Current Quarter Planned/Actual**.
+
+**Diagnosis:** `list_delivery_cycles` in `delivery-cycle-mcp` did not include
+`cycle_milestone_dates` in its response. Every cycle reached the D-419
+classifier with `c.milestone_dates === undefined`, so `deployMilestone()`
+returned null, every date predicate was false, every active cycle fell to
+Unscheduled via the catch-all. The bug pre-dated Contract 22 — the OLD
+three-section view also placed every cycle in "Other Active" for the same
+reason — but the four-section model exposed it by giving "wrong placement"
+four times more places to be obvious.
+
+**Action:** `mcp/delivery-cycle-mcp/src/tools/list_delivery_cycles.js` — added a
+batch `cycle_milestone_dates` SELECT for the resolved cycle list, grouped by
+`delivery_cycle_id`, injected into the enriched response as
+`milestone_dates: []`. Cost: one extra Supabase query per `list_delivery_cycles`
+call (batched, no N+1).
+
+### L1.4 — Fix 3: S-008 Parent Refresh on Return missing on edit close (commit b5780eb)
+
+**Trigger:** After editing an Initiative's Go to Deploy target date from the
+detail panel, the parent EPO Deploy view did not re-query — the row stayed in
+the wrong section until manual refresh.
+
+**Diagnosis:** Six components subscribe to `<app-delivery-cycle-detail>`'s
+`editPanelClosed` output but only flipped `showEditScrim`. None called the
+local list loader. This violates S-008 ("Every stack pop … triggers an
+unconditional re-query of the parent surface"). Latent in every grid+detail
+view since Contract 12.
+
+**Action:** Added the local loader call (`loadCycles()` or `loadAll()`) to both
+`onEditPanelClosed()` and `closePanel()` on:
+- `features/delivery/epo-deploy/epo-deploy.component.ts`
+- `features/delivery/deploy-schedule/deploy-schedule.component.ts`
+- `features/delivery/epo-schedule/epo-schedule.component.ts`
+- `features/delivery/epo-summary/epo-summary.component.ts`
+- `features/delivery/dashboard/delivery-cycle-dashboard.component.ts`
+- `features/delivery/gates-summary/gates-summary.component.ts`
+
+### L1.5 — Fix 4: Home card order + dashboard `assigned_person=me` query param (commit 2c4633b)
+
+**Trigger:** UAT — Phil asked that "My Initiatives" lead the home grid (it sat
+near the bottom alongside the Embedded Chat stub), and that the card's "View
+all [N] →" link actually filter the dashboard to his Initiatives.
+
+**Diagnosis:**
+- Card order: `home.component.html` rendered `app-my-delivery-cycles-card` as
+  the second-to-last card. Moved to the first card in the grid.
+- View-all link: card's footer already routed to
+  `/initiatives/list?assigned_person=me`. Dashboard's `ngOnInit` read
+  `workstream_id` / `next_gate` / `division_id` / `epo` query params but NOT
+  `assigned_person`. Dashboard already had the matching filter primitive
+  (`filterAssignedPerson='me'` + `personScope='me_terminal'`) — the gap was
+  purely the query-param read.
+
+**Action:**
+- `features/home/home.component.html` — `<app-my-delivery-cycles-card>` moved
+  to the first slot inside `<div class="oi-card-grid">`.
+- `features/delivery/dashboard/delivery-cycle-dashboard.component.ts` —
+  ngOnInit reads `qp['assigned_person']`; when `'me'`, sets
+  `filterAssignedPerson='me'`, `personScope='me_terminal'`, and the drill-down
+  banner flag. Reuses the existing classifier — no new filter primitive.
+
+### L1.6 — CC-Decisions (22.1)
+
+CC-22.1-01 — **`assigned_person=me` query-param convention.** Chose
+`?assigned_person=me` over reusing the legacy filter vocabulary
+(`?person=me` or `?role=me`) because Initiative-tracking filters are
+namespaced by what they filter, not by the relationship. Existing handlers
+already use this style (`?epo=<uuid>`, `?division_id=<uuid>`). Aligns with
+the "Me" terminal radio already in the Assigned Person filter row.
+
+CC-22.1-02 — **List MCP `milestone_dates` shape.** Returned as a plain array
+of `cycle_milestone_dates` rows (mirrors `get_delivery_cycle` shape) rather
+than as a derived summary (e.g., next-gate + status). Keeps the classifier in
+the Angular layer with full milestone data; avoids server-side coupling to
+D-419's specific Go-to-Deploy → Go-to-Build → Brief-Review walkback chain.
+Future views can derive other gate-status semantics from the same payload
+without an MCP change.
+
+CC-22.1-03 — **Home card grid order.** My Initiatives card promoted to first
+position; My Action Queue and My Notifications follow. Did not introduce a
+formal "card priority" decision — the order is a manual sequence in
+`home.component.html`. Future cards (Activity feed, etc.) should slot
+alongside intentionally rather than appending. Flagged for Design as a
+candidate for a card-ordering policy.
+
+### L1.7 — Validator / Design notes
+
+1. CLAUDE.md is now v2.7. Build and Test Commands section is the authoritative
    deploy reference — every future Code session reads it at session init.
-2. S-033 retrofit is **not required** as a separate work item — the standard's
-   trigger condition ("retrofit when next contract touches `angular/package.json`
-   or `angular/src/index.html`") was already satisfied in Contract 20 (CC-20-09).
-   The infrastructure exists end-to-end; the gap was procedural (build command
-   misuse during deploy), now closed in CLAUDE.md.
-3. Personal memory is per-machine, per-tool. Anything operationally durable
-   should land in `CLAUDE.md` or `docs/` so it survives a fresh repo clone, a
+2. S-033 retrofit is NOT a separate work item — the infrastructure was
+   delivered in Contract 20 (CC-20-09). The Contract 22.1 fix was procedural
+   (use the npm script), now closed in CLAUDE.md.
+3. The S-008 fix touches six components with the same pattern. Pattern-sweep
+   candidate for next contract: extract a shared `BaseGridWithDetailPanel`
+   mixin or a higher-order component if more grids+detail surfaces emerge.
+4. `list_delivery_cycles` milestone_dates fix adds one Supabase round trip
+   per list. Consider whether the dashboard / EPO views need a separate
+   lighter-weight list endpoint if profile load times grow.
+5. Personal memory is per-machine, per-tool. Anything operationally durable
+   should land in CLAUDE.md or `docs/` so it survives a fresh repo clone, a
    new agent, or a Validator pass.
 
-**Why this matters for Design:** the deploy banner is the contract between a
-deployed build and a user who already has the SPA open. S-033 was designed to
-make that contract reliable. Contract 22's deploy briefly broke it because the
-procedural step (use the npm script) was implicit. Documenting it explicitly in
-CLAUDE.md is the smallest change that prevents recurrence across all future
-sessions and tooling.
+### L1.8 — UAT additions (22.1)
+
+Append to §H:
+
+**H8 — `/initiatives/epo-deploy` placement after MCP fix**
+1. Open an Initiative with a Go to Deploy target in the current quarter.
+   Confirm the row renders in **Current Quarter Planned/Actual**, not in
+   Unscheduled. Pass / Fail.
+2. Edit the Go to Deploy target to a date in Q+1. Save. Close the edit panel.
+   Without manual refresh, confirm the row moves out of Current Quarter and
+   into Next Two Quarters → Q+1 sub-group. Pass / Fail.
+3. Repeat the same edit on `/delivery/deploy-schedule`. Same expectation.
+   Pass / Fail.
+
+**H9 — Home My Initiatives drill-through**
+1. Open the home page. Confirm My Initiatives is the first card in the grid.
+   Pass / Fail.
+2. Tap "View all [N] →". Confirm the dashboard opens with the **Assigned: Me**
+   chip visible above the grid and the grid filtered to Initiatives where
+   you are DCS, EPO, or DOL. Pass / Fail.
+3. Dismiss the Assigned chip. Confirm the grid re-queries unfiltered.
+   Pass / Fail.
+
+**H10 — S-033 banner**
+1. After this deploy, your existing tab's poll (≤5 min, or next route change)
+   should surface the "A new version of Pathways is available. [Reload]"
+   banner because the live `version.json` differs from boot-captured SHA.
+   Click Reload. Pass / Fail.
+2. After reload, the boot SHA captures the new version. Confirm the banner
+   does not re-appear on subsequent route changes. Pass / Fail.
 
 ---
 
