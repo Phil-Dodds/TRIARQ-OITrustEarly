@@ -19,6 +19,12 @@
   <!-- Main card grid — shown only when user has at least one Division -->
   <div *ngIf="showMainCards" class="oi-card-grid">
 
+    <!-- D-423: My Initiatives leads the grid — primary user lens. -->
+    <app-my-delivery-cycles-card
+      *ngIf="showDeliveryCycles"
+      [userId]="profile?.id ?? ''">
+    </app-my-delivery-cycles-card>
+
     <!-- Universal cards — all roles -->
     <app-my-action-queue-card
       [userId]="profile?.id ?? ''">
@@ -47,12 +53,6 @@
     <app-user-management-card
       *ngIf="showUserManagement">
     </app-user-management-card>
-
-    <!-- DS + CB — shell present, data wired in Build C -->
-    <app-my-delivery-cycles-card
-      *ngIf="showDeliveryCycles"
-      [userId]="profile?.id ?? ''">
-    </app-my-delivery-cycles-card>
 
     <!-- All roles — Chat stub only in Build A (Session 2026-03-29-A) -->
     <app-embedded-chat-card>

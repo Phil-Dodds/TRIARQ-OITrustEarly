@@ -969,6 +969,15 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (qp['division_id'])   { this.filterDivision   = qp['division_id']   as string; this.drillDownFromQp = true; }
     // Contract 20 Session 2: drill-down from EPO Summary view sets the EPO filter.
     if (qp['epo'])           { this.filterEpo        = qp['epo']           as string; this.drillDownFromQp = true; }
+    // Contract 22 (D-423): drill-down from Home → My Initiatives "View all" footer.
+    //   Filters the dashboard to Initiatives where the caller is DCS, EPO, or DOL
+    //   (assigned_to_current_user MCP scope). Maps to the same `Me` terminal option
+    //   in the Assigned Person filter row, so chip + drill-down state stay aligned.
+    if (qp['assigned_person'] === 'me') {
+      this.filterAssignedPerson = 'me';
+      this.personScope          = 'me_terminal';
+      this.drillDownFromQp      = true;
+    }
     // B-94: cycle drill-down from Gate Schedule / Deploy Schedule opens detail panel.
     if (qp['selected_cycle_id']) { this.selectedCycleId = qp['selected_cycle_id'] as string; }
 
