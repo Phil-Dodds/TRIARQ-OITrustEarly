@@ -354,6 +354,7 @@ f38418b  App name: 'Pathways OI Trust' → 'OI Trust' in user-facing strings
 6c771ca  Define .oi-btn-primary/.oi-btn-secondary/.oi-input globally + D-140 always-enabled Confirm
 268a76c  Fix tree picker thrash — cache currentlyAssignedDivisionIds; ignore input ref churn
 73be9a4  Create form: reuse D-417 tree picker for Divisions; View panel: Tier 3 overlay during load
+419eb6d  Close buttons: single visual standard + upper-right placement on Initiative detail
 ```
 
 Each commit pushed to `master` (Render auto-redeploys MCP for b5780eb). Angular
@@ -609,7 +610,44 @@ mutating operation").
    experience: there is ONE Division picker, period. Future role-based
    pickers should follow the same pattern.
 
-### L1.10 — CC-Decisions (22.1)
+### L1.10 — Fix 9: Close button standard + Initiative detail × upper-right (commit 419eb6d)
+
+**Trigger:** Phil — "The X buttons never look right." On the Initiative
+detail panel screenshot, the × was placed at the end of the action button
+row (next to the Oravive-filled Cancel Initiative), inverting the visual
+hierarchy and burying the close affordance.
+
+**Diagnosis:** Each surface had its own inline-styled or per-component
+close button — varying paddings, sizes, colors, and positions. The Initiative
+detail panel was the worst because the × shared the same row as destructive
+and constructive actions.
+
+**Action:**
+- Added two global classes to `styles.scss`:
+  - `.oi-close-btn`      — 32×32 transparent circle, gray glyph, hover gray
+                           bg. For white panel headers.
+  - `.oi-close-btn-dark` — same shape, off-white glyph, hover translucent
+                           white bg. For Deep Navy modal headers.
+- `delivery-cycle-detail.component.ts`:
+  - Added `:host { display: block; position: relative; }` so absolute
+    children position against the panel.
+  - Removed the × from the action button row.
+  - New × at the very top of the template with
+    `position:absolute; top:12px; right:12px; z-index:10;` and class
+    `oi-close-btn`. Always sits in the upper-right corner of the floater
+    regardless of action-row contents or scroll state.
+- `users.component.ts` (4 sites) and `divisions.component.ts` (3 sites):
+  swapped inline `style="background:none;border:none;cursor:pointer;font-size:18px;"`
+  for `class="oi-close-btn"`.
+
+**Deferred:** modal × buttons (user-picker, division-tree-picker,
+workstream-picker, gate-record-modal, delivery-cycle-create-panel) already
+sit in upper-right of their headers via `flex justify-content: space-between`.
+Their position was never the problem — just their styling differed
+per-component. Swap their inline classes to `.oi-close-btn-dark` /
+`.oi-close-btn` when next on the touch list. Not blocking this contract.
+
+### L1.11 — CC-Decisions (22.1)
 
 CC-22.1-01 — **`assigned_person=me` query-param convention.** Chose
 `?assigned_person=me` over reusing the legacy filter vocabulary
@@ -633,7 +671,7 @@ formal "card priority" decision — the order is a manual sequence in
 alongside intentionally rather than appending. Flagged for Design as a
 candidate for a card-ordering policy.
 
-### L1.11 — Validator / Design notes
+### L1.12 — Validator / Design notes
 
 1. CLAUDE.md is now v2.7. Build and Test Commands section is the authoritative
    deploy reference — every future Code session reads it at session init.
@@ -650,7 +688,7 @@ candidate for a card-ordering policy.
    should land in CLAUDE.md or `docs/` so it survives a fresh repo clone, a
    new agent, or a Validator pass.
 
-### L1.12 — UAT additions (22.1)
+### L1.13 — UAT additions (22.1)
 
 Append to §H:
 
@@ -691,6 +729,16 @@ Append to §H:
    "Pathways OI Trust"). Pass / Fail.
 5. S-033 banner (next deploy) reads "A new version of OI Trust is available."
    Pass / Fail.
+
+**H16 — Close buttons (Fix 9)**
+1. Open any Initiative detail. Confirm × sits in the upper-right corner of
+   the floater panel (NOT inline with Edit Initiative / Cancel Initiative
+   buttons). Action row reads: Edit · Submit · Regress · |fog rule| · Cancel
+   — Oravive. Pass / Fail.
+2. Tap any user row in /admin/users → View panel × button is a 32px circle
+   with subtle gray ✕, gray hover circle on rollover. Pass / Fail.
+3. Same on /admin/divisions and on the UM/DM Filter panel, Edit panel, and
+   Create panel headers. Pass / Fail.
 
 **H14 — New User Create form Division picker (Fix 8a)**
 1. Tap `+ Add User` on `/admin/users`. Confirm the Divisions section shows a
