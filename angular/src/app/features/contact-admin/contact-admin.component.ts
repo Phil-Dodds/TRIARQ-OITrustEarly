@@ -38,7 +38,7 @@ import { User }                  from '../../core/types/database';
       <p style="margin:0 0 var(--triarq-space-lg) 0;font-size:var(--triarq-text-small);
                 color:var(--triarq-color-text-secondary);">
         The following Admins have full system access and can help with access requests,
-        account issues, or any question about Pathways OI Trust.
+        account issues, or any question about OI Trust.
         Click an email address to send a message directly.
       </p>
 

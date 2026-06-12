@@ -39,7 +39,7 @@ type LoginState = 'idle' | 'sending' | 'error';
         </div>
 
         <div class="product-block">
-          <h1 class="product-name">Pathways OI Trust</h1>
+          <h1 class="product-name">OI Trust</h1>
           <p class="product-description">
             TRIARQ's platform for delivery workflows, organizational intelligence, and governance.
           </p>

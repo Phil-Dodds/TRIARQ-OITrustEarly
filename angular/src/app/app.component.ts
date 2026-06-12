@@ -27,7 +27,7 @@ import { Observable }             from 'rxjs';
            which route is loaded. -->
       <div *ngIf="updateAvailable$ | async" class="oi-update-banner">
         <span class="oi-update-text">
-          A new version of Pathways is available.
+          A new version of OI Trust is available.
         </span>
         <button type="button"
                 class="oi-update-btn"
