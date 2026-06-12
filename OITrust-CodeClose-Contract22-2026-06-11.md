@@ -351,6 +351,7 @@ b5780eb  Fix: milestone_dates missing in list_delivery_cycles + S-008 parent ref
 2c4633b  Home: My Initiatives card leads the grid + dashboard reads assigned_person=me
 f38418b  App name: 'Pathways OI Trust' → 'OI Trust' in user-facing strings
 0a72987  sidebar: brand 'Pathways OI Trust' → 'OI Trust' (missed in f38418b)
+6c771ca  Define .oi-btn-primary/.oi-btn-secondary/.oi-input globally + D-140 always-enabled Confirm
 ```
 
 Each commit pushed to `master` (Render auto-redeploys MCP for b5780eb). Angular
@@ -475,7 +476,53 @@ Two commits because the sidebar edit was dropped in the first commit (an
 intermediate "File has not been read yet" error from the Edit tool) and
 shipped as a follow-on commit.
 
-### L1.7 — CC-Decisions (22.1)
+### L1.7 — Fix 6: Global button/input styles + admin h2 + D-140 always-enabled Confirm (commit 6c771ca)
+
+**Trigger:** UAT on `/admin/users` and the Assign Divisions tree picker
+revealed three latent gaps:
+- `+ Add User` and `Filters` rendered as bare unstyled buttons because
+  `.oi-btn-primary` and `.oi-btn-secondary` were never defined as CSS even
+  though seven components reference them.
+- "User Management" title rendered at 60px because the global h2 token
+  (CLAUDE.md rule) cascades down. Initiative grid avoids this by using a 26px
+  inline span instead of h2. Admin pages used h2 for accessibility — the
+  size needs to be overridden.
+- Assign Divisions Confirm button was disabled with no diff, leaving the
+  blocked state opaque. D-140 standard is "keep enabled, surface reason on
+  click."
+
+**Diagnosis:** Global `styles.scss` defined `.oi-filter-chip`, `.oi-card`,
+`.oi-app-shell` etc. but never `.oi-btn-primary`, `.oi-btn-secondary`, or
+`.oi-input`. Consumers: UsersComponent, DivisionsComponent, delivery cycle
+detail, OI Library, workstream-admin, UserCreateFormComponent,
+artifact-detail. Each rendered with bare browser-default `<button>` styling,
+which on macOS/Chrome looks almost identical to plain text — invisible
+until placed next to a styled control.
+
+**Action:**
+- `angular/src/styles.scss` — added three global classes:
+  - `.oi-btn-primary` — Vital Blue fill, white text, 5px radius, 8px 18px
+    padding, hover state, disabled state.
+  - `.oi-btn-secondary` — white fill, gray border, 7px 14px padding, hover.
+  - `.oi-input` — full-width form input with 5px radius and primary focus
+    border.
+  - `.um-header h2` + `.dm-header h2` — 26px font, weight 500, color
+    #1a1a1a. Mirrors Initiative grid 26px header without changing the
+    global h2 token (which lives in `triarq.tokens.v1.css`).
+- `division-tree-picker.component.ts` — Confirm button no longer carries
+  `[disabled]`. Added `confirmBlockedReason` state + amber inline message
+  block above the footer. On `onConfirm()` with no diff, the message reads:
+  *"No Division changes to apply. Check or uncheck a Division, or tap Cancel
+  to close."* Any subsequent `toggleSelect()` clears the message — the user
+  is acting, the reason no longer applies.
+
+**Side benefit:** The five other components that used these classes
+(delivery-cycle-detail Edit/Save buttons, OI Library actions, workstream-admin
+Create form, user-create-form Cancel/Submit, artifact-detail Confirm)
+inherit the styling without any per-component change. Pattern-sweep
+candidate flagged in L1.8 is partially addressed by this gap-close.
+
+### L1.8 — CC-Decisions (22.1)
 
 CC-22.1-01 — **`assigned_person=me` query-param convention.** Chose
 `?assigned_person=me` over reusing the legacy filter vocabulary
@@ -499,7 +546,7 @@ formal "card priority" decision — the order is a manual sequence in
 alongside intentionally rather than appending. Flagged for Design as a
 candidate for a card-ordering policy.
 
-### L1.8 — Validator / Design notes
+### L1.9 — Validator / Design notes
 
 1. CLAUDE.md is now v2.7. Build and Test Commands section is the authoritative
    deploy reference — every future Code session reads it at session init.
@@ -516,7 +563,7 @@ candidate for a card-ordering policy.
    should land in CLAUDE.md or `docs/` so it survives a fresh repo clone, a
    new agent, or a Validator pass.
 
-### L1.9 — UAT additions (22.1)
+### L1.10 — UAT additions (22.1)
 
 Append to §H:
 
@@ -557,6 +604,25 @@ Append to §H:
    "Pathways OI Trust"). Pass / Fail.
 5. S-033 banner (next deploy) reads "A new version of OI Trust is available."
    Pass / Fail.
+
+**H12 — Admin grid styling parity + D-140 Confirm**
+1. `/admin/users` page title "User Management" renders at ~26px, not 60px.
+   Pass / Fail.
+2. `+ Add User` button is a solid Vital Blue rounded button (5px radius),
+   not bare text. Pass / Fail.
+3. `Filters (3)` button is a white-with-gray-border rounded button (5px
+   radius), not bare text. Pass / Fail.
+4. Active filter chips ("Role: DCS x" etc.) render as muted pill chips with
+   visible background. Pass / Fail.
+5. Same checks pass on `/admin/divisions` (title size, Filters button).
+   Pass / Fail.
+6. Open the Assign Divisions tree picker on any user. With no checkbox
+   changes, click **Confirm**. Confirm an amber inline message appears above
+   the footer reading "No Division changes to apply. Check or uncheck a
+   Division, or tap Cancel to close." The Confirm button stays enabled.
+   Pass / Fail.
+7. Toggle any Division checkbox. The amber message disappears. Click
+   Confirm — picker closes and the change applies. Pass / Fail.
 
 ---
 
