@@ -349,6 +349,8 @@ no separate spec.
 046eae1  CLAUDE.md v2.7: rewrite Build and Test Commands section
 b5780eb  Fix: milestone_dates missing in list_delivery_cycles + S-008 parent refresh on edit close
 2c4633b  Home: My Initiatives card leads the grid + dashboard reads assigned_person=me
+f38418b  App name: 'Pathways OI Trust' → 'OI Trust' in user-facing strings
+0a72987  sidebar: brand 'Pathways OI Trust' → 'OI Trust' (missed in f38418b)
 ```
 
 Each commit pushed to `master` (Render auto-redeploys MCP for b5780eb). Angular
@@ -444,7 +446,36 @@ all [N] →" link actually filter the dashboard to his Initiatives.
   `filterAssignedPerson='me'`, `personScope='me_terminal'`, and the drill-down
   banner flag. Reuses the existing classifier — no new filter primitive.
 
-### L1.6 — CC-Decisions (22.1)
+### L1.6 — Fix 5: App-name strings 'Pathways OI Trust' → 'OI Trust' (commits f38418b + 0a72987)
+
+**Trigger:** UAT — Phil noted user-facing surfaces still called the application
+"Pathways" (S-033 banner) or "Pathways OI Trust" (sidebar brand, browser tab,
+login product name, Contact-an-Admin copy). The application name is OI Trust;
+Pathways is the broader product family.
+
+**Action:** Five user-facing strings updated to "OI Trust":
+
+| Surface | Before | After |
+|---|---|---|
+| `app.component.ts` S-033 banner | A new version of **Pathways** is available. | A new version of **OI Trust** is available. |
+| `sidebar.component.ts` brand | Pathways OI Trust | OI Trust |
+| `index.html` `<title>` | Pathways OI Trust | OI Trust |
+| `login.component.ts` `<h1 product-name>` | Pathways OI Trust | OI Trust |
+| `contact-admin.component.ts` body | any question about Pathways OI Trust | any question about OI Trust |
+
+**Intentionally NOT changed** (Pathways here refers to the broader OS family,
+not the application name — Phil's clarification):
+- `login.component.ts` logo-sub: "Pathways Operating System"
+- `login.component.ts` feature descriptions: "Pathways OS",
+  "AI.TRIARQPathways environment"
+- File header comments across the codebase ("// xxx.component.ts — Pathways
+  OI Trust") — internal labels, not user-facing.
+
+Two commits because the sidebar edit was dropped in the first commit (an
+intermediate "File has not been read yet" error from the Edit tool) and
+shipped as a follow-on commit.
+
+### L1.7 — CC-Decisions (22.1)
 
 CC-22.1-01 — **`assigned_person=me` query-param convention.** Chose
 `?assigned_person=me` over reusing the legacy filter vocabulary
@@ -468,7 +499,7 @@ formal "card priority" decision — the order is a manual sequence in
 alongside intentionally rather than appending. Flagged for Design as a
 candidate for a card-ordering policy.
 
-### L1.7 — Validator / Design notes
+### L1.8 — Validator / Design notes
 
 1. CLAUDE.md is now v2.7. Build and Test Commands section is the authoritative
    deploy reference — every future Code session reads it at session init.
@@ -485,7 +516,7 @@ candidate for a card-ordering policy.
    should land in CLAUDE.md or `docs/` so it survives a fresh repo clone, a
    new agent, or a Validator pass.
 
-### L1.8 — UAT additions (22.1)
+### L1.9 — UAT additions (22.1)
 
 Append to §H:
 
@@ -510,11 +541,22 @@ Append to §H:
 
 **H10 — S-033 banner**
 1. After this deploy, your existing tab's poll (≤5 min, or next route change)
-   should surface the "A new version of Pathways is available. [Reload]"
+   should surface the "A new version of OI Trust is available. [Reload]"
    banner because the live `version.json` differs from boot-captured SHA.
    Click Reload. Pass / Fail.
 2. After reload, the boot SHA captures the new version. Confirm the banner
    does not re-appear on subsequent route changes. Pass / Fail.
+
+**H11 — App-name rename**
+1. Browser tab title reads "OI Trust" (not "Pathways OI Trust"). Pass / Fail.
+2. Sidebar brand at top-left reads "OI Trust" (not "Pathways OI Trust"). Pass / Fail.
+3. Log out → Login page `<h1>` reads "OI Trust" (not "Pathways OI Trust").
+   "Pathways Operating System" subtitle stays — it refers to the broader OS
+   family. Pass / Fail.
+4. Contact an Admin page body text says "any question about OI Trust" (not
+   "Pathways OI Trust"). Pass / Fail.
+5. S-033 banner (next deploy) reads "A new version of OI Trust is available."
+   Pass / Fail.
 
 ---
 
