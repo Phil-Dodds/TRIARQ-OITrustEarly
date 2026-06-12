@@ -303,9 +303,14 @@ export class DivisionTreePickerComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['allDivisions'] || changes['currentlyAssignedIds']) {
-      this.initialAssignedSet = new Set(this.currentlyAssignedIds);
-      this.selectedIds = new Set(this.currentlyAssignedIds);
+    // Bug fix: `currentlyAssignedIds` is consumed once in ngOnInit. Resetting
+    // selectedIds here causes a thrash because the parent typically exposes
+    // currentlyAssignedDivisionIds as a getter that returns a new array
+    // reference on every CD pass — Angular sees a "change" and ngOnChanges
+    // wipes the user's in-progress checkbox selections. The picker's local
+    // selectedIds is the source of truth during the editing session.
+    // Only respond to allDivisions changes (e.g. late MCP arrival).
+    if (changes['allDivisions']) {
       this.expandAllTrusts();
       this.rebuildTree();
     }

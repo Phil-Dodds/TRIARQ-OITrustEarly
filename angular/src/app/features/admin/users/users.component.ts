@@ -1065,6 +1065,7 @@ export class UsersComponent implements OnInit {
     this.panelMode      = 'view';
     this.assignError    = '';
     this.userDirectDivisions = [];
+    this.currentlyAssignedDivisionIds = [];
     this.loadMemberships(user.id);
     this.cdr.markForCheck();
   }
@@ -1105,6 +1106,7 @@ export class UsersComponent implements OnInit {
     this.selectedUser = newUser;
     this.selectedUserId = newUser.id;
     this.userDirectDivisions = [];
+    this.currentlyAssignedDivisionIds = [];
     this.loadMemberships(newUser.id);
     this.panelMode = 'view';
     setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
@@ -1116,6 +1118,7 @@ export class UsersComponent implements OnInit {
     this.selectedUser = null;
     this.selectedUserId = null;
     this.userDirectDivisions = [];
+    this.currentlyAssignedDivisionIds = [];
     this.cdr.markForCheck();
   }
 
@@ -1154,6 +1157,9 @@ export class UsersComponent implements OnInit {
         next: (res) => {
           if (res.success && res.data) {
             this.userDirectDivisions = res.data.directly_assigned_divisions ?? [];
+            // Refresh the cached ID array only when memberships actually change.
+            this.currentlyAssignedDivisionIds =
+              this.userDirectDivisions.map(d => d.id);
           } else {
             this.assignError = res.error ?? 'Could not load Division assignments.';
           }
@@ -1172,9 +1178,11 @@ export class UsersComponent implements OnInit {
   // Per-row assign/revoke (flat picker) retired; D-417 tree picker batch diff is the
   // single management entry point. revokeAssignment / onPickerToggle removed.
 
-  get currentlyAssignedDivisionIds(): string[] {
-    return this.userDirectDivisions.map(d => d.id);
-  }
+  // Cached IDs — refreshed only when memberships actually change. Using a
+  // getter that maps userDirectDivisions on every CD pass returned a new
+  // array reference each time, which thrashed the picker's ngOnChanges and
+  // wiped in-progress selections (Contract 22.1 picker thrash bug).
+  currentlyAssignedDivisionIds: string[] = [];
 
   openTreePicker(): void {
     this.assignError = '';
