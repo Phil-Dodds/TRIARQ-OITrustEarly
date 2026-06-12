@@ -233,7 +233,7 @@ const LEVEL_LABELS: Record<number, string> = {
       <div class="oi-side-panel oi-side-filter" *ngIf="filterPanelOpen" role="dialog" aria-modal="true">
         <div class="oi-side-head">
           <strong>Filters</strong>
-          <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+          <button class="oi-close-btn"
                   (click)="closeFilterPanel()" aria-label="Close filter panel">✕</button>
         </div>
         <div class="oi-side-body">
@@ -316,7 +316,7 @@ const LEVEL_LABELS: Record<number, string> = {
                   {{ levelLabel(selectedDivision.division_level) }}
                 </span>
               </div>
-              <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+              <button class="oi-close-btn"
                       (click)="closePanel()" aria-label="Close">✕</button>
             </div>
             <div class="oi-side-body">
@@ -433,7 +433,7 @@ const LEVEL_LABELS: Record<number, string> = {
           <ng-container *ngIf="panelMode === 'edit'">
             <div class="oi-side-head">
               <strong>Edit Division</strong>
-              <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+              <button class="oi-close-btn"
                       (click)="onScrimClick()" aria-label="Close">✕</button>
             </div>
             <div class="oi-side-body">

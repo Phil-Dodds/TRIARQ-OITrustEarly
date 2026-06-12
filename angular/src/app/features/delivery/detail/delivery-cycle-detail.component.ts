@@ -98,7 +98,20 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent],
+  styles: [`:host { display: block; position: relative; }`],
   template: `
+    <!-- D-416: × close at upper-right of the panel floater, always visible
+         when in panel mode. Positioned absolute against the relatively-
+         positioned :host so it sits independent of the cycle-header card. -->
+    <button *ngIf="panelMode"
+            class="oi-close-btn"
+            (click)="close.emit()"
+            title="Close panel"
+            aria-label="Close panel"
+            style="position:absolute;top:12px;right:12px;z-index:10;background:#fff;">
+      ✕
+    </button>
+
     <!-- D-178 Tier 1: Skeleton screen for initial cycle load -->
     <div *ngIf="loading" style="max-width:1100px;margin:var(--triarq-space-xl) auto;
                                 padding:0 var(--triarq-space-md);">
@@ -271,19 +284,6 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                            background:none;border:1px solid var(--triarq-color-primary);
                            border-radius:5px;padding:3px 8px;cursor:pointer;">
               ↺ Un-cancel Initiative
-            </button>
-
-            <!-- D-416 Rule 1: × close button in sticky panel header, far right,
-                 at title vertical center. Replaces the Contract 19 dedicated row above. -->
-            <button *ngIf="panelMode"
-                    (click)="close.emit()"
-                    title="Close panel"
-                    aria-label="Close panel"
-                    style="background:#fff;border:1px solid var(--triarq-color-border);
-                           border-radius:5px;cursor:pointer;
-                           color:var(--triarq-color-text-secondary);
-                           font-size:18px;line-height:1;padding:2px 10px;margin-left:4px;">
-              ✕
             </button>
 
           </div>

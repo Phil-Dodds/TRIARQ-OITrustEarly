@@ -71,6 +71,41 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
   margin-bottom:  var(--triarq-space-md);
 }
 
+// ── Close button (×) — single visual standard across panels + modals ───────
+// Two variants:
+//   .oi-close-btn      — for white/light panel headers (UM/DM/Initiative detail)
+//   .oi-close-btn-dark — for Deep Navy modal headers (pickers, gate record)
+// Both 32×32 hit target, transparent baseline, hover circle for affordance.
+.oi-close-btn,
+.oi-close-btn-dark {
+  background:    transparent;
+  border:        none;
+  width:         32px;
+  height:        32px;
+  border-radius: 50%;
+  cursor:        pointer;
+  padding:       0;
+  display:       inline-flex;
+  align-items:   center;
+  justify-content: center;
+  font:          400 18px/1 Roboto, sans-serif;
+  flex-shrink:   0;
+}
+.oi-close-btn {
+  color: var(--triarq-color-text-secondary, #5A5A5A);
+}
+.oi-close-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color:      var(--triarq-color-text-primary, #1E1E1E);
+}
+.oi-close-btn-dark {
+  color: rgba(255, 255, 255, 0.75);
+}
+.oi-close-btn-dark:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color:      #fff;
+}
+
 // ── Buttons (D-348 Tier 2; CLAUDE.md button radius = 5px) ───────────────────
 // Used across UM/DM panels, delivery detail, OI Library, user-create-form.
 // Initiative grid uses inline styles directly — these classes mirror that

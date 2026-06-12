@@ -313,7 +313,7 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
       <div class="oi-side-panel oi-side-filter" *ngIf="filterPanelOpen" role="dialog" aria-modal="true">
         <div class="oi-side-head">
           <strong>Filters</strong>
-          <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+          <button class="oi-close-btn"
                   (click)="closeFilterPanel()" aria-label="Close filter panel">✕</button>
         </div>
         <div class="oi-side-body">
@@ -429,7 +429,7 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
           <ng-container *ngIf="panelMode === 'create'">
             <div class="oi-side-head">
               <strong>New User</strong>
-              <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+              <button class="oi-close-btn"
                       (click)="onScrimClick()" aria-label="Close">✕</button>
             </div>
             <div class="oi-side-body">
@@ -451,7 +451,7 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                   {{ selectedUser.email }}
                 </span>
               </div>
-              <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+              <button class="oi-close-btn"
                       (click)="closePanel()" aria-label="Close">✕</button>
             </div>
             <div class="oi-side-body">
@@ -580,7 +580,7 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
           <ng-container *ngIf="panelMode === 'edit' && selectedUser">
             <div class="oi-side-head">
               <strong>Edit User</strong>
-              <button style="background:none;border:none;cursor:pointer;font-size:18px;"
+              <button class="oi-close-btn"
                       (click)="onScrimClick()" aria-label="Close">✕</button>
             </div>
             <div class="oi-side-body">
