@@ -352,6 +352,7 @@ b5780eb  Fix: milestone_dates missing in list_delivery_cycles + S-008 parent ref
 f38418b  App name: 'Pathways OI Trust' → 'OI Trust' in user-facing strings
 0a72987  sidebar: brand 'Pathways OI Trust' → 'OI Trust' (missed in f38418b)
 6c771ca  Define .oi-btn-primary/.oi-btn-secondary/.oi-input globally + D-140 always-enabled Confirm
+268a76c  Fix tree picker thrash — cache currentlyAssignedDivisionIds; ignore input ref churn
 ```
 
 Each commit pushed to `master` (Render auto-redeploys MCP for b5780eb). Angular
@@ -522,7 +523,49 @@ Create form, user-create-form Cancel/Submit, artifact-detail Confirm)
 inherit the styling without any per-component change. Pattern-sweep
 candidate flagged in L1.8 is partially addressed by this gap-close.
 
-### L1.8 — CC-Decisions (22.1)
+### L1.8 — Fix 7: Tree picker selection thrash (commit 268a76c)
+
+**Trigger:** Phil checked "Revenue Cycle Management" in the Assign Divisions
+picker, the checkbox visually went blue, but the echo section read "No
+Divisions selected" and Confirm fired the D-140 inline reason "No Division
+changes to apply." The model believed nothing was selected while the UI said
+otherwise.
+
+**Diagnosis:** Two-component race condition:
+- `UsersComponent.currentlyAssignedDivisionIds` was a getter that ran
+  `this.userDirectDivisions.map(d => d.id)` every time it was read — a fresh
+  array reference on every CD pass.
+- Angular's input binding compares array inputs by reference, not contents.
+  Every CD cycle made the picker think `currentlyAssignedIds` had changed.
+- `DivisionTreePickerComponent.ngOnChanges` reset both `initialAssignedSet`
+  and `selectedIds` on every `currentlyAssignedIds` "change."
+- Phil's click added the Division to `selectedIds` → CD cycle → parent's
+  getter returned new `[]` reference → picker reset `selectedIds = new Set([])`
+  → selection lost. The checkbox's `[checked]` binding caught up on the next
+  pass and re-rendered unchecked, but only after the user had already moved
+  on (and screenshots captured the brief midway state).
+
+**Action:**
+- `DivisionTreePickerComponent.ngOnChanges` — only respond to `allDivisions`
+  changes (e.g. late MCP arrival). `currentlyAssignedIds` is consumed once
+  in `ngOnInit` on picker open; local `selectedIds` is the source of truth
+  for the editing session.
+- `UsersComponent.currentlyAssignedDivisionIds` — replaced the getter with a
+  stable `string[]` property. Refreshed inside `loadMemberships().next` when
+  memberships actually arrive. Cleared to `[]` on every user switch
+  (`openView`, `onUserCreated`, `closePanel`).
+
+**Validator notes:**
+1. **Pattern alert.** Any other input-binding consumer that reads an array
+   from a parent getter is exposed to the same thrash. Two known cases worth
+   checking next contract:
+   - WorkstreamPickerComponent (workstream lead, member arrays)
+   - UserPickerComponent (already takes a primitive `divisionId`; safe)
+2. The picker's ngOnInit + ngOnChanges separation now models the
+   "one-shot initial state, then local truth" pattern. Document as a small
+   sub-rule if the picker pattern proliferates.
+
+### L1.9 — CC-Decisions (22.1)
 
 CC-22.1-01 — **`assigned_person=me` query-param convention.** Chose
 `?assigned_person=me` over reusing the legacy filter vocabulary
@@ -546,7 +589,7 @@ formal "card priority" decision — the order is a manual sequence in
 alongside intentionally rather than appending. Flagged for Design as a
 candidate for a card-ordering policy.
 
-### L1.9 — Validator / Design notes
+### L1.10 — Validator / Design notes
 
 1. CLAUDE.md is now v2.7. Build and Test Commands section is the authoritative
    deploy reference — every future Code session reads it at session init.
@@ -563,7 +606,7 @@ candidate for a card-ordering policy.
    should land in CLAUDE.md or `docs/` so it survives a fresh repo clone, a
    new agent, or a Validator pass.
 
-### L1.10 — UAT additions (22.1)
+### L1.11 — UAT additions (22.1)
 
 Append to §H:
 
@@ -604,6 +647,19 @@ Append to §H:
    "Pathways OI Trust"). Pass / Fail.
 5. S-033 banner (next deploy) reads "A new version of OI Trust is available."
    Pass / Fail.
+
+**H13 — Tree picker selection retention (Fix 7)**
+1. Open any user with zero Divisions assigned. Click "Assign Division →" in
+   the warning band. Picker opens. Check one Division. Confirm the checkbox
+   stays checked through subsequent CD ticks (mouse moves, hover, etc.).
+   Pass / Fail.
+2. With the Division still checked, look at the echo section at the bottom
+   of the picker. Confirm it reads "Selected (1)" with the Division name
+   visible as a chip — NOT "No Divisions selected." Pass / Fail.
+3. Click Confirm. Picker closes; the Division now appears in the user's
+   chips above the Assign Divisions button on the View panel. Pass / Fail.
+4. Re-open the picker on the same user. Confirm the just-assigned Division
+   is pre-checked. Pass / Fail.
 
 **H12 — Admin grid styling parity + D-140 Confirm**
 1. `/admin/users` page title "User Management" renders at ~26px, not 60px.
