@@ -1730,8 +1730,10 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   }
 
   // D-292: Detail component emits this when edit panel closes — deactivate scrim. Source: D-292.
+  // Contract 22: S-008 Parent Refresh on Return — re-query so edits land on the grid.
   onEditPanelClosed(): void {
     this.showEditScrim = false;
+    this.loadCycles();
     this.cdr.markForCheck();
   }
 

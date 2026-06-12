@@ -515,6 +515,8 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
   closePanel(): void {
     this.selectedCycleId = null;
     this.showEditScrim   = false;
+    // S-008 Parent Refresh on Return — re-query so EPO row totals reflect edits.
+    this.loadAll();
     this.cdr.markForCheck();
   }
 
@@ -530,6 +532,7 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
 
   onEditPanelClosed(): void {
     this.showEditScrim = false;
+    this.loadAll();
     this.cdr.markForCheck();
   }
 

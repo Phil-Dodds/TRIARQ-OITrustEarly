@@ -765,10 +765,13 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
   }
 
   /** D-308 / S-008 (Contract 15): close right panel. Workstream expansion
-   *  preserved. Workstream-level navigation unaffected. */
+   *  preserved. Workstream-level navigation unaffected.
+   *  Contract 22: S-008 Parent Refresh on Return — re-query so workstream row
+   *  counts + section placement reflect milestone/stage edits. */
   closePanel(): void {
     this.selectedCycleId = null;
     this.showEditScrim = false;
+    this.loadAll();
     this.cdr.markForCheck();
   }
 
@@ -778,9 +781,11 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  /** D-292: detail emits when its inline Edit panel closes — deactivates scrim. */
+  /** D-292: detail emits when its inline Edit panel closes — deactivates scrim.
+   *  Contract 22: S-008 — re-query the list so edits propagate to section counts. */
   onEditPanelClosed(): void {
     this.showEditScrim = false;
+    this.loadAll();
     this.cdr.markForCheck();
   }
 

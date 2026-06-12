@@ -594,6 +594,8 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
   closePanel(): void {
     this.selectedCycleId = null;
     this.showEditScrim = false;
+    // S-008: re-query on detail panel close so the gates list reflects edits.
+    this.loadCycles();
     this.cdr.markForCheck();
   }
 
@@ -603,9 +605,11 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  /** D-292: detail emits when its inline Edit panel closes — deactivates scrim. */
+  /** D-292: detail emits when its inline Edit panel closes — deactivates scrim.
+   *  Contract 22: S-008 — re-query so edits propagate to the gates view. */
   onEditPanelClosed(): void {
     this.showEditScrim = false;
+    this.loadCycles();
     this.cdr.markForCheck();
   }
 

@@ -684,6 +684,9 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
   closePanel(): void {
     this.selectedCycleId = null;
     this.showEditScrim   = false;
+    // S-008 Parent Refresh on Return: stack pop re-queries so edits made in the
+    // detail/edit panel reflect in the EPO row counts + section placement.
+    this.loadCycles();
     this.cdr.markForCheck();
   }
 
@@ -701,6 +704,9 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
 
   onEditPanelClosed(): void {
     this.showEditScrim = false;
+    // S-008: edit pop returns to detail View — re-query the list so the EPO row
+    // counts + section placement reflect any milestone-date or stage changes.
+    this.loadCycles();
     this.cdr.markForCheck();
   }
 

@@ -465,6 +465,9 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
   closePanel(): void {
     this.selectedCycleId = null;
     this.showEditScrim   = false;
+    // S-008 Parent Refresh on Return — re-query so EPO row totals + sections
+    // reflect milestone-date / stage edits made inside the detail panel.
+    this.loadCycles();
     this.cdr.markForCheck();
   }
 
@@ -480,6 +483,7 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
 
   onEditPanelClosed(): void {
     this.showEditScrim = false;
+    this.loadCycles();
     this.cdr.markForCheck();
   }
 

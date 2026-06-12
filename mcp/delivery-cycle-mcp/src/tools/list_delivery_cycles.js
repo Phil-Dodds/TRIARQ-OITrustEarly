@@ -181,13 +181,35 @@ async function list_delivery_cycles(params, caller_user_id) {
     }
   }
 
+  // ── Contract 22 fix: Resolve milestone_dates for D-419 four-section classifier.
+  // Without this, EPO Deploy + Deploy Gate by Quarter classify every Initiative
+  // as Unscheduled because m?.target_date / m?.actual_date are always undefined.
+  // Also surfaces the walkback status dot (Go to Deploy → Go to Build → Brief Review).
+  const cycleIds = cycles.map(c => c.delivery_cycle_id);
+  let milestoneMap = {};
+  if (cycleIds.length > 0) {
+    const { data: milestoneRows } = await supabase
+      .from('cycle_milestone_dates')
+      .select('*')
+      .in('delivery_cycle_id', cycleIds)
+      .is('deleted_at', null);
+    if (milestoneRows) {
+      milestoneRows.forEach(m => {
+        const bucket = milestoneMap[m.delivery_cycle_id] || [];
+        bucket.push(m);
+        milestoneMap[m.delivery_cycle_id] = bucket;
+      });
+    }
+  }
+
   const enriched = cycles.map(c => ({
     ...c,
     assigned_dcs_display_name: c.assigned_dcs_user_id ? (userMap[c.assigned_dcs_user_id] ?? null) : null,
     assigned_epo_display_name: c.assigned_epo_user_id ? (userMap[c.assigned_epo_user_id] ?? null) : null,
     assigned_dol_display_name: c.assigned_dol_user_id ? (userMap[c.assigned_dol_user_id] ?? null) : null,
     division_name:       c.division_id ? (divisionMap[c.division_id]?.division_name ?? null) : null,
-    display_name_short:  c.division_id ? (divisionMap[c.division_id]?.display_name_short ?? null) : null
+    display_name_short:  c.division_id ? (divisionMap[c.division_id]?.display_name_short ?? null) : null,
+    milestone_dates:     milestoneMap[c.delivery_cycle_id] || []
   }));
 
   return { success: true, data: enriched };
