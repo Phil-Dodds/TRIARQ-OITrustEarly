@@ -39,7 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   template: `
     <nav class="oi-sidebar" aria-label="Main navigation">
       <div class="oi-sidebar-brand">
-        <span class="oi-brand-name">Pathways OI Trust</span>
+        <span class="oi-brand-name">OI Trust</span>
       </div>
 
       <ul class="oi-nav-list">
