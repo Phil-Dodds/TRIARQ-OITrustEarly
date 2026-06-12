@@ -1403,14 +1403,19 @@ export class UsersComponent implements OnInit {
     return '';
   }
 
-  // ── Panel overlay (D-178 Tier 3) ───────────────────────────────────────────
-  // Inviting is owned by the shared UserCreateFormComponent; it shows its own busy state.
-  // Tree picker batch operations show busy via treePickerBusy on the Assign Divisions button.
+  // ── Panel overlay (D-178 Tier 3, D-346 Context D) ──────────────────────────
+  // Fires for: edit save, tree-picker MCP burst, and the membership re-query
+  // that follows it. Without the third trigger, the View panel sits "still"
+  // for the ~3s the loadMemberships round-trip takes after Confirm.
   get panelOverlayBusy(): boolean {
-    return this.saving;
+    return this.saving
+        || this.treePickerBusy
+        || (this.panelMode === 'view' && this.loadingMemberships);
   }
   get panelOverlayMessage(): string {
-    if (this.saving) { return 'Saving…'; }
+    if (this.saving)             { return 'Saving…'; }
+    if (this.treePickerBusy)     { return 'Updating Divisions…'; }
+    if (this.loadingMemberships) { return 'Loading…'; }
     return '';
   }
 

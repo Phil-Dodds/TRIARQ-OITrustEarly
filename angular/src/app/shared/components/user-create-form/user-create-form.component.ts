@@ -33,6 +33,7 @@ import {
 } from '@angular/forms';
 import { McpService } from '../../../core/services/mcp.service';
 import { User, Division } from '../../../core/types/database';
+import { DivisionTreePickerComponent } from '../../pickers/division-tree-picker/division-tree-picker.component';
 import {
   ALL_ROLE_FLAGS,
   ROLE_FLAG_ABBREVIATIONS,
@@ -56,7 +57,7 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
   selector: 'app-user-create-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, DivisionTreePickerComponent],
   template: `
     <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
       <div class="oi-field-row">
@@ -98,27 +99,39 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
         </div>
       </div>
 
-      <div class="oi-field-row">
+      <!-- Divisions: reuse the canonical D-417 tree picker. Chips render selected
+           Divisions inline; tap the button to open the picker as a modal layer
+           over the create form. Hidden when allDivisions is empty (picker
+           context inside EntityPicker per CC-22-03). -->
+      <div class="oi-field-row" *ngIf="selectableDivisions.length > 0">
         <label class="oi-field-label">Divisions (optional)</label>
         <div class="oi-zone-explain">Inactive Divisions are excluded.</div>
-        <div class="ucf-div-list">
-          <label class="oi-picker-row" *ngFor="let div of selectableDivisions">
-            <span>
-              <input type="checkbox"
-                     [checked]="divisionIds.includes(div.id)"
-                     (change)="toggleDivision(div.id)" />
-              {{ div.division_name }}
-            </span>
-          </label>
-          <div *ngIf="selectableDivisions.length === 0"
-               class="ucf-div-empty">
-            No active Divisions available.
-          </div>
+        <div *ngIf="selectedDivisionChips.length > 0" class="ucf-div-chips">
+          <span class="ucf-div-chip" *ngFor="let chip of selectedDivisionChips">
+            {{ chip.division_name }}
+            <button type="button" class="ucf-div-chip-x"
+                    (click)="removeDivision(chip.id)"
+                    [attr.aria-label]="'Remove ' + chip.division_name">×</button>
+          </span>
         </div>
+        <button type="button" class="oi-btn-secondary"
+                (click)="openDivisionPicker()"
+                style="margin-top:6px;">
+          {{ divisionIds.length > 0 ? 'Change Divisions' : 'Select Divisions' }}
+        </button>
       </div>
 
       <div class="oi-err" *ngIf="submitError">{{ submitError }}</div>
     </form>
+
+    <!-- D-417 modal-over-create-panel for Division selection -->
+    <app-division-tree-picker
+      *ngIf="divisionPickerOpen"
+      [allDivisions]="allDivisions"
+      [currentlyAssignedIds]="divisionIds"
+      (confirmed)="onDivisionPickerConfirmed($event)"
+      (cancelled)="onDivisionPickerCancelled()">
+    </app-division-tree-picker>
 
     <div class="ucf-actions">
       <button type="button" class="oi-btn-secondary"
@@ -142,15 +155,19 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
       border: 1px solid var(--triarq-color-border); border-radius: 5px;
       background: #fff; user-select: none;
     }
-    .ucf-div-list {
-      max-height: 160px; overflow-y: auto;
-      border: 1px solid var(--triarq-color-border); border-radius: 5px;
-      padding: 4px; margin-top: 6px;
+    /* Tree-picker selection chips */
+    .ucf-div-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .ucf-div-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(37,112,153,0.1); color: #257099;
+      border-radius: 999px; padding: 4px 10px;
+      font: 400 12px Roboto, sans-serif;
     }
-    .ucf-div-empty {
-      padding: 6px; font-size: 12px;
-      color: var(--triarq-color-text-secondary);
+    .ucf-div-chip-x {
+      background: none; border: none; color: #257099; cursor: pointer;
+      font: 500 14px/1 Roboto, sans-serif; padding: 0 0 0 2px;
     }
+    .ucf-div-chip-x:hover { color: #1d5878; }
     .ucf-actions {
       display: flex; justify-content: space-between;
       gap: 12px; padding-top: 12px; margin-top: 12px;
@@ -171,6 +188,7 @@ export class UserCreateFormComponent implements OnInit, OnChanges {
 
   form!: FormGroup;
   divisionIds: string[] = [];
+  divisionPickerOpen = false;   // D-417 modal-over-create-panel state
   busy        = false;
   submitError = '';
 
@@ -230,6 +248,47 @@ export class UserCreateFormComponent implements OnInit, OnChanges {
     } else {
       this.divisionIds = [...this.divisionIds, id];
     }
+    this.cdr.markForCheck();
+  }
+
+  // ── D-417 tree picker integration ──────────────────────────────────────────
+
+  /** Selected Divisions as Division[] for chip render — looked up from allDivisions. */
+  get selectedDivisionChips(): Division[] {
+    const arr: Division[] = [];
+    for (const id of this.divisionIds) {
+      const d = this.allDivisions.find(x => x.id === id);
+      if (d) { arr.push(d); }
+    }
+    arr.sort((a, b) => a.division_name.localeCompare(b.division_name));
+    return arr;
+  }
+
+  openDivisionPicker(): void {
+    this.divisionPickerOpen = true;
+    this.cdr.markForCheck();
+  }
+
+  onDivisionPickerCancelled(): void {
+    this.divisionPickerOpen = false;
+    this.cdr.markForCheck();
+  }
+
+  /** Picker emits a diff (toAdd, toRemove) relative to the IDs passed in.
+   *  Convert to a flat selected-id set and store on the form. */
+  onDivisionPickerConfirmed(diff: { toAdd: string[]; toRemove: string[] }): void {
+    const next = new Set(this.divisionIds);
+    diff.toAdd.forEach(id => next.add(id));
+    diff.toRemove.forEach(id => next.delete(id));
+    this.divisionIds = Array.from(next);
+    this.divisionPickerOpen = false;
+    this.form.markAsDirty();   // S-017 dirty-state — Divisions are a form input
+    this.cdr.markForCheck();
+  }
+
+  removeDivision(id: string): void {
+    this.divisionIds = this.divisionIds.filter(x => x !== id);
+    this.form.markAsDirty();
     this.cdr.markForCheck();
   }
 
