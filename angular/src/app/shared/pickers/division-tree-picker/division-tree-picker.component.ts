@@ -112,11 +112,17 @@ interface TreeRow {
           No Divisions selected.
         </div>
 
+        <!-- D-140 Blocked Action UX — Confirm stays enabled. Clicking with no
+             changes shows the reason inline rather than hiding it behind a
+             disabled button. -->
+        <div *ngIf="confirmBlockedReason" class="dtp-block-msg" role="alert">
+          {{ confirmBlockedReason }}
+        </div>
+
         <!-- Footer -->
         <div class="dtp-footer">
           <button class="dtp-btn-cancel" type="button" (click)="onCancel()">Cancel</button>
           <button class="dtp-btn-confirm" type="button"
-                  [disabled]="!hasChanges"
                   (click)="onConfirm()">
             Confirm
           </button>
@@ -247,8 +253,13 @@ interface TreeRow {
       padding: 8px 24px; font: 500 14px Roboto, sans-serif; color: #fff;
       cursor: pointer;
     }
-    .dtp-btn-confirm:hover:not(:disabled) { background: #1d5878; }
-    .dtp-btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; }
+    .dtp-btn-confirm:hover { background: #1d5878; }
+    /* D-140 inline block-message — appears above footer when Confirm clicked with no changes. */
+    .dtp-block-msg {
+      padding: 8px 20px; border-top: 1px solid #E8E8E8;
+      background: rgba(243,150,30,0.08); border-left: 3px solid #F3961E;
+      font: 400 12px Roboto, sans-serif; color: #5A5A5A;
+    }
   `]
 })
 export class DivisionTreePickerComponent implements OnInit, OnChanges {
@@ -263,6 +274,9 @@ export class DivisionTreePickerComponent implements OnInit, OnChanges {
   @Output() cancelled = new EventEmitter<void>();
 
   searchQuery = '';
+
+  /** D-140 — inline reason shown when Confirm is clicked with no actionable change. */
+  confirmBlockedReason = '';
 
   /** Currently selected Division IDs in this session (starts == currentlyAssignedIds). */
   selectedIds = new Set<string>();
@@ -461,6 +475,8 @@ export class DivisionTreePickerComponent implements OnInit, OnChanges {
     } else {
       this.selectedIds.add(divisionId);
     }
+    // D-140: any selection change clears the inline reason — the user is acting.
+    this.confirmBlockedReason = '';
     this.cdr.markForCheck();
   }
 
@@ -491,6 +507,14 @@ export class DivisionTreePickerComponent implements OnInit, OnChanges {
   }
 
   onConfirm(): void {
+    // D-140: Confirm stays enabled; if no diff against initial set, show the
+    // reason inline rather than disabling the button silently.
+    if (!this.hasChanges) {
+      this.confirmBlockedReason =
+        'No Division changes to apply. Check or uncheck a Division, or tap Cancel to close.';
+      this.cdr.markForCheck();
+      return;
+    }
     const toAdd: string[] = [];
     const toRemove: string[] = [];
     for (const id of this.selectedIds) {

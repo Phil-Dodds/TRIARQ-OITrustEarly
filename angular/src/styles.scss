@@ -71,6 +71,64 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
   margin-bottom:  var(--triarq-space-md);
 }
 
+// ── Buttons (D-348 Tier 2; CLAUDE.md button radius = 5px) ───────────────────
+// Used across UM/DM panels, delivery detail, OI Library, user-create-form.
+// Initiative grid uses inline styles directly — these classes mirror that
+// treatment so non-inline call-sites render consistently.
+.oi-btn-primary {
+  background:    var(--triarq-color-primary, #257099);
+  color:         #fff;
+  border:        none;
+  border-radius: 5px;
+  padding:       8px 18px;
+  font:          500 14px Roboto, sans-serif;
+  cursor:        pointer;
+  display:       inline-flex; align-items: center; justify-content: center; gap: 6px;
+  white-space:   nowrap;
+}
+.oi-btn-primary:hover:not(:disabled)    { background: #1d5878; }
+.oi-btn-primary:disabled                { opacity: 0.45; cursor: not-allowed; }
+
+.oi-btn-secondary {
+  background:    #fff;
+  color:         var(--triarq-color-text-primary, #1E1E1E);
+  border:        1px solid var(--triarq-color-border, #D0D0D0);
+  border-radius: 5px;
+  padding:       7px 14px;
+  font:          500 13px Roboto, sans-serif;
+  cursor:        pointer;
+  display:       inline-flex; align-items: center; justify-content: center; gap: 6px;
+  white-space:   nowrap;
+}
+.oi-btn-secondary:hover:not(:disabled)  { background: #F0F4F8; }
+.oi-btn-secondary:disabled              { opacity: 0.45; cursor: not-allowed; }
+
+// ── Form input (used in UM/DM Edit forms via class="oi-input") ──────────────
+.oi-input {
+  width:         100%;
+  box-sizing:    border-box;
+  border:        1px solid var(--triarq-color-border, #D0D0D0);
+  border-radius: 5px;
+  padding:       8px 12px;
+  font:          400 14px Roboto, sans-serif;
+  color:         var(--triarq-color-text-primary, #1E1E1E);
+  background:    #fff;
+}
+.oi-input:focus { outline: none; border-color: var(--triarq-color-primary, #257099); }
+.oi-input:disabled { background: #F5F5F5; cursor: not-allowed; }
+
+// ── Admin page header — title sized to match Initiative grid (26px, weight 500).
+//   Without this, the h2 inherits the global 60px size (CLAUDE.md token rule)
+//   and dwarfs the rest of the page. Initiative grid uses a 26px inline span;
+//   admin pages use h2 for accessibility — override the size for parity.
+.um-header h2,
+.dm-header h2 {
+  font-size:   26px;
+  font-weight: 500;
+  color:       #1a1a1a;
+  line-height: 1.2;
+}
+
 // ── D-200 Pattern 2: amber confirmation / warning block ──────────────────────
 //   Used for irreversible-action confirmations (D-183) and persistent advisory
 //   banners. Amber left border, 8% opacity sunray background, ⚠ icon.
