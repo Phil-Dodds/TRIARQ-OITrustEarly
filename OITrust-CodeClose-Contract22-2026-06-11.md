@@ -353,6 +353,7 @@ f38418b  App name: 'Pathways OI Trust' → 'OI Trust' in user-facing strings
 0a72987  sidebar: brand 'Pathways OI Trust' → 'OI Trust' (missed in f38418b)
 6c771ca  Define .oi-btn-primary/.oi-btn-secondary/.oi-input globally + D-140 always-enabled Confirm
 268a76c  Fix tree picker thrash — cache currentlyAssignedDivisionIds; ignore input ref churn
+73be9a4  Create form: reuse D-417 tree picker for Divisions; View panel: Tier 3 overlay during load
 ```
 
 Each commit pushed to `master` (Render auto-redeploys MCP for b5780eb). Angular
@@ -565,7 +566,50 @@ otherwise.
    "one-shot initial state, then local truth" pattern. Document as a small
    sub-rule if the picker pattern proliferates.
 
-### L1.9 — CC-Decisions (22.1)
+### L1.9 — Fix 8: Create form reuses D-417 tree picker + View panel Tier 3 overlay (commit 73be9a4)
+
+**Trigger (a):** New User Create form rendered Divisions as a FLAT checkbox
+list — same hierarchy-loss that drove the D-417 tree picker in the first
+place. The Practice Services children (QSuite & Pathways Clinical, Revenue
+Cycle Management) appeared at the same indent level as their parent.
+
+**Trigger (b):** After confirming a Division change in the tree picker, the
+User View panel sat still for ~3 seconds while `loadMemberships` round-
+tripped. No loader. Violates D-178 Tier 3 / D-346 Context D ("panel-level
+mutating operation").
+
+**Action (a):**
+- `UserCreateFormComponent` imports `DivisionTreePickerComponent`.
+- Replaced the flat checkbox list with a "Select Divisions" / "Change
+  Divisions" launcher button + inline chip display of currently-selected
+  Divisions.
+- Picker opens as a modal layer over the create panel
+  (`.dtp-overlay z-index: 1100` > `.oi-side-panel z-index: 51`).
+- On Confirm: picker's `(toAdd, toRemove)` diff is applied to the form's
+  internal `divisionIds[]`. Submit includes the IDs in `division_ids`.
+- Section hidden when `allDivisions.length === 0` (preserves CC-22-03 —
+  picker context inside EntityPicker passes empty array intentionally).
+
+**Action (b):**
+- `UsersComponent.panelOverlayBusy` extended:
+  ```ts
+  return this.saving
+      || this.treePickerBusy
+      || (this.panelMode === 'view' && this.loadingMemberships);
+  ```
+- `panelOverlayMessage` returns "Updating Divisions…" during the MCP burst,
+  "Loading…" during the membership re-query. Seamless transition through
+  the existing `<app-loading-overlay>` mounted at the top of the View
+  panel.
+
+**Validator notes:**
+1. Create form now exercises the same tree-picker codepath as the standalone
+   Assign Divisions flow. Any bug found in one surfaces in both.
+2. The S-007 reuse principle now extends to the Division selection
+   experience: there is ONE Division picker, period. Future role-based
+   pickers should follow the same pattern.
+
+### L1.10 — CC-Decisions (22.1)
 
 CC-22.1-01 — **`assigned_person=me` query-param convention.** Chose
 `?assigned_person=me` over reusing the legacy filter vocabulary
@@ -589,7 +633,7 @@ formal "card priority" decision — the order is a manual sequence in
 alongside intentionally rather than appending. Flagged for Design as a
 candidate for a card-ordering policy.
 
-### L1.10 — Validator / Design notes
+### L1.11 — Validator / Design notes
 
 1. CLAUDE.md is now v2.7. Build and Test Commands section is the authoritative
    deploy reference — every future Code session reads it at session init.
@@ -606,7 +650,7 @@ candidate for a card-ordering policy.
    should land in CLAUDE.md or `docs/` so it survives a fresh repo clone, a
    new agent, or a Validator pass.
 
-### L1.11 — UAT additions (22.1)
+### L1.12 — UAT additions (22.1)
 
 Append to §H:
 
@@ -646,6 +690,24 @@ Append to §H:
 4. Contact an Admin page body text says "any question about OI Trust" (not
    "Pathways OI Trust"). Pass / Fail.
 5. S-033 banner (next deploy) reads "A new version of OI Trust is available."
+   Pass / Fail.
+
+**H14 — New User Create form Division picker (Fix 8a)**
+1. Tap `+ Add User` on `/admin/users`. Confirm the Divisions section shows a
+   "Select Divisions" button — NOT a flat checkbox list. Pass / Fail.
+2. Tap "Select Divisions". The D-417 tree picker opens (Trust bold, Service
+   Lines indented 24px, Functional Teams 48px). Pass / Fail.
+3. Check two Divisions, Confirm. Picker closes. Two chips render below the
+   button. Button label flips to "Change Divisions". Pass / Fail.
+4. Submit the form. Confirm the new user is created with both Divisions
+   assigned (panel transitions to View, chips visible there). Pass / Fail.
+
+**H15 — View panel Tier 3 overlay during re-query (Fix 8b)**
+1. Open any user. Tap "Assign Divisions" → check/uncheck a Division → Confirm.
+2. Observe the View panel during the ~3s MCP round-trip. Confirm a panel-
+   wide overlay covers the content, reading "Updating Divisions…" then
+   transitioning to "Loading…". The × button is also covered. Pass / Fail.
+3. Overlay clears once memberships return; chips reflect the new state.
    Pass / Fail.
 
 **H13 — Tree picker selection retention (Fix 7)**
