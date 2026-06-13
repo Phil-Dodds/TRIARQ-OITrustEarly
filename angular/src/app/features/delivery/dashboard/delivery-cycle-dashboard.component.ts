@@ -676,7 +676,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <div style="overflow:hidden;min-width:140px;">
             <app-stage-track
               [currentStageId]="cycle.current_lifecycle_stage"
-              [gateStateMap]="gateStateMapsCache.get(cycle.delivery_cycle_id) ?? {}"
+              [gateStateMap]="gateStateMapsCache.get(cycle.delivery_cycle_id) ?? EMPTY_GATE_STATE_MAP"
               [displayMode]="'condensed'">
             </app-stage-track>
           </div>
@@ -927,6 +927,16 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // Expose constants to template
   readonly STAGE_LABEL_MAP = STAGE_LABEL_MAP;
   readonly GATE_LABELS     = GATE_LABELS;
+  // Default GateStateMap used as template fallback when the cache miss happens
+  // (first paint, race with applyFilters). All five gates default to 'upcoming'
+  // which renders fog — the cache populates within the same tick. Source: Contract 23 Item 2.1.
+  readonly EMPTY_GATE_STATE_MAP: GateStateMap = {
+    brief_review:  'upcoming',
+    go_to_build:   'upcoming',
+    go_to_deploy:  'upcoming',
+    go_to_release: 'upcoming',
+    close_review:  'upcoming'
+  };
 
   readonly stages: LifecycleStage[] = [
     'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE','ON_HOLD','CANCELLED'
