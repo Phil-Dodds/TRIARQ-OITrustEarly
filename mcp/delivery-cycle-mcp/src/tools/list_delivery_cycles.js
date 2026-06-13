@@ -202,6 +202,26 @@ async function list_delivery_cycles(params, caller_user_id) {
     }
   }
 
+  // ── Contract 23 Item 2.3: Batched gate_records for all returned cycles.
+  // All Initiatives grid needs gate state to render StageTrackComponent (condensed)
+  // and the 6-rule computed Headline. Same batched-by-cycle_ids pattern as the
+  // milestone_dates resolver above (Contract 22.1). Source: D-267, Section H Item 2.3.
+  let gateRecordsMap = {};
+  if (cycleIds.length > 0) {
+    const { data: gateRows } = await supabase
+      .from('gate_records')
+      .select('gate_name, gate_status, delivery_cycle_id, approver_user_id, submitted_at, submitted_by_user_id, created_at')
+      .in('delivery_cycle_id', cycleIds)
+      .is('deleted_at', null);
+    if (gateRows) {
+      gateRows.forEach(g => {
+        const bucket = gateRecordsMap[g.delivery_cycle_id] || [];
+        bucket.push(g);
+        gateRecordsMap[g.delivery_cycle_id] = bucket;
+      });
+    }
+  }
+
   const enriched = cycles.map(c => ({
     ...c,
     assigned_dcs_display_name: c.assigned_dcs_user_id ? (userMap[c.assigned_dcs_user_id] ?? null) : null,
@@ -209,7 +229,8 @@ async function list_delivery_cycles(params, caller_user_id) {
     assigned_dol_display_name: c.assigned_dol_user_id ? (userMap[c.assigned_dol_user_id] ?? null) : null,
     division_name:       c.division_id ? (divisionMap[c.division_id]?.division_name ?? null) : null,
     display_name_short:  c.division_id ? (divisionMap[c.division_id]?.display_name_short ?? null) : null,
-    milestone_dates:     milestoneMap[c.delivery_cycle_id] || []
+    milestone_dates:     milestoneMap[c.delivery_cycle_id] || [],
+    gate_records:        gateRecordsMap[c.delivery_cycle_id] || []
   }));
 
   return { success: true, data: enriched };

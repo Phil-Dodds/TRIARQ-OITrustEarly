@@ -55,6 +55,10 @@ export interface Division {
   // Contract 21 (D-413/D-414/S-032): soft-block flag added by Migration 036.
   // When false, new Initiatives and new user assignments are blocked at MCP.
   active_status?:     boolean;
+  // Contract 23 (D-424) Migration 038: when false, Brief Review gate submission skips
+  // the DOL null pre-check for Initiatives in this Division. DCS / Workstream
+  // pre-checks unchanged. Default true at DB level.
+  dol_required?:      boolean;
   // Contract 21 (D-413): member_count is surfaced by list_divisions when
   // with_member_counts is requested. Optional because not every caller asks.
   member_count?:      number;

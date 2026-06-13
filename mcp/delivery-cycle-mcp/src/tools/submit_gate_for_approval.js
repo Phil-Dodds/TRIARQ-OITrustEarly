@@ -58,9 +58,10 @@ async function submit_gate_for_approval(params, caller_user_id) {
   }
 
   // ── Fetch Initiative ──────────────────────────────────────────────────────
+  // D-424 / Contract 23 Item 3.6: division_id added — used to look up dol_required.
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, workstream_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
+    .select('delivery_cycle_id, cycle_title, workstream_id, division_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -117,24 +118,40 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
-  // ── D-391: DOL required before brief_review gate ──────────────────────────
+  // ── D-391 + D-424: DOL required before brief_review gate (Division-conditional) ─
+  // Contract 23 Item 3.6: if the cycle's Division has dol_required = false,
+  // skip the DOL null check entirely. DCS and Workstream pre-checks are unchanged.
   if (gate_name === 'brief_review' && !cycle.assigned_dol_user_id) {
-    await supabase
-      .from('cycle_event_log')
-      .insert({
-        delivery_cycle_id,
-        event_type:        'gate_blocked',
-        event_description: `Gate 'brief_review' blocked: no Domain Outcome Lead is assigned to this Initiative.`,
-        actor_user_id:     caller_user_id,
-        event_metadata:    { gate_name, reason: 'no_dol_assigned' }
-      });
+    let dolRequired = true;
+    if (cycle.division_id) {
+      const { data: divRow } = await supabase
+        .from('divisions')
+        .select('dol_required')
+        .eq('id', cycle.division_id)
+        .is('deleted_at', null)
+        .single();
+      if (divRow && divRow.dol_required === false) { dolRequired = false; }
+    }
 
-    return {
-      success: false,
-      error: `Cannot submit Brief Review gate — no Domain Outcome Lead is assigned to this Initiative. ` +
-             `A DOL must be named before Brief Review can proceed. ` +
-             `An Admin or Phil can assign a DOL using the Initiative's edit panel.`
-    };
+    if (dolRequired) {
+      await supabase
+        .from('cycle_event_log')
+        .insert({
+          delivery_cycle_id,
+          event_type:        'gate_blocked',
+          event_description: `Gate 'brief_review' blocked: no Domain Outcome Lead is assigned to this Initiative.`,
+          actor_user_id:     caller_user_id,
+          event_metadata:    { gate_name, reason: 'no_dol_assigned' }
+        });
+
+      return {
+        success: false,
+        error: `Cannot submit Brief Review gate — no Domain Outcome Lead is assigned to this Initiative. ` +
+               `A DOL must be named before Brief Review can proceed. ` +
+               `An Admin or Phil can assign a DOL using the Initiative's edit panel.`
+      };
+    }
+    // dolRequired === false: fall through; submission proceeds with no DOL.
   }
 
   // ── D-390: EPO required before go_to_build gate ───────────────────────────

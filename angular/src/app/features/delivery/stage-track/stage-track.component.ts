@@ -138,17 +138,15 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
       </div>
     </div>
 
-    <!-- ── Condensed mode — gate nodes only + stage text (spec 5.1) ─────── -->
+    <!-- ── Condensed mode — 5 gate diamonds + stage name below (Contract 23 Item 2.1) ──
+         5 unlabeled gate diamonds in a horizontal row. Current stage name renders below
+         per S-015: 11px italic Stone (#5A5A5A). Diamonds are non-interactive in condensed
+         mode — gate interaction is detail-panel only. Supersedes ARCH-25 spec 5.1
+         "adjacent text" placement (locked by D-267 + Section H Item 2.1). -->
     <div *ngIf="displayMode === 'condensed'"
-         style="display:flex;align-items:center;gap:var(--triarq-space-xs);">
+         style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
 
-      <!-- Stage text label — "In BUILD" -->
-      <span style="font-size:10px;color:var(--triarq-color-text-secondary);
-                   white-space:nowrap;min-width:40px;">
-        {{ condensedStageLabel }}
-      </span>
-
-      <!-- 5 gate nodes only -->
+      <!-- 5 gate diamonds, no labels on diamonds, non-interactive -->
       <div style="display:flex;align-items:center;gap:3px;">
         <ng-container *ngFor="let gate of gateNodes; let i = index">
           <div *ngIf="i > 0"
@@ -164,6 +162,12 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
           ></div>
         </ng-container>
       </div>
+
+      <!-- Stage name as plain secondary text below the diamonds (S-015) -->
+      <span style="font-size:11px;font-style:italic;color:#5A5A5A;
+                   white-space:nowrap;line-height:1;">
+        {{ condensedStageLabel }}
+      </span>
     </div>
   `
 })
@@ -334,11 +338,14 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
     return `${node?.label ?? gateId}${hint}`;
   }
 
-  /** "In BUILD" label for condensed mode */
+  /** Human-readable stage label for condensed mode (Contract 23 Item 2.1).
+   *  Derived from LIFECYCLE_TRACK — same source as the full-mode node labels —
+   *  so the label is never hardcoded and stays in sync with structural reads. */
   get condensedStageLabel(): string {
     const terminal: Record<string, string> = {
-      COMPLETE: 'Done', CANCELLED: 'Cancelled', ON_HOLD: 'On Hold'
+      CANCELLED: 'Cancelled', ON_HOLD: 'On Hold'
     };
-    return terminal[this.currentStageId] ?? this.currentStageId;
+    const fromTrack = this.fullTrack.find(n => n.type === 'stage' && n.id === this.currentStageId)?.label;
+    return terminal[this.currentStageId] ?? fromTrack ?? this.currentStageId;
   }
 }

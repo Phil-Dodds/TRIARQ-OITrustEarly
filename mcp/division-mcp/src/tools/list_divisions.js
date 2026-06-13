@@ -17,7 +17,7 @@ const { supabase } = require('../db');
 
 const DIVISION_SELECT =
   'id, division_name, display_name_short, division_level, division_type_label, ' +
-  'owner_user_id, parent_division_id, active_status, created_at, updated_at';
+  'owner_user_id, parent_division_id, active_status, dol_required, created_at, updated_at';
 
 /**
  * @param {object} params

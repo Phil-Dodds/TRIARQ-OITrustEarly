@@ -63,6 +63,9 @@ import {
   GateStateMap
 } from '../../../core/types/database';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
+// Contract 23 Item 2.2 / D-267: pure computeHeadline utility — 6-rule priority order.
+// Replaces inline headline()/headlineColor() logic; extracted for unit-testability.
+import { computeHeadline, headlineColorCss, HeadlineResult } from './cycle-headline.utils';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -91,9 +94,6 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   VALIDATE: 'Validate', UAT: 'UAT', PILOT: 'Pilot', RELEASE: 'Release',
   OUTCOME: 'Outcome', COMPLETE: 'Complete', CANCELLED: 'Cancelled', ON_HOLD: 'On Hold'
 };
-
-/** Stages that occur after the go_to_deploy gate. UAT is pre-deploy and excluded. */
-const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
 
 @Component({
   selector: 'app-delivery-cycle-dashboard',
@@ -562,7 +562,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
       <!-- ── Loading skeleton (D-178 Tier 1) — 6-column (Contract 4: tier dot removed, Stage/Headline split, TEAM) ── -->
       <div *ngIf="loading">
         <div *ngFor="let _ of skeletonRows"
-             style="display:grid;grid-template-columns:88px 180px 1fr 130px 1fr 110px;
+             style="display:grid;grid-template-columns:88px 180px 1fr 140px minmax(160px,1.2fr) 110px;
                     gap:8px;padding:16px;
                     border-bottom:1px solid var(--triarq-color-border);align-items:center;">
           <ion-skeleton-text animated style="height:20px;border-radius:4px;width:70px;"></ion-skeleton-text>
@@ -591,7 +591,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
       <!-- D-298: sticky top:0 — column labels stay visible on scroll. Source: D-298. -->
       <div *ngIf="!loading"
            style="display:grid;
-                  grid-template-columns:88px 180px 1fr 130px 1fr 110px;
+                  grid-template-columns:88px 180px 1fr 140px minmax(160px,1.2fr) 110px;
                   gap:8px;padding:8px 16px;
                   font-size:13px;font-weight:500;color:#fff;text-transform:uppercase;
                   background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;
@@ -613,7 +613,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
           [style.background]="selectedCycleId === cycle.delivery_cycle_id ? '#E8F0FE' : ''"
           [style.border-left]="selectedCycleId === cycle.delivery_cycle_id ? '3px solid var(--triarq-color-primary,#257099)' : '3px solid transparent'"
           style="display:grid;
-                 grid-template-columns:88px 180px 1fr 130px 1fr 110px;
+                 grid-template-columns:88px 180px 1fr 140px minmax(160px,1.2fr) 110px;
                  gap:8px;padding:16px;
                  border-bottom:1px solid #E8E8E8;
                  align-items:start;cursor:pointer;min-height:88px;"
@@ -666,25 +666,29 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
             </span>
           </div>
 
-          <!-- Col 4: Stage — plain badge only. CC-Decision-2026-04-12-A: Contract 5 removes Stage Track from grid rows (S-002). -->
-          <!-- Stage Track belongs in detail panel only. No condensed component, no subtext. -->
-          <div style="overflow:hidden;">
-            <span style="display:inline-block;background:#12274A;color:#fff;
-                         font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
-                         text-transform:uppercase;border-radius:4px;padding:3px 8px;
-                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:126px;">
-              {{ STAGE_LABEL_MAP[cycle.current_lifecycle_stage] ?? cycle.current_lifecycle_stage }}
-            </span>
+          <!-- Col 4: Stage — StageTrackComponent (condensed) + stage name below.
+               D-267 + S-002 + Contract 23 Item 2.1. Five gate diamonds, non-interactive
+               in the grid (gate clicks live in the detail panel only). Stage name
+               below diamonds, 11px italic Stone per S-015. Replaces CC-Decision-2026-04-12-A
+               solid badge — that CC-decision is superseded by Section H Contract 23.
+               gateStateMapsCache (CC-Decision-2026-04-11-A freeze fix) provides stable
+               object references so OnPush does not re-render every CD cycle. -->
+          <div style="overflow:hidden;min-width:140px;">
+            <app-stage-track
+              [currentStageId]="cycle.current_lifecycle_stage"
+              [gateStateMap]="gateStateMapsCache.get(cycle.delivery_cycle_id) ?? {}"
+              [displayMode]="'condensed'">
+            </app-stage-track>
           </div>
 
-          <!-- Col 5: Headline — computed intelligent summary text. D-267: separate from Stage. -->
-          <div style="overflow:hidden;padding-top:2px;">
+          <!-- Col 5: Headline — 6-rule computeHeadline utility. D-267 + Contract 23 Item 2.2. -->
+          <div style="overflow:hidden;padding-top:2px;min-width:160px;">
             <div style="font-size:12px;
                         display:-webkit-box;-webkit-line-clamp:3;
                         -webkit-box-orient:vertical;overflow:hidden;"
                  [style.color]="headlineColor(cycle)"
-                 title="{{ headline(cycle) }}">
-              {{ headline(cycle) }}
+                 title="{{ headlineText(cycle) }}">
+              {{ headlineText(cycle) }}
             </div>
           </div>
 
@@ -734,7 +738,7 @@ const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOME'];
       <!-- Column headers always render above this. Empty state row spans all columns. -->
       <div *ngIf="!loading && !loadError && filtered.length === 0"
            style="display:grid;
-                  grid-template-columns:88px 180px 1fr 130px 1fr 110px;
+                  grid-template-columns:88px 180px 1fr 140px minmax(160px,1.2fr) 110px;
                   border-bottom:1px solid #E8E8E8;">
         <div style="grid-column:1/-1;min-height:200px;
                     display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -1626,6 +1630,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.gateStateMapsCache = new Map(
       this.cycles.map(c => [c.delivery_cycle_id, this.buildGateStateMap(c)])
     );
+    // Contract 23 Item 2.2: headline cache is per-cycle; rebuild alongside gate state.
+    // Same OnPush stable-reference reasoning as the gate state map.
+    this._headlineCache.clear();
     // D-253: rebuild person list and workstream caches once per filter run.
     // Prevents assignedPersonListAll/Normal and workstream getters from computing on every CD cycle → freeze fix.
     this.rebuildFilterCaches();
@@ -1930,93 +1937,61 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return 'var(--triarq-color-background-subtle)';
   }
 
-  /** Headline text color per spec: amber for awaiting gate, red for overdue, body for in-progress */
+  /** Contract 23 Item 2.2 / D-267 — text and color sourced from the pure
+   *  computeHeadline utility. Template binds to headlineText() and headlineColor().
+   *  Cached per cycle id so OnPush does not re-invoke computeHeadline on each CD tick. */
+  private _headlineCache = new Map<string, HeadlineResult>();
+
+  private headlineFor(cycle: DeliveryCycle): HeadlineResult {
+    const cached = this._headlineCache.get(cycle.delivery_cycle_id);
+    if (cached) { return cached; }
+    const result = computeHeadline(cycle);
+    this._headlineCache.set(cycle.delivery_cycle_id, result);
+    return result;
+  }
+
+  headlineText(cycle: DeliveryCycle): string {
+    return this.headlineFor(cycle).text;
+  }
+
   headlineColor(cycle: DeliveryCycle): string {
-    const stage = cycle.current_lifecycle_stage;
-    if (stage === 'COMPLETE' || stage === 'CANCELLED') {
-      return 'var(--triarq-color-text-secondary)';
-    }
-    // Blocked or overdue → amber
-    const blockedGate = cycle.gate_records?.find(g => g.gate_status === 'blocked');
-    if (blockedGate) { return 'var(--triarq-color-sunray,#f5a623)'; }
-    const today = new Date().toISOString().slice(0, 10);
-    const overdueMilestone = cycle.milestone_dates?.find(
-      m => m.target_date && !m.actual_date && m.target_date < today
-    );
-    if (overdueMilestone) { return 'var(--triarq-color-error,#d32f2f)'; }
-    // Awaiting approval → amber
-    const pendingGate = cycle.gate_records?.find(g => g.gate_status === 'pending');
-    if (pendingGate) { return 'var(--triarq-color-sunray,#f5a623)'; }
-    return 'var(--triarq-color-text-secondary)';
+    return headlineColorCss(this.headlineFor(cycle).color);
   }
 
   /**
-   * Intelligent cycle headline — Session 2026-03-24-C, 6-rule priority order:
-   * 1. Terminal states (COMPLETE, CANCELLED, ON_HOLD)
-   * 2. Blocked gate — Workstream inactive
-   * 3. Milestone target date overdue — no actual_date, target_date in the past
-   * 4. Gate awaiting approval — gate_status = pending
-   * 5. Post-deploy context anchor — Pilot Start Date when in late stages
-   * 6. Default — "In [Stage Label]"
+   * Build gate display state map per Contract 23 Item 2.1 mapping:
+   *   approved          → complete
+   *   awaiting_approval → awaiting_approval (renders sunray)
+   *   blocked           → blocked (renders error color)
+   *   target_date < today AND not approved AND no actual_date → blocked (overdue treated as blocked)
+   *   pending/returned (legacy seed)                          → pending  (renders sunray)
+   *   else                                                    → upcoming (renders fog)
+   *
+   * D-345 vocabulary update: previous mapping treated 'awaiting_approval' as 'upcoming'
+   * because the case was missing, leaving the gate diamond fog-colored after submission.
+   * Contract 23 fixes that. The overdue → blocked branch is new in Contract 23 (Item 2.1).
    */
-  headline(cycle: DeliveryCycle): string {
-    const stage = cycle.current_lifecycle_stage;
-
-    // Rule 1: terminal states
-    if (stage === 'COMPLETE')  { return 'Initiative complete'; }
-    if (stage === 'CANCELLED') { return 'Initiative cancelled'; }
-    if (stage === 'ON_HOLD')   { return 'On hold'; }
-
-    // Rule 2: blocked gate (workstream inactive)
-    const blockedGate = cycle.gate_records?.find(g => g.gate_status === 'blocked');
-    if (blockedGate) {
-      return `Gate blocked — ${GATE_LABELS[blockedGate.gate_name]} · Reactivate Workstream to continue`;
-    }
-
-    // Rule 3: overdue milestone target
-    const today = new Date().toISOString().slice(0, 10);
-    const overdueMilestone = cycle.milestone_dates?.find(
-      m => m.target_date && !m.actual_date && m.target_date < today
-    );
-    if (overdueMilestone) {
-      return `Target date overdue — ${GATE_LABELS[overdueMilestone.gate_name]}`;
-    }
-
-    // Rule 4: gate awaiting approval
-    const pendingGate = cycle.gate_records?.find(g => g.gate_status === 'pending');
-    if (pendingGate) {
-      return `Awaiting approval — ${GATE_LABELS[pendingGate.gate_name]}`;
-    }
-
-    // Rule 5: post-deploy context — show Pilot Start reference
-    if (POST_DEPLOY_STAGES.includes(stage)) {
-      const pilotMilestone = cycle.milestone_dates?.find(m => m.gate_name === 'go_to_deploy');
-      if (pilotMilestone?.actual_date) {
-        return `Pilot started ${pilotMilestone.actual_date} · ${STAGE_LABEL_MAP[stage] ?? stage}`;
-      }
-      if (pilotMilestone?.target_date) {
-        return `Pilot target ${pilotMilestone.target_date} · ${STAGE_LABEL_MAP[stage] ?? stage}`;
-      }
-    }
-
-    // Rule 6: default
-    return `In ${STAGE_LABEL_MAP[stage] ?? stage}`;
-  }
-
-  /** Build gate display state map from cycle's gate records */
   buildGateStateMap(cycle: DeliveryCycle): GateStateMap {
     const gates: GateName[] = ['brief_review','go_to_build','go_to_deploy','go_to_release','close_review'];
+    const today = new Date().toISOString().slice(0, 10);
     const map: Partial<GateStateMap> = {};
     for (const gate of gates) {
       const record = cycle.gate_records?.find(g => g.gate_name === gate);
-      if (!record)                                { map[gate] = 'upcoming'; continue; }
-      if (record.gate_status === 'approved')      { map[gate] = 'complete'; continue; }
-      if (record.gate_status === 'blocked')       { map[gate] = 'blocked';  continue; }
-      if (record.gate_status === 'pending' || record.gate_status === 'returned') {
-        map[gate] = 'pending';
-      } else {
-        map[gate] = 'upcoming';
+      const milestone = cycle.milestone_dates?.find(m => m.gate_name === gate);
+      const isApproved = record?.gate_status === 'approved';
+      const isOverdue  = !!milestone?.target_date
+                      && !milestone.actual_date
+                      && !isApproved
+                      && milestone.target_date < today;
+
+      if (isApproved)                            { map[gate] = 'complete';          continue; }
+      if (record?.gate_status === 'blocked')     { map[gate] = 'blocked';           continue; }
+      if (isOverdue)                             { map[gate] = 'blocked';           continue; }
+      if (record?.gate_status === 'awaiting_approval') { map[gate] = 'awaiting_approval'; continue; }
+      if (record?.gate_status === 'pending' || record?.gate_status === 'returned') {
+        map[gate] = 'pending'; continue;
       }
+      map[gate] = 'upcoming';
     }
     return map as GateStateMap;
   }

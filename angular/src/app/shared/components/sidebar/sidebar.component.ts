@@ -27,10 +27,10 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Home',                 route: '/home',           devStatus: 'uat'         },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started' },
-  { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'uat'         },
+  { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'pilot'       },
   { label: 'Chat',                 route: '/chat',           devStatus: 'not-started' },
   { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'pilot'       },
-  { label: 'Admin',                route: '/admin',          requiresFlag: 'is_admin', devStatus: 'uat' },
+  { label: 'Admin',                route: '/admin',          requiresFlag: 'is_admin', devStatus: 'pilot' },
 ];
 
 @Component({

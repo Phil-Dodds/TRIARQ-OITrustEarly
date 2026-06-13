@@ -349,6 +349,11 @@ const LEVEL_LABELS: Record<number, string> = {
                   <span class="oi-field-label">Short Name</span>
                   <span>{{ selectedDivision.display_name_short }}</span>
                 </div>
+                <!-- D-424 / Contract 23 Item 3.4: Division-level DOL governance setting (read-only in View). -->
+                <div class="oi-field-row">
+                  <span class="oi-field-label">DOL Required</span>
+                  <span>{{ selectedDivision.dol_required === false ? 'No' : 'Yes' }}</span>
+                </div>
                 <div class="oi-zone-explain" *ngIf="selectedDivision.active_status === false">
                   No new Initiatives or user assignments permitted while inactive.
                 </div>
@@ -470,6 +475,18 @@ const LEVEL_LABELS: Record<number, string> = {
                     </div>
                   </div>
                 </div>
+                <!-- D-424 / Contract 23 Item 3.4: DOL Required toggle. Default on; not destructive (no confirmation). -->
+                <div class="oi-field-row">
+                  <label class="oi-field-label">Require DOL on Initiatives</label>
+                  <label class="oi-picker-row" style="cursor:pointer;display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox"
+                           [checked]="editDolRequiredValue"
+                           (change)="setEditDolRequired($any($event.target).checked)" />
+                    <span style="font-size:12px;color:var(--triarq-color-text-secondary);">
+                      When off, Brief Review gate submission skips the DOL null check for Initiatives in this Division.
+                    </span>
+                  </label>
+                </div>
                 <div class="oi-zone-explain">
                   Level and Parent Division are structural — changes require a Design session.
                 </div>
@@ -518,6 +535,8 @@ export class DivisionsComponent implements OnInit {
 
   editForm!: FormGroup;
   editActiveValue: boolean = true;
+  // D-424 / Contract 23 Item 3.4: DOL Required edit state. Initialized from selected Division on startEdit().
+  editDolRequiredValue: boolean = true;
   saving         = false;
   editError      = '';
   showDeactivateConfirm = false;
@@ -796,9 +815,18 @@ export class DivisionsComponent implements OnInit {
     const d = this.selectedDivision;
     this.editForm.setValue({ division_name: d.division_name });
     this.editActiveValue = d.active_status !== false;
+    // D-424 / Contract 23 Item 3.4: dol_required defaults to true at DB level, but undefined
+    // on a Division loaded before Migration 038 ran. Treat undefined as true.
+    this.editDolRequiredValue = d.dol_required !== false;
     this.showDeactivateConfirm = false;
     this.editError = '';
     this.panelMode = 'edit';
+    this.cdr.markForCheck();
+  }
+
+  /** D-424 / Contract 23 Item 3.4: DOL Required toggle setter. */
+  setEditDolRequired(value: boolean): void {
+    this.editDolRequiredValue = value;
     this.cdr.markForCheck();
   }
 
@@ -861,6 +889,10 @@ export class DivisionsComponent implements OnInit {
     };
     if (this.selectedDivision && this.editActiveValue !== (this.selectedDivision.active_status !== false)) {
       updates['active_status'] = this.editActiveValue;
+    }
+    // D-424 / Contract 23 Item 3.4: include dol_required only when it changed.
+    if (this.selectedDivision && this.editDolRequiredValue !== (this.selectedDivision.dol_required !== false)) {
+      updates['dol_required'] = this.editDolRequiredValue;
     }
 
     this.mcp.call<Division>('division', 'update_division', {

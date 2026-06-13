@@ -8,7 +8,8 @@
 
 const { supabase } = require('../db');
 
-const MUTABLE_FIELDS = ['division_name', 'display_name_short', 'division_type_label', 'owner_user_id', 'active_status'];
+// D-424 / Contract 23 Item 3.2: dol_required is admin-mutable governance setting on a Division.
+const MUTABLE_FIELDS = ['division_name', 'display_name_short', 'division_type_label', 'owner_user_id', 'active_status', 'dol_required'];
 
 // Contract 10 §6 B-48: max 10 chars on display_name_short.
 const DISPLAY_NAME_SHORT_MAX = 10;
@@ -41,6 +42,11 @@ async function update_division(params, caller_user_id) {
   // Validate active_status — must be boolean (Contract 21 / S-032).
   if (updates.active_status !== undefined && typeof updates.active_status !== 'boolean') {
     return { success: false, error: 'active_status must be a boolean.' };
+  }
+
+  // D-424 / Contract 23 Item 3.2: dol_required must be boolean when provided.
+  if (updates.dol_required !== undefined && typeof updates.dol_required !== 'boolean') {
+    return { success: false, error: 'dol_required must be a boolean.' };
   }
 
   // Validate division_name — non-empty string when provided.

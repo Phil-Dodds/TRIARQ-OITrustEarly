@@ -156,7 +156,13 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
             <ng-template #noDolPicked>
               <button type="button" class="cp-picker-trigger" (click)="openDolPicker()"></button>
             </ng-template>
-            <div class="cp-gate-note">Required before Brief Review Gate.</div>
+            <!-- D-424 / Contract 23 Item 3.5: hint flips when the selected Division
+                 has dol_required = false. Field stays visible and functional either way. -->
+            <div class="cp-gate-note">
+              {{ dolRequiredForSelectedDivision
+                  ? 'Required before Brief Review Gate.'
+                  : 'Optional for this Division.' }}
+            </div>
           </div>
 
           <!-- 7. Tier Classification — dropdown per D-191 (locked: not cards, not radio buttons). Source: D-191. -->
@@ -475,6 +481,16 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
     if (!divId) { return false; }
     const div = this.divisions.find(d => d.id === divId);
     return (div as any)?.division_level === 1;
+  }
+
+  /** D-424 / Contract 23 Item 3.5: Selected Division's DOL governance setting.
+   *  Reads dol_required directly from the Division object already in form state —
+   *  no separate MCP call. Default true when undefined or no Division selected. */
+  get dolRequiredForSelectedDivision(): boolean {
+    const divId = this.form?.get('division_id')?.value;
+    if (!divId) { return true; }
+    const div = this.divisions.find(d => d.id === divId);
+    return div?.dol_required !== false;
   }
 
   constructor(
