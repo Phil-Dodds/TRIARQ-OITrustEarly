@@ -34,7 +34,8 @@ interface HubCard {
   comingSoon?: boolean;
   /** Optional id; required for cards that surface an async headline (D-396 / spec §4). */
   id?:         'all-initiatives' | 'epo-summary' | 'epo-schedule' | 'epo-deploy'
-            |  'workstream-summary' | 'gate-schedule' | 'deploy-schedule';
+            |  'workstream-summary' | 'gate-schedule' | 'deploy-schedule'
+            |  'initiative-activity';
 }
 
 /** Spec §4 headline color semantics. */
@@ -111,6 +112,14 @@ const HUB_CARDS: HubCard[] = [
     description: 'Go to Deploy gates grouped by quarter. See which Initiatives are scheduled ' +
                  'to reach production each quarter and track commitment against target dates. ' +
                  'Use this for release planning and capacity conversations.'
+  },
+  // Contract 23 (D-428): card 8 — cross-Initiative event feed.
+  {
+    id:          'initiative-activity',
+    title:       'Initiative Activity',
+    route:       '/initiatives/activity',
+    icon:        '◉',
+    description: 'Recent activity across all initiatives.'
   }
 ];
 
@@ -294,6 +303,26 @@ export class DeliveryHubComponent implements OnInit {
         this.cdr.markForCheck();
       }
     });
+
+    // Contract 23 (D-428) — Initiative Activity card 8 headline.
+    // Independent call so a slow / failing summary call cannot stall this card.
+    // count_only:true keeps the payload to a single integer.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    this.delivery.countInitiativeActivity({ after: sevenDaysAgo }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          const n = res.data.total_count ?? 0;
+          this.headlines['initiative-activity'] = {
+            text: n === 0
+              ? 'No activity in the last 7 days'
+              : `${n} event${n === 1 ? '' : 's'} in the last 7 days`,
+            tone: 'green'
+          };
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => { /* card stays without headline on failure — navigable */ }
+    });
   }
 
   /**
@@ -347,7 +376,10 @@ export class DeliveryHubComponent implements OnInit {
 
   /** Template helper — gate the headline strip to ids we configure here. */
   hasHeadline(id: NonNullable<HubCard['id']>): boolean {
-    return id === 'epo-summary' || id === 'epo-schedule' || id === 'epo-deploy';
+    return id === 'epo-summary'
+        || id === 'epo-schedule'
+        || id === 'epo-deploy'
+        || id === 'initiative-activity';
   }
 
   onCardEnter(event: MouseEvent): void {

@@ -51,6 +51,9 @@ const { get_cycle_event_log }            = require('./tools/get_cycle_event_log'
 const { sync_jira_epic }                 = require('./tools/sync_jira_epic');
 const { get_delivery_summary }           = require('./tools/get_delivery_summary');
 
+// Contract 23 (D-428, D-429): cross-Initiative activity feed.
+const { list_initiative_activity }       = require('./tools/list_initiative_activity');
+
 // Contract 20 (D-400, D-401): EPO WIP limit model.
 const { get_epo_wip_limits }             = require('./tools/get_epo_wip_limits');
 const { update_epo_wip_limits }          = require('./tools/update_epo_wip_limits');
@@ -95,6 +98,9 @@ const TOOLS = {
 
   // Event log
   get_cycle_event_log,
+
+  // Contract 23 — cross-Initiative activity feed (D-428, D-429)
+  list_initiative_activity,
 
   // Jira sync
   sync_jira_epic,

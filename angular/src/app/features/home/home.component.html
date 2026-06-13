@@ -34,6 +34,11 @@
       [userId]="profile?.id ?? ''">
     </app-my-notifications-card>
 
+    <!-- D-429 / Contract 23 Item 6.1: My Activity card after My Notifications -->
+    <app-my-activity-card
+      [userId]="profile?.id ?? ''">
+    </app-my-activity-card>
+
     <!-- Phil only -->
     <app-system-health-card
       *ngIf="showSystemHealth">

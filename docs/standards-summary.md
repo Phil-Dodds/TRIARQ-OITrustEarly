@@ -1,7 +1,5 @@
-
-
 # Standards Summary — Pathways OI Trust
-docs/standards-summary.md | v1.7 | June 2026 | CONFIDENTIAL
+docs/standards-summary.md | v1.9 | June 2026 | CONFIDENTIAL
 
 Read this file at every session start. Active Standards carry the same force as
 Non-Negotiable Architectural Rules. A spec element that conflicts with an Active
@@ -716,3 +714,24 @@ are explicitly async. No other exceptions without a locked design decision.
 
 **CodeClose-applicable:** Yes — declare S-033 conformance on any contract that introduces a new static-hosted Angular deployment or modifies the build pipeline.
 
+### S-034 — Compact Person Row Layout
+
+**Rule:** All rows displaying a person or named entity with an avatar and secondary attribute use compact single-line layout: avatar 32px, name and secondary attribute (role pill, type label, or equivalent) on the same horizontal line, vertical padding 8px top/bottom per row. Stacked layout (avatar > 32px, secondary attribute below name on its own line) is not permitted on person rows. Applies to: EntityPickerComponent rows, User Management grid rows, Workstream member rows, and any other avatar+subline row system-wide. Exception: grid rows where sub-line content is multi-value (e.g. Division list per D-411) may retain sub-line text below the name; row height and avatar size still compress.
+
+**S-034 — Compact Person Row Layout.** Avatar 32px. Name and role pill on same horizontal line. 8px vertical padding per row. Applies system-wide to all EntityPicker rows and avatar+subline grid rows. Exception: multi-value sub-line content (e.g. Division list) may remain below name; row height still compresses. Governing: D-415.
+
+**Conformance test:** Does any person row use an avatar larger than 32px? (No = pass.) Does any person row display a single secondary attribute below the name on its own line? (No = pass.) Any failure = violation.
+
+**Exceptions:** Multi-value sub-line content (e.g. Division count list per D-411) may retain sub-line position below the name.
+
+**Non-conformance handling:** Raise spec conflict before implementing. Stacked layout on a person row is a violation unless the sub-line content is multi-value.
+
+### S-035 — About Panel Build History Maintenance
+
+**Rule:** At every CodeClose for a contract that touches one or more user-facing surfaces, Code must: (1) produce an About Entry block in the CodeClose output file; (2) prepend the corresponding `ChangelogEntry` object to `CHANGELOG` in `src/app/core/data/changelog.ts` as part of the deployment commit. About Entry block format: `## About Entry — [Contract label]` / `Date: YYYY-MM-DD` / `BuiltAt: HH:MM UTC` / `Items: - [Admin|Trio|All] [surface]: [one line]`. Items from UAT Checklist surface names — one per surface, not per CC-decision. Audience tags: `[Admin]` (admin-role users), `[Trio]` (DCS/EPO/DOL), `[All]` (every user). Tag omitted entirely if audience undetermined — no blank placeholder.
+
+**Conformance test:** For any CodeClose touching a user-facing surface — is an About Entry block present in the CodeClose output? (Yes = pass.) Is `changelog.ts` updated in the deployment commit? (Yes = pass.) Any failure = violation.
+
+**Exceptions:** CodeClose sessions touching only schema, MCP tools, or infrastructure with no user-facing surface change are exempt — state "S-035: no user-facing surface changes this contract — About Entry exempt" in CodeClose output.
+
+**Non-conformance handling:** Missing About Entry block at CodeClose = violation. Code produces it before declaring CodeClose complete.

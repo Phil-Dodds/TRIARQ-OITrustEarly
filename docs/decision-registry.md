@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.44 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.47 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-424**
+**Next available: D-430**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -169,7 +169,7 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-264 | Grid Row Tier Display Removed | Claude Chat | 2026-04-11 | not-specced |
 | D-265 | Grid Row Team Cell | Claude Chat | 2026-04-11 | not-specced |
 | D-266 | Grid Row Title and Outcome Wrapping | Claude Chat | 2026-04-11 | not-specced |
-| D-267 | Grid Row Stage and Headline as Separate Columns | Claude Chat | 2026-04-11 | not-specced |
+| D-267 | Grid Row Stage and Headline as Separate Columns | Claude Chat | 2026-04-11 | specced |
 | D-268 | S-010: Filter Panel Structure | Claude Chat | 2026-04-11 | not-specced |
 | D-269 | S-011: Filter Panel Commit Model | Claude Chat | 2026-04-11 | not-specced |
 | D-270 | S-012: Active Filter Chips | Claude Chat | 2026-04-11 | not-specced |
@@ -316,17 +316,23 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-412 | Outlook Paste-Parse on New User Form | LOCKED | 2026-06-09 | Spec | Email field parses Outlook-format paste; auto-fills Name; hint text below field |
 | D-413 | Division Management Tree Grid Pattern | LOCKED | 2026-06-09 | Spec | Single tree grid replacing drill-in; three indent levels; active_status column; amber band on inactive rows |
 | D-414 | Division Management Right Panel: Member Management, Name Edit, Deactivation | LOCKED | 2026-06-09 | Spec | Members add/remove in View panel; Name edit in Edit panel; soft-block deactivation per S-032 |
-| D-415 | Compact Person Row Layout — 32px avatar, role pill inline, 8px padding; system-wide; S-034 | LOCKED | 2026-06-09 | Spec | specced |
-| D-416 | Panel Header: × in sticky header; destructive actions Oravive fill + far right + fog rule separator | LOCKED | 2026-06-09 | Spec | specced |
-| D-417 | Division Assignment Picker — hierarchical tree multi-select replacing flat Trust dropdown | LOCKED | 2026-06-09 | Spec | specced |
-| D-418 | Artifact Attach Action available at all lifecycle stages; future slots dimmed but functional | LOCKED | 2026-06-09 | Spec | specced |
-| D-419 | EPO Deploy Gate by Quarter — four sections; status dot walkback rule; parallel apply to Deploy Gate Schedule | LOCKED | 2026-06-09 | Spec | specced |
-| D-410-Amend-1 | User Management Division filter default = All (not My Divisions) | LOCKED | 2026-06-09 | Spec | specced |
-| D-410-Amend-2 | User Management Division filter adds "No Division Assigned" fourth option | LOCKED | 2026-06-09 | Spec | specced |
-| D-420 | EntityPicker inline Add User for Admins — + Add User link opens Create User modal over picker | LOCKED | 2026-06-09 | Spec | specced |
-| D-421 | No-Division warning on user creation — D-200 Pattern 2 + Assign Division → link | LOCKED | 2026-06-09 | Spec | specced |
-| D-422 | Last Login column in User Management grid + Login Activity zone in User View panel | LOCKED | 2026-06-09 | Spec | specced |
-| D-423 | Home Screen My Initiatives Card — all roles, 5 rows, async, status dot per D-419 | LOCKED | 2026-06-09 | Spec | specced |
+| D-415 | Compact Person Row Layout — 32px avatar, role pill inline, 8px padding; system-wide; S-034 | LOCKED | 2026-06-09 | Spec | built |
+| D-416 | Panel Header: × in sticky header; destructive actions Oravive fill + far right + fog rule separator | LOCKED | 2026-06-09 | Spec | built |
+| D-417 | Division Assignment Picker — hierarchical tree multi-select replacing flat Trust dropdown | LOCKED | 2026-06-09 | Spec | built |
+| D-418 | Artifact Attach Action available at all lifecycle stages; future slots dimmed but functional | LOCKED | 2026-06-09 | Spec | built |
+| D-419 | EPO Deploy Gate by Quarter — four sections; status dot walkback rule; parallel apply to Deploy Gate Schedule | LOCKED | 2026-06-09 | Spec | built |
+| D-410-Amend-1 | User Management Division filter default = All (not My Divisions) | LOCKED | 2026-06-09 | Spec | built |
+| D-410-Amend-2 | User Management Division filter adds "No Division Assigned" fourth option | LOCKED | 2026-06-09 | Spec | built |
+| D-420 | EntityPicker inline Add User for Admins — + Add User link opens Create User modal over picker | LOCKED | 2026-06-09 | Spec | built |
+| D-421 | No-Division warning on user creation — D-200 Pattern 2 + Assign Division → link | LOCKED | 2026-06-09 | Spec | built |
+| D-422 | Last Login column in User Management grid + Login Activity zone in User View panel | LOCKED | 2026-06-09 | Spec | built |
+| D-423 | Home Screen My Initiatives Card — all roles, 5 rows, async, status dot per D-419 | LOCKED | 2026-06-09 | Spec | built |
+| D-424 | Division DOL Requirement Override — `dol_required` boolean on `divisions`; gate suppression only; first Division-level governance setting | LOCKED | 2026-06-12 | specced | Contract 23 first item |
+| D-425 | Home Card Order — My Initiatives → My Action Queue → My Notifications; new cards append | LOCKED | 2026-06-12 | built | Resolves CC-22.1-03 |
+| D-426 | About Panel with Build History — sidebar footer element, D-180 right-panel overlay, `changelog.ts` typed constant, S-035 CodeClose obligation | LOCKED | 2026-06-13 | specced | Contract 23 |
+| D-427 | Milestone Date Changes Log Actor — `set_milestone_target_date` and `set_milestone_actual_date` amended to append `cycle_event_log` entries with actor attribution | LOCKED | 2026-06-13 | specced | Contract 23 |
+| D-428 | Initiative Activity View — `/initiatives/activity`, cross-initiative `cycle_event_log` feed, Division-scoped, hub card 8 | LOCKED | 2026-06-13 | specced | Contract 23 |
+| D-429 | User Initiative History — My Activity home card + Admin User View zone; amends D-167 Build C partial | LOCKED | 2026-06-13 | specced | Contract 23 |
 
 ---
 

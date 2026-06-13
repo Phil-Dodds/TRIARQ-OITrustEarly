@@ -23,7 +23,9 @@ import {
   PointerStatus,
   DeliverySummary,
   PendingApprovalItem,
-  EpoWipLimitRow
+  EpoWipLimitRow,
+  InitiativeActivityPage,
+  InitiativeActivityCount
 } from '../types/database';
 
 @Injectable({ providedIn: 'root' })
@@ -307,6 +309,42 @@ export class DeliveryService {
     post_deploy_limit?: number;
   }): Observable<McpResponse<EpoWipLimitRow>> {
     return this.mcp.call<EpoWipLimitRow>('delivery', 'update_epo_wip_limits', params as Record<string, unknown>);
+  }
+
+  // ── Initiative activity (Contract 23, D-428, D-429) ───────────────────────
+
+  /**
+   * Cross-Initiative event feed. Division scope enforced by MCP. Pagination via
+   * before_cursor (oldest loaded row's created_at). limit default 50, max 100.
+   * Powers /initiatives/activity, My Activity home card, and User View zone.
+   */
+  listInitiativeActivity(params: {
+    division_ids?:   string[];
+    actor_user_id?:  string;
+    event_types?:    string[];
+    after?:          string;          // ISO timestamptz, inclusive lower bound
+    before_cursor?:  string;          // ISO timestamptz, exclusive upper bound
+    limit?:          number;
+  } = {}): Observable<McpResponse<InitiativeActivityPage>> {
+    return this.mcp.call<InitiativeActivityPage>(
+      'delivery', 'list_initiative_activity', params as Record<string, unknown>
+    );
+  }
+
+  /**
+   * Count-only variant used by the Initiative hub card 8 async headline.
+   * Same filter shape — passes count_only:true so MCP skips row enrichment.
+   */
+  countInitiativeActivity(params: {
+    division_ids?:  string[];
+    actor_user_id?: string;
+    event_types?:   string[];
+    after?:         string;
+  } = {}): Observable<McpResponse<InitiativeActivityCount>> {
+    return this.mcp.call<InitiativeActivityCount>(
+      'delivery', 'list_initiative_activity',
+      { ...params, count_only: true } as Record<string, unknown>
+    );
   }
 
   // ── Jira sync ──────────────────────────────────────────────────────────────

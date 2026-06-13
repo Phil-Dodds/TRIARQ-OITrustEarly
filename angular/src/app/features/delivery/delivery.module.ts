@@ -81,6 +81,13 @@ import { IonicModule }  from '@ionic/angular';
       },
       // Legacy child path — preserves bookmarks before D-392 rename.
       { path: 'cycles', redirectTo: 'list', pathMatch: 'full' },
+      // Contract 23 (D-428): cross-Initiative activity feed — hub card 8.
+      {
+        path: 'activity',
+        loadComponent: () =>
+          import('./initiative-activity/initiative-activity.component')
+            .then(c => c.InitiativeActivityComponent)
+      },
       // ── Initiative detail — must be last (param route) ────────────────────
       {
         path: ':cycle_id',

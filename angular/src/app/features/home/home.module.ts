@@ -11,6 +11,7 @@ import { OILibraryCardComponent }        from './components/oi-library-card.comp
 import { DivisionsCardComponent }        from './components/divisions-card.component';
 import { UserManagementCardComponent }   from './components/user-management-card.component';
 import { MyDeliveryCyclesCardComponent } from './components/my-delivery-cycles-card.component';
+import { MyActivityCardComponent }       from './components/my-activity-card.component';
 import { EmbeddedChatCardComponent }     from './components/embedded-chat-card.component';
 import { OnboardingMessageCardComponent } from './components/onboarding-message-card.component';
 
@@ -30,6 +31,7 @@ import { OnboardingMessageCardComponent } from './components/onboarding-message-
     CommonModule,
     IonicModule,
     MyDeliveryCyclesCardComponent,
+    MyActivityCardComponent,
     RouterModule.forChild([{ path: '', component: HomeComponent }])
   ]
 })

@@ -47,6 +47,7 @@ import { IonicModule }                 from '@ionic/angular';
 import { McpService }                  from '../../../core/services/mcp.service';
 import { UserProfileService }          from '../../../core/services/user-profile.service';
 import { AuthService }                 from '../../../core/services/auth.service';
+import { DeliveryService }             from '../../../core/services/delivery.service';
 import {
   ScreenStateService,
   SCREEN_KEYS
@@ -55,7 +56,7 @@ import { BlockedActionComponent }      from '../../../shared/components/blocked-
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { UserCreateFormComponent }     from '../../../shared/components/user-create-form/user-create-form.component';
 import { DivisionTreePickerComponent } from '../../../shared/pickers/division-tree-picker/division-tree-picker.component';
-import { User, Division }              from '../../../core/types/database';
+import { User, Division, InitiativeActivityEntry } from '../../../core/types/database';
 import {
   ALL_ROLE_FLAGS,
   ROLE_FLAG_ABBREVIATIONS,
@@ -551,6 +552,47 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                 </div>
               </div>
 
+              <!-- D-429 / Contract 23 Item 6.2 — Initiative Activity zone (Admin only) -->
+              <div class="oi-zone" *ngIf="viewerIsAdmin">
+                <div class="oi-zone-title">Initiative Activity</div>
+
+                <ng-container *ngIf="loadingViewedActivity">
+                  <div *ngFor="let _ of [1,2,3]" style="padding:6px 0;">
+                    <ion-skeleton-text animated style="height:12px;width:70%;"></ion-skeleton-text>
+                  </div>
+                </ng-container>
+
+                <div *ngIf="!loadingViewedActivity && viewedUserActivity.length === 0"
+                     style="color:#5A5A5A;font-size:12px;">
+                  No initiative activity recorded for this user.
+                </div>
+
+                <ul *ngIf="!loadingViewedActivity && viewedUserActivity.length > 0"
+                    style="list-style:none;padding:0;margin:0;font-size:12px;">
+                  <li *ngFor="let e of viewedUserActivity"
+                      style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--triarq-color-border);">
+                    <span [title]="e.created_at"
+                          style="color:#5A5A5A;font-size:11px;flex:0 0 70px;">
+                      {{ activityRelative(e.created_at) }}
+                    </span>
+                    <span style="flex:1 1 auto;color:var(--triarq-color-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                      {{ e.event_description }}
+                    </span>
+                    <a *ngIf="e.delivery_cycle_id && e.initiative_title"
+                       [routerLink]="['/initiatives', e.delivery_cycle_id]"
+                       style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:rgba(120,130,140,0.10);color:var(--triarq-color-primary);text-decoration:none;font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                      {{ e.initiative_title }}
+                    </a>
+                  </li>
+                </ul>
+
+                <a *ngIf="!loadingViewedActivity"
+                   routerLink="/initiatives/activity"
+                   style="display:inline-block;margin-top:8px;font-size:12px;color:var(--triarq-color-primary);font-weight:500;text-decoration:none;">
+                  View all →
+                </a>
+              </div>
+
               <!-- Invite zone (only when not Active) -->
               <div class="oi-zone" *ngIf="inviteStatusFor(selectedUser.id) !== 'active'">
                 <div class="oi-zone-title">Invite</div>
@@ -693,6 +735,12 @@ export class UsersComponent implements OnInit {
   // Tap column header → on, sorts by last_login_at desc with nulls last.
   sortByLastLogin     = false;
 
+  // D-429 / Contract 23 Item 6.2 — Initiative Activity zone in User View panel.
+  // Visible only to Admin viewers. Lazily loads last 10 events for selectedUser.
+  viewerIsAdmin            = false;
+  viewedUserActivity:    InitiativeActivityEntry[] = [];
+  loadingViewedActivity  = false;
+
   // Template-accessible constants.
   readonly ALL_ROLE_FLAGS = ALL_ROLE_FLAGS;
   readonly skeletonRows   = [1, 2, 3, 4, 5];
@@ -703,7 +751,8 @@ export class UsersComponent implements OnInit {
     private readonly auth:        AuthService,
     private readonly screenState: ScreenStateService,
     private readonly fb:          FormBuilder,
-    private readonly cdr:         ChangeDetectorRef
+    private readonly cdr:         ChangeDetectorRef,
+    private readonly delivery:    DeliveryService
   ) {}
 
   ngOnInit(): void {
@@ -721,6 +770,43 @@ export class UsersComponent implements OnInit {
     this.loadUsers();
     this.loadDivisionsOnce();
     this.restoreScreenState();
+
+    // D-429 §6.2 — Initiative Activity zone is Admin-only.
+    this.viewerIsAdmin = this.profile.getCurrentProfile()?.is_admin === true;
+  }
+
+  /** D-429 §6.2: load last 10 Initiative events for the viewed user.
+   *  No-op for non-Admin viewers — zone is gated upstream by *ngIf. */
+  private loadViewedUserActivity(userId: string): void {
+    if (!this.viewerIsAdmin || !userId) {
+      this.viewedUserActivity = [];
+      return;
+    }
+    this.loadingViewedActivity = true;
+    this.viewedUserActivity    = [];
+    this.cdr.markForCheck();
+
+    this.delivery.listInitiativeActivity({
+      actor_user_id: userId,
+      limit:         10
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          this.viewedUserActivity = res.data.events;
+        }
+        this.loadingViewedActivity = false;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.loadingViewedActivity = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  /** Template helper — relative timestamp for the activity zone. */
+  activityRelative(iso: string): string {
+    return this.relativeFromNow(iso);
   }
 
   // ── ESC closes open overlay (S-017) ────────────────────────────────────────
@@ -1067,6 +1153,7 @@ export class UsersComponent implements OnInit {
     this.userDirectDivisions = [];
     this.currentlyAssignedDivisionIds = [];
     this.loadMemberships(user.id);
+    this.loadViewedUserActivity(user.id);
     this.cdr.markForCheck();
   }
 
@@ -1108,6 +1195,7 @@ export class UsersComponent implements OnInit {
     this.userDirectDivisions = [];
     this.currentlyAssignedDivisionIds = [];
     this.loadMemberships(newUser.id);
+    this.loadViewedUserActivity(newUser.id);
     this.panelMode = 'view';
     setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
     this.cdr.markForCheck();
@@ -1119,6 +1207,8 @@ export class UsersComponent implements OnInit {
     this.selectedUserId = null;
     this.userDirectDivisions = [];
     this.currentlyAssignedDivisionIds = [];
+    this.viewedUserActivity = [];
+    this.loadingViewedActivity = false;
     this.cdr.markForCheck();
   }
 

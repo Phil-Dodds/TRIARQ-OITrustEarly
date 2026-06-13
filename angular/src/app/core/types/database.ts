@@ -315,6 +315,31 @@ export interface CycleEventLogEntry {
   created_at:        string;
 }
 
+// Contract 23 (D-428, D-429): cross-Initiative activity feed row.
+// Shape returned by list_initiative_activity — enriched with display names.
+export interface InitiativeActivityEntry {
+  event_id:            string;
+  event_type:          string;
+  event_description:   string;
+  created_at:          string;
+  actor_user_id:       string | null;
+  actor_display_name:  string | null;
+  delivery_cycle_id:   string;
+  initiative_title:    string | null;
+  division_id:         string | null;
+  division_short_name: string | null;
+}
+
+export interface InitiativeActivityPage {
+  events:      InitiativeActivityEntry[];
+  total_count: number;
+  has_more:    boolean;
+}
+
+export interface InitiativeActivityCount {
+  total_count: number;
+}
+
 export interface CycleArtifactType {
   artifact_type_id:   string;
   artifact_type_name: string;
