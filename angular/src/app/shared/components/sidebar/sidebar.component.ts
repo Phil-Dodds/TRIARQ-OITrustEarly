@@ -58,9 +58,16 @@ const NAV_ITEMS: NavItem[] = [
 
       <div class="oi-sidebar-footer">
         <span class="oi-sidebar-user">{{ displayName }}</span>
+        <!-- D-426: About link opens build history panel. -->
+        <button class="oi-about-btn"
+                type="button"
+                (click)="aboutOpen = true">About</button>
         <button class="oi-signout-btn" (click)="signOut()">Sign out</button>
       </div>
     </nav>
+
+    <!-- D-426 About Panel — D-180 right-panel overlay -->
+    <app-about-panel [show]="aboutOpen" (close)="aboutOpen = false"></app-about-panel>
   `,
   styles: [`
     .oi-sidebar { height: 100vh; display: flex; flex-direction: column; }
@@ -88,13 +95,17 @@ const NAV_ITEMS: NavItem[] = [
 
     .oi-sidebar-footer { padding: var(--triarq-space-md); border-top: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: var(--triarq-space-xs); }
     .oi-sidebar-user { font-size: var(--triarq-text-caption); color: var(--triarq-color-sidebar-text); }
+    .oi-about-btn,
     .oi-signout-btn { background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--triarq-color-sidebar-text); border-radius: var(--triarq-radius-button); padding: var(--triarq-space-xs) var(--triarq-space-sm); cursor: pointer; font-size: var(--triarq-text-caption); }
+    .oi-about-btn:hover,
     .oi-signout-btn:hover { background: rgba(255,255,255,0.08); }
   `]
 })
 export class SidebarComponent implements OnInit, OnDestroy {
   visibleItems: NavItem[] = [];
   displayName = '';
+  /** D-426: About Panel show/hide state. */
+  aboutOpen = false;
 
   private sub = new Subscription();
 

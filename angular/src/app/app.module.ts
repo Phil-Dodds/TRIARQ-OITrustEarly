@@ -20,6 +20,7 @@ import { AppComponent }              from './app.component';
 import { LoginComponent }            from './features/login/login.component';
 import { SidebarComponent }          from './shared/components/sidebar/sidebar.component';
 import { BlockedActionComponent }    from './shared/components/blocked-action/blocked-action.component';
+import { AboutPanelComponent }       from './shared/components/about-panel/about-panel.component';
 
 @NgModule({
   declarations: [
@@ -34,7 +35,8 @@ import { BlockedActionComponent }    from './shared/components/blocked-action/bl
     IonicModule.forRoot(),
     AppRoutingModule,
     BlockedActionComponent,     // standalone — imported, not declared
-    LoginComponent              // standalone — imported, not declared
+    LoginComponent,             // standalone — imported, not declared
+    AboutPanelComponent         // standalone — D-426 About Panel
   ],
   bootstrap: [AppComponent]
 })
