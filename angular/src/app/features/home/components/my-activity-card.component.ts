@@ -1,9 +1,11 @@
 // my-activity-card.component.ts
-// Pathways OI Trust — home screen "My Activity" card (D-429, Contract 23 Item 6.1).
+// Pathways OI Trust — home screen "My Initiative Activity" card
+// (D-429, Contract 23 Item 6.1; Phil 2026-06-14 rename + limit-7 follow-on).
 //
-// Shows last 10 cycle_event_log entries where actor_user_id = current user,
+// Shows last 7 cycle_event_log entries where actor_user_id = current user,
 // ordered by created_at DESC. Async load per D-346 — home screen does not block
-// on this card. Initiative chip routes to /initiatives/:cycle_id.
+// on this card. Initiative chip routes to /initiatives/:cycle_id and always
+// renders (per Phil 2026-06-14: every activity row must surface its Initiative).
 //
 // Card position per D-425: My Initiatives → My Action Queue → My Notifications
 // → My Activity (this card appends to that order).
@@ -36,7 +38,7 @@ import { InitiativeActivityEntry } from '../../../core/types/database';
   template: `
     <div class="oi-card oi-home-card">
       <div class="oi-card-header">
-        <h4>My Activity</h4>
+        <h4>My Initiative Activity</h4>
       </div>
 
       <!-- Skeleton while loading (D-346) -->
@@ -58,10 +60,10 @@ import { InitiativeActivityEntry } from '../../../core/types/database';
             {{ relativeTime(e.created_at) }}
           </span>
           <span class="ma-desc">{{ e.event_description }}</span>
-          <a *ngIf="e.delivery_cycle_id && e.initiative_title"
+          <a *ngIf="e.delivery_cycle_id"
              class="ma-chip"
              [routerLink]="['/initiatives', e.delivery_cycle_id]">
-            {{ e.initiative_title }}
+            {{ e.initiative_title || 'Initiative' }}
           </a>
         </li>
       </ul>
@@ -161,7 +163,7 @@ export class MyActivityCardComponent implements OnInit {
     }
     this.delivery.listInitiativeActivity({
       actor_user_id: this.userId,
-      limit:         10
+      limit:         7
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {

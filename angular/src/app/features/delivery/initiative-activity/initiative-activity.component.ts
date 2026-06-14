@@ -121,11 +121,14 @@ const PAGE_SIZE = 50;
             <!-- Description — plain text -->
             <span class="ia-desc">{{ e.event_description }}</span>
 
-            <!-- Initiative chip → /initiatives/:cycle_id (S-018 spirit) -->
-            <a *ngIf="e.delivery_cycle_id && e.initiative_title"
+            <!-- Initiative chip — always renders when delivery_cycle_id is
+                 present (always per cycle_event_log NOT NULL FK). Title falls
+                 back to "Initiative" when name unresolved. Phil 2026-06-14:
+                 every activity row must surface its linked Initiative. -->
+            <a *ngIf="e.delivery_cycle_id"
                class="ia-chip"
                [routerLink]="['/initiatives', e.delivery_cycle_id]">
-              {{ e.initiative_title }}
+              {{ e.initiative_title || 'Initiative' }}
             </a>
 
             <!-- Division short name — far right -->

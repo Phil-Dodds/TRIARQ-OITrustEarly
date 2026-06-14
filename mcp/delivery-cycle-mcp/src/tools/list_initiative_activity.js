@@ -183,11 +183,15 @@ async function list_initiative_activity(params, caller_user_id) {
   const cycleMap        = {};
   const divisionShortMap = {};
   if (cycleIdSet.size > 0) {
+    // Phil 2026-06-14 follow-on: every activity row must display its Initiative
+    // name. Drop the deleted_at filter on the enrichment lookup so soft-deleted
+    // Initiative titles still resolve. Division access scope was already
+    // enforced upstream via the cycleIds resolution (which DOES exclude deleted
+    // cycles for non-admin), so this only widens enrichment, not visibility.
     const { data: cycles } = await supabase
       .from('delivery_cycles')
       .select('delivery_cycle_id, cycle_title, division_id')
-      .in('delivery_cycle_id', Array.from(cycleIdSet))
-      .is('deleted_at', null);
+      .in('delivery_cycle_id', Array.from(cycleIdSet));
     (cycles || []).forEach(c => { cycleMap[c.delivery_cycle_id] = c; });
 
     const divIds = new Set();

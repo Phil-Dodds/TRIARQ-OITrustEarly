@@ -578,10 +578,10 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                     <span style="flex:1 1 auto;color:var(--triarq-color-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                       {{ e.event_description }}
                     </span>
-                    <a *ngIf="e.delivery_cycle_id && e.initiative_title"
+                    <a *ngIf="e.delivery_cycle_id"
                        [routerLink]="['/initiatives', e.delivery_cycle_id]"
                        style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:rgba(120,130,140,0.10);color:var(--triarq-color-primary);text-decoration:none;font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                      {{ e.initiative_title }}
+                      {{ e.initiative_title || 'Initiative' }}
                     </a>
                   </li>
                 </ul>
