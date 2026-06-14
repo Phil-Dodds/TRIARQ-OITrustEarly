@@ -33,10 +33,11 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule }  from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { IonicModule }  from '@ionic/angular';
 
-import { DeliveryService } from '../../../core/services/delivery.service';
+import { DeliveryService }    from '../../../core/services/delivery.service';
+import { UserProfileService } from '../../../core/services/user-profile.service';
 import { InitiativeActivityEntry } from '../../../core/types/database';
 
 type DateRangeKey = '7d' | '30d' | '90d';
@@ -71,8 +72,8 @@ const PAGE_SIZE = 50;
           Use this to track what has changed and who changed it.
         </p>
 
-        <!-- Date range selector — single visible filter for V1.
-             Spec slide-in panel with Division/Person/Event filters deferred. -->
+        <!-- Top filter bar: Date range + Show only mine. Phil 2026-06-14:
+             card "View all" pre-sets mine=true via ?mine=1 query param. -->
         <div class="ia-controls">
           <label class="ia-range-label" for="ia-range">Show:</label>
           <select id="ia-range"
@@ -81,6 +82,14 @@ const PAGE_SIZE = 50;
                   (ngModelChange)="onRangeChange($event)">
             <option *ngFor="let k of rangeKeys" [value]="k">{{ rangeLabel(k) }}</option>
           </select>
+
+          <label class="ia-mine-toggle">
+            <input type="checkbox"
+                   [ngModel]="showOnlyMine"
+                   (ngModelChange)="onMineToggle($event)"
+                   [disabled]="!currentUserId" />
+            Show Only My Activity
+          </label>
         </div>
       </div>
 
@@ -188,6 +197,24 @@ const PAGE_SIZE = 50;
       border-radius: var(--triarq-radius-input, 5px);
       background: #fff;
     }
+    .ia-mine-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: var(--triarq-space-md);
+      font-size: var(--triarq-text-small);
+      color: var(--triarq-color-text-primary);
+      cursor: pointer;
+      user-select: none;
+    }
+    .ia-mine-toggle input[type="checkbox"] {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+    }
+    .ia-mine-toggle input[type="checkbox"]:disabled {
+      cursor: default;
+    }
 
     .ia-feed { display: flex; flex-direction: column; gap: 4px; }
 
@@ -272,13 +299,30 @@ export class InitiativeActivityComponent implements OnInit {
   loading    = false;
   loadingMore = false;
 
+  // Phil 2026-06-14 — "Show Only My Activity" filter. Defaults true when route
+  // has ?mine=1 (set by the My Initiative Activity card link). User can uncheck
+  // to widen scope to all users in their Division access.
+  showOnlyMine     = false;
+  currentUserId: string | null = null;
+
   constructor(
-    private readonly delivery: DeliveryService,
-    private readonly cdr:      ChangeDetectorRef,
-    private readonly _router:  Router
+    private readonly delivery:  DeliveryService,
+    private readonly profile:   UserProfileService,
+    private readonly cdr:       ChangeDetectorRef,
+    private readonly route:     ActivatedRoute,
+    private readonly _router:   Router
   ) {}
 
   ngOnInit(): void {
+    // Resolve current user once on entry. Profile is already loaded by the
+    // app shell before this lazy route resolves.
+    this.currentUserId = this.profile.getCurrentProfile()?.id ?? null;
+
+    // Read ?mine=1 from route. When set AND we have a userId, default the
+    // filter ON. Falls back to OFF when userId is unknown.
+    const mineParam = this.route.snapshot.queryParamMap.get('mine');
+    this.showOnlyMine = mineParam === '1' && !!this.currentUserId;
+
     this.reload();
   }
 
@@ -288,6 +332,11 @@ export class InitiativeActivityComponent implements OnInit {
 
   onRangeChange(next: DateRangeKey): void {
     this.dateRange = next;
+    this.reload();
+  }
+
+  onMineToggle(next: boolean): void {
+    this.showOnlyMine = next && !!this.currentUserId;
     this.reload();
   }
 
@@ -302,8 +351,9 @@ export class InitiativeActivityComponent implements OnInit {
     this.cdr.markForCheck();
 
     this.delivery.listInitiativeActivity({
-      after: this.afterIso(),
-      limit: PAGE_SIZE
+      after:         this.afterIso(),
+      actor_user_id: this.actorFilterId(),
+      limit:         PAGE_SIZE
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
@@ -330,6 +380,7 @@ export class InitiativeActivityComponent implements OnInit {
     const oldest = this.events[this.events.length - 1];
     this.delivery.listInitiativeActivity({
       after:         this.afterIso(),
+      actor_user_id: this.actorFilterId(),
       before_cursor: oldest.created_at,
       limit:         PAGE_SIZE
     }).subscribe({
@@ -354,6 +405,12 @@ export class InitiativeActivityComponent implements OnInit {
     const days  = DATE_RANGE_DAYS[this.dateRange];
     const after = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     return after.toISOString();
+  }
+
+  /** Returns the actor filter to apply to MCP calls — userId when "Show Only
+   *  My Activity" is on, undefined otherwise (MCP returns all in scope). */
+  private actorFilterId(): string | undefined {
+    return this.showOnlyMine && this.currentUserId ? this.currentUserId : undefined;
   }
 
   /** Relative format: "2 hours ago", "3 days ago". Falls back to date for older. */

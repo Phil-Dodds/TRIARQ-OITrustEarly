@@ -68,10 +68,12 @@ import { InitiativeActivityEntry } from '../../../core/types/database';
         </li>
       </ul>
 
-      <!-- Footer link -->
+      <!-- Footer link — pre-sets "Show Only My Activity" filter on the
+           Initiative Activity screen (Phil 2026-06-14). User can uncheck. -->
       <a *ngIf="!loading"
          class="ma-view-all"
-         routerLink="/initiatives/activity">
+         routerLink="/initiatives/activity"
+         [queryParams]="{ mine: '1' }">
         View all activity →
       </a>
     </div>
