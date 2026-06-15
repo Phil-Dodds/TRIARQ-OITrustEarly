@@ -875,8 +875,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           {{ promoteStubMessage }}
         </div>
 
-        <!-- Stage groups — collapsible (Principle 5) -->
-        <div *ngFor="let group of artifactsByStage"
+        <!-- Stage groups — collapsible (Principle 5).
+             trackBy keeps DOM stable across cycle refresh so attach-form inputs
+             don't lose focus (Phil 2026-06-15). -->
+        <div *ngFor="let group of artifactsByStage; trackBy: trackByStage"
              style="margin-bottom:var(--triarq-space-xs);">
 
           <!-- Stage section header — ▼/▶ toggle + name + "N of M attached" count.
@@ -906,8 +908,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <!-- Expanded body -->
           <div *ngIf="isStageExpanded(group.stage)">
 
-            <!-- Slot rows -->
-            <div *ngFor="let slot of group.slots"
+            <!-- Slot rows — trackBy by artifact_type_id for stable DOM. -->
+            <div *ngFor="let slot of group.slots; trackBy: trackBySlot"
                  style="padding:var(--triarq-space-xs) var(--triarq-space-xs);
                         border-bottom:1px solid var(--triarq-color-border);
                         font-size:var(--triarq-text-small);">
@@ -1458,6 +1460,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       next: (res) => {
         if (res.success && res.data) {
           this.cycle = res.data;
+          this.rebuildArtifactsByStage();   // stable reference for *ngFor (B-69 / focus-loss fix)
           this.initExpandedStages(); // Item 2: expand current + past stages by default
           this.loadEvents(cycleId);
           // B-69: Stage Track scrollIntoView (B-61) and panel mount sometimes leave
@@ -1746,23 +1749,35 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return labels[dateStatus ?? 'not_started'] ?? (dateStatus ?? 'Not Started');
   }
 
-  /** Group artifact slots by lifecycle_stage for the artifacts panel.
-   *  AC #20: one slot per seeded cycle_artifact_types row, merged with the
-   *  matching attachment (cycle_artifacts) when one exists. Phil 2026-06-15:
-   *  every slot is active in every Initiative state — no future-stage gating.
-   *
-   *  Each slot carries the type fields (artifact_type_id, artifact_type_name,
-   *  lifecycle_stage, guidance_text, sort_order) always, plus the attachment
-   *  fields (cycle_artifact_id, display_name, external_url, oi_library_artifact_id,
-   *  pointer_status, attached_by_*, attached_at) when an attachment exists. */
+  /** Cached artifact slot groups. Rebuilt only when cycle data changes via
+   *  rebuildArtifactsByStage(). Phil 2026-06-15 bug fix: returning a new
+   *  array from a getter on every CD tick destroyed the inline attach form
+   *  inputs on each keystroke (focus lost after first char). Stable reference
+   *  pattern is the same fix used for StageTrackComponent inputs in the
+   *  dashboard grid per CC-Decision-2026-04-11-A. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  get artifactsByStage(): { stage: string; slots: any[] }[] {
+  artifactsByStage: { stage: string; slots: any[] }[] = [];
+
+  /** trackBy for artifactsByStage *ngFor — keeps DOM stable on rebuild so
+   *  inline attach-form inputs don't lose focus. */
+  trackByStage = (_i: number, g: { stage: string }): string => g.stage;
+
+  /** trackBy for slot rows — artifact_type_id is the stable key. */
+  trackBySlot = (_i: number, s: { artifact_type_id?: string }): string =>
+    s.artifact_type_id ?? `slot-${_i}`;
+
+  /** Build artifactsByStage from the current cycle. Called after cycle is
+   *  loaded or after an attachment/promotion call refreshes the cycle. */
+  private rebuildArtifactsByStage(): void {
     const types       = this.cycle?.artifact_types ?? [];
     const attachments = this.cycle?.artifacts ?? [];
 
-    if (!types.length) { return []; }
+    if (!types.length) {
+      this.artifactsByStage = [];
+      return;
+    }
 
-    // Index attachments by artifact_type_id (null-typed attachments are ad hoc — handled below).
+    // Index attachments by artifact_type_id.
     const attachByTypeId: Record<string, CycleArtifact> = {};
     attachments.forEach(a => {
       if (a.artifact_type_id) { attachByTypeId[a.artifact_type_id] = a; }
@@ -1772,13 +1787,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     const slots = types.map(t => {
       const att = attachByTypeId[t.artifact_type_id];
       return {
-        // type fields (always)
         artifact_type_id:        t.artifact_type_id,
         artifact_type_name:      t.artifact_type_name,
         lifecycle_stage:         t.lifecycle_stage,
         guidance_text:           t.guidance_text,
         sort_order:              t.sort_order,
-        // attachment fields (optional — present only when att exists)
         cycle_artifact_id:       att?.cycle_artifact_id,
         display_name:            att?.display_name,
         external_url:            att?.external_url,
@@ -1804,7 +1817,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     );
 
-    // Emit groups in canonical order, then any unknown stages last.
     const seen = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const out: { stage: string; slots: any[] }[] = [];
@@ -1818,7 +1830,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       if (!seen.has(stage)) { out.push({ stage, slots: slotList }); }
     });
 
-    return out;
+    this.artifactsByStage = out;
   }
 
   // ── Outcome ────────────────────────────────────────────────────────────────
@@ -2154,6 +2166,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       next: (res) => {
         if (res.success && res.data) {
           this.cycle           = res.data;
+          this.rebuildArtifactsByStage();
           this.cancelConfirming = false;
         } else {
           this.cancelError = res.error ?? 'Cancel failed. Please try again.';
@@ -2180,6 +2193,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       next: (res) => {
         if (res.success && res.data) {
           this.cycle             = res.data;
+          this.rebuildArtifactsByStage();
           this.uncancelConfirming = false;
         } else {
           this.uncancelError = res.error ?? 'Restore failed. Please try again.';

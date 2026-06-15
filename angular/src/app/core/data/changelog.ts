@@ -33,6 +33,17 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-06-15',
+    contractLabel: 'Artifact attach form — focus stays in input',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiative detail panel',
+        description: 'Typing in the Artifact Title or External URL field no longer loses focus after one character.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-15',
     contractLabel: 'Initiative detail — Jira link, sticky ✕, rename',
     items: [
       {
