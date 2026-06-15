@@ -879,28 +879,23 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         <div *ngFor="let group of artifactsByStage"
              style="margin-bottom:var(--triarq-space-xs);">
 
-          <!-- Stage section header — ▼/▶ toggle + name + "N of M attached" count -->
+          <!-- Stage section header — ▼/▶ toggle + name + "N of M attached" count.
+               Phil 2026-06-15: no future-stage gating — every group renders the same. -->
           <button (click)="toggleStageExpand(group.stage)"
                   style="width:100%;background:none;border:none;cursor:pointer;
                          display:flex;align-items:center;justify-content:space-between;
                          padding:var(--triarq-space-xs) var(--triarq-space-xs);
                          border-radius:5px;margin-bottom:2px;
-                         background:var(--triarq-color-background-subtle);"
-                  [style.opacity]="group.isFuture ? '0.65' : '1'">
+                         background:var(--triarq-color-background-subtle);">
             <span style="display:flex;align-items:center;gap:var(--triarq-space-xs);">
               <span style="font-size:11px;color:var(--triarq-color-text-secondary);
                            transition:transform 0.15s;"
                     [style.transform]="isStageExpanded(group.stage) ? 'rotate(0)' : 'rotate(-90deg)'">
                 ▼
               </span>
-              <span style="font-weight:500;font-size:var(--triarq-text-small);"
-                    [style.color]="group.isFuture ? 'var(--triarq-color-text-secondary)' : 'var(--triarq-color-primary)'">
+              <span style="font-weight:500;font-size:var(--triarq-text-small);
+                           color:var(--triarq-color-primary);">
                 {{ group.stage }}
-              </span>
-              <!-- D-418: future stage label is orientation-only; attach is still available. -->
-              <span *ngIf="group.isFuture"
-                    style="font-size:10px;color:var(--triarq-color-text-secondary);font-style:italic;">
-                — Future stage
               </span>
             </span>
             <span style="font-size:10px;color:var(--triarq-color-text-secondary);">
@@ -982,23 +977,17 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     </div>
                   </div>
 
-                  <!-- Empty slot placeholder — D-418: distinct text for future stage slots. -->
-                  <div *ngIf="!slot.external_url && !slot.oi_library_artifact_id && !group.isFuture"
+                  <!-- Empty slot placeholder — Phil 2026-06-15: every slot active. -->
+                  <div *ngIf="!slot.external_url && !slot.oi_library_artifact_id"
                        style="margin-top:4px;font-size:10px;color:var(--triarq-color-text-secondary);
                               font-style:italic;">
                     Not yet attached
                   </div>
-                  <div *ngIf="!slot.external_url && !slot.oi_library_artifact_id && group.isFuture"
-                       style="margin-top:4px;font-size:10px;color:var(--triarq-color-text-secondary);
-                              font-style:italic;">
-                    Attach early — slots are available at any stage.
-                  </div>
                 </div>
 
                 <!-- Action column: Attach / Replace + → OI Library.
-                     D-418: action available at all lifecycle stages. Future slots dim via opacity. -->
-                <div [style.opacity]="group.isFuture ? '0.6' : '1'"
-                     style="display:flex;flex-direction:column;align-items:flex-end;
+                     Phil 2026-06-15: every slot has functional action regardless of stage. -->
+                <div style="display:flex;flex-direction:column;align-items:flex-end;
                             gap:4px;flex-shrink:0;">
                   <button *ngIf="!slot.external_url"
                           (click)="openAttachForm(slot.artifact_type_id ?? '')"
@@ -1071,10 +1060,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
             </div><!-- end slot rows -->
 
-            <!-- Ad hoc attach link at bottom of each expanded stage. D-418: available
-                 at any stage; future slots dim via opacity. -->
-            <div [style.opacity]="group.isFuture ? '0.6' : '1'"
-                 style="padding:var(--triarq-space-xs) var(--triarq-space-xs);">
+            <!-- Ad hoc attach link at bottom of each expanded stage.
+                 Phil 2026-06-15: every stage's ad-hoc attach is fully active. -->
+            <div style="padding:var(--triarq-space-xs) var(--triarq-space-xs);">
               <!-- Ad hoc form open for this stage -->
               <div *ngIf="showAttachForm && attachingForTypeId === '__adhoc__' + group.stage"
                    style="background:var(--triarq-color-background-subtle);
@@ -1758,24 +1746,79 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return labels[dateStatus ?? 'not_started'] ?? (dateStatus ?? 'Not Started');
   }
 
-  /** Group cycle artifacts by lifecycle_stage for the artifacts panel.
-   *  Group C: isFuture=true when the stage is beyond the current lifecycle stage — slots are dimmed. */
-  get artifactsByStage(): { stage: string; slots: CycleArtifact[]; isFuture: boolean }[] {
-    const artifacts = this.cycle?.artifacts;
-    if (!artifacts?.length) { return []; }
-    const STAGE_ORDER: string[] = [
-      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE'
-    ];
-    const currentIdx = STAGE_ORDER.indexOf(this.cycle?.current_lifecycle_stage as string ?? '');
-    const stages = [...new Set(artifacts.map(a => a.lifecycle_stage ?? 'General'))];
-    return stages.map(stage => {
-      const stageIdx = STAGE_ORDER.indexOf(stage);
+  /** Group artifact slots by lifecycle_stage for the artifacts panel.
+   *  AC #20: one slot per seeded cycle_artifact_types row, merged with the
+   *  matching attachment (cycle_artifacts) when one exists. Phil 2026-06-15:
+   *  every slot is active in every Initiative state — no future-stage gating.
+   *
+   *  Each slot carries the type fields (artifact_type_id, artifact_type_name,
+   *  lifecycle_stage, guidance_text, sort_order) always, plus the attachment
+   *  fields (cycle_artifact_id, display_name, external_url, oi_library_artifact_id,
+   *  pointer_status, attached_by_*, attached_at) when an attachment exists. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  get artifactsByStage(): { stage: string; slots: any[] }[] {
+    const types       = this.cycle?.artifact_types ?? [];
+    const attachments = this.cycle?.artifacts ?? [];
+
+    if (!types.length) { return []; }
+
+    // Index attachments by artifact_type_id (null-typed attachments are ad hoc — handled below).
+    const attachByTypeId: Record<string, CycleArtifact> = {};
+    attachments.forEach(a => {
+      if (a.artifact_type_id) { attachByTypeId[a.artifact_type_id] = a; }
+    });
+
+    // Build one slot per type — merge attachment when present.
+    const slots = types.map(t => {
+      const att = attachByTypeId[t.artifact_type_id];
       return {
-        stage,
-        slots:    artifacts.filter(a => (a.lifecycle_stage ?? 'General') === stage),
-        isFuture: currentIdx >= 0 && stageIdx > currentIdx
+        // type fields (always)
+        artifact_type_id:        t.artifact_type_id,
+        artifact_type_name:      t.artifact_type_name,
+        lifecycle_stage:         t.lifecycle_stage,
+        guidance_text:           t.guidance_text,
+        sort_order:              t.sort_order,
+        // attachment fields (optional — present only when att exists)
+        cycle_artifact_id:       att?.cycle_artifact_id,
+        display_name:            att?.display_name,
+        external_url:            att?.external_url,
+        oi_library_artifact_id:  att?.oi_library_artifact_id,
+        pointer_status:          att?.pointer_status,
+        attached_by_user_id:     att?.attached_by_user_id,
+        attached_by_display_name: att?.attached_by_display_name,
+        attached_at:             att?.attached_at
       };
     });
+
+    // Group by lifecycle_stage, preserve canonical stage order, sort each group by sort_order.
+    const STAGE_ORDER: string[] = [
+      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE','ANY'
+    ];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const groupMap: Record<string, any[]> = {};
+    slots.forEach(s => {
+      const k = s.lifecycle_stage || 'General';
+      (groupMap[k] = groupMap[k] || []).push(s);
+    });
+    Object.values(groupMap).forEach(arr =>
+      arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    );
+
+    // Emit groups in canonical order, then any unknown stages last.
+    const seen = new Set<string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const out: { stage: string; slots: any[] }[] = [];
+    STAGE_ORDER.forEach(stage => {
+      if (groupMap[stage]?.length) {
+        out.push({ stage, slots: groupMap[stage] });
+        seen.add(stage);
+      }
+    });
+    Object.entries(groupMap).forEach(([stage, slotList]) => {
+      if (!seen.has(stage)) { out.push({ stage, slots: slotList }); }
+    });
+
+    return out;
   }
 
   // ── Outcome ────────────────────────────────────────────────────────────────
@@ -2285,9 +2328,17 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.attachError = '';
     this.cdr.markForCheck();
 
+    // Ad-hoc form uses sentinel '__adhoc__<stage>' for attachingForTypeId — that
+    // is NOT a UUID. Pass undefined in that case so MCP records the attachment
+    // with artifact_type_id = null (cycle_artifact_types has the 'ANY' row for
+    // ad-hoc references; the MCP accepts null per attach_cycle_artifact.js).
+    const typeIdParam = !this.attachingForTypeId || this.attachingForTypeId.startsWith('__adhoc__')
+      ? undefined
+      : this.attachingForTypeId;
+
     this.delivery.attachArtifact({
       delivery_cycle_id: this.cycle.delivery_cycle_id,
-      artifact_type_id:  this.attachingForTypeId || undefined,
+      artifact_type_id:  typeIdParam,
       display_name:      this.attachForm.value.display_name as string,
       external_url:      this.attachForm.value.external_url as string
     }).subscribe({

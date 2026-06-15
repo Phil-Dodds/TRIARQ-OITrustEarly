@@ -107,6 +107,15 @@ async function get_delivery_cycle(params, caller_user_id) {
     .is('deleted_at', null)
     .order('attached_at', { ascending: true });
 
+  // ── Fetch seeded artifact types (26 + ad hoc) ─────────────────────────────
+  // Build C §3.7 + §5.10 + AC #20: every Initiative renders one slot per type
+  // organized by lifecycle stage. Phil 2026-06-15: no future-stage gating —
+  // every slot is active in every Initiative state.
+  const { data: artifact_types } = await supabase
+    .from('cycle_artifact_types')
+    .select('*')
+    .order('sort_order', { ascending: true });
+
   // ── Resolve DCS / EPO / DOL display names + caller role ───────────────────
   const userIdsToResolve = [
     cycle.assigned_dcs_user_id,
@@ -187,7 +196,9 @@ async function get_delivery_cycle(params, caller_user_id) {
       gate_records:     enrichedGateRecords,
       workstream:       workstream ? { ...workstream, home_division_name } : null,
       jira_links:       jira_links            || [],
-      artifacts:        artifacts             || []
+      artifacts:        artifacts             || [],
+      // AC #20: seeded slot definitions for the detail panel's Artifacts zone.
+      artifact_types:   artifact_types        || []
     }
   };
 }

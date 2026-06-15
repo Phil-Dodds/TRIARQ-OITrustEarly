@@ -266,6 +266,10 @@ export interface DeliveryCycle {
   gate_records?:           GateRecord[];
   jira_links?:             JiraLink[];
   artifacts?:              CycleArtifact[];
+  // AC #20: seeded slot definitions returned by get_delivery_cycle so the
+  // detail panel can render one card per type whether or not an attachment
+  // exists. Phil 2026-06-15: every slot active in every state.
+  artifact_types?:         CycleArtifactType[];
 }
 
 export interface CycleMilestoneDate {

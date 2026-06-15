@@ -33,6 +33,22 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-06-15',
+    contractLabel: 'Initiative detail — Artifact slots now visible (AC #20 fix)',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiative detail panel',
+        description: 'All 27 seeded artifact slots now render grouped by stage. Every slot has an Attach button regardless of Initiative state. Bug: prior build never rendered slots when no attachments existed.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative detail panel',
+        description: 'Ad-hoc "+ Attach Document" now works (was sending a sentinel string in place of artifact_type_id; MCP rejected as invalid UUID).'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-15',
     contractLabel: 'Initiative grid Division filter — children by default',
     items: [
       {
