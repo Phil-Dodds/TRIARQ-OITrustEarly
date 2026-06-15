@@ -32,6 +32,29 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-06-15',
+    contractLabel: 'Initiative grid Division filter — children by default',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiative list grid',
+        description: 'Division filter now includes all child divisions by default. Uncheck "Include child divisions" in the filter panel to see only the selected Division.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-14',
+    builtAt:       '16:29 UTC',
+    contractLabel: 'Contract 23 D-426 — About Panel + Build History',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Sidebar',
+        description: 'New "About" button in the sidebar footer opens a Build History panel.'
+      }
+    ]
+  },
+  {
     date:          '2026-06-14',
     builtAt:       '12:13 UTC',
     contractLabel: 'Contract 23 Part 2 — Show Only My Activity',

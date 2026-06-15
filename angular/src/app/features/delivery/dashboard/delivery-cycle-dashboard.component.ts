@@ -193,7 +193,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                        border:1.5px solid #257099;color:#257099;border-radius:999px;
                        padding:4px 12px;font-size:13px;white-space:nowrap;">
             Division: {{ filterDivisionLabel }}
-            <button (click)="filterDivision='';includeChildDivisions=false;onDivisionFilterChange()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+            <button (click)="filterDivision='';includeChildDivisions=true;onDivisionFilterChange()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
           </span>
         </div>
 
@@ -876,7 +876,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   stagedGateStatus:     string  = '';
   stagedAssignedPerson: string  = '';
   stagedDivision:       string  = '';
-  stagedIncludeChildren: boolean = false;
+  // Phil 2026-06-15: Division filter includes children by default.
+  // Users opt OUT by unchecking the "Include child divisions" toggle in the
+  // filter panel. Matches the end-user mental model — pick a Division and
+  // see everything under it.
+  stagedIncludeChildren: boolean = true;
 
   // S-013: Accordion — which filter row is currently expanded. Empty = all collapsed.
   openFilterRow: string = '';
@@ -906,7 +910,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   filterWorkstream:         string  = '';
   // D-166: division filter — server-side reload when changed
   filterDivision:           string  = '';
-  includeChildDivisions:    boolean = false;
+  // Phil 2026-06-15: includes children by default; user can opt out via toggle.
+  includeChildDivisions:    boolean = true;
   // D-173/D-175: next gate filter — computed client-side from lifecycle stage
   filterNextGate:           string  = '';
   // D-389/D-390: assigned DCS / EPO filters — client-side, derived from loaded cycles
@@ -1682,7 +1687,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterGateStatus      = '';
     this.filterAssignedPerson  = '';
     this.filterDivision        = '';
-    this.includeChildDivisions = false;
+    this.includeChildDivisions = true;   // Phil 2026-06-15: children-by-default
     this.loadCycles();
   }
 
@@ -1874,7 +1879,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.stagedGateStatus     = '';
     this.stagedAssignedPerson = '';
     this.stagedDivision       = '';
-    this.stagedIncludeChildren = false;
+    this.stagedIncludeChildren = true;   // Phil 2026-06-15: children-by-default
     this.openFilterRow        = '';
     this.wsScope              = '';  // CC-Decision-2026-04-12-E
     this.personScope          = '';  // CC-Decision-2026-04-12-F
