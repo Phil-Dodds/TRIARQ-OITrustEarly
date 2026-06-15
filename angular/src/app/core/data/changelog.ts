@@ -33,6 +33,27 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-06-15',
+    contractLabel: 'Initiative detail — Jira link, sticky ✕, rename',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiative detail panel',
+        description: 'Jira epic link now persists — new link_jira_epic MCP tool creates the jira_links row. Prior build silently dropped the input.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative detail panel',
+        description: '✕ close button stays visible at the top of the panel while scrolling (was falling off when content was tall).'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative detail panel',
+        description: '"Cycle Artifacts" heading renamed to "Documents/Artifacts".'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-15',
     contractLabel: 'Initiative detail — Artifact slots now visible (AC #20 fix)',
     items: [
       {

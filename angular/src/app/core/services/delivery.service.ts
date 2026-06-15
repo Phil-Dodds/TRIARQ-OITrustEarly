@@ -347,7 +347,17 @@ export class DeliveryService {
     );
   }
 
-  // ── Jira sync ──────────────────────────────────────────────────────────────
+  // ── Jira link + sync ──────────────────────────────────────────────────────
+
+  /** Creates (or updates) the jira_links row for an Initiative and mirrors the
+   *  key to delivery_cycles.jira_epic_key. Must be called BEFORE syncJiraEpic —
+   *  sync requires the link row to exist. */
+  linkJiraEpic(params: {
+    delivery_cycle_id: string;
+    jira_epic_key:     string;
+  }): Observable<McpResponse<JiraLink>> {
+    return this.mcp.call<JiraLink>('delivery', 'link_jira_epic', params as Record<string, unknown>);
+  }
 
   syncJiraEpic(params: {
     delivery_cycle_id: string;

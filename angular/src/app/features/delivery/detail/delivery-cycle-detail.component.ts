@@ -100,17 +100,6 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent],
   styles: [`:host { display: block; position: relative; }`],
   template: `
-    <!-- D-416: × close at upper-right of the panel floater, always visible
-         when in panel mode. Positioned absolute against the relatively-
-         positioned :host so it sits independent of the cycle-header card. -->
-    <button *ngIf="panelMode"
-            class="oi-close-btn"
-            (click)="close.emit()"
-            title="Close panel"
-            aria-label="Close panel"
-            style="position:absolute;top:12px;right:12px;z-index:10;background:#fff;">
-      ✕
-    </button>
 
     <!-- D-178 Tier 1: Skeleton screen for initial cycle load -->
     <div *ngIf="loading" style="max-width:1100px;margin:var(--triarq-space-xl) auto;
@@ -164,11 +153,22 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       </app-delivery-cycle-edit-panel>
 
       <!-- D-291 (amended by D-416): sticky outer wrapper. × close button lives
-           INSIDE the cycle-header card action bar at the far-right end, at the same
-           vertical position as the panel title. Destructive actions are visually
-           segregated from non-destructive by an Oravive fill + 1px fog vertical
-           rule per D-416 Rule 2. -->
+           INSIDE this sticky wrapper at upper-right so it stays visible while the
+           panel content scrolls (Phil 2026-06-15: × was falling off when content
+           was tall enough to scroll past the top of viewport). Destructive actions
+           are visually segregated from non-destructive by an Oravive fill + 1px
+           fog vertical rule per D-416 Rule 2. -->
       <div style="position:sticky;top:0;z-index:5;background:#fff;">
+        <!-- Sticky × close button — sits at top-right of every scroll position. -->
+        <button *ngIf="panelMode"
+                class="oi-close-btn"
+                (click)="close.emit()"
+                title="Close panel"
+                aria-label="Close panel"
+                style="position:absolute;top:12px;right:12px;z-index:10;background:#fff;">
+          ✕
+        </button>
+
 
 
       <!-- ── Cycle Header ───────────────────────────────────────────────── -->
@@ -858,7 +858,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
         <div style="display:flex;align-items:center;justify-content:space-between;
                     margin-bottom:var(--triarq-space-xs);">
-          <span style="font-weight:500;">Cycle Artifacts</span>
+          <span style="font-weight:500;">Documents/Artifacts</span>
         </div>
         <!-- CC-Decision-2026-04-12-D: Zone explanatory text 11px italic #5A5A5A. Source: Contract 5 Block 2.5. -->
         <p style="margin:0 0 var(--triarq-space-sm) 0;font-size:11px;font-style:italic;color:#5A5A5A;">
@@ -2381,19 +2381,22 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   // ── Jira sync ──────────────────────────────────────────────────────────────
 
-  /** State 1: Link a Jira epic to this cycle using the epic key form. */
+  /** State 1: Link a Jira epic to this cycle using the epic key form.
+   *  Phil 2026-06-15 bug fix: now calls link_jira_epic MCP which CREATES
+   *  the jira_links row. Previous code called sync_jira_epic which
+   *  silently dropped the input when no link row existed yet. */
   linkJiraEpic(): void {
     if (!this.cycle || !this.jiraEpicKeyCtrl.value?.trim()) { return; }
     this.linkingJiraEpic = true;
     this.jiraLinkError   = '';
     this.cdr.markForCheck();
 
-    this.delivery.syncJiraEpic({
+    this.delivery.linkJiraEpic({
       delivery_cycle_id: this.cycle.delivery_cycle_id,
       jira_epic_key:     this.jiraEpicKeyCtrl.value.trim()
     }).subscribe({
       next: (res) => {
-        if (res.success || res.data?.['stub']) {
+        if (res.success) {
           this.showJiraLinkForm = false;
           this.jiraEpicKeyCtrl.reset();
           this.loadCycle(this.cycle!.delivery_cycle_id);

@@ -48,6 +48,7 @@ const { attach_cycle_artifact }          = require('./tools/attach_cycle_artifac
 const { promote_artifact_to_oi_library } = require('./tools/promote_artifact_to_oi_library');
 
 const { get_cycle_event_log }            = require('./tools/get_cycle_event_log');
+const { link_jira_epic }                 = require('./tools/link_jira_epic');
 const { sync_jira_epic }                 = require('./tools/sync_jira_epic');
 const { get_delivery_summary }           = require('./tools/get_delivery_summary');
 
@@ -102,7 +103,8 @@ const TOOLS = {
   // Contract 23 — cross-Initiative activity feed (D-428, D-429)
   list_initiative_activity,
 
-  // Jira sync
+  // Jira link + sync
+  link_jira_epic,
   sync_jira_epic,
 
   // Dashboard hub summaries (D-171–D-176)
