@@ -18,7 +18,9 @@ import { IonicModule }  from '@ionic/angular';
       { path: 'users',       loadComponent: () => import('./users/users.component').then(c => c.UsersComponent) },
       { path: 'workstreams', loadComponent: () => import('../delivery/workstream-admin/workstream-admin.component').then(c => c.WorkstreamAdminComponent) },
       // Contract 20 (D-401): EPO WIP Limits admin screen.
-      { path: 'epo-wip',     loadComponent: () => import('./epo-wip-limits/epo-wip-limits.component').then(c => c.EpoWipLimitsComponent) }
+      { path: 'epo-wip',     loadComponent: () => import('./epo-wip-limits/epo-wip-limits.component').then(c => c.EpoWipLimitsComponent) },
+      // Contract 24 (D-437): Artifact Type management admin screen.
+      { path: 'artifact-types', loadComponent: () => import('./artifact-types/artifact-types.component').then(c => c.ArtifactTypesComponent) }
     ])
   ]
 })

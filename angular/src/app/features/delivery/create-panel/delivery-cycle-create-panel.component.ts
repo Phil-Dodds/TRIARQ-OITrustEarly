@@ -37,9 +37,14 @@ import { filter, take } from 'rxjs/operators';
 import { DeliveryService }           from '../../../core/services/delivery.service';
 import { UserProfileService }        from '../../../core/services/user-profile.service';
 import { LoadingOverlayComponent }   from '../../../shared/components/loading-overlay/loading-overlay.component';
-import { WorkstreamPickerComponent } from '../../../shared/pickers/workstream-picker/workstream-picker.component';
-import { UserPickerComponent }       from '../../../shared/pickers/user-picker/user-picker.component';
+import { WorkstreamPickerComponent }         from '../../../shared/pickers/workstream-picker/workstream-picker.component';
+import { UserPickerComponent }               from '../../../shared/pickers/user-picker/user-picker.component';
+import { DivisionAssignmentPickerComponent } from '../../../shared/pickers/division-assignment-picker/division-assignment-picker.component';
 import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User } from '../../../core/types/database';
+import {
+  DivisionTrustGroup,
+  groupDivisionsByTrust
+} from '../../../core/utils/division-grouping';
 
 @Component({
   selector: 'app-delivery-cycle-create-panel',
@@ -47,7 +52,8 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, ReactiveFormsModule, IonicModule,
-    LoadingOverlayComponent, WorkstreamPickerComponent, UserPickerComponent
+    LoadingOverlayComponent, WorkstreamPickerComponent, UserPickerComponent,
+    DivisionAssignmentPickerComponent
   ],
   template: `
     <!-- D-180: Right panel — Deep Navy header, body with 24px padding -->
@@ -71,13 +77,30 @@ import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User }
             <label class="cp-label">
               Division <span class="cp-required" aria-hidden="true">*</span>
             </label>
-            <select formControlName="division_id" class="cp-input"
+            <!-- D-436 (Contract 24): Division Assignment Picker replaces the
+                 native <select>. My Divisions short list + Show all expansion
+                 (non-Admin); Recently Used + full list (Admin). -->
+            <button type="button"
+                    class="cp-input"
+                    style="text-align:left;cursor:pointer;background:#fff;"
                     [class.cp-input--error]="f['division_id'].invalid && f['division_id'].touched"
-                    (change)="onDivisionChange()">
-              <option value="">— Select Division —</option>
-              <!-- S-032: pickers exclude inactive Divisions from new selections. -->
-              <option *ngFor="let d of selectableDivisions" [value]="d.id">{{ d.division_name }}</option>
-            </select>
+                    (click)="openDivisionPicker()">
+              <span *ngIf="f['division_id'].value">
+                {{ divisionDisplayName(f['division_id'].value) }}
+              </span>
+              <span *ngIf="!f['division_id'].value" style="color:#9E9E9E;">
+                — Select Division —
+              </span>
+            </button>
+            <app-division-assignment-picker
+              *ngIf="divisionPickerOpen"
+              [currentDivisionId]="f['division_id'].value || null"
+              [isAdmin]="viewerIsAdmin"
+              [myDivisions]="selectableDivisions"
+              [allDivisions]="selectableDivisions"
+              (selected)="onDivisionPicked($event)"
+              (cancelled)="divisionPickerOpen = false">
+            </app-division-assignment-picker>
             <div *ngIf="f['division_id'].invalid && f['division_id'].touched"
                  class="cp-field-error">Division is required.</div>
           </div>
@@ -434,6 +457,12 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
   get selectableDivisions(): Division[] {
     return this.divisions.filter(d => d.active_status !== false);
   }
+
+  /** D-433 (Contract 24): selectable Divisions grouped by parent Trust for
+   *  <optgroup> rendering on the Division <select>. */
+  get groupedSelectableDivisions(): DivisionTrustGroup[] {
+    return groupDivisionsByTrust(this.selectableDivisions);
+  }
   // D-292: Dashboard increments to signal cancel (ESC or scrim click). Source: D-292.
   @Input() cancelSignal = 0;
 
@@ -448,6 +477,10 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
   showDiscardConfirm = false;
   // Guard: show warning when user clicks Workstream picker without Division selected.
   noDivisionWarning  = false;
+
+  // D-436 (Contract 24): Division Assignment Picker state.
+  divisionPickerOpen = false;
+  viewerIsAdmin      = false;
 
   // Workstream picker state (CC-002)
   showWorkstreamPicker = false;
@@ -516,6 +549,8 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
     // multiple roles; if they're a DCS, they get auto-assigned.
     this.subs.add(
       this.profile.profile$.pipe(filter(p => p !== null), take(1)).subscribe(p => {
+        // D-436 (Contract 24): admin flag for Division picker scoping.
+        this.viewerIsAdmin = p?.is_admin === true;
         if (p?.is_dcs === true && p.id && p.display_name) {
           this.selectedDcs = p as unknown as User;
           this.updateDcsChip(this.selectedDcs);
@@ -592,6 +627,25 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
     this.selectedWorkstream = null;
     this.noDivisionWarning  = false;
     this.cdr.markForCheck();
+  }
+
+  // ── Division Assignment Picker (D-436, Contract 24) ──────────────────────────
+  openDivisionPicker(): void {
+    this.divisionPickerOpen = true;
+    this.cdr.markForCheck();
+  }
+
+  onDivisionPicked(divisionId: string): void {
+    this.divisionPickerOpen = false;
+    this.form.get('division_id')?.setValue(divisionId);
+    this.form.get('division_id')?.markAsTouched();
+    this.onDivisionChange();
+  }
+
+  /** Display name for the current Division id — falls back to '' if unknown. */
+  divisionDisplayName(divisionId: string | null | undefined): string {
+    if (!divisionId) { return ''; }
+    return this.divisions.find(d => d.id === divisionId)?.division_name ?? '';
   }
 
   // ── Workstream picker ───────────────────────────────────────────────────────

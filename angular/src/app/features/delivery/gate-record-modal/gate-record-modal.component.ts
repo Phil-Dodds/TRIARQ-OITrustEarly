@@ -50,7 +50,9 @@ import {
   CycleMilestoneDate,
   TierClassification,
   User,
-  DateStatus
+  DateStatus,
+  EpoWipWarning,
+  GateDecisionResult
 } from '../../../core/types/database';
 
 export interface GateRecordModalData {
@@ -334,6 +336,32 @@ const GATE_LABELS: Record<GateName, string> = {
           </div>
         </div>
 
+        <!-- Contract 24 (AC-18 / D-437): post-approval warnings block.
+             D-200 Pattern 2 (amber, non-blocking). Renders when the just-
+             recorded approval came back with wip_warning or suggestion_warnings.
+             Approver clicks Acknowledge to close + refresh. -->
+        <div *ngIf="confirmMode === 'post-approve-warning'" class="oi-warn-pattern2">
+          <div class="oi-warn-icon">⚠</div>
+          <div class="oi-warn-body">
+            <div class="oi-warn-text" *ngIf="postApproveWipWarning">
+              <strong>WIP alert:</strong> {{ postApproveWipWarning.message }}
+            </div>
+            <div class="oi-warn-text" *ngIf="postApproveSuggestions.length > 0">
+              <strong>Typically attached before {{ gateLabel }}:</strong>
+              {{ postApproveSuggestions.join(', ') }}.
+              <br>
+              <span style="color:#5A5A5A;">Approving without these is permitted — this is a reminder.</span>
+            </div>
+            <div class="grm-action-row">
+              <button class="grm-btn-primary"
+                      type="button"
+                      (click)="acknowledgePostApproveWarning()">
+                Acknowledge
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- ── RETURN form (single-step — notes are required) ─────────────── -->
         <form *ngIf="confirmMode === 'return'"
               [formGroup]="returnForm"
@@ -504,13 +532,21 @@ export class GateRecordModalComponent {
   record:    GateRecord | null = null;
   milestone: CycleMilestoneDate | null = null;
 
-  /** Action state machine — drives inline confirmation replacement of action area. */
-  confirmMode: 'none' | 'approve' | 'withdraw' | 'return' = 'none';
+  /** Action state machine — drives inline confirmation replacement of action area.
+   *  'post-approve-warning' (Contract 24, AC-18): the gate has just been approved
+   *  and the response carried a wip_warning and/or suggestion_warnings. The modal
+   *  stays open showing the warnings until the approver acknowledges. */
+  confirmMode: 'none' | 'approve' | 'withdraw' | 'return' | 'post-approve-warning' = 'none';
   processing      = false;
   processingAction: 'submit' | 'approve' | 'return' | 'withdraw' | null = null;
 
   actionError = '';
   actionHint  = '';
+
+  /** Contract 24 (AC-18 / D-437): warnings captured from record_gate_decision
+   *  response. Surfaced in the modal post-approval as a D-200 Pattern 2 block. */
+  postApproveWipWarning: EpoWipWarning | null = null;
+  postApproveSuggestions: string[]            = [];
 
   returnForm: FormGroup;
   returnNotesError = false;
@@ -732,8 +768,20 @@ export class GateRecordModalComponent {
       next: (res) => {
         if (res.success) {
           this.endProcessing();
-          // Approve advances stage → caller does full reload (D-345).
-          this.onGateActionComplete('full');
+          // Contract 24 (AC-18 / D-437): if the response carries warnings,
+          // hold the modal open in post-approve-warning state until the
+          // approver acknowledges. Otherwise close + full refresh per D-345.
+          const result: GateDecisionResult | undefined = res.data ?? undefined;
+          const hasWipWarning  = !!result?.wip_warning;
+          const hasSuggestions = (result?.suggestion_warnings ?? []).length > 0;
+          if (hasWipWarning || hasSuggestions) {
+            this.postApproveWipWarning  = result?.wip_warning ?? null;
+            this.postApproveSuggestions = result?.suggestion_warnings ?? [];
+            this.confirmMode            = 'post-approve-warning';
+            this.cdr.markForCheck();
+          } else {
+            this.onGateActionComplete('full');
+          }
         } else {
           this.endProcessing(
             res.error ?? 'Decision record failed.',
@@ -745,6 +793,15 @@ export class GateRecordModalComponent {
         this.endProcessing(err.error ?? 'Decision record failed.');
       }
     });
+  }
+
+  /** Contract 24 (AC-18): approver acknowledges the post-approval warning
+   *  block. Closes the modal with refreshKind:'full' so the parent reloads. */
+  acknowledgePostApproveWarning(): void {
+    this.confirmMode            = 'none';
+    this.postApproveWipWarning  = null;
+    this.postApproveSuggestions = [];
+    this.onGateActionComplete('full');
   }
 
   onReturnConfirm(): void {

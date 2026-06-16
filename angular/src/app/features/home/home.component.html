@@ -39,6 +39,12 @@
       [userId]="profile?.id ?? ''">
     </app-my-activity-card>
 
+    <!-- D-430 / Contract 24 Workstream 6: My Completed Gates card.
+         Appended per D-425 — new cards land after the prior universal cards. -->
+    <app-my-completed-gates-card
+      [userId]="profile?.id ?? ''">
+    </app-my-completed-gates-card>
+
     <!-- Phil only -->
     <app-system-health-card
       *ngIf="showSystemHealth">

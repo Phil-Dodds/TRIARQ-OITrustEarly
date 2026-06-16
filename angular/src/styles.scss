@@ -371,3 +371,53 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
   input { margin-right: 8px; }
 }
 
+// D-200 Pattern 2 — non-blocking amber warning block.
+// Used by gate-record-modal post-approval warnings (AC-18 / D-437) and any
+// other inline non-blocking warning context (S-025 Pattern 2 rendering).
+.oi-warn-pattern2 {
+  display: flex;
+  gap: var(--triarq-space-sm);
+  align-items: flex-start;
+  background: rgba(245, 166, 35, 0.08);
+  border-left: 3px solid var(--triarq-color-sunray, #f5a623);
+  padding: 10px 12px;
+  border-radius: 4px;
+  margin: var(--triarq-space-sm) 0;
+}
+.oi-warn-icon {
+  color: var(--triarq-color-sunray, #f5a623);
+  font-size: 16px;
+  line-height: 1.2;
+  flex: 0 0 auto;
+}
+.oi-warn-body { flex: 1 1 auto; }
+.oi-warn-text {
+  font-size: 13px;
+  color: var(--triarq-color-text-primary);
+  margin-bottom: var(--triarq-space-sm);
+}
+.oi-warn-text:last-child { margin-bottom: 0; }
+
+// S-036 / D-432 — Grid Column Sort Standard.
+// Sortable column header: ↕ on hover (uses ::after pseudo), ↑/↓ when active
+// (rendered inline by the component as .oi-sort-active text). Indicator
+// position is to the right of the label.
+.oi-sort-th {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  &:hover::after {
+    content: ' ↕';
+    color: var(--triarq-color-text-secondary);
+    font-size: 11px;
+    opacity: 0.6;
+  }
+  // When the column is the active sort, the component renders ↑ or ↓ inline.
+  // Suppress the hover affordance so the active indicator is the only one
+  // visible (per S-036 conformance test).
+  &.oi-sort-active {
+    font-weight: 600;
+    &:hover::after { content: ''; }
+  }
+}
+

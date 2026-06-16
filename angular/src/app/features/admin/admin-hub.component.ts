@@ -46,6 +46,14 @@ const ADMIN_CARDS: AdminCard[] = [
     who:         'Phil and Admin',
     route:       'epo-wip',
     icon:        '◐'
+  },
+  // Contract 24 (D-437): fifth admin card — Artifact Type management.
+  {
+    title:       'Artifact Types',
+    description: 'Manage suggested artifact types by stage and gate. The system uses these to suggest the right document when an Initiative submits a gate. Deactivating a type hides it from new attachments while leaving historical attachments in place.',
+    who:         'Phil and Admin',
+    route:       'artifact-types',
+    icon:        '⬢'
   }
 ];
 

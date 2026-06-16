@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.47 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.48 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-430**
+**Next available: D-438**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -333,6 +333,14 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-427 | Milestone Date Changes Log Actor — `set_milestone_target_date` and `set_milestone_actual_date` amended to append `cycle_event_log` entries with actor attribution | LOCKED | 2026-06-13 | specced | Contract 23 |
 | D-428 | Initiative Activity View — `/initiatives/activity`, cross-initiative `cycle_event_log` feed, Division-scoped, hub card 8 | LOCKED | 2026-06-13 | specced | Contract 23 |
 | D-429 | User Initiative History — My Activity home card + Admin User View zone; amends D-167 Build C partial | LOCKED | 2026-06-13 | specced | Contract 23 |
+| D-430 | My Completed Gates Home Card | Specced | 2026-06-15 | Claude Chat | Contract 24 |
+| D-431 | Recently Approved Gates View (Hub Card 9) | Specced | 2026-06-15 | Claude Chat | Contract 24; amends D-396 |
+| D-432 | Grid Column Sort Interaction Standard (S-036) | Specced | 2026-06-15 | Claude Chat | Contract 24 |
+| D-433 | Division Picker Hierarchy Grouping | Specced | 2026-06-15 | Claude Chat | Contract 24 |
+| D-434 | Gate Column Rename on Initiatives Grid | Specced | 2026-06-15 | Claude Chat | Contract 24; amends D-267 |
+| D-435 | Next Gate Sort on Initiatives Grid | Specced | 2026-06-15 | Claude Chat | Contract 24; amends D-434 |
+| D-436 | Division Assignment Picker: My Divisions Scoping | Specced | 2026-06-15 | Claude Chat | Contract 24 |
+| D-437 | Artifact Type Admin Management + Seed Revision + Gate Warnings | Specced | 2026-06-15 | Claude Chat | Contract 24 (UI+seed) / Contract 25 (display model) |
 
 ---
 

@@ -88,6 +88,13 @@ import { IonicModule }  from '@ionic/angular';
           import('./initiative-activity/initiative-activity.component')
             .then(c => c.InitiativeActivityComponent)
       },
+      // Contract 24 (D-431): Recently Approved Gates view — hub card 9.
+      {
+        path: 'gates-approved',
+        loadComponent: () =>
+          import('./gates-approved/gates-approved.component')
+            .then(c => c.GatesApprovedComponent)
+      },
       // ── Initiative detail — must be last (param route) ────────────────────
       {
         path: ':cycle_id',

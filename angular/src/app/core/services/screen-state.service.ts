@@ -41,6 +41,14 @@ export const SCREEN_KEYS = {
   INITIATIVES_EPO_SUMMARY:  'initiatives.epo-summary',
   INITIATIVES_EPO_SCHEDULE: 'initiatives.epo-schedule',
   INITIATIVES_EPO_DEPLOY:   'initiatives.epo-deploy',
+  // Contract 24 (D-431): Recently Approved Gates view.
+  INITIATIVES_GATES_APPROVED: 'initiatives.gates-approved',
+  // Contract 24 (D-437): Artifact Type management admin screen.
+  ADMIN_ARTIFACT_TYPES:     'admin.artifact-types',
+  // Contract 24 (D-436): Division assignment picker history — shared across
+  // every Division assignment picker. Stores last-5 selected Division ids
+  // under filter_state.ids per user.
+  PICKER_DIVISION_RECENT:   'picker.division.recent',
 } as const;
 
 export type ScreenKey = typeof SCREEN_KEYS[keyof typeof SCREEN_KEYS];

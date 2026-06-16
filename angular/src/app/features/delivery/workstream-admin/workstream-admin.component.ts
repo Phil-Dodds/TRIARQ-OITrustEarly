@@ -46,6 +46,10 @@ import {
 }                                    from '../../../core/services/screen-state.service';
 import { DeliveryWorkstream, Division, User } from '../../../core/types/database';
 import { LoadingOverlayComponent }  from '../../../shared/components/loading-overlay/loading-overlay.component';
+import {
+  DivisionTrustGroup,
+  groupDivisionsByTrust
+} from '../../../core/utils/division-grouping';
 
 type StatusFilter = 'active' | 'inactive' | 'all';
 type WsSortField  = 'workstream_name' | 'display_name_short' | 'home_division_name'
@@ -508,9 +512,12 @@ type PanelMode    = 'none' | 'view' | 'edit' | 'create';
               <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
                 Home Division *
               </label>
+              <!-- D-433 (Contract 24): Divisions grouped by parent Trust. -->
               <select formControlName="home_division_id" class="oi-input">
                 <option value="">— Select Division —</option>
-                <option *ngFor="let d of activeDivisions" [value]="d.id">{{ d.division_name }}</option>
+                <optgroup *ngFor="let g of groupedActiveDivisions" [label]="g.trust.division_name">
+                  <option *ngFor="let d of g.children" [value]="d.id">{{ d.division_name }}</option>
+                </optgroup>
               </select>
               <div *ngIf="editForm.get('home_division_id')?.invalid && editForm.get('home_division_id')?.touched"
                    style="color:var(--triarq-color-error);font-size:11px;margin-top:2px;">
@@ -612,9 +619,12 @@ type PanelMode    = 'none' | 'view' | 'edit' | 'create';
               <label style="display:block;font-size:var(--triarq-text-small);margin-bottom:4px;">
                 Home Division *
               </label>
+              <!-- D-433 (Contract 24): Divisions grouped by parent Trust. -->
               <select formControlName="home_division_id" class="oi-input">
                 <option value="">— Select Division —</option>
-                <option *ngFor="let d of activeDivisions" [value]="d.id">{{ d.division_name }}</option>
+                <optgroup *ngFor="let g of groupedActiveDivisions" [label]="g.trust.division_name">
+                  <option *ngFor="let d of g.children" [value]="d.id">{{ d.division_name }}</option>
+                </optgroup>
               </select>
               <div *ngIf="createForm.get('home_division_id')?.invalid && createForm.get('home_division_id')?.touched"
                    style="color:var(--triarq-color-error);font-size:11px;margin-top:2px;">
@@ -875,6 +885,13 @@ export class WorkstreamAdminComponent implements OnInit {
     // Existing rows referencing an inactive Division continue to display via
     // divisionName(id) which still searches the full list.
     return this.divisions.filter(d => d.active_status !== false);
+  }
+
+  /** D-433 (Contract 24): Divisions grouped by parent Trust for <optgroup>
+   *  rendering on the Home Division <select> controls. Excludes inactive
+   *  Divisions per S-032 — same scope as activeDivisions. */
+  get groupedActiveDivisions(): DivisionTrustGroup[] {
+    return groupDivisionsByTrust(this.activeDivisions);
   }
   get activeUsers(): User[] {
     return this.users.filter(u => u.is_active);

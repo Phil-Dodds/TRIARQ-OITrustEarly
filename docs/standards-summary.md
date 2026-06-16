@@ -1,5 +1,5 @@
 # Standards Summary — Pathways OI Trust
-docs/standards-summary.md | v1.9 | June 2026 | CONFIDENTIAL
+docs/standards-summary.md | v2.0 | June 2026 | CONFIDENTIAL
 
 Read this file at every session start. Active Standards carry the same force as
 Non-Negotiable Architectural Rules. A spec element that conflicts with an Active
@@ -735,3 +735,12 @@ are explicitly async. No other exceptions without a locked design decision.
 **Exceptions:** CodeClose sessions touching only schema, MCP tools, or infrastructure with no user-facing surface change are exempt — state "S-035: no user-facing surface changes this contract — About Entry exempt" in CodeClose output.
 
 **Non-conformance handling:** Missing About Entry block at CodeClose = violation. Code produces it before declaring CodeClose complete.
+
+### S-036 — Grid Column Sort Interaction Standard
+
+**Rule:** Column header is the exclusive sort control (no sort in filter panel). Sortable headers show ↕ on hover only. Click → ascending (↑, bold label). Click again → descending (↓). Click different column → ascending on new column, prior clears. Non-sortable: no hover icon, default cursor. Sortable vs non-sortable declared in each screen's governing decision. Sort state persists per D-171. Default sort per screen declared in screen's own decision.
+
+**Conformance test:** Sortable columns show ↕ hover and ↑/↓ active indicators? Sort control absent from filter panel? Sortable/non-sortable declared in screen's spec? All yes = pass.
+
+**Exceptions:** None.
+

@@ -597,9 +597,19 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;
                   position:sticky;top:0;z-index:3;margin-top:10px;">
         <span>Division</span>
-        <span>Initiative Name</span>
+        <span class="oi-sort-th"
+              [class.oi-sort-active]="sortField === 'cycle_title'"
+              (click)="setSort('cycle_title')">
+          Initiative Name {{ sortIcon('cycle_title') }}
+        </span>
         <span>Outcome</span>
-        <span>Stage</span>
+        <!-- D-434 (Contract 24): column header renamed STAGE → GATE.
+             D-435: column is sortable per S-036; click defaults descending. -->
+        <span class="oi-sort-th"
+              [class.oi-sort-active]="sortField === 'next_gate'"
+              (click)="setSort('next_gate')">
+          Gate {{ sortIcon('next_gate') }}
+        </span>
         <span>Headline</span>
         <span>Team</span>
       </div>
@@ -925,9 +935,19 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // Item 5: Drill-down visual confirmation — tracks which filters came from query params
   drillDownFromQp = false;  // set true when query params were present on init
 
-  // Sort state
-  sortField: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' = 'cycle_title';
+  // Sort state — D-435 (Contract 24) adds 'next_gate' as a sortable column.
+  sortField: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' | 'next_gate' = 'cycle_title';
   sortDir:   'asc' | 'desc' = 'asc';
+
+  // D-435 (Contract 24): canonical gate sequence used for next-gate sort order.
+  // Brief Review (1) → Go to Build (2) → Go to Deploy (3) → Go to Release (4) → Close Review (5).
+  private readonly GATE_SORT_ORDER: Record<GateName, number> = {
+    brief_review:  1,
+    go_to_build:   2,
+    go_to_deploy:  3,
+    go_to_release: 4,
+    close_review:  5
+  };
 
   // Expose constants to template
   readonly STAGE_LABEL_MAP = STAGE_LABEL_MAP;
@@ -1549,7 +1569,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       this.includeChildDivisions = filter['includeChildDivisions'];
     }
     if (typeof sort['sortField'] === 'string') {
-      this.sortField = sort['sortField'] as 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification';
+      const allowed = ['cycle_title', 'current_lifecycle_stage', 'tier_classification', 'next_gate'];
+      if (allowed.includes(sort['sortField'] as string)) {
+        this.sortField = sort['sortField'] as
+          'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' | 'next_gate';
+      }
     }
     if (typeof sort['sortDir'] === 'string') {
       this.sortDir = sort['sortDir'] as 'asc' | 'desc';
@@ -1630,6 +1654,26 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
     // Sort
     result = result.slice().sort((a, b) => {
+      // D-435 (Contract 24): next_gate uses int sort_order (1–5, null when all
+      // approved → sorts last in both directions) with sub-sort by target_date.
+      if (this.sortField === 'next_gate') {
+        const ao = this.nextGateSortOrder(a);
+        const bo = this.nextGateSortOrder(b);
+        const aNull = ao == null;
+        const bNull = bo == null;
+        if (aNull && bNull) { return 0; }
+        if (aNull)          { return 1; }
+        if (bNull)          { return -1; }
+        const primary = this.sortDir === 'asc' ? (ao! - bo!) : (bo! - ao!);
+        if (primary !== 0) { return primary; }
+        // Sub-sort: target_date ascending within the same gate; null target last.
+        const at = this.nextGateTargetDate(a);
+        const bt = this.nextGateTargetDate(b);
+        if (!at && !bt) { return 0; }
+        if (!at)        { return 1; }
+        if (!bt)        { return -1; }
+        return at.localeCompare(bt);
+      }
       let va = '', vb = '';
       switch (this.sortField) {
         case 'cycle_title':             va = a.cycle_title;             vb = b.cycle_title;             break;
@@ -1703,19 +1747,50 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  setSort(field: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification'): void {
+  setSort(field: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' | 'next_gate'): void {
     if (this.sortField === field) {
       this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
     } else {
       this.sortField = field;
-      this.sortDir   = 'asc';
+      // D-435 (Contract 24): Next Gate column defaults to descending on first
+      // click (Close Review first — furthest-along Initiatives at the top).
+      this.sortDir   = field === 'next_gate' ? 'desc' : 'asc';
     }
     this.applyFilters();
   }
 
-  sortIcon(field: string): string {
-    if (this.sortField !== field) { return '↕'; }
+  /** S-036: '↕' is rendered via .oi-sort-th CSS hover; '↑'/'↓' inline on active. */
+  sortIcon(field: string): '↑' | '↓' | '' {
+    if (this.sortField !== field) { return ''; }
     return this.sortDir === 'asc' ? '↑' : '↓';
+  }
+
+  /** D-435 next gate sort order. First gate_record (in canonical sequence) whose
+   *  status is not 'approved'. Returns null when every gate is approved → sorts
+   *  last in both directions per spec. */
+  private nextGateSortOrder(cycle: DeliveryCycle): number | null {
+    const records = cycle.gate_records ?? [];
+    let lowest: number | null = null;
+    for (const r of records) {
+      if (r.gate_status === 'approved') { continue; }
+      const order = this.GATE_SORT_ORDER[r.gate_name];
+      if (order == null) { continue; }
+      if (lowest == null || order < lowest) { lowest = order; }
+    }
+    // No gate records yet — treat as Brief Review (sort_order 1).
+    if (lowest == null && records.length === 0) { return 1; }
+    return lowest;
+  }
+
+  /** D-435 sub-sort key: target_date from the milestone matching the next gate. */
+  private nextGateTargetDate(cycle: DeliveryCycle): string | null {
+    const order = this.nextGateSortOrder(cycle);
+    if (order == null) { return null; }
+    const nextGateName = (Object.entries(this.GATE_SORT_ORDER)
+      .find(([, n]) => n === order)?.[0]) as GateName | undefined;
+    if (!nextGateName) { return null; }
+    const milestone = (cycle.milestone_dates ?? []).find(m => m.gate_name === nextGateName);
+    return milestone?.target_date ?? null;
   }
 
   sortLabel(): string {

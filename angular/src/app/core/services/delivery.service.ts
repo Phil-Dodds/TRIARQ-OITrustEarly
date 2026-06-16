@@ -25,7 +25,11 @@ import {
   PendingApprovalItem,
   EpoWipLimitRow,
   InitiativeActivityPage,
-  InitiativeActivityCount
+  InitiativeActivityCount,
+  ApprovedGateRow,
+  MyCompletedGatesResponse,
+  ArtifactTypeRow,
+  GateDecisionResult
 } from '../types/database';
 
 @Injectable({ providedIn: 'root' })
@@ -200,8 +204,10 @@ export class DeliveryService {
     gate_name:         GateName;
     decision:          'approved' | 'returned';
     approver_notes?:   string;
-  }): Observable<McpResponse<GateRecord>> {
-    return this.mcp.call<GateRecord>('delivery', 'record_gate_decision', params as Record<string, unknown>);
+  }): Observable<McpResponse<GateDecisionResult>> {
+    return this.mcp.call<GateDecisionResult>(
+      'delivery', 'record_gate_decision', params as Record<string, unknown>
+    );
   }
 
   /**
@@ -344,6 +350,62 @@ export class DeliveryService {
     return this.mcp.call<InitiativeActivityCount>(
       'delivery', 'list_initiative_activity',
       { ...params, count_only: true } as Record<string, unknown>
+    );
+  }
+
+  // ── Contract 24 — approved gate analytical views (D-430, D-431) ──────────
+
+  /** D-431 — Division-scoped approved gate feed. */
+  listApprovedGates(params: {
+    division_ids?:     string[];
+    gate_names?:       GateName[];
+    approver_user_id?: string;
+    days_back?:        number;
+  } = {}): Observable<McpResponse<ApprovedGateRow[]>> {
+    return this.mcp.call<ApprovedGateRow[]>(
+      'delivery', 'list_approved_gates', params as Record<string, unknown>
+    );
+  }
+
+  /** D-430 — Caller's recently-approved gates as DCS / EPO / DOL. */
+  listMyCompletedGates(params: {
+    limit?:     number;
+    days_back?: number;
+  } = {}): Observable<McpResponse<MyCompletedGatesResponse>> {
+    return this.mcp.call<MyCompletedGatesResponse>(
+      'delivery', 'list_my_completed_gates', params as Record<string, unknown>
+    );
+  }
+
+  // ── Contract 24 — Artifact Type management (D-437) ───────────────────────
+
+  listArtifactTypes(): Observable<McpResponse<ArtifactTypeRow[]>> {
+    return this.mcp.call<ArtifactTypeRow[]>('delivery', 'list_artifact_types', {});
+  }
+
+  createArtifactType(params: {
+    artifact_type_name: string;
+    lifecycle_stage:    string;
+    guidance_text:      string;
+    sort_order:         number;
+    required_at_gate?:  string | null;
+  }): Observable<McpResponse<ArtifactTypeRow>> {
+    return this.mcp.call<ArtifactTypeRow>(
+      'delivery', 'create_artifact_type', params as Record<string, unknown>
+    );
+  }
+
+  updateArtifactType(params: {
+    artifact_type_id:    string;
+    artifact_type_name?: string;
+    lifecycle_stage?:    string;
+    guidance_text?:      string;
+    sort_order?:         number;
+    required_at_gate?:   string | null;
+    active?:             boolean;
+  }): Observable<McpResponse<ArtifactTypeRow>> {
+    return this.mcp.call<ArtifactTypeRow>(
+      'delivery', 'update_artifact_type', params as Record<string, unknown>
     );
   }
 

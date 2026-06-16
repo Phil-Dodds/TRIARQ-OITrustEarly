@@ -510,3 +510,59 @@ export interface EpoWipWarning {
   epo_display_name: string;
   message:          string;
 }
+
+/** Full record_gate_decision MCP response shape (Contract 24 alignment).
+ *  Approval returns stage_advanced=true, wip_warning when at/over EPO limit
+ *  on a zone-trigger gate, and suggestion_warnings listing artifact gaps. */
+export interface GateDecisionResult {
+  gate_record:         GateRecord;
+  stage_advanced:      boolean;
+  new_stage:           LifecycleStage | null;
+  wip_warning:         EpoWipWarning | null;
+  suggestion_warnings: string[];
+}
+
+// ── Contract 24 — approved gate feeds (D-430, D-431) ──────────────────────────
+
+/** Single row in the Recently Approved Gates feed (D-431). */
+export interface ApprovedGateRow {
+  gate_record_id:        string;
+  gate_name:             GateName;
+  gate_name_display:     string;
+  initiative_name:       string;
+  delivery_cycle_id:     string;
+  division_id:           string;
+  division_short_name:   string;
+  approver_user_id:      string | null;
+  approver_display_name: string;
+  approver_decision_at:  string;
+}
+
+/** Single row in the My Completed Gates home card feed (D-430). */
+export interface MyCompletedGateRow {
+  gate_name:            GateName;
+  gate_name_display:    string;
+  initiative_name:      string;
+  delivery_cycle_id:    string;
+  division_short_name:  string;
+  approver_decision_at: string;
+}
+
+export interface MyCompletedGatesResponse {
+  items:       MyCompletedGateRow[];
+  total_count: number;
+}
+
+// Contract 24 (D-437) — Artifact Type admin row shape.
+// Backed by cycle_artifact_types table + Migration 039 active_status column.
+export interface ArtifactTypeRow {
+  artifact_type_id:    string;
+  artifact_type_name:  string;
+  lifecycle_stage:     LifecycleStage | 'ANY';
+  required_at_gate:    GateName | 'all' | null;
+  guidance_text:       string;
+  sort_order:          number;
+  active_status:       boolean;
+  created_at:          string;
+  updated_at:          string;
+}

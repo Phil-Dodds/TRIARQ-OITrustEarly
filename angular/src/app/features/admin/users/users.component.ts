@@ -63,8 +63,22 @@ import {
   ROLE_FLAG_DISPLAY_NAMES,
   RoleFlag
 } from '../../../core/constants/roles';
+import {
+  SortState,
+  applySortToggle,
+  sortIndicator,
+  compareString,
+  compareDate
+} from '../../../core/utils/sort-state';
 
 type ActiveRoleFlag = RoleFlag;
+
+/** S-036 / D-432 sortable columns on the User Management grid (Contract 24). */
+type UserSortColumn = 'display_name' | 'last_login_at' | 'created_at' | 'invite_status';
+const DEFAULT_USER_SORT: SortState<UserSortColumn> = {
+  column:    'last_login_at',
+  direction: 'desc'
+};
 
 type PanelMode = 'view' | 'edit' | 'create' | null;
 type ActiveFilter = 'all' | 'active' | 'inactive';
@@ -134,7 +148,7 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
     /* Grid container — Initiative grid look. Header is sticky Deep Navy uppercase. */
     .um-grid{border:1px solid var(--triarq-color-border);border-radius:6px;background:#fff;overflow:hidden}
     /* D-422: 6 columns — Name | Email | Role | Active | Last Login | Invite. */
-    .um-row{display:grid;grid-template-columns:2fr 2fr 1.4fr .9fr 1.1fr 1.1fr;gap:var(--triarq-space-sm);padding:6px var(--triarq-space-md);border-bottom:1px solid #E8E8E8;align-items:center;font-size:13px;border-left:3px solid transparent}
+    .um-row{display:grid;grid-template-columns:2fr 1.8fr 1.4fr .9fr 1.1fr 1fr 1.1fr;gap:var(--triarq-space-sm);padding:6px var(--triarq-space-md);border-bottom:1px solid #E8E8E8;align-items:center;font-size:13px;border-left:3px solid transparent}
     /* Header row — matches Initiative grid: Deep Navy bg, white uppercase, sticky. */
     .um-header-row{font-weight:500;color:#fff;background:#12274A;text-transform:uppercase;letter-spacing:0.3px;font-size:13px;padding:8px var(--triarq-space-md);position:sticky;top:0;z-index:3;border-left:none;border-bottom:none}
     .um-data:hover{background:#F0F4F8;cursor:pointer}
@@ -207,7 +221,8 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
       <div class="um-grid" *ngIf="loading">
         <div class="um-row um-header-row">
           <span>User Name</span><span>Email</span><span>Roles</span>
-          <span>Active Status</span><span>Last Login</span><span>Invite Status</span>
+          <span>Active Status</span><span>Last Login</span>
+          <span>Created</span><span>Invite Status</span>
         </div>
         <div class="um-row" *ngFor="let _ of skeletonRows">
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
@@ -216,23 +231,36 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
           <ion-skeleton-text animated style="height:18px;border-radius:999px;width:50px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
         </div>
       </div>
 
-      <!-- Grid (D-196: header always rendered) ──────────────────────────── -->
+      <!-- Grid (D-196 header always rendered; S-036 sortable headers Contract 24) ─ -->
       <div class="um-grid" *ngIf="!loading && users.length > 0">
         <div class="um-row um-header-row">
-          <span>User Name</span>
+          <span class="oi-sort-th"
+                [class.oi-sort-active]="isSorted('display_name')"
+                (click)="onSortColumn('display_name')">
+            User Name {{ sortGlyph('display_name') }}
+          </span>
           <span>Email</span>
           <span>Roles</span>
           <span>Active Status</span>
-          <!-- D-422: Last Login is sortable. Tap header toggles sort on/off; on = desc. -->
-          <span (click)="toggleLastLoginSort()"
-                style="cursor:pointer;user-select:none;"
-                [title]="sortByLastLogin ? 'Sorted by Last Login (most recent first). Tap to clear.' : 'Tap to sort by Last Login (most recent first).'">
-            Last Login{{ sortByLastLogin ? ' ▼' : '' }}
+          <span class="oi-sort-th"
+                [class.oi-sort-active]="isSorted('last_login_at')"
+                (click)="onSortColumn('last_login_at')">
+            Last Login {{ sortGlyph('last_login_at') }}
           </span>
-          <span>Invite Status</span>
+          <span class="oi-sort-th"
+                [class.oi-sort-active]="isSorted('created_at')"
+                (click)="onSortColumn('created_at')">
+            Created {{ sortGlyph('created_at') }}
+          </span>
+          <span class="oi-sort-th"
+                [class.oi-sort-active]="isSorted('invite_status')"
+                (click)="onSortColumn('invite_status')">
+            Invite Status {{ sortGlyph('invite_status') }}
+          </span>
         </div>
 
         <div
@@ -289,6 +317,10 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                   style="color:#5A5A5A;font-style:italic;">
               Never logged in
             </span>
+          </span>
+          <!-- Contract 24 / S-036: Created column added for sort surface. -->
+          <span [title]="user.created_at" style="color:#5A5A5A;">
+            {{ relativeFromNow(user.created_at) }}
           </span>
           <span>
             <span class="um-pill"
@@ -731,9 +763,10 @@ export class UsersComponent implements OnInit {
   treePickerOpen      = false;   // D-417 hierarchical tree picker modal
   treePickerBusy      = false;   // batch MCP diff in flight
 
-  // D-422 — Last Login sort. Off = alphabetical by display_name (server default).
-  // Tap column header → on, sorts by last_login_at desc with nulls last.
-  sortByLastLogin     = false;
+  // S-036 / D-432 (Contract 24) — multi-column sort state. Replaces the
+  // single-column toggle introduced in D-422. Sortable columns: display_name,
+  // last_login_at, created_at, invite_status. Default: last_login_at desc.
+  sortState: SortState<UserSortColumn> = { ...DEFAULT_USER_SORT };
 
   // D-429 / Contract 23 Item 6.2 — Initiative Activity zone in User View panel.
   // Visible only to Admin viewers. Lazily loads last 10 events for selectedUser.
@@ -841,12 +874,28 @@ export class UsersComponent implements OnInit {
         activeStatus: status
       };
       this.pendingFilters = { ...this.filters, roleFlags: [...roles] };
-      this.cdr.markForCheck();
     }
+    // S-036 (Contract 24) — restore multi-column sort. Fall back to default
+    // when persisted shape doesn't match the current enum.
+    const s = saved.sort_state as Partial<SortState<UserSortColumn>> | null;
+    if (s && typeof s === 'object') {
+      const validColumn = (c: unknown): c is UserSortColumn =>
+        c === 'display_name' || c === 'last_login_at'
+        || c === 'created_at' || c === 'invite_status';
+      const validDir = (d: unknown): d is 'asc' | 'desc' => d === 'asc' || d === 'desc';
+      if (validColumn(s.column) && validDir(s.direction)) {
+        this.sortState = { column: s.column, direction: s.direction };
+      }
+    }
+    this.cdr.markForCheck();
   }
 
   private saveScreenState(): void {
-    this.screenState.save(SCREEN_KEYS.ADMIN_USERS, this.filters as unknown as Record<string, unknown>, {});
+    this.screenState.save(
+      SCREEN_KEYS.ADMIN_USERS,
+      this.filters   as unknown as Record<string, unknown>,
+      this.sortState as unknown as Record<string, unknown>
+    );
   }
 
   // ── Data loading ───────────────────────────────────────────────────────────
@@ -934,24 +983,54 @@ export class UsersComponent implements OnInit {
     }
   }
 
-  // ── Filtering ──────────────────────────────────────────────────────────────
+  // ── Filtering + sorting ─────────────────────────────────────────────────────
   get filteredUsers(): User[] {
     const list = this.users.filter(u => this.matches(u));
-    if (!this.sortByLastLogin) { return list; }
-    // D-422: descending by last_login_at, nulls last (never-logged-in users go to bottom).
+    const { column, direction } = this.sortState;
+    const tieBreak = (a: User, b: User) =>
+      (a.display_name || '').localeCompare(b.display_name || '');
+
     return [...list].sort((a, b) => {
-      const av = a.last_login_at ?? null;
-      const bv = b.last_login_at ?? null;
-      if (av && bv) { return bv.localeCompare(av); }
-      if (av) { return -1; }
-      if (bv) { return 1; }
-      return (a.display_name || '').localeCompare(b.display_name || '');
+      let primary = 0;
+      switch (column) {
+        case 'display_name':
+          primary = compareString(a.display_name, b.display_name, direction);
+          break;
+        case 'last_login_at':
+          primary = compareDate(a.last_login_at ?? null, b.last_login_at ?? null, direction);
+          break;
+        case 'created_at':
+          primary = compareDate(a.created_at, b.created_at, direction);
+          break;
+        case 'invite_status':
+          primary = compareString(
+            this.inviteStatusFor(a.id),
+            this.inviteStatusFor(b.id),
+            direction
+          );
+          break;
+      }
+      return primary !== 0 ? primary : tieBreak(a, b);
     });
   }
 
-  toggleLastLoginSort(): void {
-    this.sortByLastLogin = !this.sortByLastLogin;
+  /** S-036 click handler — exclusive sort column with asc/desc toggle. */
+  onSortColumn(column: UserSortColumn): void {
+    // D-435-style per-column default direction: Last Login defaults desc.
+    const firstClickDir = column === 'last_login_at' ? 'desc' : 'asc';
+    this.sortState = applySortToggle(this.sortState, column, firstClickDir);
+    this.saveScreenState();
     this.cdr.markForCheck();
+  }
+
+  /** Template helper: '↑' / '↓' / '' for the given column. */
+  sortGlyph(column: UserSortColumn): '↑' | '↓' | '' {
+    return sortIndicator(this.sortState, column);
+  }
+
+  /** Template helper: true when the column is the active sort. */
+  isSorted(column: UserSortColumn): boolean {
+    return this.sortState.column === column;
   }
 
   /** D-422 relative time formatter — coarse buckets, no external lib. */

@@ -44,12 +44,17 @@ import { filter, take }  from 'rxjs/operators';
 import { DeliveryService }           from '../../../core/services/delivery.service';
 import { UserProfileService }        from '../../../core/services/user-profile.service';
 import { McpService }                from '../../../core/services/mcp.service';
-import { WorkstreamPickerComponent } from '../../../shared/pickers/workstream-picker/workstream-picker.component';
-import { UserPickerComponent }       from '../../../shared/pickers/user-picker/user-picker.component';
+import { WorkstreamPickerComponent }         from '../../../shared/pickers/workstream-picker/workstream-picker.component';
+import { UserPickerComponent }               from '../../../shared/pickers/user-picker/user-picker.component';
+import { DivisionAssignmentPickerComponent } from '../../../shared/pickers/division-assignment-picker/division-assignment-picker.component';
 import {
   DeliveryCycle, DeliveryWorkstream, Division, User,
   TierClassification, McpResponse
 } from '../../../core/types/database';
+import {
+  DivisionTrustGroup,
+  groupDivisionsByTrust
+} from '../../../core/utils/division-grouping';
 
 // Utility helpers (mirrored from create-panel to keep component standalone)
 const AVATAR_COLORS_EP = [
@@ -71,7 +76,7 @@ function epAvatarColorFromName(name: string): string {
   selector: 'app-delivery-cycle-edit-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, IonicModule, WorkstreamPickerComponent, UserPickerComponent],
+  imports: [CommonModule, ReactiveFormsModule, IonicModule, WorkstreamPickerComponent, UserPickerComponent, DivisionAssignmentPickerComponent],
   template: `
     <!-- S-006: Edit surface — pushes onto navigation stack, View remains below.
          Positioned as an absolute overlay within the detail panel container. -->
@@ -111,14 +116,31 @@ function epAvatarColorFromName(name: string): string {
                  In Edit the cycle already has a Division; required indicator is misleading. Source: D-165, Contract 9. -->
             <div class="ep-field">
               <label class="ep-label">Division</label>
-              <select formControlName="division_id" class="ep-input"
-                      (change)="onDivisionChange()">
-                <option value="">— Select Division —</option>
-                <!-- S-032: pickers exclude inactive Divisions from new selections. -->
-                <option *ngFor="let d of selectableAvailableDivisions" [value]="d.id">
-                  {{ d.division_name }}
-                </option>
-              </select>
+              <!-- D-436 (Contract 24): Division Assignment Picker replaces the
+                   native <select>. My Divisions short list + Show all expansion
+                   (non-Admin); Recently Used + full list (Admin). D-433 Trust
+                   grouping applied to the expanded list. -->
+              <button type="button"
+                      class="ep-input"
+                      style="text-align:left;cursor:pointer;background:#fff;"
+                      (click)="openDivisionPicker()">
+                <span *ngIf="form.get('division_id')?.value">
+                  {{ divisionDisplayName(form.get('division_id')?.value) }}
+                </span>
+                <span *ngIf="!form.get('division_id')?.value"
+                      style="color:#9E9E9E;">
+                  — Select Division —
+                </span>
+              </button>
+              <app-division-assignment-picker
+                *ngIf="divisionPickerOpen"
+                [currentDivisionId]="form.get('division_id')?.value || null"
+                [isAdmin]="viewerIsAdmin"
+                [myDivisions]="selectableAvailableDivisions"
+                [allDivisions]="selectableAvailableDivisions"
+                (selected)="onDivisionPicked($event)"
+                (cancelled)="divisionPickerOpen = false">
+              </app-division-assignment-picker>
               <!-- B-38: S-025 Pattern 1 guidance text. Source: Contract 10 §3 B-38. -->
               <div class="ep-hint">The Division that owns this Initiative.</div>
               <div *ngIf="f['division_id'].invalid && f['division_id'].touched"
@@ -496,6 +518,17 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     return this.availableDivisions.filter(d => d.active_status !== false);
   }
 
+  /** D-433 (Contract 24): selectable Divisions grouped by parent Trust for
+   *  <optgroup> rendering on the Division <select>. */
+  get groupedSelectableDivisions(): DivisionTrustGroup[] {
+    return groupDivisionsByTrust(this.selectableAvailableDivisions);
+  }
+
+  // D-436 (Contract 24): Division Assignment Picker state. Caller's admin
+  // flag is resolved once at picker open from UserProfileService.
+  divisionPickerOpen = false;
+  viewerIsAdmin      = false;
+
   // Workstream picker state.
   showWorkstreamPicker                    = false;
   selectedWorkstream: DeliveryWorkstream | null = null;
@@ -556,6 +589,9 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   ) {}
 
   ngOnInit(): void {
+    // D-436 — admin flag for the Division picker scoping path.
+    this.viewerIsAdmin = this.profile.getCurrentProfile()?.is_admin === true;
+
     // Initialise form with current cycle values.
     // B-24 fix: Division and Tier no longer required in the form since they're already set.
     // Required validators kept so Save doesn't succeed if they're accidentally cleared,
@@ -718,6 +754,27 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       currentTier !== '' &&
       currentTier !== this.originalTier;
     this.cdr.markForCheck();
+  }
+
+  // ── Division Assignment Picker (D-436, Contract 24) ──────────────────────────
+  openDivisionPicker(): void {
+    this.divisionPickerOpen = true;
+    this.cdr.markForCheck();
+  }
+
+  onDivisionPicked(divisionId: string): void {
+    this.divisionPickerOpen = false;
+    this.form.get('division_id')?.setValue(divisionId);
+    this.form.get('division_id')?.markAsTouched();
+    this.onDivisionChange();
+  }
+
+  /** Display name for the current Division id — falls back to id if not found
+   *  (e.g. the cycle's saved Division is now inactive). */
+  divisionDisplayName(divisionId: string | null | undefined): string {
+    if (!divisionId) { return ''; }
+    const d = this.availableDivisions.find(x => x.id === divisionId);
+    return d?.division_name ?? '';
   }
 
   // ── Workstream picker ─────────────────────────────────────────────────────────
