@@ -1,11 +1,11 @@
 // update_artifact_type.js
 // Pathways OI Trust — delivery-cycle-mcp
-// Update an artifact type (D-437, Contract 24). Admin only.
+// Update an artifact type (D-437 origin, D-438 Contract 25 schema). Admin only.
 //
 // Params:
-//   artifact_type_id:    required string
+//   artifact_type_id:   required string
 //   Any of: artifact_type_name, lifecycle_stage, guidance_text, sort_order,
-//           required_at_gate, active
+//           primary_gate, gate_warning_behavior, active
 //
 // Deactivation (active:false) is blocked when cycle_artifacts rows reference
 // this artifact type. Caller receives a structured block message.
@@ -17,8 +17,11 @@ const { supabase } = require('../db');
 const VALID_STAGES = new Set([
   'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','ANY'
 ]);
-const VALID_GATES = new Set([
-  'brief_review','go_to_build','go_to_deploy','go_to_release','close_review','all'
+const VALID_PRIMARY_GATES = new Set([
+  'brief_review','go_to_build','go_to_deploy','go_to_release','close_review'
+]);
+const VALID_WARNING_BEHAVIORS = new Set([
+  'none','primary_only','primary_and_subsequent'
 ]);
 
 async function update_artifact_type(params, caller_user_id) {
@@ -57,12 +60,19 @@ async function update_artifact_type(params, caller_user_id) {
   if (Number.isFinite(params.sort_order)) {
     updates.sort_order = Math.floor(params.sort_order);
   }
-  if (Object.prototype.hasOwnProperty.call(params, 'required_at_gate')) {
-    const r = params.required_at_gate;
-    if (r !== null && !VALID_GATES.has(r)) {
-      return { success: false, error: 'required_at_gate is invalid.' };
+  if (Object.prototype.hasOwnProperty.call(params, 'primary_gate')) {
+    const p = params.primary_gate;
+    if (p !== null && !VALID_PRIMARY_GATES.has(p)) {
+      return { success: false, error: 'primary_gate is invalid.' };
     }
-    updates.required_at_gate = r;
+    updates.primary_gate = p;
+  }
+  if (Object.prototype.hasOwnProperty.call(params, 'gate_warning_behavior')) {
+    const w = params.gate_warning_behavior;
+    if (!VALID_WARNING_BEHAVIORS.has(w)) {
+      return { success: false, error: 'gate_warning_behavior is invalid.' };
+    }
+    updates.gate_warning_behavior = w;
   }
   if (Object.prototype.hasOwnProperty.call(params, 'active')) {
     const next = params.active === true || params.active === false ? params.active : null;

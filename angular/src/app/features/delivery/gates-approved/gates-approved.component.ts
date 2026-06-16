@@ -1,5 +1,5 @@
 // gates-approved.component.ts — Pathways OI Trust
-// Recently Approved Gates view (D-431 / hub card 9 / Contract 24).
+// Recently Approved Gates view (D-431 / hub card 9 / Contract 24; D-440 Contract 25).
 // Route: /initiatives/gates-approved
 //
 // Read-only feed of gates approved in the last 4 weeks. Division-scoped via
@@ -11,12 +11,17 @@
 // Pagination: 50 rows + "Load more" button. No date range filter (fixed
 // 28-day window). No + New Initiative button (explicit D-431 exception).
 //
+// D-440 (Contract 25): Initiative chips on this surface open the D-180
+// right panel (this surface has a right-panel slot per D-440) rather than
+// routing full-page. Reuses the canonical app-delivery-cycle-detail panel
+// per S-007.
+//
 // Filter persistence per D-171 screen key `initiatives.gates-approved`.
 //
-// V1 scope:
+// Scope:
 //   - Server fetch with optional ?personFilter query param pre-set
 //   - S-036 sort interaction on all five columns
-//   - Initiative chip → /initiatives/:cycle_id (S-018 spirit)
+//   - Initiative chip → right panel (D-180, D-440)
 //   - "Showing N of M" footer + Load more
 //
 // Deferred to follow-on contract (recorded as CC-decisions in CodeClose):
@@ -24,7 +29,7 @@
 //     Approved-by filters and active chips bar.
 //   - Filter state persistence beyond the query-param pre-set.
 //
-// Source: D-431, D-180, D-181, D-346, S-021, S-036, OITrust-Contract24-Spec.
+// Source: D-431, D-180, D-181, D-346, D-440, S-007, S-021, S-036.
 
 import {
   Component,
@@ -36,6 +41,7 @@ import { CommonModule }                from '@angular/common';
 import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { IonicModule }                 from '@ionic/angular';
 
+import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 import { DeliveryService }   from '../../../core/services/delivery.service';
 import {
   ScreenStateService,
@@ -68,9 +74,10 @@ const PAGE_SIZE = 50;
   selector:        'app-gates-approved',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, RouterModule, IonicModule],
+  imports:         [CommonModule, RouterModule, IonicModule, DeliveryCycleDetailComponent],
   template: `
-    <div class="ga-shell">
+    <div class="ga-flex">
+    <div class="ga-shell" [class.ga-shell-with-panel]="!!selectedCycleId">
 
       <div class="ga-header">
         <h3 class="ga-title">Recently Approved Gates</h3>
@@ -125,13 +132,15 @@ const PAGE_SIZE = 50;
           No gates approved in the last 28 days.
         </div>
 
-        <div class="ga-row ga-data" *ngFor="let row of pageRows">
+        <div class="ga-row ga-data" *ngFor="let row of pageRows"
+             [class.ga-row-selected]="selectedCycleId === row.delivery_cycle_id">
           <span class="ga-cell">{{ row.gate_name_display }}</span>
-          <a class="ga-chip"
-             [routerLink]="['/initiatives', row.delivery_cycle_id]"
-             [title]="row.initiative_name">
+          <button class="ga-chip"
+                  type="button"
+                  (click)="openInitiative(row.delivery_cycle_id)"
+                  [title]="row.initiative_name">
             {{ row.initiative_name }}
-          </a>
+          </button>
           <span class="ga-cell ga-muted">{{ row.division_short_name }}</span>
           <span class="ga-cell ga-muted">{{ row.approver_display_name }}</span>
           <span class="ga-cell">{{ formatDate(row.approver_decision_at) }}</span>
@@ -150,9 +159,31 @@ const PAGE_SIZE = 50;
         </button>
       </div>
     </div>
+
+    <!-- D-180 / D-440: right-panel slot. Reuses canonical Initiative View
+         (S-007). Read-only View — no scrim, list stays interactive (S-017). -->
+    <div class="ga-panel" *ngIf="selectedCycleId">
+      <app-delivery-cycle-detail
+        [cycleId]="selectedCycleId"
+        (close)="closePanel()">
+      </app-delivery-cycle-detail>
+    </div>
+
+    </div>
   `,
   styles: [`
-    .ga-shell { padding: var(--triarq-space-md); }
+    .ga-flex { display: flex; align-items: stretch; min-height: calc(100vh - 64px); }
+    .ga-shell { flex: 1 1 auto; padding: var(--triarq-space-md); min-width: 0; }
+    .ga-shell-with-panel { flex: 0 0 40%; }
+    .ga-panel {
+      flex: 0 0 60%;
+      border-left: 1px solid var(--triarq-color-border);
+      background: #fff;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
     .ga-header { margin-bottom: var(--triarq-space-md); }
     .ga-title  { margin: 0; font-size: 18px; font-weight: 600; color: #1E1E1E; }
     .ga-subtitle {
@@ -183,16 +214,19 @@ const PAGE_SIZE = 50;
       padding: var(--triarq-space-xl); text-align: center;
       color: #5A5A5A; font-size: 13px;
     }
-    /* S-021 entity chip — pill, muted bg, no underline */
+    /* S-021 entity chip — pill, muted bg, no underline. D-440: button now,
+       opens right panel rather than routing full-page. */
     .ga-chip {
       display: inline-flex; align-items: center;
-      padding: 2px 10px; border-radius: 999px;
+      padding: 2px 10px; border: 0; border-radius: 999px;
       background: rgba(120, 130, 140, 0.10);
       color: var(--triarq-color-primary, #257099);
       text-decoration: none; font-size: 12px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer;
     }
     .ga-chip:hover { background: rgba(120, 130, 140, 0.20); }
+    .ga-row-selected { background: #E8F0FE; }
 
     .ga-footer {
       display: flex; justify-content: space-between; align-items: center;
@@ -217,6 +251,10 @@ export class GatesApprovedComponent implements OnInit {
   /** Number of rows currently rendered — grows by PAGE_SIZE on Load more. */
   visibleCount         = PAGE_SIZE;
   personFilterUserId: string | null = null;
+
+  /** D-440: id of the Initiative currently open in the right panel.
+   *  Null when no panel is open. List stays interactive (no scrim) — S-017. */
+  selectedCycleId: string | null = null;
 
   sortState: SortState<GaSortColumn> = { ...DEFAULT_GA_SORT };
 
@@ -275,6 +313,19 @@ export class GatesApprovedComponent implements OnInit {
 
   glyph(column: GaSortColumn): '↑' | '↓' | '' {
     return sortIndicator(this.sortState, column);
+  }
+
+  /** D-440: open the Initiative detail in the right panel. One slot — opening
+   *  a second Initiative replaces the first. S-018: list stays interactive. */
+  openInitiative(cycleId: string): void {
+    this.selectedCycleId = cycleId;
+    this.cdr.markForCheck();
+  }
+
+  /** S-008: child panel pop triggers a list re-query. */
+  closePanel(): void {
+    this.selectedCycleId = null;
+    this.load();
   }
 
   loadMore(): void {

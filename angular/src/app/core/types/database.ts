@@ -344,14 +344,19 @@ export interface InitiativeActivityCount {
   total_count: number;
 }
 
+// D-438 (Contract 25): required_at_gate replaced by primary_gate +
+// gate_warning_behavior. Migration 040 drops the required_at_gate column.
+export type GateWarningBehavior = 'none' | 'primary_only' | 'primary_and_subsequent';
+
 export interface CycleArtifactType {
-  artifact_type_id:   string;
-  artifact_type_name: string;
-  lifecycle_stage:    string;
-  guidance_text:      string;
-  sort_order:         number;
-  gate_required:      boolean;
-  required_at_gate:   GateName | null;
+  artifact_type_id:      string;
+  artifact_type_name:    string;
+  lifecycle_stage:       string;
+  guidance_text:         string;
+  sort_order:            number;
+  gate_required:         boolean;
+  primary_gate:          GateName | null;
+  gate_warning_behavior: GateWarningBehavior;
 }
 
 export interface CycleArtifact {
@@ -553,16 +558,18 @@ export interface MyCompletedGatesResponse {
   total_count: number;
 }
 
-// Contract 24 (D-437) — Artifact Type admin row shape.
-// Backed by cycle_artifact_types table + Migration 039 active_status column.
+// Contract 24 (D-437) origin; Contract 25 (D-438) supersedes the
+// required_at_gate column with primary_gate + gate_warning_behavior.
+// Backed by cycle_artifact_types table + Migration 040.
 export interface ArtifactTypeRow {
-  artifact_type_id:    string;
-  artifact_type_name:  string;
-  lifecycle_stage:     LifecycleStage | 'ANY';
-  required_at_gate:    GateName | 'all' | null;
-  guidance_text:       string;
-  sort_order:          number;
-  active_status:       boolean;
-  created_at:          string;
-  updated_at:          string;
+  artifact_type_id:       string;
+  artifact_type_name:     string;
+  lifecycle_stage:        LifecycleStage | 'ANY';
+  primary_gate:           GateName | null;
+  gate_warning_behavior:  GateWarningBehavior;
+  guidance_text:          string;
+  sort_order:             number;
+  active_status:          boolean;
+  created_at:             string;
+  updated_at:             string;
 }

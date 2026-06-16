@@ -43,6 +43,8 @@ export const SCREEN_KEYS = {
   INITIATIVES_EPO_DEPLOY:   'initiatives.epo-deploy',
   // Contract 24 (D-431): Recently Approved Gates view.
   INITIATIVES_GATES_APPROVED: 'initiatives.gates-approved',
+  // Contract 25 (D-439): Initiative Activity feed filter panel state.
+  INITIATIVES_ACTIVITY:       'initiatives.activity',
   // Contract 24 (D-437): Artifact Type management admin screen.
   ADMIN_ARTIFACT_TYPES:     'admin.artifact-types',
   // Contract 24 (D-436): Division assignment picker history — shared across

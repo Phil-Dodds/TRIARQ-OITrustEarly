@@ -37,6 +37,7 @@ const {
   WIP_LIMIT_POST_DEPLOY,
   nextStage
 } = require('../lifecycle');
+const { computeArtifactSuggestionWarnings } = require('./helpers/artifact-warnings');
 
 // D-400: gates whose approval transitions a cycle INTO a counted WIP zone.
 // brief_review transitions BRIEF → DESIGN (pre_build), but Contract 20 spec §2.3
@@ -293,12 +294,15 @@ async function record_gate_decision(params, caller_user_id) {
     });
   }
 
-  // ── D-437 (Contract 24): artifact suggestion warnings on approval ─────────
-  // Same computation as submit_gate_for_approval — surfaced for symmetry so
-  // approval audit captures the gap state. Non-blocking; UI renders Pattern 2.
-  const suggestion_warnings = decision === 'approve'
-    ? await computeArtifactSuggestionWarnings(delivery_cycle_id, gate_name)
-    : [];
+  // ── D-438 (Contract 25): artifact suggestion warnings on approval ─────────
+  // Shared computation lives in helpers/artifact-warnings (CC-24-07 follow-up).
+  // Wire shape is artifact_type_name[] — preserves the Angular gate-record
+  // modal contract. Approval status is unchanged regardless.
+  let suggestion_warnings = [];
+  if (decision === 'approve') {
+    const warningEntries = await computeArtifactSuggestionWarnings(delivery_cycle_id, gate_name);
+    suggestion_warnings = warningEntries.map(w => w.artifact_type_name);
+  }
 
   return {
     success: true,
@@ -310,33 +314,6 @@ async function record_gate_decision(params, caller_user_id) {
       suggestion_warnings     // [] when no gaps; ['Artifact Type Name', ...] otherwise
     }
   };
-}
-
-/**
- * D-437: list of artifact type names expected for this gate but not yet
- * attached to the Initiative. Mirrors submit_gate_for_approval's helper.
- */
-async function computeArtifactSuggestionWarnings(delivery_cycle_id, gate_name) {
-  const { data: types } = await supabase
-    .from('cycle_artifact_types')
-    .select('artifact_type_id, artifact_type_name, required_at_gate, active_status')
-    .or(`required_at_gate.eq.${gate_name},required_at_gate.eq.all`)
-    .eq('active_status', true);
-  const candidates = (types || []).filter(t => t.active_status !== false);
-  if (candidates.length === 0) { return []; }
-
-  const candidateIds = candidates.map(t => t.artifact_type_id);
-  const { data: attached } = await supabase
-    .from('cycle_artifacts')
-    .select('artifact_type_id')
-    .eq('delivery_cycle_id', delivery_cycle_id)
-    .in('artifact_type_id', candidateIds)
-    .is('deleted_at', null);
-  const attachedIds = new Set((attached || []).map(a => a.artifact_type_id));
-
-  return candidates
-    .filter(t => !attachedIds.has(t.artifact_type_id))
-    .map(t => t.artifact_type_name);
 }
 
 /**

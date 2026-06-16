@@ -22,6 +22,7 @@
 'use strict';
 
 const { supabase } = require('../db');
+const { computeArtifactSuggestionWarnings } = require('./helpers/artifact-warnings');
 
 // Gate-name display strings — used in event_description and surfaced to UI text.
 // Source: gate-submission-flow-spec-2026-04-19 §3.1.
@@ -278,43 +279,18 @@ async function submit_gate_for_approval(params, caller_user_id) {
       event_metadata:    { gate_name }
     });
 
-  // ── D-437 (Contract 24): non-blocking artifact suggestion warnings ─────────
-  // Compute artifact gaps AFTER submission succeeds. Returns an array of
-  // missing artifact type names — the Angular submit modal renders them as a
-  // D-200 Pattern 2 amber warning. Submission status is unchanged regardless.
-  const suggestion_warnings = await computeArtifactSuggestionWarnings(
+  // ── D-438 (Contract 25): non-blocking artifact suggestion warnings ────────
+  // Compute artifact gaps AFTER submission succeeds, using the shared
+  // primary_gate / gate_warning_behavior rule from helpers/artifact-warnings.
+  // Wire shape is artifact_type_name[] to preserve the Angular contract; the
+  // helper returns {artifact_type_id, artifact_type_name} objects, which we
+  // flatten here. Submission status is unchanged regardless.
+  const warningEntries = await computeArtifactSuggestionWarnings(
     delivery_cycle_id, gate_name
   );
+  const suggestion_warnings = warningEntries.map(w => w.artifact_type_name);
 
   return { success: true, data: updated_gate, suggestion_warnings };
-}
-
-/**
- * D-437: list of artifact type names expected for this gate but not yet
- * attached to the Initiative. Includes both gate-specific suggestions and
- * required_at_gate='all' types. Non-blocking — purely informational.
- */
-async function computeArtifactSuggestionWarnings(delivery_cycle_id, gate_name) {
-  const { data: types } = await supabase
-    .from('cycle_artifact_types')
-    .select('artifact_type_id, artifact_type_name, required_at_gate, active_status')
-    .or(`required_at_gate.eq.${gate_name},required_at_gate.eq.all`)
-    .eq('active_status', true);
-  const candidates = (types || []).filter(t => t.active_status !== false);
-  if (candidates.length === 0) { return []; }
-
-  const candidateIds = candidates.map(t => t.artifact_type_id);
-  const { data: attached } = await supabase
-    .from('cycle_artifacts')
-    .select('artifact_type_id')
-    .eq('delivery_cycle_id', delivery_cycle_id)
-    .in('artifact_type_id', candidateIds)
-    .is('deleted_at', null);
-  const attachedIds = new Set((attached || []).map(a => a.artifact_type_id));
-
-  return candidates
-    .filter(t => !attachedIds.has(t.artifact_type_id))
-    .map(t => t.artifact_type_name);
 }
 
 module.exports = { submit_gate_for_approval };

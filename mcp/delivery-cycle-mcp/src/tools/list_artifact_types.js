@@ -1,7 +1,10 @@
 // list_artifact_types.js
 // Pathways OI Trust — delivery-cycle-mcp
 // Lists all artifact types, including inactive ones, for the Artifact Type
-// admin screen (D-437, Contract 24).
+// admin screen (D-437 origin, D-438 Contract 25 schema).
+//
+// D-438 (Contract 25): exposes primary_gate + gate_warning_behavior; the
+// prior required_at_gate column is dropped by Migration 040.
 //
 // Caller must be admin. Returns rows sorted by (lifecycle_stage, sort_order).
 
@@ -22,7 +25,7 @@ async function list_artifact_types(_params, caller_user_id) {
 
   const { data, error } = await supabase
     .from('cycle_artifact_types')
-    .select('artifact_type_id, artifact_type_name, lifecycle_stage, required_at_gate, guidance_text, sort_order, active_status, created_at, updated_at')
+    .select('artifact_type_id, artifact_type_name, lifecycle_stage, primary_gate, gate_warning_behavior, guidance_text, sort_order, active_status, created_at, updated_at')
     .order('lifecycle_stage', { ascending: true })
     .order('sort_order',      { ascending: true });
   if (error) {

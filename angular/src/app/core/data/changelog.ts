@@ -32,6 +32,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-06-16',
+    contractLabel: 'Contract 25 — Primary Gate model + Activity filter panel + cross-surface chips',
+    items: [
+      {
+        audience:    'Admin',
+        surface:     'Artifact Types admin',
+        description: 'Suggested Before Gate replaced with Primary Gate plus Gate Warning behavior. Migration 040 required.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Gate submission and approval warnings',
+        description: 'Suggested-artifact warnings now follow Primary Gate plus propagation (primary only or primary and subsequent).'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Activity view',
+        description: 'New filter panel — Division, Person, Event type, Date range — with active chip bar and Show Only My Activity preserved.'
+      },
+      {
+        audience:    'All',
+        surface:     'Recently Approved Gates view',
+        description: 'Initiative chips now open the Initiative detail panel beside the grid instead of routing to the full page.'
+      }
+    ]
+  },
+  {
     date:          '2026-06-15',
     contractLabel: 'WIP zone model — Brief counts in Pre-Build; Post-Deploy renamed Post-Build',
     items: [

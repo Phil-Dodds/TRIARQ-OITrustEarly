@@ -16,7 +16,12 @@
 // row's created_at to load the next page. has_more derived by fetching limit+1
 // and slicing.
 //
-// Source: D-428, D-429, Contract 23 Section H Items 5 + 6.
+// Source: D-428, D-429, D-439, Contract 23 Section H Items 5 + 6, Contract 25 WS2.
+//
+// Contract 25 (D-439): adds person_user_ids[] for multi-select Person filter on
+// /initiatives/activity. The legacy actor_user_id (single user) is preserved
+// for callers (My Activity home card) — when both are supplied,
+// person_user_ids takes precedence and actor_user_id is ignored.
 
 'use strict';
 
@@ -27,19 +32,21 @@ const MAX_LIMIT     = 100;
 
 /**
  * @param {object} params
- * @param {string[]} [params.division_ids]   — filter to specific divisions; null/empty = viewer's scope
- * @param {string}   [params.actor_user_id]  — filter to a specific actor
- * @param {string[]} [params.event_types]    — filter to specific event_type values
- * @param {string}   [params.after]          — timestamptz; lower bound inclusive
- * @param {string}   [params.before_cursor]  — timestamptz; upper bound exclusive (pagination)
- * @param {number}   [params.limit]          — default 50, max 100
- * @param {boolean}  [params.count_only]     — when true, returns { total_count } only
- * @param {string}   caller_user_id          — from JWT (middleware)
+ * @param {string[]} [params.division_ids]    — filter to specific divisions; null/empty = viewer's scope
+ * @param {string}   [params.actor_user_id]   — filter to a single actor (legacy; My Activity home card)
+ * @param {string[]} [params.person_user_ids] — D-439: filter to multiple actors (Person filter)
+ * @param {string[]} [params.event_types]     — filter to specific event_type values
+ * @param {string}   [params.after]           — timestamptz; lower bound inclusive
+ * @param {string}   [params.before_cursor]   — timestamptz; upper bound exclusive (pagination)
+ * @param {number}   [params.limit]           — default 50, max 100
+ * @param {boolean}  [params.count_only]      — when true, returns { total_count } only
+ * @param {string}   caller_user_id           — from JWT (middleware)
  */
 async function list_initiative_activity(params, caller_user_id) {
   const {
     division_ids,
     actor_user_id,
+    person_user_ids,
     event_types,
     after,
     before_cursor,
@@ -116,11 +123,16 @@ async function list_initiative_activity(params, caller_user_id) {
   }
 
   // ── Filter chain — applied identically to count and row queries ──────────
+  // D-439: when person_user_ids[] is supplied it supersedes the legacy
+  // single-actor actor_user_id; otherwise actor_user_id is honored.
+  const hasPersonList = Array.isArray(person_user_ids) && person_user_ids.length > 0;
   function applyFilters(q) {
     if (cycleIds !== null) {
       q = q.in('delivery_cycle_id', cycleIds);
     }
-    if (actor_user_id) {
+    if (hasPersonList) {
+      q = q.in('actor_user_id', person_user_ids);
+    } else if (actor_user_id) {
       q = q.eq('actor_user_id', actor_user_id);
     }
     if (Array.isArray(event_types) && event_types.length > 0) {

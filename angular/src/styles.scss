@@ -464,3 +464,214 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
   }
 }
 
+// ── Initiative Activity (D-428 / D-439, Contract 25) ───────────────────────
+// Moved from component-inline per D-371 (CSS budget discipline). Selectors
+// stay `ia-` prefixed and scoped by the activity view's DOM structure.
+
+.ia-subtitle {
+  margin: 0 0 var(--triarq-space-md) 0;
+  font-size: 11px;
+  font-style: italic;
+  color: #5A5A5A;
+  max-width: 620px;
+  line-height: 1.6;
+}
+.ia-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--triarq-space-md);
+}
+.ia-mine-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--triarq-text-small);
+  color: var(--triarq-color-text-primary);
+  cursor: pointer;
+  user-select: none;
+  input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
+  input[type="checkbox"]:disabled { cursor: default; }
+}
+
+.ia-filter-btn {
+  position: relative;
+  padding: 6px 14px;
+  border: 1px solid var(--triarq-color-primary);
+  border-radius: var(--triarq-radius-button, 5px);
+  background: #fff;
+  color: var(--triarq-color-primary);
+  font-size: var(--triarq-text-small);
+  cursor: pointer;
+}
+.ia-filter-count {
+  display: inline-block;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--triarq-color-primary);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.ia-chip-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: var(--triarq-space-md) 0;
+}
+.ia-active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  background: rgba(37, 112, 153, 0.10);
+  color: var(--triarq-color-primary);
+  font-size: 12px;
+}
+.ia-chip-x {
+  width: 18px; height: 18px;
+  border: 0; background: transparent;
+  color: var(--triarq-color-primary);
+  cursor: pointer; font-size: 12px;
+  border-radius: 999px;
+  &:hover { background: rgba(37,112,153,0.20); }
+}
+
+.ia-feed { display: flex; flex-direction: column; gap: 4px; }
+.ia-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--triarq-space-sm);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--triarq-color-border);
+  font-size: var(--triarq-text-body);
+  &:last-of-type { border-bottom: 0; }
+}
+.ia-row-skeleton { padding: 10px 12px; }
+.ia-time  { flex: 0 0 110px; color: #5A5A5A; font-size: 12px; }
+.ia-actor { font-weight: 600; }
+.ia-system { color: #5A5A5A; }
+.ia-desc { flex: 1 1 auto; color: var(--triarq-color-text-primary); }
+
+.ia-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(120, 130, 140, 0.10);
+  color: var(--triarq-color-primary);
+  text-decoration: none;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: background-color 0.15s;
+  &:hover { background: rgba(120, 130, 140, 0.20); cursor: pointer; }
+}
+.ia-division { font-size: 11px; color: #5A5A5A; margin-left: auto; }
+
+.ia-empty {
+  padding: var(--triarq-space-2xl);
+  text-align: center;
+  color: #5A5A5A;
+  font-size: var(--triarq-text-body);
+}
+.ia-footer {
+  margin-top: var(--triarq-space-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--triarq-space-md);
+}
+.ia-count { font-size: 11px; color: #5A5A5A; }
+.ia-load-more {
+  padding: 8px 16px;
+  border: 1px solid var(--triarq-color-primary);
+  border-radius: var(--triarq-radius-button, 5px);
+  background: #fff;
+  color: var(--triarq-color-primary);
+  font-size: var(--triarq-text-small);
+  cursor: pointer;
+  &:disabled { opacity: 0.5; cursor: default; }
+}
+
+// S-010 filter panel — slide-in from right
+.ia-scrim {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.32);
+  z-index: 50;
+}
+.ia-panel {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 360px;
+  background: #fff;
+  box-shadow: -8px 0 24px rgba(0,0,0,0.18);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+.ia-panel-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--triarq-color-border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ia-panel-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+.ia-panel-foot {
+  padding: 12px 16px;
+  border-top: 1px solid var(--triarq-color-border);
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.ia-frow { border-bottom: 1px solid #E8E8E8; }
+.ia-frow-head {
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px;
+  color: var(--triarq-color-text-primary);
+  &:hover { background: #F0F4F8; }
+}
+.ia-frow-val { color: #5A5A5A; font-size: 12px; }
+.ia-frow-open .ia-frow-head { background: #F0F4F8; }
+.ia-frow-body {
+  padding: 4px 16px 12px 16px;
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 13px;
+}
+.ia-check, .ia-radio {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.ia-search {
+  padding: 6px 10px;
+  border: 1px solid var(--triarq-color-border);
+  border-radius: 5px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.ia-person-list { max-height: 240px; overflow-y: auto; }
+.ia-frow-empty { color: #5A5A5A; font-size: 12px; padding: 6px 0; }
+.ia-custom-range {
+  display: flex; flex-direction: column; gap: 6px; margin-top: 6px;
+}
+.ia-label { font-size: 12px; color: #5A5A5A; }
+.ia-date-input {
+  padding: 6px 10px;
+  border: 1px solid var(--triarq-color-border);
+  border-radius: 5px;
+  font-size: 13px;
+}
+

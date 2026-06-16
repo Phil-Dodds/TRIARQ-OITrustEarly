@@ -325,12 +325,13 @@ export class DeliveryService {
    * Powers /initiatives/activity, My Activity home card, and User View zone.
    */
   listInitiativeActivity(params: {
-    division_ids?:   string[];
-    actor_user_id?:  string;
-    event_types?:    string[];
-    after?:          string;          // ISO timestamptz, inclusive lower bound
-    before_cursor?:  string;          // ISO timestamptz, exclusive upper bound
-    limit?:          number;
+    division_ids?:     string[];
+    actor_user_id?:    string;
+    person_user_ids?:  string[];      // D-439 multi-select Person filter
+    event_types?:      string[];
+    after?:            string;          // ISO timestamptz, inclusive lower bound
+    before_cursor?:    string;          // ISO timestamptz, exclusive upper bound
+    limit?:            number;
   } = {}): Observable<McpResponse<InitiativeActivityPage>> {
     return this.mcp.call<InitiativeActivityPage>(
       'delivery', 'list_initiative_activity', params as Record<string, unknown>
@@ -377,18 +378,19 @@ export class DeliveryService {
     );
   }
 
-  // ── Contract 24 — Artifact Type management (D-437) ───────────────────────
+  // ── Artifact Type management (D-437 origin; D-438 Contract 25 schema) ────
 
   listArtifactTypes(): Observable<McpResponse<ArtifactTypeRow[]>> {
     return this.mcp.call<ArtifactTypeRow[]>('delivery', 'list_artifact_types', {});
   }
 
   createArtifactType(params: {
-    artifact_type_name: string;
-    lifecycle_stage:    string;
-    guidance_text:      string;
-    sort_order:         number;
-    required_at_gate?:  string | null;
+    artifact_type_name:     string;
+    lifecycle_stage:        string;
+    guidance_text:          string;
+    sort_order:             number;
+    primary_gate?:          string | null;
+    gate_warning_behavior?: 'none' | 'primary_only' | 'primary_and_subsequent';
   }): Observable<McpResponse<ArtifactTypeRow>> {
     return this.mcp.call<ArtifactTypeRow>(
       'delivery', 'create_artifact_type', params as Record<string, unknown>
@@ -396,13 +398,14 @@ export class DeliveryService {
   }
 
   updateArtifactType(params: {
-    artifact_type_id:    string;
-    artifact_type_name?: string;
-    lifecycle_stage?:    string;
-    guidance_text?:      string;
-    sort_order?:         number;
-    required_at_gate?:   string | null;
-    active?:             boolean;
+    artifact_type_id:       string;
+    artifact_type_name?:    string;
+    lifecycle_stage?:       string;
+    guidance_text?:         string;
+    sort_order?:            number;
+    primary_gate?:          string | null;
+    gate_warning_behavior?: 'none' | 'primary_only' | 'primary_and_subsequent';
+    active?:                boolean;
   }): Observable<McpResponse<ArtifactTypeRow>> {
     return this.mcp.call<ArtifactTypeRow>(
       'delivery', 'update_artifact_type', params as Record<string, unknown>

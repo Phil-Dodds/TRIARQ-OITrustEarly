@@ -1,29 +1,33 @@
 // initiative-activity.component.ts
-// Pathways OI Trust — Initiative Activity feed (D-428).
+// Pathways OI Trust — Initiative Activity feed (D-428, D-439).
 // Route: /initiatives/activity
 //
-// Reverse-chronological cycle_event_log feed scoped by viewer's Division access
-// (admin sees all). Each row shows: timestamp, actor, event description,
-// Initiative chip, Division short name. Read-only — no actions.
+// Contract 25 (D-439) replaces the Contract 23 top-bar date dropdown with a
+// full S-010 slide-in filter panel: Division / Person / Event type / Date
+// range. Filter chip bar per S-012 shows active non-default filters; X on a
+// chip resets that dimension and re-queries immediately. Apply / Clear all
+// commit model per S-011. Filter state persists under D-171 screen key
+// `initiatives.activity`.
 //
-// Pagination: 50 rows per request, "Load more" appends next page using the
-// oldest visible row's created_at as before_cursor.
+// CC-25-01 (deviation): Event type filter uses a multi-select checklist inside
+// the drill-in row, conflicting with S-013 "no checkbox lists inside the
+// panel." Spec WS2 §Event type filter explicitly mandates a checklist for this
+// surface; that overrides S-013 for this dimension.
 //
-// V1 scope (Contract 23 §5):
-//   - Date range filter (Last 7 / 30 / 90 days) — default Last 7 days
-//   - Reverse-chronological list with pagination
-//   - Initiative chip → navigate to /initiatives/:cycle_id (S-018 spirit)
-//   - Actor renders as bold text (no User panel drill-through yet)
-//   - "Showing N of M events" count + Load more button
+// CC-25-02 (deviation): Person filter is an inline multi-select checklist
+// (same drill-in treatment as Event type) rather than the S-022 EntityPicker
+// modal. The codebase has no multi-select EntityPicker variant; building one
+// is out of scope for Contract 25. Multi-select EntityPicker deferred.
 //
-// Deferred to follow-on contract (recorded as CC-decisions):
-//   - Slide-in filter panel with Division/Person/Event type filters (spec §5.2)
-//   - Active filter chip bar with dismiss + re-query (spec §5.2)
-//   - Filter state persistence via screen key 'initiatives.activity' (D-171)
-//   - Custom date range picker
-//   - Tappable actor chip → User panel
+// Standing S-021 exception (Cand-05): actor display is bold text — no User
+// detail panel exists yet so chips are deferred.
 //
-// Source: D-428, D-181, D-180, D-346, S-015, S-021.
+// "Show Only My Activity" checkbox preserved as a convenience shortcut — it
+// toggles the Person filter to the current user only (set on check, cleared
+// on uncheck). The route query param `?mine=1` still pre-sets it.
+//
+// Source: D-428, D-439, D-181, D-180, D-200, D-171, D-346, S-010, S-011,
+//         S-012, S-013, S-015, S-021, S-022.
 
 import {
   Component,
@@ -38,23 +42,70 @@ import { IonicModule }  from '@ionic/angular';
 
 import { DeliveryService }    from '../../../core/services/delivery.service';
 import { UserProfileService } from '../../../core/services/user-profile.service';
-import { InitiativeActivityEntry } from '../../../core/types/database';
+import { McpService }         from '../../../core/services/mcp.service';
+import {
+  ScreenStateService,
+  SCREEN_KEYS
+} from '../../../core/services/screen-state.service';
+import {
+  Division,
+  InitiativeActivityEntry,
+  User
+} from '../../../core/types/database';
 
-type DateRangeKey = '7d' | '30d' | '90d';
+type DateRangeKey = '7d' | '30d' | '90d' | 'custom';
 
 const DATE_RANGE_LABELS: Record<DateRangeKey, string> = {
-  '7d':  'Last 7 days',
-  '30d': 'Last 30 days',
-  '90d': 'Last 90 days'
+  '7d':     'Last 7 days',
+  '30d':    'Last 30 days',
+  '90d':    'Last 90 days',
+  'custom': 'Custom range'
 };
 
-const DATE_RANGE_DAYS: Record<DateRangeKey, number> = {
+const DATE_RANGE_DAYS: Record<'7d'|'30d'|'90d', number> = {
   '7d':  7,
   '30d': 30,
   '90d': 90
 };
 
 const PAGE_SIZE = 50;
+
+// Known event types per Contract 25 WS2 §Event type filter display name map.
+// New types fall back to "underscore → space, title-case" — surfaced as a
+// CC-decision when first encountered (CC-25-03 placeholder for future drift).
+const EVENT_TYPE_DISPLAY: Record<string, string> = {
+  gate_submitted:                 'Gate submitted',
+  gate_approved:                  'Gate approved',
+  gate_returned:                  'Gate returned',
+  gate_blocked:                   'Gate blocked',
+  milestone_target_date_changed:  'Milestone date set',
+  milestone_actual_date_set:      'Milestone actual date set',
+  initiative_created:             'Initiative created',
+  initiative_updated:             'Initiative updated',
+  stage_advanced:                 'Stage advanced'
+};
+
+const KNOWN_EVENT_TYPES = Object.keys(EVENT_TYPE_DISPLAY);
+
+type FilterRow = 'division' | 'person' | 'event' | 'date' | null;
+
+interface AppliedFilters {
+  divisionIds:  string[];   // empty = default (My Divisions; admin = all)
+  personIds:    string[];   // empty = all persons
+  eventTypes:   string[];   // empty = all event types
+  dateRange:    DateRangeKey;
+  customAfter:  string;     // ISO date (yyyy-mm-dd)
+  customBefore: string;     // ISO date (yyyy-mm-dd)
+}
+
+const DEFAULT_FILTERS: AppliedFilters = {
+  divisionIds:  [],
+  personIds:    [],
+  eventTypes:   [],
+  dateRange:    '7d',
+  customAfter:  '',
+  customBefore: ''
+};
 
 @Component({
   selector:        'app-initiative-activity',
@@ -72,17 +123,8 @@ const PAGE_SIZE = 50;
           Use this to track what has changed and who changed it.
         </p>
 
-        <!-- Top filter bar: Date range + Show only mine. Phil 2026-06-14:
-             card "View all" pre-sets mine=true via ?mine=1 query param. -->
+        <!-- Top controls: Show Only Mine + Filter button -->
         <div class="ia-controls">
-          <label class="ia-range-label" for="ia-range">Show:</label>
-          <select id="ia-range"
-                  class="ia-range-select"
-                  [ngModel]="dateRange"
-                  (ngModelChange)="onRangeChange($event)">
-            <option *ngFor="let k of rangeKeys" [value]="k">{{ rangeLabel(k) }}</option>
-          </select>
-
           <label class="ia-mine-toggle">
             <input type="checkbox"
                    [ngModel]="showOnlyMine"
@@ -90,7 +132,25 @@ const PAGE_SIZE = 50;
                    [disabled]="!currentUserId" />
             Show Only My Activity
           </label>
+
+          <button class="ia-filter-btn" (click)="openPanel()">
+            Filters
+            <span class="ia-filter-count" *ngIf="activeFilterCount > 0">
+              {{ activeFilterCount }}
+            </span>
+          </button>
         </div>
+      </div>
+
+      <!-- S-012 active filter chip bar -->
+      <div class="ia-chip-bar" *ngIf="activeChips.length > 0">
+        <span class="ia-chip ia-active-chip"
+              *ngFor="let chip of activeChips">
+          {{ chip.label }}
+          <button class="ia-chip-x"
+                  (click)="dismissChip(chip.dim)"
+                  [attr.aria-label]="'Remove ' + chip.label">✕</button>
+        </span>
       </div>
 
       <!-- Feed -->
@@ -108,7 +168,7 @@ const PAGE_SIZE = 50;
 
           <!-- Empty state -->
           <div *ngIf="!loading && events.length === 0" class="ia-empty">
-            No activity found for the selected range.
+            No activity matches the current filters.
           </div>
 
           <!-- Rows -->
@@ -117,7 +177,7 @@ const PAGE_SIZE = 50;
               {{ relativeTime(e.created_at) }}
             </span>
 
-            <!-- Actor — bold text V1 (User panel drill-through deferred) -->
+            <!-- Actor — bold text (Cand-05 S-021 exception) -->
             <span class="ia-actor">
               <ng-container *ngIf="e.actor_display_name; else systemActor">
                 {{ e.actor_display_name }}
@@ -130,10 +190,8 @@ const PAGE_SIZE = 50;
             <!-- Description — plain text -->
             <span class="ia-desc">{{ e.event_description }}</span>
 
-            <!-- Initiative chip — always renders when delivery_cycle_id is
-                 present (always per cycle_event_log NOT NULL FK). Title falls
-                 back to "Initiative" when name unresolved. Phil 2026-06-14:
-                 every activity row must surface its linked Initiative. -->
+            <!-- Initiative chip — full-page route per D-440 (no right-panel
+                 slot on this surface) -->
             <a *ngIf="e.delivery_cycle_id"
                class="ia-chip"
                [routerLink]="['/initiatives', e.delivery_cycle_id]">
@@ -162,8 +220,121 @@ const PAGE_SIZE = 50;
         </ng-container>
 
       </div>
+
+      <!-- S-010/011/013 filter panel -->
+      <div class="ia-scrim" *ngIf="panelOpen" (click)="cancelPanel()"></div>
+      <aside class="ia-panel" *ngIf="panelOpen"
+             role="dialog" aria-modal="true" aria-label="Filters">
+        <header class="ia-panel-head">
+          <strong>Filters</strong>
+          <button class="oi-close-btn"
+                  (click)="cancelPanel()" aria-label="Close">✕</button>
+        </header>
+        <div class="ia-panel-body">
+
+          <!-- Division row -->
+          <div class="ia-frow" [class.ia-frow-open]="expandedRow === 'division'">
+            <button class="ia-frow-head" (click)="toggleRow('division')">
+              <span>Division</span>
+              <span class="ia-frow-val">{{ divisionValueLabel(pending) }}</span>
+            </button>
+            <div class="ia-frow-body" *ngIf="expandedRow === 'division'">
+              <ng-container *ngIf="divisions.length === 0">
+                <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
+              </ng-container>
+              <label *ngFor="let d of divisions" class="ia-check">
+                <input type="checkbox"
+                       [checked]="pending.divisionIds.includes(d.id)"
+                       (change)="toggleDivision(d.id)" />
+                {{ d.display_name_short || d.division_name }}
+              </label>
+            </div>
+          </div>
+
+          <!-- Person row (CC-25-02 inline multi-select) -->
+          <div class="ia-frow" [class.ia-frow-open]="expandedRow === 'person'">
+            <button class="ia-frow-head" (click)="toggleRow('person')">
+              <span>Person</span>
+              <span class="ia-frow-val">{{ personValueLabel(pending) }}</span>
+            </button>
+            <div class="ia-frow-body" *ngIf="expandedRow === 'person'">
+              <input type="search"
+                     class="ia-search"
+                     placeholder="Search people…"
+                     [(ngModel)]="personSearch" />
+              <ng-container *ngIf="users.length === 0">
+                <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
+              </ng-container>
+              <div class="ia-person-list">
+                <label *ngFor="let u of filteredUsers" class="ia-check">
+                  <input type="checkbox"
+                         [checked]="pending.personIds.includes(u.id)"
+                         (change)="togglePerson(u.id)" />
+                  {{ u.display_name }}
+                </label>
+                <div *ngIf="filteredUsers.length === 0 && users.length > 0"
+                     class="ia-frow-empty">
+                  No people match "{{ personSearch }}".
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Event type row (CC-25-01 checklist) -->
+          <div class="ia-frow" [class.ia-frow-open]="expandedRow === 'event'">
+            <button class="ia-frow-head" (click)="toggleRow('event')">
+              <span>Event type</span>
+              <span class="ia-frow-val">{{ eventValueLabel(pending) }}</span>
+            </button>
+            <div class="ia-frow-body" *ngIf="expandedRow === 'event'">
+              <label *ngFor="let t of knownEventTypes" class="ia-check">
+                <input type="checkbox"
+                       [checked]="pending.eventTypes.includes(t)"
+                       (change)="toggleEvent(t)" />
+                {{ eventTypeLabel(t) }}
+              </label>
+            </div>
+          </div>
+
+          <!-- Date range row -->
+          <div class="ia-frow" [class.ia-frow-open]="expandedRow === 'date'">
+            <button class="ia-frow-head" (click)="toggleRow('date')">
+              <span>Date range</span>
+              <span class="ia-frow-val">{{ dateValueLabel(pending) }}</span>
+            </button>
+            <div class="ia-frow-body" *ngIf="expandedRow === 'date'">
+              <label class="ia-radio" *ngFor="let k of rangeKeys">
+                <input type="radio"
+                       name="ia-range"
+                       [value]="k"
+                       [ngModel]="pending.dateRange"
+                       (ngModelChange)="setDateRange(k)" />
+                {{ rangeLabel(k) }}
+              </label>
+              <div *ngIf="pending.dateRange === 'custom'" class="ia-custom-range">
+                <label class="ia-label">From</label>
+                <input type="date" class="ia-date-input"
+                       [(ngModel)]="pending.customAfter" />
+                <label class="ia-label">To</label>
+                <input type="date" class="ia-date-input"
+                       [(ngModel)]="pending.customBefore" />
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- S-011: Apply / Clear all / X. X is the close button in the header. -->
+        <footer class="ia-panel-foot">
+          <button class="oi-btn-secondary" (click)="clearAll()">Clear all</button>
+          <button class="oi-btn-primary"   (click)="applyFilters()">Apply filters</button>
+        </footer>
+      </aside>
+
     </div>
   `,
+  // D-371: filter-panel and feed CSS moved to global styles.scss to stay under
+  // the 4kB component-style error budget. Selectors keep the `ia-` prefix.
   styles: [`
     .ia-shell {
       max-width: 1080px;
@@ -172,177 +343,249 @@ const PAGE_SIZE = 50;
     }
     .ia-header { margin-bottom: var(--triarq-space-lg); }
     .ia-title { margin: 0 0 4px 0; }
-    /* S-015: 11px italic Stone */
-    .ia-subtitle {
-      margin: 0 0 var(--triarq-space-md) 0;
-      font-size: 11px;
-      font-style: italic;
-      color: #5A5A5A;
-      max-width: 620px;
-      line-height: 1.6;
-    }
-    .ia-controls {
-      display: flex;
-      align-items: center;
-      gap: var(--triarq-space-sm);
-    }
-    .ia-range-label {
-      font-size: var(--triarq-text-small);
-      color: var(--triarq-color-text-primary);
-    }
-    .ia-range-select {
-      font-size: var(--triarq-text-small);
-      padding: 6px 10px;
-      border: 1px solid var(--triarq-color-border);
-      border-radius: var(--triarq-radius-input, 5px);
-      background: #fff;
-    }
-    .ia-mine-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-left: var(--triarq-space-md);
-      font-size: var(--triarq-text-small);
-      color: var(--triarq-color-text-primary);
-      cursor: pointer;
-      user-select: none;
-    }
-    .ia-mine-toggle input[type="checkbox"] {
-      cursor: pointer;
-      width: 16px;
-      height: 16px;
-    }
-    .ia-mine-toggle input[type="checkbox"]:disabled {
-      cursor: default;
-    }
-
-    .ia-feed { display: flex; flex-direction: column; gap: 4px; }
-
-    .ia-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--triarq-space-sm);
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--triarq-color-border);
-      font-size: var(--triarq-text-body);
-    }
-    .ia-row:last-of-type { border-bottom: 0; }
-
-    .ia-row-skeleton { padding: 10px 12px; }
-
-    .ia-time {
-      flex: 0 0 110px;
-      color: #5A5A5A;
-      font-size: 12px;
-    }
-    .ia-actor { font-weight: 600; }
-    .ia-system { color: #5A5A5A; }
-    .ia-desc { flex: 1 1 auto; color: var(--triarq-color-text-primary); }
-
-    /* S-021 entity chip — pill shape, muted background */
-    .ia-chip {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 10px;
-      border-radius: 999px;
-      background: rgba(120, 130, 140, 0.10);
-      color: var(--triarq-color-primary);
-      text-decoration: none;
-      font-size: 12px;
-      white-space: nowrap;
-      transition: background-color 0.15s;
-    }
-    .ia-chip:hover { background: rgba(120, 130, 140, 0.20); cursor: pointer; }
-
-    .ia-division {
-      font-size: 11px;
-      color: #5A5A5A;
-      margin-left: auto;
-    }
-
-    .ia-empty {
-      padding: var(--triarq-space-2xl);
-      text-align: center;
-      color: #5A5A5A;
-      font-size: var(--triarq-text-body);
-    }
-
-    .ia-footer {
-      margin-top: var(--triarq-space-md);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--triarq-space-md);
-    }
-    .ia-count { font-size: 11px; color: #5A5A5A; }
-    .ia-load-more {
-      padding: 8px 16px;
-      border: 1px solid var(--triarq-color-primary);
-      border-radius: var(--triarq-radius-button, 5px);
-      background: #fff;
-      color: var(--triarq-color-primary);
-      font-size: var(--triarq-text-small);
-      cursor: pointer;
-    }
-    .ia-load-more:disabled { opacity: 0.5; cursor: default; }
   `]
 })
 export class InitiativeActivityComponent implements OnInit {
 
-  readonly rangeKeys: DateRangeKey[] = ['7d', '30d', '90d'];
+  readonly rangeKeys: DateRangeKey[] = ['7d', '30d', '90d', 'custom'];
+  readonly knownEventTypes = KNOWN_EVENT_TYPES;
 
-  dateRange: DateRangeKey = '7d';
+  /** Applied (committed) filter state — used for the actual query. */
+  applied: AppliedFilters = { ...DEFAULT_FILTERS };
+  /** Pending (panel-staging) filter state — copied to applied on Apply. */
+  pending: AppliedFilters = { ...DEFAULT_FILTERS };
+
   events:    InitiativeActivityEntry[] = [];
   totalCount = 0;
   hasMore    = false;
   loading    = false;
   loadingMore = false;
 
-  // Phil 2026-06-14 — "Show Only My Activity" filter. Defaults true when route
-  // has ?mine=1 (set by the My Initiative Activity card link). User can uncheck
-  // to widen scope to all users in their Division access.
+  panelOpen   = false;
+  expandedRow: FilterRow = null;
+  personSearch = '';
+
+  divisions: Division[] = [];
+  users:     User[]     = [];
+  divisionsLoaded = false;
+  usersLoaded     = false;
+
   showOnlyMine     = false;
   currentUserId: string | null = null;
 
   constructor(
-    private readonly delivery:  DeliveryService,
-    private readonly profile:   UserProfileService,
-    private readonly cdr:       ChangeDetectorRef,
-    private readonly route:     ActivatedRoute,
-    private readonly _router:   Router
+    private readonly delivery:    DeliveryService,
+    private readonly profile:     UserProfileService,
+    private readonly mcp:         McpService,
+    private readonly screenState: ScreenStateService,
+    private readonly cdr:         ChangeDetectorRef,
+    private readonly route:       ActivatedRoute,
+    private readonly _router:     Router
   ) {}
 
   ngOnInit(): void {
-    // Resolve current user once on entry. Profile is already loaded by the
-    // app shell before this lazy route resolves.
     this.currentUserId = this.profile.getCurrentProfile()?.id ?? null;
 
-    // Read ?mine=1 from route. When set AND we have a userId, default the
-    // filter ON. Falls back to OFF when userId is unknown.
     const mineParam = this.route.snapshot.queryParamMap.get('mine');
     this.showOnlyMine = mineParam === '1' && !!this.currentUserId;
 
+    this.restoreFilters().then(() => {
+      if (this.showOnlyMine && this.currentUserId) {
+        this.applied = { ...this.applied, personIds: [this.currentUserId] };
+      }
+      this.pending = { ...this.applied };
+      this.reload();
+    });
+  }
+
+  // ── Filter chip bar (S-012) ────────────────────────────────────────────────
+
+  get activeFilterCount(): number {
+    return this.activeChips.length;
+  }
+
+  get activeChips(): { dim: keyof AppliedFilters; label: string }[] {
+    const chips: { dim: keyof AppliedFilters; label: string }[] = [];
+    const a = this.applied;
+    if (a.divisionIds.length > 0) {
+      chips.push({ dim: 'divisionIds', label: 'Division: ' + this.summarize(
+        a.divisionIds.map(id => {
+          const d = this.divisions.find(x => x.id === id);
+          return d ? (d.display_name_short || d.division_name) : 'Division';
+        })
+      ) });
+    }
+    if (a.personIds.length > 0) {
+      chips.push({ dim: 'personIds', label: 'Person: ' + this.summarize(
+        a.personIds.map(id => {
+          const u = this.users.find(x => x.id === id);
+          return u?.display_name ?? 'Person';
+        })
+      ) });
+    }
+    if (a.eventTypes.length > 0) {
+      chips.push({ dim: 'eventTypes', label: 'Event: ' + this.summarize(
+        a.eventTypes.map(t => this.eventTypeLabel(t))
+      ) });
+    }
+    if (a.dateRange !== '7d') {
+      chips.push({ dim: 'dateRange', label: 'Date: ' + this.dateValueLabel(a) });
+    }
+    return chips;
+  }
+
+  private summarize(items: string[]): string {
+    if (items.length === 0) return '';
+    if (items.length === 1) return items[0];
+    if (items.length <= 2)  return items.join(', ');
+    return `${items[0]} +${items.length - 1}`;
+  }
+
+  /** Remove one dimension's filter and immediately re-query (S-012). */
+  dismissChip(dim: keyof AppliedFilters): void {
+    const next = { ...this.applied };
+    if (dim === 'divisionIds') next.divisionIds = [];
+    if (dim === 'personIds')   {
+      next.personIds = [];
+      this.showOnlyMine = false;
+    }
+    if (dim === 'eventTypes')  next.eventTypes = [];
+    if (dim === 'dateRange')   { next.dateRange = '7d'; next.customAfter = ''; next.customBefore = ''; }
+    this.applied = next;
+    this.pending = { ...next };
+    this.persistFilters();
     this.reload();
   }
 
-  rangeLabel(k: DateRangeKey): string {
-    return DATE_RANGE_LABELS[k];
+  // ── Panel open / close ─────────────────────────────────────────────────────
+
+  openPanel(): void {
+    this.pending     = { ...this.applied };
+    this.expandedRow = null;
+    this.panelOpen   = true;
+    this.personSearch = '';
+    this.ensureDivisionsLoaded();
+    this.ensureUsersLoaded();
+    this.cdr.markForCheck();
   }
 
-  onRangeChange(next: DateRangeKey): void {
-    this.dateRange = next;
+  cancelPanel(): void {
+    this.panelOpen   = false;
+    this.expandedRow = null;
+    this.cdr.markForCheck();
+  }
+
+  applyFilters(): void {
+    this.applied = { ...this.pending };
+    if (this.currentUserId && this.applied.personIds.length === 1 &&
+        this.applied.personIds[0] === this.currentUserId) {
+      this.showOnlyMine = true;
+    } else {
+      this.showOnlyMine = false;
+    }
+    this.panelOpen   = false;
+    this.expandedRow = null;
+    this.persistFilters();
     this.reload();
   }
+
+  clearAll(): void {
+    this.pending = { ...DEFAULT_FILTERS };
+    this.expandedRow = null;
+    this.cdr.markForCheck();
+  }
+
+  // ── Drill-in (S-013) — one row at a time ───────────────────────────────────
+
+  toggleRow(row: Exclude<FilterRow, null>): void {
+    this.expandedRow = this.expandedRow === row ? null : row;
+    this.cdr.markForCheck();
+  }
+
+  // ── Per-row toggles ────────────────────────────────────────────────────────
+
+  toggleDivision(id: string): void {
+    this.pending = { ...this.pending, divisionIds: toggleId(this.pending.divisionIds, id) };
+  }
+  togglePerson(id: string): void {
+    this.pending = { ...this.pending, personIds: toggleId(this.pending.personIds, id) };
+  }
+  toggleEvent(t: string): void {
+    this.pending = { ...this.pending, eventTypes: toggleId(this.pending.eventTypes, t) };
+  }
+  setDateRange(k: DateRangeKey): void {
+    this.pending = { ...this.pending, dateRange: k };
+  }
+
+  // ── Show Only My Activity checkbox ─────────────────────────────────────────
 
   onMineToggle(next: boolean): void {
-    this.showOnlyMine = next && !!this.currentUserId;
+    if (next && this.currentUserId) {
+      this.applied = { ...this.applied, personIds: [this.currentUserId] };
+      this.showOnlyMine = true;
+    } else {
+      this.applied = { ...this.applied, personIds: [] };
+      this.showOnlyMine = false;
+    }
+    this.pending = { ...this.applied };
+    this.persistFilters();
     this.reload();
   }
+
+  // ── Label helpers ──────────────────────────────────────────────────────────
+
+  rangeLabel(k: DateRangeKey): string { return DATE_RANGE_LABELS[k]; }
+
+  divisionValueLabel(f: AppliedFilters): string {
+    if (f.divisionIds.length === 0) return 'My Divisions';
+    const names = f.divisionIds.map(id => {
+      const d = this.divisions.find(x => x.id === id);
+      return d ? (d.display_name_short || d.division_name) : '...';
+    });
+    return this.summarize(names);
+  }
+
+  personValueLabel(f: AppliedFilters): string {
+    if (f.personIds.length === 0) return 'All';
+    const names = f.personIds.map(id => {
+      const u = this.users.find(x => x.id === id);
+      return u?.display_name ?? '...';
+    });
+    return this.summarize(names);
+  }
+
+  eventValueLabel(f: AppliedFilters): string {
+    if (f.eventTypes.length === 0) return 'All';
+    return this.summarize(f.eventTypes.map(t => this.eventTypeLabel(t)));
+  }
+
+  dateValueLabel(f: AppliedFilters): string {
+    if (f.dateRange === 'custom') {
+      if (f.customAfter && f.customBefore) return `${f.customAfter} → ${f.customBefore}`;
+      if (f.customAfter)                   return `Since ${f.customAfter}`;
+      if (f.customBefore)                  return `Until ${f.customBefore}`;
+      return 'Custom range';
+    }
+    return DATE_RANGE_LABELS[f.dateRange];
+  }
+
+  eventTypeLabel(t: string): string {
+    return EVENT_TYPE_DISPLAY[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  get filteredUsers(): User[] {
+    const q = this.personSearch.trim().toLowerCase();
+    if (!q) return this.users;
+    return this.users.filter(u =>
+      (u.display_name || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q)
+    );
+  }
+
+  // ── Data loading ───────────────────────────────────────────────────────────
 
   trackById = (_i: number, e: InitiativeActivityEntry): string => e.event_id;
 
-  /** Fetch first page from MCP. Resets feed state. */
   reload(): void {
     this.loading    = true;
     this.events     = [];
@@ -350,11 +593,7 @@ export class InitiativeActivityComponent implements OnInit {
     this.hasMore    = false;
     this.cdr.markForCheck();
 
-    this.delivery.listInitiativeActivity({
-      after:         this.afterIso(),
-      actor_user_id: this.actorFilterId(),
-      limit:         PAGE_SIZE
-    }).subscribe({
+    this.delivery.listInitiativeActivity(this.buildQueryParams()).subscribe({
       next: (res) => {
         if (res.success && res.data) {
           this.events     = res.data.events;
@@ -371,7 +610,6 @@ export class InitiativeActivityComponent implements OnInit {
     });
   }
 
-  /** Append the next page using the oldest visible row's created_at as cursor. */
   loadMore(): void {
     if (this.loadingMore || !this.hasMore || this.events.length === 0) return;
     this.loadingMore = true;
@@ -379,10 +617,8 @@ export class InitiativeActivityComponent implements OnInit {
 
     const oldest = this.events[this.events.length - 1];
     this.delivery.listInitiativeActivity({
-      after:         this.afterIso(),
-      actor_user_id: this.actorFilterId(),
+      ...this.buildQueryParams(),
       before_cursor: oldest.created_at,
-      limit:         PAGE_SIZE
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
@@ -400,20 +636,100 @@ export class InitiativeActivityComponent implements OnInit {
     });
   }
 
-  /** Compute the after (lower bound) ISO timestamp for the current range. */
+  private buildQueryParams(): Parameters<DeliveryService['listInitiativeActivity']>[0] {
+    const a = this.applied;
+    const params: Parameters<DeliveryService['listInitiativeActivity']>[0] = {
+      limit: PAGE_SIZE,
+      after: this.afterIso()
+    };
+    if (a.divisionIds.length > 0) params.division_ids    = a.divisionIds;
+    if (a.personIds.length > 0)   params.person_user_ids = a.personIds;
+    if (a.eventTypes.length > 0)  params.event_types     = a.eventTypes;
+    if (a.dateRange === 'custom' && a.customBefore) {
+      // Custom upper bound is exclusive — add one day to make end-of-day inclusive.
+      const before = new Date(a.customBefore + 'T00:00:00Z');
+      before.setUTCDate(before.getUTCDate() + 1);
+      params.before_cursor = before.toISOString();
+    }
+    return params;
+  }
+
+  /** Lower bound (after) ISO for the current range. */
   private afterIso(): string {
-    const days  = DATE_RANGE_DAYS[this.dateRange];
-    const after = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    return after.toISOString();
+    const a = this.applied;
+    if (a.dateRange === 'custom') {
+      if (a.customAfter) {
+        return new Date(a.customAfter + 'T00:00:00Z').toISOString();
+      }
+      return new Date(0).toISOString();
+    }
+    const days = DATE_RANGE_DAYS[a.dateRange];
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  /** Returns the actor filter to apply to MCP calls — userId when "Show Only
-   *  My Activity" is on, undefined otherwise (MCP returns all in scope). */
-  private actorFilterId(): string | undefined {
-    return this.showOnlyMine && this.currentUserId ? this.currentUserId : undefined;
+  // ── Lazy-loaded panel data ─────────────────────────────────────────────────
+
+  private ensureDivisionsLoaded(): void {
+    if (this.divisionsLoaded) return;
+    this.mcp.call<Division[]>('division', 'list_divisions', { include_inactive: false }).subscribe({
+      next: res => {
+        if (res.success && Array.isArray(res.data)) {
+          this.divisions = [...res.data].sort((a, b) =>
+            (a.display_name_short || a.division_name).localeCompare(b.display_name_short || b.division_name)
+          );
+        }
+        this.divisionsLoaded = true;
+        this.cdr.markForCheck();
+      },
+      error: () => { this.divisionsLoaded = true; this.cdr.markForCheck(); }
+    });
   }
 
-  /** Relative format: "2 hours ago", "3 days ago". Falls back to date for older. */
+  private ensureUsersLoaded(): void {
+    if (this.usersLoaded) return;
+    this.mcp.call<User[]>('division', 'list_users', {}).subscribe({
+      next: res => {
+        if (res.success && Array.isArray(res.data)) {
+          this.users = [...res.data]
+            .filter(u => u.is_active !== false)
+            .sort((a, b) => (a.display_name || '').localeCompare(b.display_name || ''));
+        }
+        this.usersLoaded = true;
+        this.cdr.markForCheck();
+      },
+      error: () => { this.usersLoaded = true; this.cdr.markForCheck(); }
+    });
+  }
+
+  // ── Persistence (D-171) ────────────────────────────────────────────────────
+
+  private async restoreFilters(): Promise<void> {
+    try {
+      const state = await this.screenState.restore(SCREEN_KEYS.INITIATIVES_ACTIVITY);
+      if (state?.filter_state) {
+        const f = state.filter_state as Partial<AppliedFilters>;
+        this.applied = {
+          divisionIds:  Array.isArray(f.divisionIds) ? f.divisionIds : [],
+          personIds:    Array.isArray(f.personIds)   ? f.personIds   : [],
+          eventTypes:   Array.isArray(f.eventTypes)  ? f.eventTypes  : [],
+          dateRange:    (f.dateRange as DateRangeKey) ?? '7d',
+          customAfter:  typeof f.customAfter  === 'string' ? f.customAfter  : '',
+          customBefore: typeof f.customBefore === 'string' ? f.customBefore : ''
+        };
+      }
+    } catch { /* restore failures degrade to defaults */ }
+  }
+
+  private persistFilters(): void {
+    void this.screenState.save(
+      SCREEN_KEYS.INITIATIVES_ACTIVITY,
+      this.applied as unknown as Record<string, unknown>,
+      {}
+    );
+  }
+
+  // ── Time formatting ────────────────────────────────────────────────────────
+
   relativeTime(iso: string): string {
     const then = new Date(iso).getTime();
     if (!Number.isFinite(then)) return '';
@@ -428,7 +744,6 @@ export class InitiativeActivityComponent implements OnInit {
     return this.shortDate(iso);
   }
 
-  /** Absolute formatted timestamp for tooltip. */
   absoluteTime(iso: string): string {
     const d = new Date(iso);
     return Number.isFinite(d.getTime()) ? d.toUTCString() : iso;
@@ -440,4 +755,10 @@ export class InitiativeActivityComponent implements OnInit {
       ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
       : iso;
   }
+}
+
+// ── Local pure helper ────────────────────────────────────────────────────────
+
+function toggleId(arr: string[], id: string): string[] {
+  return arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id];
 }
