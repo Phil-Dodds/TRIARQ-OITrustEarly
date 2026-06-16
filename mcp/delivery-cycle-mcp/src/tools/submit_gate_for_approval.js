@@ -278,7 +278,43 @@ async function submit_gate_for_approval(params, caller_user_id) {
       event_metadata:    { gate_name }
     });
 
-  return { success: true, data: updated_gate };
+  // ── D-437 (Contract 24): non-blocking artifact suggestion warnings ─────────
+  // Compute artifact gaps AFTER submission succeeds. Returns an array of
+  // missing artifact type names — the Angular submit modal renders them as a
+  // D-200 Pattern 2 amber warning. Submission status is unchanged regardless.
+  const suggestion_warnings = await computeArtifactSuggestionWarnings(
+    delivery_cycle_id, gate_name
+  );
+
+  return { success: true, data: updated_gate, suggestion_warnings };
+}
+
+/**
+ * D-437: list of artifact type names expected for this gate but not yet
+ * attached to the Initiative. Includes both gate-specific suggestions and
+ * required_at_gate='all' types. Non-blocking — purely informational.
+ */
+async function computeArtifactSuggestionWarnings(delivery_cycle_id, gate_name) {
+  const { data: types } = await supabase
+    .from('cycle_artifact_types')
+    .select('artifact_type_id, artifact_type_name, required_at_gate, active_status')
+    .or(`required_at_gate.eq.${gate_name},required_at_gate.eq.all`)
+    .eq('active_status', true);
+  const candidates = (types || []).filter(t => t.active_status !== false);
+  if (candidates.length === 0) { return []; }
+
+  const candidateIds = candidates.map(t => t.artifact_type_id);
+  const { data: attached } = await supabase
+    .from('cycle_artifacts')
+    .select('artifact_type_id')
+    .eq('delivery_cycle_id', delivery_cycle_id)
+    .in('artifact_type_id', candidateIds)
+    .is('deleted_at', null);
+  const attachedIds = new Set((attached || []).map(a => a.artifact_type_id));
+
+  return candidates
+    .filter(t => !attachedIds.has(t.artifact_type_id))
+    .map(t => t.artifact_type_name);
 }
 
 module.exports = { submit_gate_for_approval };
