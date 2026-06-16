@@ -32,6 +32,10 @@ const { advance_cycle_stage }            = require('./tools/advance_cycle_stage'
 const { reverse_cycle_stage }            = require('./tools/reverse_cycle_stage');
 const { set_cycle_on_hold }              = require('./tools/set_cycle_on_hold');
 const { resume_cycle_from_hold }         = require('./tools/resume_cycle_from_hold');
+// Bugfix 2026-06-15: cancel + uncancel MCP tools previously missing from the
+// server (Angular cancelCycle() referenced non-existent endpoints).
+const { cancel_delivery_cycle }          = require('./tools/cancel_delivery_cycle');
+const { uncancel_delivery_cycle }        = require('./tools/uncancel_delivery_cycle');
 const { assign_roles_to_cycle }          = require('./tools/assign_roles_to_cycle');
 const { set_outcome_statement }          = require('./tools/set_outcome_statement');
 
@@ -39,6 +43,13 @@ const { submit_gate_for_approval }       = require('./tools/submit_gate_for_appr
 const { record_gate_decision }           = require('./tools/record_gate_decision');
 const { withdraw_gate_submission }       = require('./tools/withdraw_gate_submission');
 const { list_pending_approvals }         = require('./tools/list_pending_approvals');
+// Contract 24 — approved gate queries (D-430, D-431).
+const { list_approved_gates }            = require('./tools/list_approved_gates');
+const { list_my_completed_gates }        = require('./tools/list_my_completed_gates');
+// Contract 24 — artifact type management (D-437).
+const { list_artifact_types }            = require('./tools/list_artifact_types');
+const { create_artifact_type }           = require('./tools/create_artifact_type');
+const { update_artifact_type }           = require('./tools/update_artifact_type');
 
 const { set_milestone_target_date }      = require('./tools/set_milestone_target_date');
 const { set_milestone_actual_date }      = require('./tools/set_milestone_actual_date');
@@ -79,6 +90,8 @@ const TOOLS = {
   reverse_cycle_stage,
   set_cycle_on_hold,
   resume_cycle_from_hold,
+  cancel_delivery_cycle,
+  uncancel_delivery_cycle,
   assign_roles_to_cycle,
   set_outcome_statement,
 
@@ -87,6 +100,13 @@ const TOOLS = {
   record_gate_decision,
   withdraw_gate_submission,
   list_pending_approvals,
+  // Contract 24 — approved gate analytical views (D-430, D-431).
+  list_approved_gates,
+  list_my_completed_gates,
+  // Contract 24 — artifact type management + warnings (D-437).
+  list_artifact_types,
+  create_artifact_type,
+  update_artifact_type,
 
   // Milestone date management
   set_milestone_target_date,

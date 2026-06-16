@@ -1149,8 +1149,13 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           </button>
         </div>
 
-        <!-- State 1: No Jira link yet — show + Link button and inline form -->
+        <!-- State 1: No Jira link yet — show + Link button and inline form.
+             Contract 24 AC-23: prominent "Not linked" label per spec. -->
         <div *ngIf="!jiraLink">
+          <div style="font-size:var(--triarq-text-small);color:#5A5A5A;
+                      margin-bottom:var(--triarq-space-xs);">
+            Status: <strong style="color:#1E1E1E;">Not linked</strong>
+          </div>
           <!-- CC-Decision-2026-04-12-D: Zone explanatory text 11px italic #5A5A5A. Source: Contract 5 Block 2.5. -->
           <div style="font-size:11px;font-style:italic;color:#5A5A5A;
                       margin-bottom:var(--triarq-space-xs);">
@@ -1201,7 +1206,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                       border-radius:0 6px 6px 0;
                       padding:var(--triarq-space-xs) var(--triarq-space-sm);
                       margin-top:var(--triarq-space-xs);">
-            <div style="font-weight:500;margin-bottom:2px;">Jira sync not yet configured</div>
+            <div style="font-weight:500;margin-bottom:2px;">Jira sync unavailable — API not yet configured</div>
             <div style="color:var(--triarq-color-text-secondary);">{{ syncStubMessage }}</div>
           </div>
         </div>
@@ -2164,18 +2169,18 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
     this.delivery.cancelCycle(this.cycle.delivery_cycle_id).subscribe({
       next: (res) => {
-        if (res.success && res.data) {
-          this.cycle           = res.data;
-          this.rebuildArtifactsByStage();
+        if (res.success) {
           this.cancelConfirming = false;
+          // Re-query with full joined enrichment per the setOnHold pattern.
+          this.loadCycle(this.cycle!.delivery_cycle_id);
         } else {
           this.cancelError = res.error ?? 'Cancel failed. Please try again.';
         }
         this.cancelBusy = false;
         this.cdr.markForCheck();
       },
-      error: () => {
-        this.cancelError = 'Cancel failed. Please try again.';
+      error: (err: { error?: string }) => {
+        this.cancelError = err.error ?? 'Cancel failed. Please try again.';
         this.cancelBusy  = false;
         this.cdr.markForCheck();
       }
@@ -2191,18 +2196,18 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
     this.delivery.uncancelCycle(this.cycle.delivery_cycle_id).subscribe({
       next: (res) => {
-        if (res.success && res.data) {
-          this.cycle             = res.data;
-          this.rebuildArtifactsByStage();
+        if (res.success) {
           this.uncancelConfirming = false;
+          // Re-query with full joined enrichment per the setOnHold pattern.
+          this.loadCycle(this.cycle!.delivery_cycle_id);
         } else {
           this.uncancelError = res.error ?? 'Restore failed. Please try again.';
         }
         this.uncancelBusy = false;
         this.cdr.markForCheck();
       },
-      error: () => {
-        this.uncancelError = 'Restore failed. Please try again.';
+      error: (err: { error?: string }) => {
+        this.uncancelError = err.error ?? 'Restore failed. Please try again.';
         this.uncancelBusy  = false;
         this.cdr.markForCheck();
       }
