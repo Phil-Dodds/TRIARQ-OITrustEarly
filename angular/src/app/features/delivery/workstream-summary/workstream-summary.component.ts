@@ -2,7 +2,7 @@
 // Route: /delivery/workstreams (D-DeliveryHub-FourViews)
 //
 // Contract 13 surface (Section 10): WIP counts per workstream across the three
-// zones — Pre-Build (DESIGN/SPEC), Build (BUILD/VALIDATE/UAT), and Post-Deploy
+// zones — Pre-Build (BRIEF/DESIGN/SPEC), Build (BUILD/VALIDATE/UAT), and Post-Build
 // (PILOT/RELEASE/OUTCOME). Zone count renders red and the row carries a ⚠ WIP
 // Flag whenever a zone is at or over its limit (D-WIPLimit-2026-04-06).
 //
@@ -62,7 +62,7 @@ import {
              Summary now shows zone throughput only — no per-workstream alerts.
              EPO Summary view (/initiatives/epo-summary) carries the WIP alert UI. -->
         <p class="ws-subtitle">
-          WIP throughput per Workstream across Pre-Build, Build, and Post-Deploy
+          WIP throughput per Workstream across Pre-Build, Build, and Post-Build
           stages. WIP limits are configured per EPO — see the
           <a routerLink="/initiatives/epo-summary" class="ws-subtitle-link">EPO WIP Summary view</a>
           for over-limit alerts.
@@ -84,7 +84,7 @@ import {
         <span>Home Division</span>
         <span class="num">Pre-Build WIP</span>
         <span class="num">Build WIP</span>
-        <span class="num">Post-Deploy WIP</span>
+        <span class="num">Post-Build WIP</span>
       </div>
 
       <!-- Skeleton — S-028 Context B / D-178 Tier 1 -->

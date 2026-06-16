@@ -32,6 +32,7 @@ const { supabase } = require('../db');
 const {
   NEXT_GATE_BY_STAGE,
   WIP_CATEGORY_BY_STAGE,
+  getCycleWipZone,
   WIP_LIMIT_PRE_BUILD,
   WIP_LIMIT_BUILD,
   WIP_LIMIT_POST_DEPLOY,
@@ -87,6 +88,9 @@ async function get_delivery_summary(params, caller_id) {
   // ── Load active delivery cycles ─────────────────────────────────────────────
   // Active = not COMPLETE, not CANCELLED, not soft-deleted (D-190: ON_HOLD is included)
   // Contract 20 Session 2: assigned_epo_user_id added for epo_summaries.
+  // 2026-06-15 (D-WIPLimit amendment): pre_hold_lifecycle_stage added so the
+  // getCycleWipZone helper can resolve ON_HOLD cycles to the zone they were
+  // in before being held.
   let cycleQuery = supabase
     .from('delivery_cycles')
     .select(`
@@ -95,6 +99,7 @@ async function get_delivery_summary(params, caller_id) {
       workstream_id,
       assigned_epo_user_id,
       current_lifecycle_stage,
+      pre_hold_lifecycle_stage,
       milestone_dates:cycle_milestone_dates(gate_name, target_date, actual_date)
     `)
     .not('current_lifecycle_stage', 'in', '("COMPLETE","CANCELLED")')
@@ -193,7 +198,9 @@ async function get_delivery_summary(params, caller_id) {
 
     entry.total_active_cycles++;
 
-    const wipCat = WIP_CATEGORY_BY_STAGE[cycle.current_lifecycle_stage];
+    // D-WIPLimit amendment 2026-06-15: BRIEF counts in pre_build; ON_HOLD
+    // resolves via pre_hold_lifecycle_stage (handled inside getCycleWipZone).
+    const wipCat = getCycleWipZone(cycle);
     if (wipCat === 'pre_build')   { entry.wip_pre_build++;   }
     if (wipCat === 'build')       { entry.wip_build++;       }
     if (wipCat === 'post_deploy') { entry.wip_post_deploy++; }
@@ -332,7 +339,9 @@ async function buildEpoSummaries(cycles) {
     }
 
     entry.total_active_cycles++;
-    const zone = WIP_CATEGORY_BY_STAGE[cycle.current_lifecycle_stage];
+    // D-WIPLimit amendment 2026-06-15: BRIEF counts in pre_build; ON_HOLD
+    // resolves via pre_hold_lifecycle_stage (handled inside getCycleWipZone).
+    const zone = getCycleWipZone(cycle);
     if (zone === 'pre_build')   { entry.wip_pre_build++;   }
     if (zone === 'build')       { entry.wip_build++;       }
     if (zone === 'post_deploy') { entry.wip_post_deploy++; }

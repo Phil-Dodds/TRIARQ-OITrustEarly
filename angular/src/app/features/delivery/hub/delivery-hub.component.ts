@@ -67,11 +67,10 @@ const HUB_CARDS: HubCard[] = [
     title:       'EPO WIP Summary',
     route:       '/initiatives/epo-summary',
     icon:        '◐',
-    description: 'WIP counts per EPO across Pre-Build, Build, and Post-Deploy zones. ' +
-                 'Identify EPOs at or over their configured WIP limit. EPOs whose ' +
-                 'Initiatives are all in Brief are hidden by default — toggle the ' +
-                 '"Include EPOs with no WIP" filter on the view to see them. Click ' +
-                 'an EPO to see their matching Initiatives.'
+    description: 'WIP counts per EPO across three zones — Pre-Build (Brief/Design/Spec), ' +
+                 'Build (Build/Validate/UAT), and Post-Build (Pilot/Release/Outcome). ' +
+                 'Identify EPOs at or over their configured WIP limit. Click an EPO ' +
+                 'to see their matching Initiatives.'
   },
   {
     id:          'epo-schedule',
@@ -95,7 +94,7 @@ const HUB_CARDS: HubCard[] = [
     title:       'Workstream Summary',
     route:       '/initiatives/workstreams',
     icon:        '⟳',
-    description: 'WIP throughput per Workstream across Pre-Build, Build, and Post-Deploy ' +
+    description: 'WIP throughput per Workstream across Pre-Build, Build, and Post-Build ' +
                  'stages. WIP limits live per EPO — see the EPO WIP Summary view for ' +
                  'over-limit alerts. Click the Workstream name to see the matching Initiatives.'
   },

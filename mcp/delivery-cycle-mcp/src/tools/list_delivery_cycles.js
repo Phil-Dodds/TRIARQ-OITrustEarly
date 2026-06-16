@@ -74,6 +74,7 @@ async function list_delivery_cycles(params, caller_user_id) {
       workstream_id,
       tier_classification,
       current_lifecycle_stage,
+      pre_hold_lifecycle_stage,
       outcome_statement,
       assigned_dcs_user_id,
       assigned_epo_user_id,

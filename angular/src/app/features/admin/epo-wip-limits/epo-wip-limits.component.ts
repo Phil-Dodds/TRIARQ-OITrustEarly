@@ -101,7 +101,7 @@ const SAVED_TICK_FADE_MS = 1500;
         <!-- S-015 surface description -->
         <p class="ewl-subtitle">
           Configure WIP zone limits for each EPO. Defaults are 3 per zone — Pre-Build, Build,
-          and Post-Deploy. Lower limits enforce tighter focus; higher limits open capacity.
+          and Post-Build. Lower limits enforce tighter focus; higher limits open capacity.
           Changes take effect on the next gate approval.
         </p>
       </div>
@@ -132,7 +132,7 @@ const SAVED_TICK_FADE_MS = 1500;
             Build {{ sortIndicator('build_limit') }}
           </span>
           <span class="num ewl-sort-trigger" (click)="onSort('post_deploy_limit')">
-            Post-Deploy {{ sortIndicator('post_deploy_limit') }}
+            Post-Build {{ sortIndicator('post_deploy_limit') }}
           </span>
           <span class="ewl-sort-trigger" (click)="onSort('updated_at')">
             Last Updated {{ sortIndicator('updated_at') }}

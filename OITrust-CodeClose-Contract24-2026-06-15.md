@@ -90,6 +90,15 @@ Phil's UAT of Contract 24 surfaced that the "Cancel Initiative" UI calls `cancel
 **CC-24-14 — Edit Jira link affordance added (UAT follow-on).**
 Phil's UAT flagged that the Jira link was create-once-no-edit. Added an "Edit" link button next to the rendered Epic key in both State 2 (stub) and State 3 (configured). Reuses the existing `jiraEpicKeyCtrl` form, `showJiraLinkForm` toggle, and `linkJiraEpic()` handler — the underlying `link_jira_epic` MCP tool is already idempotent (existing-row update). Two new methods: `openJiraEditForm()` pre-populates the input with the current key, `cancelJiraEditForm()` resets + closes. No MCP change required.
 
+**CC-24-16 — D-WIPLimit / D-400 amendment: Brief counts in Pre-Build; Post-Deploy renamed Post-Build; ON_HOLD counts via pre-hold stage.**
+Phil's direct instruction 2026-06-15 (post-Contract 24 UAT). Three changes to the WIP zone model:
+1. **BRIEF added to Pre-Build.** `WIP_CATEGORY_BY_STAGE.BRIEF` flips from null to 'pre_build'. All EPOs with Brief-stage Initiatives now show non-zero Pre-Build counts; many will jump to over-limit immediately. Default limits 3/3/3 unchanged — Admins may want to raise Pre-Build limits.
+2. **ON_HOLD counts in pre-hold zone.** New `getCycleWipZone(cycle)` helper in lifecycle.js resolves ON_HOLD cycles via `pre_hold_lifecycle_stage`. `get_delivery_summary` query updated to include the column; `record_gate_decision` WIP count switched from SQL `.in(zoneStages)` to JS filter via the helper so the count matches the summary exactly. Only COMPLETE, CANCELLED, and cycles with no assigned EPO are excluded — Phil's explicit rule.
+3. **Label "Post-Deploy" → "Post-Build"** (user-facing only). Internal identifier `post_deploy`, DB column `epo_wip_limits.post_deploy_limit`, type enum value, and `WIP_LIMIT_POST_DEPLOY` constant all unchanged to avoid migration risk. Labels swept across EPO WIP Summary, Workstream Summary, EPO WIP Limits admin, Initiative Tracking hub card descriptions, and the About panel.
+4. **Help text added to EPO WIP Summary** explaining the three zones with stage lists and the COMPLETE/CANCELLED/on-hold rules.
+
+This is a D-400 amendment. Per D-317 the D-number for the amendment is Design Chat's allocation — flagged here for the next governance pass. CLAUDE.md candidate 8 below.
+
 **CC-24-15 — Five Contract 24 MCP tool files committed late (Render deploy fix).**
 `mcp/delivery-cycle-mcp/src/index.js` was edited during Contract 24 to register five new tools (`list_approved_gates`, `list_my_completed_gates`, `list_artifact_types`, `create_artifact_type`, `update_artifact_type`), and the tool files were written. But the tool files were never `git add`-ed — only `index.js` plus the WS9 bugfix tools (`cancel_delivery_cycle`, `uncancel_delivery_cycle`) made it into commits. Render crashed on Phil's manual redeploy with `Cannot find module ./tools/list_approved_gates` because the deployed source tree didn't contain the files. Two earlier deploys looked successful only because Render wasn't actually picking the pushes up (see CC-24-12). Hot-fix commit `1c1a289` adds all 5 tool files plus the two modified-but-uncommitted files (`submit_gate_for_approval` and `record_gate_decision` suggestion_warnings amendments). Memory file `deploy_git_status_check.md` added so future sessions check `git status -s` for untracked tool files before deploy pushes. CLAUDE.md candidate 7 below.
 
@@ -148,7 +157,7 @@ CLAUDE.md candidate flagged below: this contract added significant logic without
 - S-035 (About Entry + changelog): About Entry block produced + changelog.ts updated — PASS
 - S-036 (grid sort): declared per screen; User Mgmt + All Initiatives + Recently Approved Gates + Artifact Types compliant — PASS for new surfaces
 
-**(6) CC-decision completeness** — 15 sequential CC-decisions: CC-24-01 through CC-24-15. No gaps. CC-24-12 / CC-24-13 / CC-24-14 / CC-24-15 added post-deploy during Phil's UAT.
+**(6) CC-decision completeness** — 16 sequential CC-decisions: CC-24-01 through CC-24-16. No gaps. CC-24-12 / CC-24-13 / CC-24-14 / CC-24-15 / CC-24-16 added post-deploy during Phil's UAT.
 
 **(7) Structural health** — Files modified that exceed the component 300-line threshold or service 400-line threshold:
 - `users.component.ts` — 1547 → 1605 (was already large; +Created column + sort helpers)
@@ -187,6 +196,9 @@ Pattern observed in `cancelCycleAction()` and `uncancelCycleAction()` original c
 
 **Candidate 7 — Pre-deploy `git status -s` check before any push that triggers a deploy.**
 CC-24-15 root-caused a Render `Cannot find module` crash to 5 Contract 24 MCP tool files left untracked when `index.js` requires were committed. The CodeClose Verification Pass (Rule 29) covers spec coverage / regression / test ratchet / pattern sweep / standards / CC-completeness / structural-health / deployment — none of those catch "the file index.js requires isn't checked in." Recommendation: add a verification step "(9) Repo cleanliness" — for every contract that ships, run `git status -s mcp/ angular/src/` and confirm no `??` entries for files that any committed `require()` / `import` line names. Trigger: Contract 24 Render deploy failure.
+
+**Candidate 8 — D-400 / D-WIPLimit-2026-04-06 amended without a Design Session.**
+CC-24-16 records a substantive amendment to the WIP zone model (BRIEF added to Pre-Build; ON_HOLD counts via pre-hold stage; "Post-Deploy" label renamed "Post-Build"). Per D-317 D-numbers are Design Chat's allocation; the amendment was made on Phil's direct instruction in a Code session. Recommendation: next Design Chat allocates a D-number for the amendment, updates D-400 / build-c-spec.md §8 zone definition, and adds an amendment row to the decision registry. Code-side change is in place and deployed; governance still needs to catch up. Trigger: CC-24-16.
 
 ---
 

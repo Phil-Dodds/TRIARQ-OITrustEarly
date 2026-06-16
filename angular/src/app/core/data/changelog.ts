@@ -33,6 +33,37 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-06-15',
+    contractLabel: 'WIP zone model — Brief counts in Pre-Build; Post-Deploy renamed Post-Build',
+    items: [
+      {
+        audience:    'All',
+        surface:     'EPO WIP Summary view',
+        description: 'Brief-stage Initiatives now count in the Pre-Build WIP zone. Previously only Design and Spec counted. EPOs with Brief-stage work will now show up in the default view and may surface as over-limit.'
+      },
+      {
+        audience:    'All',
+        surface:     'EPO WIP Summary view',
+        description: 'Initiatives on hold now count in the WIP zone they were in before being held — they no longer drop out of the picture.'
+      },
+      {
+        audience:    'All',
+        surface:     'EPO WIP Summary view',
+        description: 'Help text added near the top of the screen explaining the three zones: Pre-Build (Brief/Design/Spec), Build (Build/Validate/UAT), Post-Build (Pilot/Release/Outcome).'
+      },
+      {
+        audience:    'All',
+        surface:     'EPO WIP Summary + EPO WIP Limits + Workstream Summary + Initiative Tracking hub',
+        description: 'Third zone label "Post-Deploy" renamed to "Post-Build" everywhere for naming parallelism with Pre-Build and Build.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'EPO WIP Limits admin screen',
+        description: 'Heads-up: Pre-Build limits may need to be raised now that Brief-stage Initiatives count — defaults remain 3/3/3.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-15',
     contractLabel: 'EPO Summary → EPO WIP Summary (rename + clarifier)',
     items: [
       {

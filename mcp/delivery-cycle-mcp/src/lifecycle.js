@@ -115,13 +115,19 @@ const NEXT_GATE_BY_STAGE = {
   ON_HOLD:   null
 };
 
-// WIP category for each lifecycle stage (D-WIPLimit-2026-04-06, supersedes D-190).
-//   pre_build  = DESIGN, SPEC                (BRIEF excluded — pre-design)
+// WIP category for each lifecycle stage. Amends D-WIPLimit-2026-04-06 / D-400
+// (2026-06-15 Phil instruction):
+//   pre_build  = BRIEF, DESIGN, SPEC          (BRIEF now counts — committed work)
 //   build      = BUILD, VALIDATE, UAT
-//   post_deploy = PILOT, RELEASE, OUTCOME
-// COMPLETE, CANCELLED, ON_HOLD, BRIEF excluded from WIP counting (null).
+//   post_deploy = PILOT, RELEASE, OUTCOME      (internal key kept; user-facing
+//                                               label rendered as "Post-Build"
+//                                               for naming parallelism)
+// COMPLETE, CANCELLED excluded from WIP counting (null).
+// ON_HOLD is NOT included in this static map — callers must resolve ON_HOLD
+// via pre_hold_lifecycle_stage (see getCycleWipZone helper below). An ON_HOLD
+// cycle counts in the zone matching the stage it was in before being held.
 const WIP_CATEGORY_BY_STAGE = {
-  BRIEF:     null,
+  BRIEF:     'pre_build',
   DESIGN:    'pre_build',
   SPEC:      'pre_build',
   BUILD:     'build',
@@ -132,8 +138,24 @@ const WIP_CATEGORY_BY_STAGE = {
   OUTCOME:   'post_deploy',
   COMPLETE:  null,
   CANCELLED: null,
-  ON_HOLD:   null
+  ON_HOLD:   null  // resolved via pre_hold_lifecycle_stage at count time
 };
+
+/**
+ * Resolve the WIP zone for a cycle, honouring the ON_HOLD pre-hold rule.
+ * Returns 'pre_build' | 'build' | 'post_deploy' | null.
+ *
+ * COMPLETE, CANCELLED, and cycles with no assigned_epo_user_id are the only
+ * categories excluded from WIP. (Caller must enforce the EPO assignment
+ * check — this helper only resolves stage → zone.)
+ */
+function getCycleWipZone(cycle) {
+  if (!cycle) { return null; }
+  const stage = cycle.current_lifecycle_stage === 'ON_HOLD'
+    ? (cycle.pre_hold_lifecycle_stage || 'BRIEF')
+    : cycle.current_lifecycle_stage;
+  return WIP_CATEGORY_BY_STAGE[stage] || null;
+}
 
 // WIP limit per zone per workstream — default 3/3/3 (D-WIPLimit-2026-04-06).
 // Per-workstream override via wip_limit_* columns is a future enhancement;
@@ -152,6 +174,7 @@ module.exports = {
   TERMINAL_STAGES,
   NEXT_GATE_BY_STAGE,
   WIP_CATEGORY_BY_STAGE,
+  getCycleWipZone,
   WIP_LIMIT,
   WIP_LIMIT_PRE_BUILD,
   WIP_LIMIT_BUILD,

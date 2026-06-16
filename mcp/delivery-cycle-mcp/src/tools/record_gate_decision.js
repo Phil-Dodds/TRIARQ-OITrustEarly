@@ -31,6 +31,7 @@ const { supabase }  = require('../db');
 const {
   GATE_REQUIRED_TO_ENTER,
   WIP_CATEGORY_BY_STAGE,
+  getCycleWipZone,
   WIP_LIMIT_PRE_BUILD,
   WIP_LIMIT_BUILD,
   WIP_LIMIT_POST_DEPLOY,
@@ -374,19 +375,19 @@ async function computeEpoWipWarning({ epo_user_id, new_stage, this_cycle_id }) {
     return null;
   }
 
-  // Count Initiatives assigned to this EPO whose current_lifecycle_stage maps
-  // to the same zone. This count includes the just-advanced cycle (it now
-  // sits in the zone). Excludes deleted cycles.
-  const zoneStages = Object.entries(WIP_CATEGORY_BY_STAGE)
-    .filter(([, z]) => z === zone)
-    .map(([stage]) => stage);
-
-  const { count, error: countErr } = await supabase
+  // Count Initiatives assigned to this EPO that resolve to this WIP zone.
+  // D-WIPLimit amendment 2026-06-15: getCycleWipZone resolves BRIEF →
+  // pre_build and resolves ON_HOLD via pre_hold_lifecycle_stage. We fetch
+  // the EPO's active cycles and filter in JS rather than issuing a complex
+  // SQL OR to keep the zone logic in one place (lifecycle.getCycleWipZone).
+  const { data: epoCycles, error: countErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id', { count: 'exact', head: true })
+    .select('delivery_cycle_id, current_lifecycle_stage, pre_hold_lifecycle_stage')
     .eq('assigned_epo_user_id', epo_user_id)
-    .in('current_lifecycle_stage', zoneStages)
+    .not('current_lifecycle_stage', 'in', '("COMPLETE","CANCELLED")')
     .is('deleted_at', null);
+
+  const count = (epoCycles ?? []).filter(c => getCycleWipZone(c) === zone).length;
 
   if (countErr) {
     // Non-fatal — log and skip warning rather than break gate approval.

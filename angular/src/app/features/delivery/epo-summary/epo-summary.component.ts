@@ -7,9 +7,16 @@
 // a row with inline counts + WIP alert flag + expand chevron. Each row
 // expands into three zone section groups:
 //
-//   1. Pre-Build Zone  — Initiatives in DESIGN or SPEC stage
-//   2. Build Zone      — Initiatives in BUILD, VALIDATE, or UAT stage
-//   3. Post-Deploy Zone — Initiatives in PILOT, RELEASE, or OUTCOME stage
+//   1. Pre-Build Zone — Initiatives in BRIEF, DESIGN, or SPEC stage
+//   2. Build Zone     — Initiatives in BUILD, VALIDATE, or UAT stage
+//   3. Post-Build Zone — Initiatives in PILOT, RELEASE, or OUTCOME stage
+//
+// D-WIPLimit amendment 2026-06-15: BRIEF stage now counts in Pre-Build
+// (was excluded). ON_HOLD cycles count in the zone matching their
+// pre_hold_lifecycle_stage. Only COMPLETE, CANCELLED, and Initiatives
+// without an assigned EPO are excluded. User-facing label "Post-Deploy"
+// rendered as "Post-Build" — internal identifier `post_deploy` unchanged
+// for DB / type compatibility.
 //
 // WIP alert: amber count + ⚠ flag when zone count ≥ EPO's limit (default
 // 3/3/3 from epo_wip_limits). D-200 Pattern 2 amber styling.
@@ -51,7 +58,9 @@ import {
 } from '../../../core/types/database';
 
 // WIP_CATEGORY_BY_STAGE mirror — kept in component scope to avoid widening imports.
+// D-WIPLimit amendment 2026-06-15: BRIEF now counts in pre_build.
 const ZONE_BY_STAGE: Partial<Record<LifecycleStage, 'pre_build' | 'build' | 'post_deploy'>> = {
+  BRIEF:    'pre_build',
   DESIGN:   'pre_build',
   SPEC:     'pre_build',
   BUILD:    'build',
@@ -61,6 +70,16 @@ const ZONE_BY_STAGE: Partial<Record<LifecycleStage, 'pre_build' | 'build' | 'pos
   RELEASE:  'post_deploy',
   OUTCOME:  'post_deploy'
 };
+
+/** Resolve WIP zone for a cycle, honouring the ON_HOLD pre-hold rule.
+ *  ON_HOLD cycles count in the zone matching their pre_hold_lifecycle_stage.
+ *  Mirrors lifecycle.getCycleWipZone on the MCP side. */
+function resolveCycleZone(c: { current_lifecycle_stage: LifecycleStage; pre_hold_lifecycle_stage?: LifecycleStage | null; }): 'pre_build' | 'build' | 'post_deploy' | null {
+  const stage = c.current_lifecycle_stage === 'ON_HOLD'
+    ? ((c.pre_hold_lifecycle_stage as LifecycleStage | undefined) || 'BRIEF')
+    : c.current_lifecycle_stage;
+  return ZONE_BY_STAGE[stage] ?? null;
+}
 
 const WIP_LIMIT_DEFAULT = 3;
 
@@ -99,13 +118,34 @@ interface EpoRowView {
           <button *ngIf="canCreateCycle" class="es-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
         </div>
         <p class="es-subtitle">
-          Active Initiatives organized by EPO across Pre-Build, Build, and
-          Post-Deploy zones. The ⚠ flag and amber count mark zones where the
-          EPO has reached or exceeded their configured WIP limit. EPOs whose
-          Initiatives are all in Brief stage carry no WIP and are hidden by
-          default — toggle "Include EPOs with no WIP" below to see them.
-          Click an EPO row to expand; click an EPO name to filter the full dashboard.
+          Active Initiatives organized by EPO across three WIP zones. The ⚠ flag
+          and amber count mark zones where the EPO has reached or exceeded their
+          configured WIP limit. Click an EPO row to expand; click an EPO name to
+          filter the full dashboard.
         </p>
+        <!-- D-WIPLimit amendment 2026-06-15: zone help text. Renders the three
+             zone definitions so users understand which stages count where. -->
+        <div class="es-zone-help">
+          <div class="es-zone-help-row">
+            <span class="es-zone-pill es-zone-pre">Pre-Build</span>
+            <span>Initiatives in <strong>Brief, Design, or Spec</strong> stage — the work an EPO is
+              shaping and specifying before build starts.</span>
+          </div>
+          <div class="es-zone-help-row">
+            <span class="es-zone-pill es-zone-build">Build</span>
+            <span>Initiatives in <strong>Build, Validate, or UAT</strong> stage — actively under
+              construction or in test.</span>
+          </div>
+          <div class="es-zone-help-row">
+            <span class="es-zone-pill es-zone-post">Post-Build</span>
+            <span>Initiatives in <strong>Pilot, Release, or Outcome</strong> stage — deployed and
+              moving through pilot, release, and outcome measurement until closed.</span>
+          </div>
+          <div class="es-zone-help-note">
+            Cancelled and Completed Initiatives are not counted. Initiatives on
+            hold count in the zone they were in before being held.
+          </div>
+        </div>
       </div>
 
       <div class="es-toggle-row">
@@ -164,7 +204,7 @@ interface EpoRowView {
               </span>
               ·
               <span [class.es-over]="row.post_deploy_exceeded">
-                Post-Deploy: {{ row.post_deploy.length }}/{{ row.post_deploy_limit }}
+                Post-Build: {{ row.post_deploy.length }}/{{ row.post_deploy_limit }}
               </span>
               <span *ngIf="anyZoneExceeded(row)" class="es-flag-icon" title="One or more zones at or over the WIP limit">⚠</span>
             </span>
@@ -192,9 +232,9 @@ interface EpoRowView {
             <section class="es-section">
               <div class="es-section-header"
                    [class.es-section-amber]="row.post_deploy_exceeded">
-                Post-Deploy Zone — {{ row.post_deploy.length }} of {{ row.post_deploy_limit }}
+                Post-Build Zone — {{ row.post_deploy.length }} of {{ row.post_deploy_limit }}
               </div>
-              <ng-container *ngTemplateOutlet="zoneRows; context: { cycles: row.post_deploy, emptyMsg: 'No Initiatives in Post-Deploy zone.' }"></ng-container>
+              <ng-container *ngTemplateOutlet="zoneRows; context: { cycles: row.post_deploy, emptyMsg: 'No Initiatives in Post-Build zone.' }"></ng-container>
             </section>
 
           </div>
@@ -254,6 +294,45 @@ interface EpoRowView {
     .es-new-cycle { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; }
     .es-new-cycle:hover { background: #1d5a7a; }
     .es-subtitle { margin: 4px 0 12px 0; font-size: 11px; font-style: italic; color: #5A5A5A; max-width: 720px; line-height: 1.6; }
+    .es-zone-help {
+      max-width: 820px;
+      margin: 0 0 var(--triarq-space-md);
+      padding: var(--triarq-space-sm) var(--triarq-space-md);
+      background: var(--triarq-color-background-subtle, #f5f6fa);
+      border-left: 3px solid var(--triarq-color-primary, #257099);
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--triarq-color-text-primary);
+      line-height: 1.5;
+    }
+    .es-zone-help-row {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--triarq-space-sm);
+      padding: 4px 0;
+    }
+    .es-zone-pill {
+      flex: 0 0 auto;
+      display: inline-block;
+      min-width: 88px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+      color: #fff;
+    }
+    .es-zone-pre   { background: #5A8DAA; }
+    .es-zone-build { background: #257099; }
+    .es-zone-post  { background: #12274A; }
+    .es-zone-help-note {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--triarq-color-border);
+      font-size: 11px;
+      font-style: italic;
+      color: #5A5A5A;
+    }
     .es-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--triarq-space-md); margin-bottom: var(--triarq-space-md); }
     .es-toggle { display: flex; align-items: center; gap: 8px; font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); cursor: pointer; }
     .es-toggle-secondary { color: var(--triarq-color-stone, #5A5A5A); font-size: 11px; margin-left: auto; }
@@ -452,9 +531,11 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
     };
 
     for (const c of this.cycles) {
-      if (!c.assigned_epo_user_id) continue;
-      const zone = ZONE_BY_STAGE[c.current_lifecycle_stage as LifecycleStage];
-      if (!zone) continue;
+      if (!c.assigned_epo_user_id) { continue; }
+      // D-WIPLimit amendment 2026-06-15: BRIEF counts in pre_build; ON_HOLD
+      // resolves via pre_hold_lifecycle_stage. resolveCycleZone handles both.
+      const zone = resolveCycleZone(c);
+      if (!zone) { continue; } // COMPLETE / CANCELLED — excluded per spec.
       const row = ensureRow(c.assigned_epo_user_id, c.assigned_epo_display_name ?? 'EPO');
       row[zone].push(c);
       row.total_active_cycles++;
