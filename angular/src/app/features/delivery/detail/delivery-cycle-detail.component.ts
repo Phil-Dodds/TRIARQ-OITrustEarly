@@ -1199,8 +1199,13 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         <!-- State 2: Link present but Jira not configured -->
         <div *ngIf="jiraLink && syncStubMessage"
              style="font-size:var(--triarq-text-small);">
-          <div>
-            Epic: <strong>{{ jiraLink.jira_epic_key }}</strong>
+          <div *ngIf="!showJiraLinkForm" style="display:flex;align-items:center;gap:var(--triarq-space-sm);">
+            <span>Epic: <strong>{{ jiraLink.jira_epic_key }}</strong></span>
+            <button (click)="openJiraEditForm()"
+                    style="font-size:11px;color:var(--triarq-color-primary);
+                           background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">
+              Edit
+            </button>
           </div>
           <div style="background:#fff8e1;border-left:4px solid var(--triarq-color-sunray,#f5a623);
                       border-radius:0 6px 6px 0;
@@ -1213,8 +1218,13 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
         <!-- State 3: Link present + configured -->
         <div *ngIf="jiraLink && !syncStubMessage">
-          <div style="font-size:var(--triarq-text-small);">
+          <div *ngIf="!showJiraLinkForm" style="font-size:var(--triarq-text-small);">
             Epic: <strong>{{ jiraLink.jira_epic_key }}</strong>
+            <button (click)="openJiraEditForm()"
+                    style="margin-left:var(--triarq-space-sm);font-size:11px;color:var(--triarq-color-primary);
+                           background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">
+              Edit
+            </button>
             &nbsp;·&nbsp; Sync Status:
             <span [style.color]="jiraLink.sync_status === 'synced'
                     ? 'var(--triarq-color-success,#2e7d32)'
@@ -1232,6 +1242,34 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);margin-top:4px;">
             Last sync error: {{ jiraLink.last_sync_error }}
           </div>
+        </div>
+
+        <!-- Edit form — reused for both State 2 and State 3 when showJiraLinkForm is true. -->
+        <div *ngIf="jiraLink && showJiraLinkForm"
+             style="display:flex;align-items:center;gap:var(--triarq-space-sm);
+                    flex-wrap:wrap;margin-top:var(--triarq-space-xs);">
+          <input [formControl]="jiraEpicKeyCtrl"
+                 class="oi-input"
+                 placeholder="e.g. OIT-123"
+                 style="font-size:var(--triarq-text-small);max-width:160px;" />
+          <button class="oi-btn-primary"
+                  (click)="linkJiraEpic()"
+                  [disabled]="jiraEpicKeyCtrl.invalid || linkingJiraEpic"
+                  style="font-size:var(--triarq-text-small);
+                         display:flex;align-items:center;gap:6px;">
+            <ion-spinner *ngIf="linkingJiraEpic" name="crescent"
+                         style="width:14px;height:14px;"></ion-spinner>
+            <span>Save</span>
+          </button>
+          <button (click)="cancelJiraEditForm()"
+                  style="font-size:var(--triarq-text-small);background:none;border:none;
+                         cursor:pointer;color:var(--triarq-color-text-secondary);">
+            Cancel
+          </button>
+          <span *ngIf="jiraLinkError"
+                style="color:var(--triarq-color-error);font-size:var(--triarq-text-small);">
+            {{ jiraLinkError }}
+          </span>
         </div>
       </div>
 
@@ -2399,6 +2437,23 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   }
 
   // ── Jira sync ──────────────────────────────────────────────────────────────
+
+  /** Open the Edit form on an already-linked Jira epic. Pre-populates the
+   *  input with the current key so the user can amend rather than retype. */
+  openJiraEditForm(): void {
+    this.jiraEpicKeyCtrl.setValue(this.jiraLink?.jira_epic_key ?? '');
+    this.jiraLinkError    = '';
+    this.showJiraLinkForm = true;
+    this.cdr.markForCheck();
+  }
+
+  /** Cancel out of an in-progress Jira link/edit form. */
+  cancelJiraEditForm(): void {
+    this.showJiraLinkForm = false;
+    this.jiraLinkError    = '';
+    this.jiraEpicKeyCtrl.reset();
+    this.cdr.markForCheck();
+  }
 
   /** State 1: Link a Jira epic to this cycle using the epic key form.
    *  Phil 2026-06-15 bug fix: now calls link_jira_epic MCP which CREATES
