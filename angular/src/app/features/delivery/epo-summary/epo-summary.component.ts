@@ -95,14 +95,16 @@ interface EpoRowView {
       <div class="es-header">
         <a routerLink="/initiatives" class="es-back-link">← Initiative Tracking</a>
         <div class="es-header-row">
-          <h3 class="es-title">EPO Summary</h3>
+          <h3 class="es-title">EPO WIP Summary</h3>
           <button *ngIf="canCreateCycle" class="es-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
         </div>
         <p class="es-subtitle">
           Active Initiatives organized by EPO across Pre-Build, Build, and
           Post-Deploy zones. The ⚠ flag and amber count mark zones where the
-          EPO has reached or exceeded their configured WIP limit. Click an
-          EPO row to expand; click an EPO name to filter the full dashboard.
+          EPO has reached or exceeded their configured WIP limit. EPOs whose
+          Initiatives are all in Brief stage carry no WIP and are hidden by
+          default — toggle "Include EPOs with no WIP" below to see them.
+          Click an EPO row to expand; click an EPO name to filter the full dashboard.
         </p>
       </div>
 
@@ -130,7 +132,7 @@ interface EpoRowView {
       </div>
 
       <div *ngIf="loadError && !loading" class="es-error">
-        <div class="es-error-primary">EPO Summary could not load.</div>
+        <div class="es-error-primary">EPO WIP Summary could not load.</div>
         <div class="es-error-secondary">{{ loadError }}</div>
       </div>
 

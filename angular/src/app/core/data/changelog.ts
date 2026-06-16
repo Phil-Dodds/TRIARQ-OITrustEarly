@@ -33,6 +33,22 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-06-15',
+    contractLabel: 'EPO Summary → EPO WIP Summary (rename + clarifier)',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiative Tracking hub',
+        description: '"EPO Summary" card renamed to "EPO WIP Summary." Description updated to note that EPOs whose Initiatives are all in Brief stage carry no WIP and are hidden by default.'
+      },
+      {
+        audience:    'All',
+        surface:     'EPO WIP Summary view',
+        description: 'Screen title renamed. Subtitle clarifies that the view counts Initiatives in Pre-Build (Design/Spec), Build (Build/Validate/UAT), and Post-Deploy (Pilot/Release/Outcome) zones only — Brief-stage Initiatives are not WIP. Toggle "Include EPOs with no WIP" to see EPOs whose work hasn\'t yet entered any counted zone.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-15',
     contractLabel: 'Contract 24 — Sort standard + picker scoping + gates feeds + artifact admin',
     items: [
       {

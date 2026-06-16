@@ -35,7 +35,7 @@ interface HubCard {
   /** Optional id; required for cards that surface an async headline (D-396 / spec §4). */
   id?:         'all-initiatives' | 'epo-summary' | 'epo-schedule' | 'epo-deploy'
             |  'workstream-summary' | 'gate-schedule' | 'deploy-schedule'
-            |  'initiative-activity';
+            |  'initiative-activity' | 'gates-approved';
 }
 
 /** Spec §4 headline color semantics. */
@@ -64,12 +64,14 @@ const HUB_CARDS: HubCard[] = [
   },
   {
     id:          'epo-summary',
-    title:       'EPO Summary',
+    title:       'EPO WIP Summary',
     route:       '/initiatives/epo-summary',
     icon:        '◐',
     description: 'WIP counts per EPO across Pre-Build, Build, and Post-Deploy zones. ' +
-                 'Identify EPOs at or over their configured WIP limit. Click an EPO ' +
-                 'to see their matching Initiatives.'
+                 'Identify EPOs at or over their configured WIP limit. EPOs whose ' +
+                 'Initiatives are all in Brief are hidden by default — toggle the ' +
+                 '"Include EPOs with no WIP" filter on the view to see them. Click ' +
+                 'an EPO to see their matching Initiatives.'
   },
   {
     id:          'epo-schedule',
@@ -94,7 +96,7 @@ const HUB_CARDS: HubCard[] = [
     route:       '/initiatives/workstreams',
     icon:        '⟳',
     description: 'WIP throughput per Workstream across Pre-Build, Build, and Post-Deploy ' +
-                 'stages. WIP limits live per EPO — see the EPO Summary view for ' +
+                 'stages. WIP limits live per EPO — see the EPO WIP Summary view for ' +
                  'over-limit alerts. Click the Workstream name to see the matching Initiatives.'
   },
   {
@@ -120,6 +122,15 @@ const HUB_CARDS: HubCard[] = [
     route:       '/initiatives/activity',
     icon:        '◉',
     description: 'Recent activity across all initiatives.'
+  },
+  // Contract 24 (D-431): card 9 — Recently Approved Gates analytical view.
+  // Amends D-396 (eight cards → nine cards).
+  {
+    id:          'gates-approved',
+    title:       'Recently Approved Gates',
+    route:       '/initiatives/gates-approved',
+    icon:        '✓',
+    description: 'Gates approved in the last 4 weeks, across all initiatives in your divisions.'
   }
 ];
 
@@ -323,6 +334,25 @@ export class DeliveryHubComponent implements OnInit {
       },
       error: () => { /* card stays without headline on failure — navigable */ }
     });
+
+    // Contract 24 (D-431) — Recently Approved Gates card 9 headline.
+    // Reuses list_approved_gates and counts the array (no count_only variant
+    // since the endpoint is small and not yet paginated).
+    this.delivery.listApprovedGates({ days_back: 28 }).subscribe({
+      next: (res) => {
+        if (res.success && Array.isArray(res.data)) {
+          const n = res.data.length;
+          this.headlines['gates-approved'] = {
+            text: n === 0
+              ? 'No gates approved in the last 28 days'
+              : `${n} gate${n === 1 ? '' : 's'} approved in the last 28 days`,
+            tone: 'green'
+          };
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => { /* card stays without headline on failure — navigable */ }
+    });
   }
 
   /**
@@ -379,7 +409,8 @@ export class DeliveryHubComponent implements OnInit {
     return id === 'epo-summary'
         || id === 'epo-schedule'
         || id === 'epo-deploy'
-        || id === 'initiative-activity';
+        || id === 'initiative-activity'
+        || id === 'gates-approved';
   }
 
   onCardEnter(event: MouseEvent): void {

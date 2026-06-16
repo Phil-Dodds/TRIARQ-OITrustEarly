@@ -64,7 +64,7 @@ import {
         <p class="ws-subtitle">
           WIP throughput per Workstream across Pre-Build, Build, and Post-Deploy
           stages. WIP limits are configured per EPO — see the
-          <a routerLink="/initiatives/epo-summary" class="ws-subtitle-link">EPO Summary view</a>
+          <a routerLink="/initiatives/epo-summary" class="ws-subtitle-link">EPO WIP Summary view</a>
           for over-limit alerts.
         </p>
       </div>
