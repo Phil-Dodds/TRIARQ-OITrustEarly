@@ -124,24 +124,25 @@ interface EpoRowView {
           filter the full dashboard.
         </p>
         <!-- D-WIPLimit amendment 2026-06-15: zone help text. Renders the three
-             zone definitions so users understand which stages count where. -->
-        <div class="es-zone-help">
-          <div class="es-zone-help-row">
-            <span class="es-zone-pill es-zone-pre">Pre-Build</span>
+             zone definitions so users understand which stages count where.
+             Styles in global styles.scss (.oi-zone-help) per D-371. -->
+        <div class="oi-zone-help">
+          <div class="oi-zone-help-row">
+            <span class="oi-zone-pill oi-zone-pre">Pre-Build</span>
             <span>Initiatives in <strong>Brief, Design, or Spec</strong> stage — the work an EPO is
               shaping and specifying before build starts.</span>
           </div>
-          <div class="es-zone-help-row">
-            <span class="es-zone-pill es-zone-build">Build</span>
+          <div class="oi-zone-help-row">
+            <span class="oi-zone-pill oi-zone-build">Build</span>
             <span>Initiatives in <strong>Build, Validate, or UAT</strong> stage — actively under
               construction or in test.</span>
           </div>
-          <div class="es-zone-help-row">
-            <span class="es-zone-pill es-zone-post">Post-Build</span>
+          <div class="oi-zone-help-row">
+            <span class="oi-zone-pill oi-zone-post">Post-Build</span>
             <span>Initiatives in <strong>Pilot, Release, or Outcome</strong> stage — deployed and
               moving through pilot, release, and outcome measurement until closed.</span>
           </div>
-          <div class="es-zone-help-note">
+          <div class="oi-zone-help-note">
             Cancelled and Completed Initiatives are not counted. Initiatives on
             hold count in the zone they were in before being held.
           </div>
@@ -294,45 +295,8 @@ interface EpoRowView {
     .es-new-cycle { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; }
     .es-new-cycle:hover { background: #1d5a7a; }
     .es-subtitle { margin: 4px 0 12px 0; font-size: 11px; font-style: italic; color: #5A5A5A; max-width: 720px; line-height: 1.6; }
-    .es-zone-help {
-      max-width: 820px;
-      margin: 0 0 var(--triarq-space-md);
-      padding: var(--triarq-space-sm) var(--triarq-space-md);
-      background: var(--triarq-color-background-subtle, #f5f6fa);
-      border-left: 3px solid var(--triarq-color-primary, #257099);
-      border-radius: 4px;
-      font-size: 12px;
-      color: var(--triarq-color-text-primary);
-      line-height: 1.5;
-    }
-    .es-zone-help-row {
-      display: flex;
-      align-items: flex-start;
-      gap: var(--triarq-space-sm);
-      padding: 4px 0;
-    }
-    .es-zone-pill {
-      flex: 0 0 auto;
-      display: inline-block;
-      min-width: 88px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 600;
-      text-align: center;
-      color: #fff;
-    }
-    .es-zone-pre   { background: #5A8DAA; }
-    .es-zone-build { background: #257099; }
-    .es-zone-post  { background: #12274A; }
-    .es-zone-help-note {
-      margin-top: 6px;
-      padding-top: 6px;
-      border-top: 1px dashed var(--triarq-color-border);
-      font-size: 11px;
-      font-style: italic;
-      color: #5A5A5A;
-    }
+    /* Zone-help block styles live in global styles.scss (.oi-zone-help) to keep
+       this component under its CSS budget — D-371 quality discipline. */
     .es-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: var(--triarq-space-md); margin-bottom: var(--triarq-space-md); }
     .es-toggle { display: flex; align-items: center; gap: 8px; font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); cursor: pointer; }
     .es-toggle-secondary { color: var(--triarq-color-stone, #5A5A5A); font-size: 11px; margin-left: auto; }

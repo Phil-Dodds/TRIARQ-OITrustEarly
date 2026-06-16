@@ -398,6 +398,49 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
 }
 .oi-warn-text:last-child { margin-bottom: 0; }
 
+// D-WIPLimit amendment 2026-06-15 — Zone help block.
+// Used by EPO WIP Summary to render the three-zone explanation.
+// Lives in global styles so component CSS budget (D-371) is preserved.
+.oi-zone-help {
+  max-width: 820px;
+  margin: 0 0 var(--triarq-space-md);
+  padding: var(--triarq-space-sm) var(--triarq-space-md);
+  background: var(--triarq-color-background-subtle, #f5f6fa);
+  border-left: 3px solid var(--triarq-color-primary, #257099);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--triarq-color-text-primary);
+  line-height: 1.5;
+}
+.oi-zone-help-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--triarq-space-sm);
+  padding: 4px 0;
+}
+.oi-zone-pill {
+  flex: 0 0 auto;
+  display: inline-block;
+  min-width: 88px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: #fff;
+}
+.oi-zone-pre   { background: #5A8DAA; }
+.oi-zone-build { background: #257099; }
+.oi-zone-post  { background: #12274A; }
+.oi-zone-help-note {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--triarq-color-border);
+  font-size: 11px;
+  font-style: italic;
+  color: #5A5A5A;
+}
+
 // S-036 / D-432 — Grid Column Sort Standard.
 // Sortable column header: ↕ on hover (uses ::after pseudo), ↑/↓ when active
 // (rendered inline by the component as .oi-sort-active text). Indicator
