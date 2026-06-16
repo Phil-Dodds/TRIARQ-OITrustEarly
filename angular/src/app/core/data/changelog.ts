@@ -33,6 +33,77 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-06-15',
+    contractLabel: 'Contract 24 — Sort standard + picker scoping + gates feeds + artifact admin',
+    items: [
+      {
+        audience:    'Admin',
+        surface:     'User Management grid',
+        description: 'User Name, Last Login, Created, and Invite Status columns are now sortable. Default sort is Last Login descending. Click a column header to sort; click again to flip direction.'
+      },
+      {
+        audience:    'All',
+        surface:     'All Initiatives grid',
+        description: 'Stage column renamed to Gate and is now sortable. Sort defaults to descending — Initiatives closest to release appear first. Sub-sorted by the next gate target date within each gate.'
+      },
+      {
+        audience:    'All',
+        surface:     'Division pickers system-wide',
+        description: 'Native Division dropdowns now group Divisions under their parent Trust, alphabetical within each group.'
+      },
+      {
+        audience:    'All',
+        surface:     'New Initiative + Edit Initiative panels',
+        description: 'Division field is now a picker. Non-Admin users see their assigned Divisions first with a "Show all divisions" expansion. Admin users see a Recently Used section at the top.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Home screen',
+        description: 'New "My Completed Gates" card lists gates approved on your Initiatives in the last 4 weeks. "View all" deep-links to the Recently Approved Gates view filtered to you.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Tracking hub',
+        description: 'New hub card 9 "Recently Approved Gates" with last-28-days headline.'
+      },
+      {
+        audience:    'All',
+        surface:     'Recently Approved Gates view',
+        description: 'New /initiatives/gates-approved route. Read-only feed of gates approved in the last 28 days across all Initiatives in your Divisions. All columns sortable.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Admin hub',
+        description: 'New "Artifact Types" card.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Artifact Types admin screen',
+        description: 'New /admin/artifact-types screen. Manage suggested artifact types per lifecycle stage and gate. Deactivation only — no delete; historical attachments are preserved.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Gate Record modal',
+        description: 'When you approve a Go to Build or Go to Deploy gate that would push an EPO at or over their WIP limit, an amber WIP warning now appears in the modal. Suggested artifacts that were not attached before approval are also surfaced — both are reminders, not blockers.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative detail panel',
+        description: 'Jira sync zone now shows a clear "Not linked" status when no Jira epic is linked, and an "API not yet configured" message when a link is present but sync is dormant.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative detail panel',
+        description: 'Edit button added next to a linked Jira epic key — change the key without unlinking first. Pre-populates the input with the current key.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative detail panel',
+        description: 'Cancel Initiative now works. The Cancel and Un-cancel buttons were calling MCP endpoints that had never been built — clicking Cancel always failed silently. Both endpoints are now in place; cancelled Initiatives can be restored to their pre-cancel stage from the same panel.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-15',
     contractLabel: 'Artifact attach form — focus stays in input',
     items: [
       {
