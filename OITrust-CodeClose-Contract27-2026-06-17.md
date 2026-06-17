@@ -300,7 +300,37 @@ Already prepended to `angular/src/app/core/data/changelog.ts` in commit `8a52fbe
 
 ---
 
-## Section I — Session output path
+## Section I — Retro Items
+
+**Retro-27-1 — Contract 26 changes are not in `changelog.ts`.**
+
+Observation: the Contract 27 spec referenced "Contract 26 (AC-29) closed" as a
+prerequisite, but no Contract 26 entry exists in
+`angular/src/app/core/data/changelog.ts` and no commit on master is labelled
+Contract 26 (last commit before this session was `bc88dfa` Contract 25 Part 2).
+
+Implications:
+- Users opening the About panel on the deployed app see the timeline jump from
+  Contract 25 Part 2 follow-ons (2026-06-16) directly to Contract 27 (today) —
+  Contract 26 user-facing changes (if any shipped) are invisible.
+- S-035 conformance is broken for whatever surfaces Contract 26 touched.
+- No backfill was added in this session because inventing content is worse than
+  the gap.
+
+Action for next Design Session:
+1. Confirm whether Contract 26 shipped to production or was rolled into another
+   contract under a different label.
+2. If it shipped, produce the missing About Entry block from Contract 26's
+   CodeClose output (or reconstruct from the diff if no CodeClose exists) and
+   land it via the next Code session.
+3. If it never shipped, retire the "Contract 26" reference in the Contract 27
+   spec prerequisite line and any other governance document that cites it.
+
+Surfaced by Phil during the Contract 27 CodeClose review on 2026-06-17.
+
+---
+
+## Section J — Session output path
 
 Phil — full Windows path to this document:
 
