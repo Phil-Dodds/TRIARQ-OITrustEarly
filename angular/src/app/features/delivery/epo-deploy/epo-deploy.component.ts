@@ -61,8 +61,20 @@ import {
   DeliveryCycle,
   Division,
   DateStatus,
-  CycleMilestoneDate
+  CycleMilestoneDate,
+  RoadmapFreezeDate
 } from '../../../core/types/database';
+import {
+  QuarterRef,
+  quarterOfDate,
+  shiftQuarter as shiftQuarterRef,
+  quarterFromIso,
+  isoInQuarter,
+  quarterIndex,
+  computePriorQuarterSymbol,
+  PRIOR_QUARTER_SYMBOL_DISPLAY,
+  PriorQuarterSymbol
+} from '../shared/roadmap-planning.util';
 
 const DEPLOY_GATE = 'go_to_deploy';
 // D-419 walkback chain — Go to Deploy → Go to Build → Brief Review. First gate
@@ -78,12 +90,6 @@ interface EpoGroup {
   nextQ1:       DeliveryCycle[];  // Q+1
   nextQ2:       DeliveryCycle[];  // Q+2
   unscheduled:  DeliveryCycle[];
-}
-
-interface QuarterLabel {
-  label: string;   // e.g. "Q2 2026"
-  year:  number;
-  q:     number;
 }
 
 @Component({
@@ -104,13 +110,39 @@ interface QuarterLabel {
         <a routerLink="/initiatives" class="edp-back-link">← Initiative Tracking</a>
         <div class="edp-header-row">
           <h3 class="edp-title">EPO Deploy by Quarter</h3>
+
+          <!-- D-445: Quarter Pivot Control — non-persistent, resets on every load. -->
+          <div class="rpd-pivot" *ngIf="referenceQuarter">
+            <button type="button" class="rpd-pivot-btn" (click)="onShiftQuarter(-1)" aria-label="Previous quarter">‹</button>
+            <span class="rpd-pivot-label">{{ referenceQuarter.label }}</span>
+            <button type="button" class="rpd-pivot-btn" (click)="onShiftQuarter(1)"  aria-label="Next quarter">›</button>
+          </div>
+
           <button *ngIf="canCreateCycle" class="edp-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
         </div>
+
+        <!-- D-446: Baseline selector — non-persistent. -->
+        <div class="rpd-baseline-row">
+          <label class="rpd-baseline-label">Baseline:</label>
+          <select class="rpd-baseline-select"
+                  [disabled]="freezeDates.length === 0"
+                  [ngModel]="selectedFreezeDateId"
+                  (ngModelChange)="onBaselineChange($event)">
+            <option *ngIf="freezeDates.length === 0" [ngValue]="null">No baselines saved — see Admin</option>
+            <ng-container *ngIf="freezeDates.length > 0">
+              <option [ngValue]="null">— Select baseline —</option>
+              <option *ngFor="let fd of freezeDates" [ngValue]="fd.freeze_date_id">
+                {{ fd.freeze_label }} — {{ formatBaselineDate(fd.freeze_date) }}
+              </option>
+            </ng-container>
+          </select>
+        </div>
+
         <p class="edp-subtitle">
           Go to Deploy gate cadence per EPO across the prior quarter ({{ priorQuarter.label }}),
-          current quarter ({{ currentQuarter.label }}), and other active Initiatives. Click an EPO row
-          to expand and see Initiatives grouped by quarter. Click an EPO name to filter
-          the full dashboard to their Initiatives.
+          current quarter ({{ currentQuarter.label }}), and active Initiatives. Use the quarter
+          control to anchor a different reference quarter. Select a baseline to compare prior
+          quarter planned vs. actual deployments.
         </p>
       </div>
 
@@ -154,18 +186,33 @@ interface QuarterLabel {
           <!-- D-419 four-section body. -->
           <div *ngIf="isExpanded(group.user_id)" class="edp-body">
 
-            <!-- Section 1 — Prior Quarter Actual -->
+            <!-- Section 1 — Prior Quarter Actual / Planned vs Actual -->
             <section class="edp-section">
               <div class="edp-section-header">
-                Prior Quarter — {{ priorQuarter.label }} Actual
+                {{ priorSectionHeader }}
               </div>
+
+              <!-- D-446: Data gap notice (D-200 Pattern 2). -->
+              <div *ngIf="showDataGapNotice" class="rpd-data-gap">
+                <span class="rpd-data-gap-text">
+                  Target date history before {{ dataGapBoundaryLabel }} is incomplete.
+                  Some initiatives may be misclassified.
+                </span>
+                <button type="button" class="rpd-data-gap-dismiss" (click)="dismissDataGap()">Got it</button>
+              </div>
+
               <div class="edp-grid edp-grid-header">
                 <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
               </div>
               <ng-container *ngIf="group.prior.length > 0; else priorEmpty">
                 <div *ngFor="let c of group.prior; trackBy: trackByCycleId"
                      class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
-                  <span class="edp-cycle-title">{{ c.cycle_title }}</span>
+                  <span class="edp-cycle-title">
+                    <span *ngIf="priorQuarterSymbolFor(c) as sym"
+                          class="rpd-prior-symbol"
+                          [style.color]="sym.color">{{ sym.char }}</span>
+                    {{ c.cycle_title }}
+                  </span>
                   <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
                   <span>{{ deployDisplay(c) }}</span>
                   <span>
@@ -313,7 +360,7 @@ interface QuarterLabel {
     .edp-shell { max-width: 1100px; margin: var(--triarq-space-2xl) auto; padding: 0 var(--triarq-space-md); }
     .edp-back-link { font-size: var(--triarq-text-small); color: var(--triarq-color-primary); text-decoration: none; }
     .edp-header { margin-bottom: var(--triarq-space-md); }
-    .edp-header-row { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 4px 0; }
+    .edp-header-row { display: flex; align-items: center; gap: var(--triarq-space-md); justify-content: space-between; margin: 8px 0 4px; flex-wrap: wrap; }
     .edp-title { margin: 0; }
     .edp-new-cycle { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
     .edp-new-cycle:hover { background: #1d5a7a; }
@@ -364,6 +411,19 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
   cancelEditSignal = 0;
   showEditScrim    = false;
 
+  // D-445: Reference quarter — non-persistent. Initialized to actual current
+  // calendar quarter on every component init. Mutated by Quarter Pivot Control.
+  referenceQuarter: QuarterRef = quarterOfDate(new Date());
+
+  // D-446: Baseline selector state — non-persistent. selectedFreezeDateId is
+  // bound to the <select>; selectedFreezeDate is the resolved record.
+  freezeDates: RoadmapFreezeDate[]               = [];
+  selectedFreezeDateId: string | null            = null;
+  selectedFreezeDate:   RoadmapFreezeDate | null = null;
+
+  // D-446: Data gap notice — dismissed flag persisted via user_screen_state.
+  dataGapDismissed = false;
+
   readonly skeletonRows = [1, 2, 3];
 
   private readonly profileSub = new Subscription();
@@ -378,6 +438,9 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    // D-445: pivot resets to actual current quarter on every load.
+    this.referenceQuarter = quarterOfDate(new Date());
+
     this.profileSub.add(
       this.profile.profile$.pipe(
         filter((p): p is NonNullable<typeof p> => p !== null),
@@ -396,9 +459,16 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
           this.showMyDivisionsOnly = saved.filter_state['showMyDivisionsOnly'] as boolean;
         }
 
+        // D-446: load persisted data-gap dismissal flag.
+        const gapState = await this.screenState.restore(
+          SCREEN_KEYS.INITIATIVES_EPO_DEPLOY_DATA_GAP_DISMISSED
+        );
+        this.dataGapDismissed = gapState?.filter_state?.['dismissed'] === true;
+
         if (!this.isPrivileged) {
           await this.loadUserDivisions(userId);
         }
+        this.loadFreezeDates();
         this.loadCycles();
       })
     );
@@ -425,10 +495,19 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
     this.loadError = '';
     this.cdr.markForCheck();
 
-    const params: { division_id?: string; include_child_divisions?: boolean } = {};
+    const params: {
+      division_id?:             string;
+      include_child_divisions?: boolean;
+      include_event_log?:       boolean;
+    } = {};
     if (!this.isPrivileged && this.showMyDivisionsOnly && this.userDivisionIds.length === 1) {
       params.division_id = this.userDivisionIds[0];
       params.include_child_divisions = true;
+    }
+    // D-446: only pull event log when a baseline is selected — symbol algorithm
+    // is the only consumer.
+    if (this.selectedFreezeDate) {
+      params.include_event_log = true;
     }
 
     this.delivery.listCycles(params).subscribe({
@@ -449,6 +528,37 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ── D-444 / D-446: Baseline list + selection ─────────────────────────────
+
+  private loadFreezeDates(): void {
+    this.delivery.listRoadmapFreezeDates().subscribe({
+      next: (res) => {
+        this.freezeDates = (res.success && res.data) ? res.data : [];
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.freezeDates = [];
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  onBaselineChange(freezeDateId: string | null): void {
+    this.selectedFreezeDateId = freezeDateId;
+    this.selectedFreezeDate   = freezeDateId
+      ? (this.freezeDates.find(f => f.freeze_date_id === freezeDateId) ?? null)
+      : null;
+    // Re-query so target_date_change_events are present (or stripped) per state.
+    this.loadCycles();
+  }
+
+  formatBaselineDate(iso: string): string {
+    if (!iso) { return '—'; }
+    const d = new Date(iso + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) { return iso; }
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
   onToggleChange(): void {
     this.screenState.save(
       SCREEN_KEYS.INITIATIVES_EPO_DEPLOY,
@@ -458,53 +568,74 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
     this.loadCycles();
   }
 
-  // ── Quarter math (mirrors deploy-schedule) ────────────────────────────────
+  // ── D-445: Reference-quarter pivot ────────────────────────────────────────
 
-  private quarterOf(d: Date): { year: number; q: number } {
-    return { year: d.getFullYear(), q: Math.floor(d.getMonth() / 3) + 1 };
+  onShiftQuarter(delta: number): void {
+    this.referenceQuarter = shiftQuarterRef(this.referenceQuarter, delta);
+    this.cdr.markForCheck();
   }
 
-  private quarterFromIso(iso: string | null | undefined): { year: number; q: number } | null {
-    if (!iso) return null;
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return null;
-    return this.quarterOf(d);
+  // ── Quarter accessors — derive from referenceQuarter (D-445) ─────────────
+
+  get currentQuarter(): QuarterRef { return this.referenceQuarter; }
+  get priorQuarter():   QuarterRef { return shiftQuarterRef(this.referenceQuarter, -1); }
+  get nextQ1():         QuarterRef { return shiftQuarterRef(this.referenceQuarter, 1); }
+  get nextQ2():         QuarterRef { return shiftQuarterRef(this.referenceQuarter, 2); }
+
+  private inQuarter(iso: string | null | undefined, target: QuarterRef): boolean {
+    return isoInQuarter(iso, target);
   }
 
-  get currentQuarter(): QuarterLabel {
-    const q = this.quarterOf(new Date());
-    return { ...q, label: `Q${q.q} ${q.year}` };
-  }
-
-  get priorQuarter(): QuarterLabel {
-    return this.shiftedQuarter(-1);
-  }
-
-  /** D-419 — next two quarters. nextQ1 = current + 1; nextQ2 = current + 2. */
-  get nextQ1(): QuarterLabel { return this.shiftedQuarter(1); }
-  get nextQ2(): QuarterLabel { return this.shiftedQuarter(2); }
-
-  private shiftedQuarter(offset: number): QuarterLabel {
-    const now = this.quarterOf(new Date());
-    let q = now.q + offset;
-    let year = now.year;
-    while (q < 1)  { q += 4; year -= 1; }
-    while (q > 4)  { q -= 4; year += 1; }
-    return { year, q, label: `Q${q} ${year}` };
-  }
-
-  private inQuarter(iso: string | null | undefined, target: QuarterLabel): boolean {
-    const q = this.quarterFromIso(iso);
-    return !!q && q.year === target.year && q.q === target.q;
-  }
-
-  /** True if the calendar quarter for `iso` is at or beyond `target` (Q+2). */
-  private quarterIndex(q: { year: number; q: number }): number {
-    return q.year * 4 + q.q;
-  }
   private isoQuarterIndex(iso: string | null | undefined): number | null {
-    const q = this.quarterFromIso(iso);
-    return q ? this.quarterIndex(q) : null;
+    const q = quarterFromIso(iso);
+    return q ? quarterIndex(q) : null;
+  }
+
+  // ── D-446: Section header + per-row symbol + data-gap notice ─────────────
+
+  get priorSectionHeader(): string {
+    const base = `Prior Quarter — ${this.priorQuarter.label}`;
+    if (this.selectedFreezeDate) {
+      return `${base} Planned / Actual · ${this.selectedFreezeDate.freeze_label}`;
+    }
+    return `${base} Actual`;
+  }
+
+  /** Returns symbol display object for the row, or null when no symbol. */
+  priorQuarterSymbolFor(c: DeliveryCycle): { char: string; color: string } | null {
+    if (!this.selectedFreezeDate) { return null; }
+    const sym: PriorQuarterSymbol | null = computePriorQuarterSymbol(
+      c,
+      this.selectedFreezeDate.freeze_date,
+      this.priorQuarter,
+      c.target_date_change_events
+    );
+    return sym ? PRIOR_QUARTER_SYMBOL_DISPLAY[sym] : null;
+  }
+
+  /** Spec §Workstream 3 Data Gap Disclosure — show when (a) baseline selected,
+   *  (b) not yet dismissed, and (c) zero milestone_target_date_changed events
+   *  exist across the loaded cycles. Contract 23 deploy date is not currently
+   *  recorded in CLAUDE.md or changelog.ts — CC-27-4 records this fallback. */
+  get showDataGapNotice(): boolean {
+    if (!this.selectedFreezeDate || this.dataGapDismissed) { return false; }
+    const anyEvents = this.cycles.some(c => (c.target_date_change_events?.length ?? 0) > 0);
+    return !anyEvents;
+  }
+
+  get dataGapBoundaryLabel(): string {
+    if (!this.selectedFreezeDate) { return ''; }
+    return this.formatBaselineDate(this.selectedFreezeDate.freeze_date);
+  }
+
+  dismissDataGap(): void {
+    this.dataGapDismissed = true;
+    this.screenState.save(
+      SCREEN_KEYS.INITIATIVES_EPO_DEPLOY_DATA_GAP_DISMISSED,
+      { dismissed: true },
+      {}
+    );
+    this.cdr.markForCheck();
   }
 
   // ── Deploy gate helpers ───────────────────────────────────────────────────
@@ -585,7 +716,7 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
     const current = this.currentQuarter;
     const q1      = this.nextQ1;
     const q2      = this.nextQ2;
-    const q2Index = this.quarterIndex(q2);
+    const q2Index = quarterIndex(q2);
 
     const isActive = (c: DeliveryCycle) =>
       c.current_lifecycle_stage !== 'COMPLETE' &&

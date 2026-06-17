@@ -51,6 +51,11 @@ export const SCREEN_KEYS = {
   // every Division assignment picker. Stores last-5 selected Division ids
   // under filter_state.ids per user.
   PICKER_DIVISION_RECENT:   'picker.division.recent',
+  // Contract 27 (D-444): Deploy Roadmap Baselines admin screen sort.
+  ADMIN_DEPLOY_BASELINES:   'admin.deploy-baselines',
+  // Contract 27 (D-446): per-view dismissal flag for the pre-Contract-23 data-gap notice.
+  INITIATIVES_EPO_DEPLOY_DATA_GAP_DISMISSED:   'initiatives.epo-deploy.data-gap-dismissed',
+  DELIVERY_DEPLOY_SCHEDULE_DATA_GAP_DISMISSED: 'delivery.deploy-schedule.data-gap-dismissed',
 } as const;
 
 export type ScreenKey = typeof SCREEN_KEYS[keyof typeof SCREEN_KEYS];

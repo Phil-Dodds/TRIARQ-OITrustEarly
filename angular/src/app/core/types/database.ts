@@ -270,6 +270,17 @@ export interface DeliveryCycle {
   // detail panel can render one card per type whether or not an attachment
   // exists. Phil 2026-06-15: every slot active in every state.
   artifact_types?:         CycleArtifactType[];
+  // Contract 27 / D-446: optional milestone_target_date_changed projection.
+  // Present only when list_delivery_cycles is called with include_event_log:true.
+  // Ordered created_at DESC; capped at 50 entries per cycle.
+  target_date_change_events?: MilestoneTargetDateChangeEvent[];
+}
+
+export interface MilestoneTargetDateChangeEvent {
+  created_at:      string;
+  gate_name:       GateName | null;
+  old_target_date: string | null;
+  new_target_date: string | null;
 }
 
 export interface CycleMilestoneDate {
@@ -578,4 +589,14 @@ export interface ArtifactTypeRow {
   active_status:          boolean;
   created_at:             string;
   updated_at:             string;
+}
+
+// Contract 27 (D-444) — Deploy Roadmap Baselines registry.
+export interface RoadmapFreezeDate {
+  freeze_date_id:          string;
+  freeze_date:             string;          // ISO date string YYYY-MM-DD
+  freeze_label:            string;
+  created_at:              string;
+  created_by_user_id:      string;
+  created_by_display_name: string | null;
 }

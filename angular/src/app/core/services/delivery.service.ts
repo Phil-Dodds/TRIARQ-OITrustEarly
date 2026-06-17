@@ -29,7 +29,8 @@ import {
   ApprovedGateRow,
   MyCompletedGatesResponse,
   ArtifactTypeRow,
-  GateDecisionResult
+  GateDecisionResult,
+  RoadmapFreezeDate
 } from '../types/database';
 
 @Injectable({ providedIn: 'root' })
@@ -134,6 +135,7 @@ export class DeliveryService {
     filter_no_workstream?:     boolean;   // D-167: when true, returns only cycles with no workstream
     tier_classification?:      TierClassification;
     assigned_to_current_user?: boolean;   // D-391: when true, returns only cycles where caller is DCS, EPO, or DOL
+    include_event_log?:        boolean;   // D-446: when true, attaches target_date_change_events per cycle
   } = {}): Observable<McpResponse<DeliveryCycle[]>> {
     return this.mcp.call<DeliveryCycle[]>('delivery', 'list_delivery_cycles', params as Record<string, unknown>);
   }
@@ -449,5 +451,42 @@ export class DeliveryService {
     jira_epic_key:     string;
   }): Observable<McpResponse<{ jira_epic_key: string; sync_status: string; last_synced_at?: string; stub?: boolean; message?: string }>> {
     return this.mcp.call('delivery', 'sync_jira_epic', params as Record<string, unknown>);
+  }
+
+  // ── Contract 27 — Deploy Roadmap Baselines (D-444) ────────────────────────
+
+  /** Any authenticated user — deploy views call this for the baseline selector. */
+  listRoadmapFreezeDates(): Observable<McpResponse<RoadmapFreezeDate[]>> {
+    return this.mcp.call<RoadmapFreezeDate[]>('delivery', 'list_roadmap_freeze_dates', {});
+  }
+
+  /** Admin only. Returns DUPLICATE_DATE in data.code on freeze_date collision. */
+  createRoadmapFreezeDate(params: {
+    freeze_date:  string;     // ISO YYYY-MM-DD
+    freeze_label: string;
+  }): Observable<McpResponse<RoadmapFreezeDate>> {
+    return this.mcp.call<RoadmapFreezeDate>(
+      'delivery', 'create_roadmap_freeze_date', params as Record<string, unknown>
+    );
+  }
+
+  /** Admin only. */
+  updateRoadmapFreezeDate(params: {
+    freeze_date_id: string;
+    freeze_date?:   string;
+    freeze_label?:  string;
+  }): Observable<McpResponse<RoadmapFreezeDate>> {
+    return this.mcp.call<RoadmapFreezeDate>(
+      'delivery', 'update_roadmap_freeze_date', params as Record<string, unknown>
+    );
+  }
+
+  /** Admin only. Soft-delete (CC-27-1) — clears the active uniqueness slot. */
+  deleteRoadmapFreezeDate(params: {
+    freeze_date_id: string;
+  }): Observable<McpResponse<{ deleted: true; freeze_date_id: string }>> {
+    return this.mcp.call<{ deleted: true; freeze_date_id: string }>(
+      'delivery', 'delete_roadmap_freeze_date', params as Record<string, unknown>
+    );
   }
 }

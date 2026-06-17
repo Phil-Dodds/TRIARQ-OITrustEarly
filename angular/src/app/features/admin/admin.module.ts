@@ -20,7 +20,9 @@ import { IonicModule }  from '@ionic/angular';
       // Contract 20 (D-401): EPO WIP Limits admin screen.
       { path: 'epo-wip',     loadComponent: () => import('./epo-wip-limits/epo-wip-limits.component').then(c => c.EpoWipLimitsComponent) },
       // Contract 24 (D-437): Artifact Type management admin screen.
-      { path: 'artifact-types', loadComponent: () => import('./artifact-types/artifact-types.component').then(c => c.ArtifactTypesComponent) }
+      { path: 'artifact-types', loadComponent: () => import('./artifact-types/artifact-types.component').then(c => c.ArtifactTypesComponent) },
+      // Contract 27 (D-444): Deploy Roadmap Baselines admin screen.
+      { path: 'deploy-baselines', loadComponent: () => import('./deploy-baselines/deploy-baselines.component').then(c => c.DeployBaselinesComponent) }
     ])
   ]
 })

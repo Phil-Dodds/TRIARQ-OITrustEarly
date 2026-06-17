@@ -55,6 +55,14 @@ const ADMIN_CARDS: AdminCard[] = [
     who:         'Phil and Admin',
     route:       'artifact-types',
     icon:        '⬢'
+  },
+  // Contract 27 (D-444): sixth admin card — Deploy Roadmap Baselines.
+  {
+    title:       'Deploy Roadmap Baselines',
+    description: 'Manage the roadmap baselines used for planned vs. actual deployment analysis. Each baseline is a dated snapshot — when selected on the Deploy by Quarter views it lights up which Initiatives shipped as planned and which shifted.',
+    who:         'Phil and Admin',
+    route:       'deploy-baselines',
+    icon:        '◇'
   }
 ];
 

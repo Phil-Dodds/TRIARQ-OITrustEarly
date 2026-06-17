@@ -10,6 +10,12 @@
 //   filter_no_workstream      — when true, return only cycles with no workstream assigned (D-167)
 //   tier_classification       — filter by tier
 //   assigned_to_current_user  — when true, return only cycles where the caller is the assigned DS or CB
+//   include_event_log         — Contract 27 / D-446: when true, attaches up to 50
+//                               milestone_target_date_changed events per cycle to
+//                               support prior-quarter Planned vs. Actual symbols on
+//                               the Deploy by Quarter views. Events are projected as
+//                               { created_at, gate_name, old_target_date,
+//                                 new_target_date } sorted created_at DESC.
 //
 // D-165: workstream_id may be null on cycles created without a workstream assignment.
 // D-166: division filter supports child division inheritance via include_child_divisions flag.
@@ -39,7 +45,8 @@ async function list_delivery_cycles(params, caller_user_id) {
     workstream_id,
     filter_no_workstream,
     tier_classification,
-    assigned_to_current_user
+    assigned_to_current_user,
+    include_event_log
   } = params;
 
   // ── Resolve accessible division IDs for this user ─────────────────────────
@@ -223,6 +230,33 @@ async function list_delivery_cycles(params, caller_user_id) {
     }
   }
 
+  // ── Contract 27 / D-446: Optional milestone_target_date_changed event log.
+  // Required by the Deploy by Quarter prior-quarter planned-vs-actual symbol
+  // algorithm. Cap at 50 entries per cycle to keep the payload bounded.
+  let targetChangeMap = {};
+  if (include_event_log === true && cycleIds.length > 0) {
+    const { data: eventRows } = await supabase
+      .from('cycle_event_log')
+      .select('delivery_cycle_id, created_at, event_metadata')
+      .in('delivery_cycle_id', cycleIds)
+      .eq('event_type', 'milestone_target_date_changed')
+      .order('created_at', { ascending: false });
+
+    if (eventRows) {
+      for (const e of eventRows) {
+        const bucket = targetChangeMap[e.delivery_cycle_id] || [];
+        if (bucket.length >= 50) { continue; }
+        bucket.push({
+          created_at:      e.created_at,
+          gate_name:       e.event_metadata?.gate_name        ?? null,
+          old_target_date: e.event_metadata?.old_target_date  ?? null,
+          new_target_date: e.event_metadata?.new_target_date  ?? null
+        });
+        targetChangeMap[e.delivery_cycle_id] = bucket;
+      }
+    }
+  }
+
   const enriched = cycles.map(c => ({
     ...c,
     assigned_dcs_display_name: c.assigned_dcs_user_id ? (userMap[c.assigned_dcs_user_id] ?? null) : null,
@@ -231,7 +265,10 @@ async function list_delivery_cycles(params, caller_user_id) {
     division_name:       c.division_id ? (divisionMap[c.division_id]?.division_name ?? null) : null,
     display_name_short:  c.division_id ? (divisionMap[c.division_id]?.display_name_short ?? null) : null,
     milestone_dates:     milestoneMap[c.delivery_cycle_id] || [],
-    gate_records:        gateRecordsMap[c.delivery_cycle_id] || []
+    gate_records:        gateRecordsMap[c.delivery_cycle_id] || [],
+    ...(include_event_log === true
+      ? { target_date_change_events: targetChangeMap[c.delivery_cycle_id] || [] }
+      : {})
   }));
 
   return { success: true, data: enriched };

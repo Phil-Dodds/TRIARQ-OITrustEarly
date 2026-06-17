@@ -441,6 +441,64 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
   color: #5A5A5A;
 }
 
+// ── Roadmap Planning Mode (D-445 / D-446, Contract 27) ────────────────────
+// Quarter Pivot Control, baseline selector, data-gap notice, and prior-quarter
+// symbol — shared between EPO Deploy and Workstream Deploy views. Hosted here
+// per D-371 (CSS budget discipline) — both view components would otherwise
+// duplicate the same ~700 bytes of rules and breach the 4 kB hard ceiling.
+.rpd-pivot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.rpd-pivot-btn {
+  background: transparent;
+  color: var(--triarq-color-primary);
+  border: 1px solid var(--triarq-color-border);
+  border-radius: 5px;
+  width: 28px; height: 28px;
+  font-size: 16px; line-height: 1;
+  padding: 0; cursor: pointer;
+  &:hover { background: rgba(37,112,153,0.06); }
+}
+.rpd-pivot-label {
+  min-width: 80px;
+  text-align: center;
+  font-size: var(--triarq-text-small);
+  font-weight: 500;
+}
+.rpd-baseline-row {
+  display: flex; align-items: center; gap: 8px;
+  margin: 4px 0;
+}
+.rpd-baseline-label { font-size: 11px; color: #5A5A5A; }
+.rpd-baseline-select {
+  padding: 4px 8px;
+  border: 1px solid var(--triarq-color-border);
+  border-radius: 5px;
+  font-size: var(--triarq-text-small);
+  background: #fff;
+  min-width: 240px;
+  &:disabled { color: #5A5A5A; background: rgba(0,0,0,0.03); }
+}
+.rpd-data-gap {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; margin: 6px 0;
+  background: rgba(245,166,35,0.08);
+  border-left: 3px solid var(--triarq-color-sunray);
+  border-radius: 5px;
+}
+.rpd-data-gap-text { flex: 1; font-size: 11px; }
+.rpd-data-gap-dismiss {
+  background: transparent;
+  color: var(--triarq-color-primary);
+  border: 1px solid var(--triarq-color-primary);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 11px; cursor: pointer;
+}
+.rpd-prior-symbol { margin-right: 6px; font-weight: 700; }
+
 // S-036 / D-432 — Grid Column Sort Standard.
 // Sortable column header: ↕ on hover (uses ::after pseudo), ↑/↓ when active
 // (rendered inline by the component as .oi-sort-active text). Indicator

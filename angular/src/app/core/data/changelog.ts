@@ -32,6 +32,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-06-17',
+    contractLabel: 'Contract 27 — Roadmap Planning Mode',
+    items: [
+      {
+        audience:    'Admin',
+        surface:     'Administration — Deploy Roadmap Baselines',
+        description: 'New Admin screen at /admin/deploy-baselines for managing dated baseline snapshots. Add, edit inline, and remove baselines with a five-second confirmation window. Each baseline labels a freeze date so the Deploy by Quarter views can compare planned vs. actual deployments against it.'
+      },
+      {
+        audience:    'All',
+        surface:     'EPO Deploy by Quarter',
+        description: 'Quarter Pivot Control in the header lets you anchor a different reference quarter — chevrons step ±1 quarter, the label updates, and section bucketing follows. Resets to the actual calendar quarter on every load.'
+      },
+      {
+        audience:    'All',
+        surface:     'EPO Deploy by Quarter — Baseline selector',
+        description: 'Pick a baseline from the dropdown to compare Prior Quarter planned vs. actual deployments. ✓ marks Initiatives that shipped as planned, ✕ marks misses, and ✚ marks deployments that were not planned as of the baseline.'
+      },
+      {
+        audience:    'All',
+        surface:     'Deploy Gate by Quarter (Workstream)',
+        description: 'Same Quarter Pivot Control and Baseline selector available on the Workstream-organized Deploy view. Selection is per-view and not persisted across reloads.'
+      }
+    ]
+  },
+  {
     date:          '2026-06-16',
     contractLabel: 'Contract 25 Part 2 follow-on — Edit + Remove on Initiative artifacts',
     items: [

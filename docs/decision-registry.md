@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.48 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.51 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-438**
+**Next available: D-447**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -341,6 +341,15 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-435 | Next Gate Sort on Initiatives Grid | Specced | 2026-06-15 | Claude Chat | Contract 24; amends D-434 |
 | D-436 | Division Assignment Picker: My Divisions Scoping | Specced | 2026-06-15 | Claude Chat | Contract 24 |
 | D-437 | Artifact Type Admin Management + Seed Revision + Gate Warnings | Specced | 2026-06-15 | Claude Chat | Contract 24 (UI+seed) / Contract 25 (display model) |
+| D-438 | Artifact Type Primary Gate Assignment and Warning Behavior | Specced | 2026-06-15 | Claude Chat | Contract 25; amends D-437; resolves DEFER-2026-06-15-001 |
+| D-439 | Initiative Activity Feed: Filter Panel Completion | Specced | 2026-06-15 | Claude Chat | Contract 25; amends D-428; closes CC-23.2-08 |
+| D-440 | Cross-Surface Entity Navigation Pattern | Specced | 2026-06-15 | Claude Chat | Contract 25; closes CC-23.2-07 |
+| D-441 | Pre-Packaging Session Close Checklist (Rule 35) | Not-specced | 2026-06-15 | Claude Chat | Session governance rule; cross-project candidate MSOF |
+| D-442 | Rule 36: Test Ratchet Acknowledgment at CodeClose | Not-specced | 2026-06-16 | Claude Chat | Amends Rule 29 §3; CC-24 Candidate 1 |
+| D-443 | Rule 29 Amendment: Repo Cleanliness Check Before Deploy (§9) | Not-specced | 2026-06-16 | Claude Chat | Amends Rule 29; CC-24 Candidate 7 |
+| D-444 | Roadmap Freeze Date Registry (Deploy Roadmap Baselines) | Specced | 2026-06-17 | Claude Chat | Contract 27; amends D-311 (sixth Admin hub card) |
+| D-445 | Quarter Pivot Control on Deploy Gate Views | Specced | 2026-06-17 | Claude Chat | Contract 27; amends D-399, D-PilotSchedule |
+| D-446 | Prior Quarter Planned vs. Actual Analysis | Specced | 2026-06-17 | Claude Chat | Contract 27; governed by D-444, D-445 |
 
 ---
 

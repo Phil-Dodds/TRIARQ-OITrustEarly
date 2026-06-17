@@ -72,6 +72,12 @@ const { list_initiative_activity }       = require('./tools/list_initiative_acti
 const { get_epo_wip_limits }             = require('./tools/get_epo_wip_limits');
 const { update_epo_wip_limits }          = require('./tools/update_epo_wip_limits');
 
+// Contract 27 (D-444): Deploy Roadmap Baselines registry.
+const { list_roadmap_freeze_dates }      = require('./tools/list_roadmap_freeze_dates');
+const { create_roadmap_freeze_date }     = require('./tools/create_roadmap_freeze_date');
+const { update_roadmap_freeze_date }     = require('./tools/update_roadmap_freeze_date');
+const { delete_roadmap_freeze_date }     = require('./tools/delete_roadmap_freeze_date');
+
 const app  = express();
 const PORT = process.env.PORT || 3003;
 
@@ -136,7 +142,13 @@ const TOOLS = {
 
   // Contract 20 — EPO WIP limit model (D-400, D-401)
   get_epo_wip_limits,
-  update_epo_wip_limits
+  update_epo_wip_limits,
+
+  // Contract 27 — Deploy Roadmap Baselines registry (D-444)
+  list_roadmap_freeze_dates,
+  create_roadmap_freeze_date,
+  update_roadmap_freeze_date,
+  delete_roadmap_freeze_date
 };
 
 // ── CORS — allow GitHub Pages and local dev origins ───────────────────────────
