@@ -347,9 +347,9 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-441 | Pre-Packaging Session Close Checklist (Rule 35) | Not-specced | 2026-06-15 | Claude Chat | Session governance rule; cross-project candidate MSOF |
 | D-442 | Rule 36: Test Ratchet Acknowledgment at CodeClose | Not-specced | 2026-06-16 | Claude Chat | Amends Rule 29 §3; CC-24 Candidate 1 |
 | D-443 | Rule 29 Amendment: Repo Cleanliness Check Before Deploy (§9) | Not-specced | 2026-06-16 | Claude Chat | Amends Rule 29; CC-24 Candidate 7 |
-| D-444 | Roadmap Freeze Date Registry (Deploy Roadmap Baselines) | Specced | 2026-06-17 | Claude Chat | Contract 27; amends D-311 (sixth Admin hub card) |
-| D-445 | Quarter Pivot Control on Deploy Gate Views | Specced | 2026-06-17 | Claude Chat | Contract 27; amends D-399, D-PilotSchedule |
-| D-446 | Prior Quarter Planned vs. Actual Analysis | Specced | 2026-06-17 | Claude Chat | Contract 27; governed by D-444, D-445 |
+| D-444 | Roadmap Freeze Date Registry (Deploy Roadmap Baselines) | built | 2026-06-17 | Claude Chat | Contract 27; amends D-311 (sixth Admin hub card) |
+| D-445 | Quarter Pivot Control on Deploy Gate Views | built | 2026-06-17 | Claude Chat | Contract 27; amends D-399, D-PilotSchedule |
+| D-446 | Prior Quarter Planned vs. Actual Analysis | built | 2026-06-17 | Claude Chat | Contract 27; governed by D-444, D-445 |
 
 ---
 
