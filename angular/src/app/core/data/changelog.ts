@@ -33,6 +33,49 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-06-16',
+    contractLabel: 'Contract 25 Part 2 follow-on — Edit + Remove on Initiative artifacts',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiative Detail — Artifacts zone',
+        description: 'Filled artifact rows now show Edit and Remove actions. Edit opens an inline form to change the title and URL. Remove uses a two-step confirm to soft-delete the link.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Detail — Artifacts zone',
+        description: 'Legacy ad-hoc attachments that were saved without a gate now appear in the Unscheduled group so they can be edited or removed.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-16',
+    contractLabel: 'Contract 25 Part 2 follow-on — Ad-hoc artifact attach fix',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiative Detail — Artifacts zone',
+        description: 'The "+ Attach Document" button now saves successfully and the artifact renders inside the gate group it was attached from. Title field carries through as the artifact label. Migration 042 required.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-16',
+    contractLabel: 'Contract 25 Part 2 — Stage → Gate swap (D-438 Amendment 1)',
+    items: [
+      {
+        audience:    'Admin',
+        surface:     'Initiative Artifact Types admin',
+        description: 'Renamed from "Artifact Types". Stage column / field / filter removed — gate is the single organizing concept. Sort defaults to Primary Gate ascending. Migration 041 required.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Detail — Artifacts zone',
+        description: 'Artifact slots now group by primary gate (Brief Review → Close Review) with an Unscheduled group last when populated. Empty groups suppressed. Attach action remains available on every slot.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-16',
     contractLabel: 'Contract 25 — Primary Gate model + Activity filter panel + cross-surface chips',
     items: [
       {

@@ -262,6 +262,9 @@ export class DeliveryService {
   attachArtifact(params: {
     delivery_cycle_id:      string;
     artifact_type_id?:      string;
+    /** Contract 25 Part 2 follow-on: gate group key for ad-hoc attaches so
+     *  Zone 6 renders them under the right group. Omit for type-bound attaches. */
+    gate_affinity?:         string;
     display_name:           string;
     external_url?:          string;
     oi_library_artifact_id?: string;
@@ -275,6 +278,25 @@ export class DeliveryService {
     oi_library_artifact_id: string;
   }): Observable<McpResponse<CycleArtifact>> {
     return this.mcp.call<CycleArtifact>('delivery', 'promote_artifact_to_oi_library', params as Record<string, unknown>);
+  }
+
+  /** Contract 25 Part 2 follow-on: edit an existing Initiative artifact's
+   *  display_name and/or external_url. Auth (DCS/EPO/DOL/admin) enforced
+   *  server-side. */
+  updateArtifact(params: {
+    cycle_artifact_id: string;
+    display_name?:     string;
+    external_url?:     string;
+  }): Observable<McpResponse<CycleArtifact>> {
+    return this.mcp.call<CycleArtifact>('delivery', 'update_cycle_artifact', params as Record<string, unknown>);
+  }
+
+  /** Contract 25 Part 2 follow-on: soft-delete an Initiative artifact.
+   *  Auth (DCS/EPO/DOL/admin) enforced server-side. */
+  detachArtifact(params: {
+    cycle_artifact_id: string;
+  }): Observable<McpResponse<CycleArtifact>> {
+    return this.mcp.call<CycleArtifact>('delivery', 'detach_cycle_artifact', params as Record<string, unknown>);
   }
 
   // ── Event log ──────────────────────────────────────────────────────────────
@@ -386,7 +408,6 @@ export class DeliveryService {
 
   createArtifactType(params: {
     artifact_type_name:     string;
-    lifecycle_stage:        string;
     guidance_text:          string;
     sort_order:             number;
     primary_gate?:          string | null;
@@ -400,7 +421,6 @@ export class DeliveryService {
   updateArtifactType(params: {
     artifact_type_id:       string;
     artifact_type_name?:    string;
-    lifecycle_stage?:       string;
     guidance_text?:         string;
     sort_order?:            number;
     primary_gate?:          string | null;

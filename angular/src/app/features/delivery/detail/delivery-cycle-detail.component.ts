@@ -860,11 +860,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     margin-bottom:var(--triarq-space-xs);">
           <span style="font-weight:500;">Documents/Artifacts</span>
         </div>
-        <!-- CC-Decision-2026-04-12-D: Zone explanatory text 11px italic #5A5A5A. Source: Contract 5 Block 2.5. -->
+        <!-- CC-Decision-2026-04-12-D: Zone explanatory text 11px italic #5A5A5A. Source: Contract 5 Block 2.5.
+             D-438 Amendment 1: "lifecycle stage" → "primary gate". -->
         <p style="margin:0 0 var(--triarq-space-sm) 0;font-size:11px;font-style:italic;color:#5A5A5A;">
-          Artifacts are grouped by the lifecycle stage they belong to. Attach an external URL
-          to fill a slot. Use "→ OI Library" to record the artifact in the OI Library
-          (full submission completes in Build B).
+          Artifacts are grouped by the primary gate they support. Attach an external URL
+          to fill a slot, or use "+ Attach Document" inside a group to add an ad-hoc reference.
+          Use "→ OI Library" to record the artifact in the OI Library (full submission completes in Build B).
         </p>
 
         <!-- Promote stub message — inline, not alert -->
@@ -875,15 +876,17 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           {{ promoteStubMessage }}
         </div>
 
-        <!-- Stage groups — collapsible (Principle 5).
-             trackBy keeps DOM stable across cycle refresh so attach-form inputs
-             don't lose focus (Phil 2026-06-15). -->
-        <div *ngFor="let group of artifactsByStage; trackBy: trackByStage"
+        <!-- Gate groups — collapsible (Principle 5).
+             D-438 Amendment 1 (Contract 25 Part 2): grouped by primary_gate
+             instead of lifecycle_stage. "Unscheduled" group (null-gate) renders
+             last when populated. trackBy keeps DOM stable across cycle refresh
+             so attach-form inputs don't lose focus (Phil 2026-06-15). -->
+        <div *ngFor="let group of artifactsByGate; trackBy: trackByGate"
              style="margin-bottom:var(--triarq-space-xs);">
 
-          <!-- Stage section header — ▼/▶ toggle + name + "N of M attached" count.
-               Phil 2026-06-15: no future-stage gating — every group renders the same. -->
-          <button (click)="toggleStageExpand(group.stage)"
+          <!-- Gate section header — ▼/▶ toggle + name + "N of M attached" count.
+               D-418: no future-gate gating — every group renders the same. -->
+          <button (click)="toggleGateExpand(group.key)"
                   style="width:100%;background:none;border:none;cursor:pointer;
                          display:flex;align-items:center;justify-content:space-between;
                          padding:var(--triarq-space-xs) var(--triarq-space-xs);
@@ -892,12 +895,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <span style="display:flex;align-items:center;gap:var(--triarq-space-xs);">
               <span style="font-size:11px;color:var(--triarq-color-text-secondary);
                            transition:transform 0.15s;"
-                    [style.transform]="isStageExpanded(group.stage) ? 'rotate(0)' : 'rotate(-90deg)'">
+                    [style.transform]="isGateExpanded(group.key) ? 'rotate(0)' : 'rotate(-90deg)'">
                 ▼
               </span>
               <span style="font-weight:500;font-size:var(--triarq-text-small);
                            color:var(--triarq-color-primary);">
-                {{ group.stage }}
+                {{ group.gate_display_name }}
               </span>
             </span>
             <span style="font-size:10px;color:var(--triarq-color-text-secondary);">
@@ -906,7 +909,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           </button>
 
           <!-- Expanded body -->
-          <div *ngIf="isStageExpanded(group.stage)">
+          <div *ngIf="isGateExpanded(group.key)">
 
             <!-- Slot rows — trackBy by artifact_type_id for stable DOM. -->
             <div *ngFor="let slot of group.slots; trackBy: trackBySlot"
@@ -991,26 +994,100 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                      Phil 2026-06-15: every slot has functional action regardless of stage. -->
                 <div style="display:flex;flex-direction:column;align-items:flex-end;
                             gap:4px;flex-shrink:0;">
-                  <button *ngIf="!slot.external_url"
+                  <button *ngIf="!slot.external_url && !slot.is_adhoc"
                           (click)="openAttachForm(slot.artifact_type_id ?? '')"
                           style="font-size:var(--triarq-text-small);color:var(--triarq-color-primary);
                                  background:none;border:none;cursor:pointer;padding:0;">
                     Attach
                   </button>
-                  <button *ngIf="slot.external_url"
+                  <button *ngIf="slot.external_url && !slot.is_adhoc"
                           (click)="openAttachForm(slot.artifact_type_id ?? '')"
                           style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);
                                  background:none;border:none;cursor:pointer;padding:0;">
                     Replace
                   </button>
-                  <button *ngIf="slot.external_url && slot.pointer_status === 'external_only'"
+                  <button *ngIf="slot.external_url && slot.pointer_status === 'external_only' && !slot.is_adhoc"
                           (click)="promoteArtifact(slot)"
                           style="font-size:10px;color:var(--triarq-color-text-secondary);
                                  background:none;border:none;cursor:pointer;padding:0;"
                           title="Record in OI Library (submission completes in Build B)">
                     → OI Library
                   </button>
+                  <!-- Contract 25 Part 2 follow-on: Edit + Remove on filled rows (slot + ad-hoc). -->
+                  <button *ngIf="slot.cycle_artifact_id && slot.external_url"
+                          (click)="openEditArtifact(slot)"
+                          style="font-size:10px;color:var(--triarq-color-text-secondary);
+                                 background:none;border:none;cursor:pointer;padding:0;">
+                    Edit
+                  </button>
+                  <button *ngIf="slot.cycle_artifact_id && slot.external_url"
+                          (click)="requestRemoveArtifact(slot)"
+                          [disabled]="removingId === slot.cycle_artifact_id"
+                          [style.color]="removeConfirmingId === slot.cycle_artifact_id ? 'var(--triarq-color-error)' : 'var(--triarq-color-text-secondary)'"
+                          style="font-size:10px;background:none;border:none;cursor:pointer;padding:0;">
+                    {{ removingId === slot.cycle_artifact_id
+                       ? 'Removing…'
+                       : (removeConfirmingId === slot.cycle_artifact_id ? 'Click again to confirm' : 'Remove') }}
+                  </button>
+                  <!-- Ad-hoc row marker: visual hint that this isn't a seeded slot.
+                       Contract 25 Part 2 follow-on. -->
+                  <span *ngIf="slot.is_adhoc"
+                        style="font-size:10px;color:var(--triarq-color-text-secondary);
+                               font-style:italic;">
+                    Ad-hoc
+                  </span>
                 </div>
+              </div>
+
+              <!-- Remove error inline (rare). -->
+              <div *ngIf="removeError && removingId === null && removeConfirmingId === slot.cycle_artifact_id"
+                   style="color:var(--triarq-color-error);font-size:10px;margin-top:4px;">
+                {{ removeError }}
+              </div>
+
+              <!-- Inline edit form — Contract 25 Part 2 follow-on. -->
+              <div *ngIf="editingArtifactId === slot.cycle_artifact_id"
+                   style="margin-top:var(--triarq-space-xs);
+                          background:var(--triarq-color-background-subtle);
+                          border-radius:5px;padding:var(--triarq-space-xs);
+                          position:relative;">
+                <app-loading-overlay [visible]="savingEdit" message="Saving…"></app-loading-overlay>
+                <form [formGroup]="attachForm" (ngSubmit)="submitEditArtifact()">
+                  <div style="display:grid;gap:var(--triarq-space-xs);
+                              grid-template-columns:2fr 3fr auto;align-items:end;">
+                    <div>
+                      <label style="display:block;font-size:10px;margin-bottom:2px;">
+                        Artifact Title <span style="color:var(--triarq-color-error);">*</span>
+                      </label>
+                      <input formControlName="display_name" class="oi-input"
+                             style="font-size:var(--triarq-text-small);" />
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:10px;margin-bottom:2px;">
+                        External URL <span style="color:var(--triarq-color-error);">*</span>
+                      </label>
+                      <input formControlName="external_url" class="oi-input" type="url"
+                             style="font-size:var(--triarq-text-small);" />
+                    </div>
+                    <div style="display:flex;gap:4px;">
+                      <button type="submit" class="oi-btn-primary"
+                              [disabled]="attachForm.invalid || savingEdit"
+                              style="font-size:var(--triarq-text-small);white-space:nowrap;
+                                     display:flex;align-items:center;gap:6px;">
+                        <ion-spinner *ngIf="savingEdit" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                        <span>{{ savingEdit ? '…' : 'Save' }}</span>
+                      </button>
+                      <button type="button" (click)="cancelEditArtifact()"
+                              style="background:none;border:none;cursor:pointer;
+                                     font-size:var(--triarq-text-small);
+                                     color:var(--triarq-color-text-secondary);">✕</button>
+                    </div>
+                  </div>
+                  <div *ngIf="editingError"
+                       style="color:var(--triarq-color-error);font-size:10px;margin-top:4px;">
+                    {{ editingError }}
+                  </div>
+                </form>
               </div>
 
               <!-- Inline attach form — opened per slot or from stage ad hoc link -->
@@ -1062,11 +1139,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
             </div><!-- end slot rows -->
 
-            <!-- Ad hoc attach link at bottom of each expanded stage.
-                 Phil 2026-06-15: every stage's ad-hoc attach is fully active. -->
+            <!-- Ad hoc attach link at bottom of each expanded gate group.
+                 D-418: every group's ad-hoc attach is fully active regardless of cycle stage. -->
             <div style="padding:var(--triarq-space-xs) var(--triarq-space-xs);">
-              <!-- Ad hoc form open for this stage -->
-              <div *ngIf="showAttachForm && attachingForTypeId === '__adhoc__' + group.stage"
+              <!-- Ad hoc form open for this gate group -->
+              <div *ngIf="showAttachForm && attachingForTypeId === '__adhoc__' + group.key"
                    style="background:var(--triarq-color-background-subtle);
                           border-radius:5px;padding:var(--triarq-space-xs);
                           position:relative;">
@@ -1111,8 +1188,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 </form>
               </div>
               <!-- Ad hoc link -->
-              <button *ngIf="!(showAttachForm && attachingForTypeId === '__adhoc__' + group.stage)"
-                      (click)="openAttachForm('__adhoc__' + group.stage)"
+              <button *ngIf="!(showAttachForm && attachingForTypeId === '__adhoc__' + group.key)"
+                      (click)="openAttachForm('__adhoc__' + group.key)"
                       style="font-size:10px;color:var(--triarq-color-primary);
                              background:none;border:none;cursor:pointer;padding:0;">
                 + Attach Document
@@ -1121,11 +1198,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
           </div><!-- end expanded body -->
 
-        </div><!-- end stage group loop -->
+        </div><!-- end gate group loop -->
 
         <!-- Empty state — D-418: removed "slots become available as the cycle advances"
-             text; that gating no longer applies. Attach is available at any stage. -->
-        <div *ngIf="artifactsByStage.length === 0"
+             text; that gating no longer applies. Attach is available at any gate. -->
+        <div *ngIf="artifactsByGate.length === 0"
              style="font-size:14px;font-style:italic;font-family:Roboto,sans-serif;
                     color:#9E9E9E;padding:16px;">
           No artifacts attached yet.
@@ -1371,6 +1448,18 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   promoteStubMessage = '';
   attachForm!:      FormGroup;
 
+  // Contract 25 Part 2 follow-on: edit + remove on filled artifact rows.
+  // Reuses attachForm (same field set: display_name + external_url).
+  editingArtifactId: string | null = null;
+  editingError      = '';
+  savingEdit        = false;
+  // Two-step remove confirmation. First click sets removeConfirmingId; second
+  // click within the timeout fires detach. Timeout clears confirm state.
+  removeConfirmingId: string | null = null;
+  removingId:         string | null = null;
+  removeError       = '';
+  private removeConfirmTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
   // Jira
   syncing         = false;
   syncStubMessage = '';
@@ -1426,9 +1515,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   savingActualDate         = false;
   actualDateError          = '';
 
-  // Item 2: Artifact stage expand/collapse — Principle 5
-  // Populated on cycle load: current + past stages expanded by default; future collapsed
-  expandedStages = new Set<string>();
+  // Zone 6: Artifact gate expand/collapse — Principle 5
+  // D-438 Amendment 1 (Contract 25 Part 2): gate-keyed (was stage-keyed).
+  // Populated on cycle load: current + past gates expanded; future + Unscheduled collapsed.
+  // Keys are gate name values (brief_review/.../close_review) plus 'unscheduled' for null-gate group.
+  expandedGates = new Set<string>();
 
   // Expose constants to template
   readonly GATE_LABELS     = GATE_LABELS;
@@ -1503,8 +1594,8 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       next: (res) => {
         if (res.success && res.data) {
           this.cycle = res.data;
-          this.rebuildArtifactsByStage();   // stable reference for *ngFor (B-69 / focus-loss fix)
-          this.initExpandedStages(); // Item 2: expand current + past stages by default
+          this.rebuildArtifactsByGate();   // stable reference for *ngFor (B-69 / focus-loss fix)
+          this.initExpandedGates(); // Zone 6: expand current + past gates by default
           this.loadEvents(cycleId);
           // B-69: Stage Track scrollIntoView (B-61) and panel mount sometimes leave
           // an ambient text selection on Gate Record content. Clear it once on load.
@@ -1793,30 +1884,39 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   }
 
   /** Cached artifact slot groups. Rebuilt only when cycle data changes via
-   *  rebuildArtifactsByStage(). Phil 2026-06-15 bug fix: returning a new
+   *  rebuildArtifactsByGate(). Phil 2026-06-15 bug fix: returning a new
    *  array from a getter on every CD tick destroyed the inline attach form
    *  inputs on each keystroke (focus lost after first char). Stable reference
    *  pattern is the same fix used for StageTrackComponent inputs in the
-   *  dashboard grid per CC-Decision-2026-04-11-A. */
+   *  dashboard grid per CC-Decision-2026-04-11-A.
+   *
+   *  D-438 Amendment 1 (Contract 25 Part 2): groups keyed by primary_gate
+   *  (was lifecycle_stage). `key` is gate name or 'unscheduled' for null-gate. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  artifactsByStage: { stage: string; slots: any[] }[] = [];
+  artifactsByGate: { key: string; gate: string | null; gate_display_name: string; slots: any[] }[] = [];
 
-  /** trackBy for artifactsByStage *ngFor — keeps DOM stable on rebuild so
+  /** trackBy for artifactsByGate *ngFor — keeps DOM stable on rebuild so
    *  inline attach-form inputs don't lose focus. */
-  trackByStage = (_i: number, g: { stage: string }): string => g.stage;
+  trackByGate = (_i: number, g: { key: string }): string => g.key;
 
-  /** trackBy for slot rows — artifact_type_id is the stable key. */
-  trackBySlot = (_i: number, s: { artifact_type_id?: string }): string =>
-    s.artifact_type_id ?? `slot-${_i}`;
+  /** trackBy for slot rows — artifact_type_id is the stable key for type-driven
+   *  slots; cycle_artifact_id is the stable key for ad-hoc rows (Contract 25
+   *  Part 2 follow-on). */
+  trackBySlot = (_i: number, s: { artifact_type_id?: string | null; cycle_artifact_id?: string }): string =>
+    s.artifact_type_id ?? (s.cycle_artifact_id ? `adhoc-${s.cycle_artifact_id}` : `slot-${_i}`);
 
-  /** Build artifactsByStage from the current cycle. Called after cycle is
-   *  loaded or after an attachment/promotion call refreshes the cycle. */
-  private rebuildArtifactsByStage(): void {
+  /** Build artifactsByGate from the current cycle. Called after cycle is
+   *  loaded or after an attachment/promotion call refreshes the cycle.
+   *
+   *  Groups artifact slots by primary_gate. Renders five named gate groups
+   *  in sequence order (brief_review → close_review) then "Unscheduled" for
+   *  null-gate types. Empty groups are suppressed. */
+  private rebuildArtifactsByGate(): void {
     const types       = this.cycle?.artifact_types ?? [];
     const attachments = this.cycle?.artifacts ?? [];
 
     if (!types.length) {
-      this.artifactsByStage = [];
+      this.artifactsByGate = [];
       return;
     }
 
@@ -1832,7 +1932,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       return {
         artifact_type_id:        t.artifact_type_id,
         artifact_type_name:      t.artifact_type_name,
-        lifecycle_stage:         t.lifecycle_stage,
+        primary_gate:            t.primary_gate ?? null,
         guidance_text:           t.guidance_text,
         sort_order:              t.sort_order,
         cycle_artifact_id:       att?.cycle_artifact_id,
@@ -1846,34 +1946,66 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       };
     });
 
-    // Group by lifecycle_stage, preserve canonical stage order, sort each group by sort_order.
-    const STAGE_ORDER: string[] = [
-      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE','ANY'
+    // Gate sequence + display labels. Unscheduled (null gate) renders last.
+    const GATE_GROUPS: { key: string; gate: string | null; gate_display_name: string }[] = [
+      { key: 'brief_review',  gate: 'brief_review',  gate_display_name: 'Brief Review'  },
+      { key: 'go_to_build',   gate: 'go_to_build',   gate_display_name: 'Go to Build'   },
+      { key: 'go_to_deploy',  gate: 'go_to_deploy',  gate_display_name: 'Go to Deploy'  },
+      { key: 'go_to_release', gate: 'go_to_release', gate_display_name: 'Go to Release' },
+      { key: 'close_review',  gate: 'close_review',  gate_display_name: 'Close Review'  },
+      { key: 'unscheduled',   gate: null,            gate_display_name: 'Unscheduled'   }
     ];
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const groupMap: Record<string, any[]> = {};
     slots.forEach(s => {
-      const k = s.lifecycle_stage || 'General';
+      const k = s.primary_gate ?? 'unscheduled';
       (groupMap[k] = groupMap[k] || []).push(s);
     });
     Object.values(groupMap).forEach(arr =>
       arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     );
 
-    const seen = new Set<string>();
+    // Contract 25 Part 2 follow-on: append ad-hoc attachments to their gate
+    // group's slot list. Ad-hocs are cycle_artifacts rows with
+    // artifact_type_id IS NULL. They render below the seeded slot rows in
+    // their gate_affinity group; legacy null-type/null-affinity rows from
+    // before Migration 042 land in the Unscheduled group so they remain
+    // visible and the user can Edit or Remove them. is_adhoc gates Replace /
+    // → OI Library buttons so they don't open the slot-attach flow.
+    attachments
+      .filter(a => !a.artifact_type_id)
+      .forEach(a => {
+        const k = (a.gate_affinity as string) || 'unscheduled';
+        const adhocSlot = {
+          artifact_type_id:        null,
+          artifact_type_name:      undefined,
+          primary_gate:            k === 'unscheduled' ? null : k,
+          guidance_text:           '',
+          sort_order:              Number.POSITIVE_INFINITY,
+          is_adhoc:                true,
+          cycle_artifact_id:       a.cycle_artifact_id,
+          display_name:            a.display_name,
+          external_url:            a.external_url,
+          oi_library_artifact_id:  a.oi_library_artifact_id,
+          pointer_status:          a.pointer_status,
+          attached_by_user_id:     a.attached_by_user_id,
+          attached_by_display_name: a.attached_by_display_name,
+          attached_at:             a.attached_at
+        };
+        (groupMap[k] = groupMap[k] || []).push(adhocSlot);
+      });
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const out: { stage: string; slots: any[] }[] = [];
-    STAGE_ORDER.forEach(stage => {
-      if (groupMap[stage]?.length) {
-        out.push({ stage, slots: groupMap[stage] });
-        seen.add(stage);
+    const out: { key: string; gate: string | null; gate_display_name: string; slots: any[] }[] = [];
+    GATE_GROUPS.forEach(g => {
+      const list = groupMap[g.key];
+      if (list?.length) {
+        out.push({ ...g, slots: list });
       }
     });
-    Object.entries(groupMap).forEach(([stage, slotList]) => {
-      if (!seen.has(stage)) { out.push({ stage, slots: slotList }); }
-    });
 
-    this.artifactsByStage = out;
+    this.artifactsByGate = out;
   }
 
   // ── Outcome ────────────────────────────────────────────────────────────────
@@ -2385,17 +2517,26 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.attachError = '';
     this.cdr.markForCheck();
 
-    // Ad-hoc form uses sentinel '__adhoc__<stage>' for attachingForTypeId — that
-    // is NOT a UUID. Pass undefined in that case so MCP records the attachment
-    // with artifact_type_id = null (cycle_artifact_types has the 'ANY' row for
-    // ad-hoc references; the MCP accepts null per attach_cycle_artifact.js).
-    const typeIdParam = !this.attachingForTypeId || this.attachingForTypeId.startsWith('__adhoc__')
-      ? undefined
-      : this.attachingForTypeId;
+    // Ad-hoc form uses sentinel '__adhoc__<gate-key>' for attachingForTypeId — that
+    // is NOT a UUID. Extract the gate group key as gate_affinity so the MCP can
+    // record it on cycle_artifacts.gate_affinity (Migration 042) and Zone 6 can
+    // render the attachment inside its gate group.
+    let typeIdParam: string | undefined;
+    let gateAffinityParam: string | undefined;
+    if (!this.attachingForTypeId || this.attachingForTypeId.startsWith('__adhoc__')) {
+      typeIdParam = undefined;
+      gateAffinityParam = this.attachingForTypeId
+        ? this.attachingForTypeId.slice('__adhoc__'.length)
+        : undefined;
+    } else {
+      typeIdParam = this.attachingForTypeId;
+      gateAffinityParam = undefined;
+    }
 
     this.delivery.attachArtifact({
       delivery_cycle_id: this.cycle.delivery_cycle_id,
       artifact_type_id:  typeIdParam,
+      gate_affinity:     gateAffinityParam,
       display_name:      this.attachForm.value.display_name as string,
       external_url:      this.attachForm.value.external_url as string
     }).subscribe({
@@ -2434,6 +2575,114 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       },
       error: () => { this.cdr.markForCheck(); }
     });
+  }
+
+  // ── Edit + remove on filled artifact rows (Contract 25 Part 2 follow-on) ──
+
+  /** Open the inline edit form for a filled artifact slot or ad-hoc row.
+   *  Reuses attachForm — same field set (display_name + external_url). */
+  openEditArtifact(slot: { cycle_artifact_id?: string; display_name?: string; external_url?: string | null }): void {
+    if (!slot.cycle_artifact_id) { return; }
+    // Close any other edit/attach/remove state in progress.
+    this.showAttachForm = false;
+    this.attachingForTypeId = '';
+    this.cancelRemoveConfirm();
+    this.editingArtifactId = slot.cycle_artifact_id;
+    this.editingError = '';
+    this.attachForm.reset({
+      display_name: slot.display_name  ?? '',
+      external_url: slot.external_url  ?? ''
+    });
+    this.cdr.markForCheck();
+  }
+
+  cancelEditArtifact(): void {
+    this.editingArtifactId = null;
+    this.editingError = '';
+    this.savingEdit = false;
+    this.cdr.markForCheck();
+  }
+
+  submitEditArtifact(): void {
+    if (!this.cycle || !this.editingArtifactId || this.attachForm.invalid) { return; }
+    this.savingEdit = true;
+    this.editingError = '';
+    this.cdr.markForCheck();
+
+    this.delivery.updateArtifact({
+      cycle_artifact_id: this.editingArtifactId,
+      display_name:      this.attachForm.value.display_name as string,
+      external_url:      this.attachForm.value.external_url as string
+    }).subscribe({
+      next: (res) => {
+        this.savingEdit = false;
+        if (res.success) {
+          this.editingArtifactId = null;
+          this.loadCycle(this.cycle!.delivery_cycle_id);
+        } else {
+          this.editingError = res.error ?? 'Save failed.';
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.savingEdit = false;
+        this.editingError = err.error ?? 'Save failed. Check the URL and try again.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  /** Two-step remove. First call sets confirm state + 5s timeout to reset.
+   *  Second call (while confirm pending) fires the detach. */
+  requestRemoveArtifact(slot: { cycle_artifact_id?: string }): void {
+    if (!slot.cycle_artifact_id || !this.cycle) { return; }
+    if (this.removeConfirmingId === slot.cycle_artifact_id) {
+      // Second click — execute.
+      this.performRemoveArtifact(slot.cycle_artifact_id);
+      return;
+    }
+    // First click — enter confirm state, start timeout.
+    this.cancelRemoveConfirm();
+    this.removeConfirmingId = slot.cycle_artifact_id;
+    this.removeError = '';
+    this.removeConfirmTimeoutHandle = setTimeout(() => {
+      this.removeConfirmingId = null;
+      this.cdr.markForCheck();
+    }, 5000);
+    this.cdr.markForCheck();
+  }
+
+  private performRemoveArtifact(cycleArtifactId: string): void {
+    if (!this.cycle) { return; }
+    this.cancelRemoveConfirm();
+    this.removingId = cycleArtifactId;
+    this.removeError = '';
+    this.cdr.markForCheck();
+
+    this.delivery.detachArtifact({ cycle_artifact_id: cycleArtifactId }).subscribe({
+      next: (res) => {
+        this.removingId = null;
+        if (res.success) {
+          this.loadCycle(this.cycle!.delivery_cycle_id);
+        } else {
+          this.removeError = res.error ?? 'Remove failed.';
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.removingId = null;
+        this.removeError = err.error ?? 'Remove failed.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  private cancelRemoveConfirm(): void {
+    if (this.removeConfirmTimeoutHandle) {
+      clearTimeout(this.removeConfirmTimeoutHandle);
+      this.removeConfirmTimeoutHandle = null;
+    }
+    this.removeConfirmingId = null;
   }
 
   // ── Jira sync ──────────────────────────────────────────────────────────────
@@ -2651,13 +2900,26 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     const c    = this.cycle;
     const arts = c.artifacts ?? [];
 
-    const byStage = (stage: string) => arts.filter(a => a.lifecycle_stage === stage && a.external_url);
-    const briefArts   = byStage('BRIEF');
-    const specArts    = byStage('SPEC');
-    const buildArts   = byStage('BUILD');
-    const uatArts     = byStage('UAT');
-    const pilotArts   = byStage('PILOT');
-    const outcomeArts = byStage('OUTCOME');
+    // D-438 Amendment 1 (Contract 25 Part 2): replaced lifecycle_stage filter
+    // with primary_gate lookup via artifact_types map. The prior a.lifecycle_stage
+    // field was never populated on attachments (joined comment notwithstanding),
+    // so checklist "attached" rows were always false-negative; this gate-based
+    // lookup is the first time the check actually evaluates against attachment data.
+    const typeIdToGate: Record<string, GateName | null> = {};
+    (c.artifact_types ?? []).forEach(t => {
+      typeIdToGate[t.artifact_type_id] = (t.primary_gate ?? null) as (GateName | null);
+    });
+    const byGate = (gate: GateName) => arts.filter(a =>
+      !!a.artifact_type_id &&
+      typeIdToGate[a.artifact_type_id] === gate &&
+      a.external_url
+    );
+    const briefArts   = byGate('brief_review');
+    const specArts    = byGate('go_to_build');
+    const buildArts   = byGate('go_to_deploy');
+    const uatArts     = byGate('go_to_deploy');
+    const pilotArts   = byGate('go_to_release');
+    const outcomeArts = byGate('close_review');
 
     const hasName = (list: CycleArtifact[], ...terms: string[]) =>
       list.some(a => terms.some(t => (a.artifact_type_name ?? '').toLowerCase().includes(t)));
@@ -2915,35 +3177,40 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     });
   }
 
-  // ── Item 2: Artifact stage expand/collapse ─────────────────────────────────
+  // ── Zone 6: Artifact gate expand/collapse ─────────────────────────────────
+  // D-438 Amendment 1 (Contract 25 Part 2): gate-keyed (was stage-keyed).
 
-  /** Initialise expandedStages: current + past stages expanded; future collapsed. */
-  private initExpandedStages(): void {
+  /** Initialise expandedGates: gates up to and including the cycle's current
+   *  next gate are expanded; later gates + Unscheduled stay collapsed.
+   *  Terminal cycles (no next gate) expand all scheduled gates by default. */
+  private initExpandedGates(): void {
     if (!this.cycle) { return; }
-    const STAGE_ORDER = [
-      'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','COMPLETE'
+    const GATE_ORDER = [
+      'brief_review','go_to_build','go_to_deploy','go_to_release','close_review'
     ];
-    const currentIdx = STAGE_ORDER.indexOf(this.cycle.current_lifecycle_stage);
-    this.expandedStages = new Set(
-      STAGE_ORDER.filter((_, i) => i <= currentIdx)
-    );
+    const nextGate = NEXT_GATE_BY_STAGE[this.cycle.current_lifecycle_stage as LifecycleStage] ?? null;
+    const currentIdx = nextGate ? GATE_ORDER.indexOf(nextGate) : -1;
+    const expanded = currentIdx >= 0
+      ? GATE_ORDER.filter((_, i) => i <= currentIdx)
+      : GATE_ORDER.slice();
+    this.expandedGates = new Set(expanded);
   }
 
-  /** Toggle a stage section open or closed. */
-  toggleStageExpand(stage: string): void {
-    if (this.expandedStages.has(stage)) {
-      this.expandedStages.delete(stage);
+  /** Toggle a gate section open or closed. */
+  toggleGateExpand(key: string): void {
+    if (this.expandedGates.has(key)) {
+      this.expandedGates.delete(key);
     } else {
-      this.expandedStages.add(stage);
+      this.expandedGates.add(key);
     }
     this.cdr.markForCheck();
   }
 
-  isStageExpanded(stage: string): boolean {
-    return this.expandedStages.has(stage);
+  isGateExpanded(key: string): boolean {
+    return this.expandedGates.has(key);
   }
 
-  /** Count attached artifacts in a stage group */
+  /** Count attached artifacts in a gate group */
   attachedCountInGroup(slots: CycleArtifact[]): number {
     return slots.filter(s => s.external_url || s.oi_library_artifact_id).length;
   }

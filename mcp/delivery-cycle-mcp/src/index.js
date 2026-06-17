@@ -56,6 +56,8 @@ const { set_milestone_actual_date }      = require('./tools/set_milestone_actual
 const { update_milestone_status }        = require('./tools/update_milestone_status');
 
 const { attach_cycle_artifact }          = require('./tools/attach_cycle_artifact');
+const { update_cycle_artifact }          = require('./tools/update_cycle_artifact');
+const { detach_cycle_artifact }          = require('./tools/detach_cycle_artifact');
 const { promote_artifact_to_oi_library } = require('./tools/promote_artifact_to_oi_library');
 
 const { get_cycle_event_log }            = require('./tools/get_cycle_event_log');
@@ -115,6 +117,8 @@ const TOOLS = {
 
   // Artifact tracking
   attach_cycle_artifact,
+  update_cycle_artifact,
+  detach_cycle_artifact,
   promote_artifact_to_oi_library,
 
   // Event log

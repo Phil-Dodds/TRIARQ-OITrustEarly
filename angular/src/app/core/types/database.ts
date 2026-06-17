@@ -346,12 +346,13 @@ export interface InitiativeActivityCount {
 
 // D-438 (Contract 25): required_at_gate replaced by primary_gate +
 // gate_warning_behavior. Migration 040 drops the required_at_gate column.
+// D-438 Amendment 1 (Contract 25 Part 2): lifecycle_stage dropped from
+// cycle_artifact_types. Migration 041.
 export type GateWarningBehavior = 'none' | 'primary_only' | 'primary_and_subsequent';
 
 export interface CycleArtifactType {
   artifact_type_id:      string;
   artifact_type_name:    string;
-  lifecycle_stage:       string;
   guidance_text:         string;
   sort_order:            number;
   gate_required:         boolean;
@@ -363,6 +364,10 @@ export interface CycleArtifact {
   cycle_artifact_id:      string;
   delivery_cycle_id:      string;
   artifact_type_id:       string | null;
+  // Contract 25 Part 2 follow-on: gate group an ad-hoc attachment was added
+  // under. NULL for type-bound attachments. One of the 5 gate names or
+  // 'unscheduled' for ad-hocs from the Unscheduled group.
+  gate_affinity:          GateName | 'unscheduled' | null;
   display_name:           string;
   external_url:           string | null;
   oi_library_artifact_id: string | null;
@@ -372,9 +377,10 @@ export interface CycleArtifact {
   created_at:             string;
   updated_at:             string;
   deleted_at:             string | null;
-  // Joined — populated by get_delivery_cycle when artifacts are returned with full type metadata
+  // Joined — populated by get_delivery_cycle when artifacts are returned with full type metadata.
+  // D-438 Amendment 1: lifecycle_stage dropped; primary_gate is the gate-grouping field.
   artifact_type_name?:      string;
-  lifecycle_stage?:         string;
+  primary_gate?:            GateName | null;
   guidance_text?:           string;   // from cycle_artifact_types.guidance_text — shown in slot UI (Item 2)
   attached_by_display_name?: string;  // resolved from attached_by_user_id — shown as tappable chip (D-181)
 }
@@ -560,11 +566,11 @@ export interface MyCompletedGatesResponse {
 
 // Contract 24 (D-437) origin; Contract 25 (D-438) supersedes the
 // required_at_gate column with primary_gate + gate_warning_behavior.
-// Backed by cycle_artifact_types table + Migration 040.
+// Contract 25 Part 2 (D-438 Amendment 1, Migration 041) drops the
+// lifecycle_stage column — gate is the single organizing concept.
 export interface ArtifactTypeRow {
   artifact_type_id:       string;
   artifact_type_name:     string;
-  lifecycle_stage:        LifecycleStage | 'ANY';
   primary_gate:           GateName | null;
   gate_warning_behavior:  GateWarningBehavior;
   guidance_text:          string;

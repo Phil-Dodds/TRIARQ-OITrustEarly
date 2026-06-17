@@ -47,10 +47,11 @@ const ADMIN_CARDS: AdminCard[] = [
     route:       'epo-wip',
     icon:        '◐'
   },
-  // Contract 24 (D-437): fifth admin card — Artifact Type management.
+  // Contract 24 (D-437): fifth admin card — Initiative Artifact Type management.
+  // Contract 25 Part 2 (D-438 Amendment 1): renamed from "Artifact Types"; stage organizing concept dropped.
   {
-    title:       'Artifact Types',
-    description: 'Manage suggested artifact types by stage and gate. The system uses these to suggest the right document when an Initiative submits a gate. Deactivating a type hides it from new attachments while leaving historical attachments in place.',
+    title:       'Initiative Artifact Types',
+    description: 'Manage suggested Initiative artifact types organized by primary gate. The system uses these to suggest the right document when an Initiative submits a gate. Deactivating a type hides it from new attachments while leaving historical attachments in place.',
     who:         'Phil and Admin',
     route:       'artifact-types',
     icon:        '⬢'

@@ -1,10 +1,13 @@
 // update_artifact_type.js
 // Pathways OI Trust — delivery-cycle-mcp
-// Update an artifact type (D-437 origin, D-438 Contract 25 schema). Admin only.
+// Update an artifact type (D-437 origin, D-438 + Amendment 1). Admin only.
+//
+// D-438 Amendment 1 (Contract 25 Part 2): `lifecycle_stage` removed from
+// cycle_artifact_types — gate is the single organizing concept.
 //
 // Params:
 //   artifact_type_id:   required string
-//   Any of: artifact_type_name, lifecycle_stage, guidance_text, sort_order,
+//   Any of: artifact_type_name, guidance_text, sort_order,
 //           primary_gate, gate_warning_behavior, active
 //
 // Deactivation (active:false) is blocked when cycle_artifacts rows reference
@@ -14,9 +17,6 @@
 
 const { supabase } = require('../db');
 
-const VALID_STAGES = new Set([
-  'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','ANY'
-]);
 const VALID_PRIMARY_GATES = new Set([
   'brief_review','go_to_build','go_to_deploy','go_to_release','close_review'
 ]);
@@ -45,12 +45,6 @@ async function update_artifact_type(params, caller_user_id) {
     const name = params.artifact_type_name.trim();
     if (!name) { return { success: false, error: 'artifact_type_name cannot be empty.' }; }
     updates.artifact_type_name = name;
-  }
-  if (typeof params.lifecycle_stage === 'string') {
-    if (!VALID_STAGES.has(params.lifecycle_stage)) {
-      return { success: false, error: 'lifecycle_stage is invalid.' };
-    }
-    updates.lifecycle_stage = params.lifecycle_stage;
   }
   if (typeof params.guidance_text === 'string') {
     const guide = params.guidance_text.trim();

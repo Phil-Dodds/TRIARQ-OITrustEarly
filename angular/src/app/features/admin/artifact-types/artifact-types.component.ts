@@ -1,26 +1,27 @@
 // artifact-types.component.ts — Pathways OI Trust
-// Route: /admin/artifact-types  (Admin role only — D-437 origin, D-438 Contract 25 schema).
+// Route: /admin/artifact-types  (Admin role only — D-437 origin, D-438 + Amendment 1).
 //
-// Manages the Artifact Type catalog used by Initiative attachment slots and
-// gate suggestion warnings. Standard grid + right panel per S-005, S-018,
-// S-019. Create via S-016 right-panel form. Deactivation only — no delete.
+// Manages the Initiative Artifact Types catalog used by Initiative attachment
+// slots and gate suggestion warnings. Standard grid + right panel per S-005,
+// S-018, S-019. Create via S-016 right-panel form. Deactivation only — no delete.
 //
-// D-438 (Contract 25): "Suggested Before Gate" column replaced by "Primary
-// Gate". New Gate Warning dropdown binds gate_warning_behavior. Grid filter
-// panel (when added) must target primary_gate not required_at_gate.
+// D-438 Amendment 1 (Contract 25 Part 2): `lifecycle_stage` dropped from
+// cycle_artifact_types — gate is the single organizing concept. Screen renamed
+// "Initiative Artifact Types" (hub card + page title). Stage column / field /
+// filter removed. Sort defaults to Primary Gate ascending.
 //
 // Scope:
-//   - Grid: Name · Stage · Primary Gate · Active Status
+//   - Grid: Name · Primary Gate · Active Status
 //   - View + Edit + Create right-panel pattern
 //   - Deactivation blocked when cycle_artifacts references exist (MCP enforced)
-//   - S-036 sort: all four columns sortable; default Stage asc + sort_order asc
+//   - S-036 sort: all three columns sortable; default Primary Gate asc + sort_order asc
 //
 // Deferred (CC-candidates):
 //   - Full S-010..S-013 slide-in filter panel — when added, must filter on primary_gate
 //   - +Add Artifact Type panel (Create surface) — V1 ships read/edit only
 //   - Sort persistence beyond in-session
 //
-// Source: D-437, D-438, S-005, S-018, S-019, S-036, S-001, S-014, S-024.
+// Source: D-437, D-438, D-438 Amendment 1, S-005, S-018, S-019, S-036, S-001, S-014, S-024.
 
 import {
   Component, ChangeDetectionStrategy, ChangeDetectorRef,
@@ -39,18 +40,20 @@ import {
 
 type AtSortColumn =
   | 'artifact_type_name'
-  | 'lifecycle_stage'
   | 'primary_gate'
   | 'active_status';
 
 const DEFAULT_AT_SORT: SortState<AtSortColumn> = {
-  column:    'lifecycle_stage',
+  column:    'primary_gate',
   direction: 'asc'
 };
 
-const STAGE_ORDER: Record<string, number> = {
-  BRIEF: 1, DESIGN: 2, SPEC: 3, BUILD: 4, VALIDATE: 5,
-  UAT: 6, PILOT: 7, RELEASE: 8, OUTCOME: 9, ANY: 99
+const GATE_SEQUENCE: Record<string, number> = {
+  brief_review:  1,
+  go_to_build:   2,
+  go_to_deploy:  3,
+  go_to_release: 4,
+  close_review:  5
 };
 const GATE_DISPLAY: Record<string, string> = {
   brief_review:  'Brief Review',
@@ -77,9 +80,9 @@ type PanelMode = 'view' | 'edit' | null;
     <div class="at-shell">
 
       <div class="at-header">
-        <h3 class="at-title">Artifact Types</h3>
+        <h3 class="at-title">Initiative Artifact Types</h3>
         <p class="at-subtitle">
-          Suggested artifact types organized by lifecycle stage. The system uses
+          Suggested artifact types organized by primary gate. The system uses
           these to recommend the right document before each gate. Deactivating
           a type hides it from new attachments — historical attachments stay in
           place.
@@ -92,11 +95,6 @@ type PanelMode = 'view' | 'edit' | null;
                 [class.oi-sort-active]="isSorted('artifact_type_name')"
                 (click)="onSortColumn('artifact_type_name')">
             Name {{ glyph('artifact_type_name') }}
-          </span>
-          <span class="oi-sort-th"
-                [class.oi-sort-active]="isSorted('lifecycle_stage')"
-                (click)="onSortColumn('lifecycle_stage')">
-            Stage {{ glyph('lifecycle_stage') }}
           </span>
           <span class="oi-sort-th"
                 [class.oi-sort-active]="isSorted('primary_gate')"
@@ -115,7 +113,6 @@ type PanelMode = 'view' | 'edit' | null;
             <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
             <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
             <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
-            <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
           </div>
         </ng-container>
 
@@ -128,7 +125,6 @@ type PanelMode = 'view' | 'edit' | null;
              [class.at-selected]="selectedId === row.artifact_type_id"
              (click)="openView(row)">
           <span class="at-cell">{{ row.artifact_type_name }}</span>
-          <span class="at-cell at-stage">{{ row.lifecycle_stage }}</span>
           <span class="at-cell">{{ gateLabel(row.primary_gate) }}</span>
           <span>
             <span class="at-pill"
@@ -144,14 +140,13 @@ type PanelMode = 'view' | 'edit' | null;
       <div class="oi-scrim" *ngIf="panelMode === 'edit'" (click)="onScrimClick()"></div>
       <div class="oi-side-panel" *ngIf="panelMode" role="dialog" aria-modal="true">
         <div class="oi-side-head">
-          <strong>{{ panelMode === 'edit' ? 'Edit Artifact Type' : 'Artifact Type' }}</strong>
+          <strong>{{ panelMode === 'edit' ? 'Edit Initiative Artifact Type' : 'Initiative Artifact Type' }}</strong>
           <button class="oi-close-btn" (click)="closePanel()" aria-label="Close">✕</button>
         </div>
         <div class="oi-side-body" *ngIf="selectedRow">
           <ng-container *ngIf="panelMode === 'view'">
             <dl class="at-dl">
               <dt>Name</dt>          <dd>{{ selectedRow.artifact_type_name }}</dd>
-              <dt>Stage</dt>         <dd>{{ selectedRow.lifecycle_stage }}</dd>
               <dt>Primary Gate</dt>  <dd>{{ gateLabel(selectedRow.primary_gate) }}</dd>
               <dt>Gate Warning</dt>  <dd>{{ warningLabel(selectedRow.gate_warning_behavior) }}</dd>
               <dt>Guidance</dt>      <dd>{{ selectedRow.guidance_text }}</dd>
@@ -164,11 +159,6 @@ type PanelMode = 'view' | 'edit' | null;
             <form [formGroup]="editForm" novalidate class="at-form">
               <label class="at-label">Name</label>
               <input formControlName="artifact_type_name" class="at-input" />
-
-              <label class="at-label">Stage</label>
-              <select formControlName="lifecycle_stage" class="at-input">
-                <option *ngFor="let s of allStages" [value]="s">{{ s }}</option>
-              </select>
 
               <label class="at-label">Primary Gate</label>
               <select formControlName="primary_gate" class="at-input">
@@ -230,7 +220,7 @@ type PanelMode = 'view' | 'edit' | null;
       border-radius: 6px; background: #fff; overflow: hidden;
     }
     .at-row {
-      display: grid; grid-template-columns: 2fr 100px 200px 120px;
+      display: grid; grid-template-columns: 2fr 200px 120px;
       gap: var(--triarq-space-sm);
       padding: 8px var(--triarq-space-md);
       border-bottom: 1px solid #E8E8E8;
@@ -244,7 +234,6 @@ type PanelMode = 'view' | 'edit' | null;
     .at-data       { cursor: pointer; }
     .at-data:hover { background: #F0F4F8; }
     .at-selected   { background: #E8F0FE; }
-    .at-stage      { color: #5A5A5A; }
     .at-pill {
       display: inline-block; padding: 2px 8px; border-radius: 999px;
       font-size: 11px; font-weight: 500;
@@ -284,9 +273,6 @@ export class ArtifactTypesComponent implements OnInit {
   saveError   = '';
 
   readonly skeletonRows = [1, 2, 3, 4, 5, 6];
-  readonly allStages: string[] = [
-    'BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','RELEASE','OUTCOME','ANY'
-  ];
 
   constructor(
     private readonly delivery: DeliveryService,
@@ -295,7 +281,6 @@ export class ArtifactTypesComponent implements OnInit {
   ) {
     this.editForm = this.fb.group({
       artifact_type_name:    ['', Validators.required],
-      lifecycle_stage:       ['BRIEF', Validators.required],
       primary_gate:          [null],
       gate_warning_behavior: ['none', Validators.required],
       guidance_text:         ['', Validators.required],
@@ -317,19 +302,14 @@ export class ArtifactTypesComponent implements OnInit {
       switch (column) {
         case 'artifact_type_name':
           return compareString(a.artifact_type_name, b.artifact_type_name, direction);
-        case 'lifecycle_stage': {
-          const oa = STAGE_ORDER[a.lifecycle_stage] ?? 50;
-          const ob = STAGE_ORDER[b.lifecycle_stage] ?? 50;
+        case 'primary_gate': {
+          // NULL primary_gate (Unscheduled) sorts last in asc, first in desc.
+          const oa = a.primary_gate ? (GATE_SEQUENCE[a.primary_gate] ?? 98) : 99;
+          const ob = b.primary_gate ? (GATE_SEQUENCE[b.primary_gate] ?? 98) : 99;
           const cmp = direction === 'asc' ? (oa - ob) : (ob - oa);
           if (cmp !== 0) { return cmp; }
           return compareNumber(a.sort_order, b.sort_order, 'asc');
         }
-        case 'primary_gate':
-          return compareString(
-            this.gateLabel(a.primary_gate),
-            this.gateLabel(b.primary_gate),
-            direction
-          );
         case 'active_status':
           if (a.active_status === b.active_status) { return 0; }
           if (direction === 'asc')                 { return a.active_status ? -1 : 1; }
@@ -366,7 +346,6 @@ export class ArtifactTypesComponent implements OnInit {
     if (!this.selectedRow) { return; }
     this.editForm.reset({
       artifact_type_name:    this.selectedRow.artifact_type_name,
-      lifecycle_stage:       this.selectedRow.lifecycle_stage,
       primary_gate:          this.selectedRow.primary_gate ?? null,
       gate_warning_behavior: this.selectedRow.gate_warning_behavior ?? 'none',
       guidance_text:         this.selectedRow.guidance_text,
@@ -408,7 +387,6 @@ export class ArtifactTypesComponent implements OnInit {
     this.delivery.updateArtifactType({
       artifact_type_id:       this.selectedRow.artifact_type_id,
       artifact_type_name:     v.artifact_type_name,
-      lifecycle_stage:        v.lifecycle_stage,
       primary_gate:           v.primary_gate ?? null,
       gate_warning_behavior:  v.gate_warning_behavior ?? 'none',
       guidance_text:          v.guidance_text,
