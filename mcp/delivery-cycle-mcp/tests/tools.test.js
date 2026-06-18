@@ -162,6 +162,69 @@ describe('get_delivery_cycle', () => {
     assert.ok(result.error.includes('delivery_cycle_id'));
   });
 
+  // ── CC-28-3 hotfix — artifact enrichment ─────────────────────────────────
+  // Pre-existing gap: cycle_artifacts rows returned raw, so the Angular
+  // CycleArtifact.artifact_type_name + attached_by_display_name joined
+  // fields were always undefined. Surfaced during Contract 28 UAT —
+  // Bug 1: "Attached by" chip rendered "Unknown".
+  // Bug 2: gate checklist hasName() matcher silently false-negative for
+  //        every named-artifact check on every gate.
+
+  test('CC-28-3: response builds enrichedArtifacts with joined fields', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/get_delivery_cycle.js'),
+      'utf8'
+    );
+    assert.ok(/enrichedArtifacts\s*=\s*\(artifacts \|\| \[\]\)\.map/.test(src),
+      'enrichedArtifacts must be derived from raw artifacts');
+    assert.ok(/artifact_type_name:\s*a\.artifact_type_id/.test(src),
+      'enriched row must populate artifact_type_name from the type lookup');
+    assert.ok(/attached_by_display_name:\s*a\.attached_by_user_id/.test(src),
+      'enriched row must populate attached_by_display_name from userMap');
+  });
+
+  test('CC-28-3: artifact_type_name lookup uses artifact_types map', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/get_delivery_cycle.js'),
+      'utf8'
+    );
+    assert.ok(/artifactTypeNameMap\s*=\s*\{\}/.test(src),
+      'artifactTypeNameMap must be declared');
+    assert.ok(/artifactTypeNameMap\[t\.artifact_type_id\]\s*=\s*t\.artifact_type_name/.test(src),
+      'artifactTypeNameMap must be keyed by artifact_type_id');
+  });
+
+  test('CC-28-3: user resolve pass includes artifact attacher ids', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/get_delivery_cycle.js'),
+      'utf8'
+    );
+    assert.ok(/artifactAttacherIds\s*=\s*\(artifacts \|\| \[\]\)/.test(src),
+      'artifactAttacherIds must collect attached_by_user_id values');
+    assert.ok(/\.\.\.artifactAttacherIds/.test(src),
+      'userIdsToResolve must spread artifactAttacherIds');
+  });
+
+  test('CC-28-3: response.data.artifacts references enrichedArtifacts (not raw)', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/get_delivery_cycle.js'),
+      'utf8'
+    );
+    assert.ok(/artifacts:\s*enrichedArtifacts/.test(src),
+      'response must return enrichedArtifacts, not the raw artifacts array');
+  });
+
+  test('CC-28-3: null safety — null artifact_type_id resolves to null name', () => {
+    // Ad-hoc artifacts (artifact_type_id IS NULL) must still pass through
+    // without throwing — checklist matchers safely skip them when name is null.
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/get_delivery_cycle.js'),
+      'utf8'
+    );
+    assert.ok(/a\.artifact_type_id\s*\?\s*\(artifactTypeNameMap\[a\.artifact_type_id\]\s*\?\?\s*null\)\s*:\s*null/.test(src),
+      'null artifact_type_id branch must return null without lookup');
+  });
+
 });
 
 

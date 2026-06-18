@@ -117,11 +117,19 @@ async function get_delivery_cycle(params, caller_user_id) {
     .order('sort_order', { ascending: true });
 
   // ── Resolve DCS / EPO / DOL display names + caller role ───────────────────
+  // CC-28-3: also resolve attached_by_user_id for every artifact so the
+  // joined attached_by_display_name is populated in the response. Prior to
+  // this the field was specced on the Angular type but never returned —
+  // every "Attached by" chip rendered as Unknown.
+  const artifactAttacherIds = (artifacts || [])
+    .map(a => a.attached_by_user_id)
+    .filter(Boolean);
   const userIdsToResolve = [
     cycle.assigned_dcs_user_id,
     cycle.assigned_epo_user_id,
     cycle.assigned_dol_user_id,
-    caller_user_id
+    caller_user_id,
+    ...artifactAttacherIds
   ].filter(Boolean);
 
   let userMap = {};
@@ -130,7 +138,7 @@ async function get_delivery_cycle(params, caller_user_id) {
     const { data: userRows } = await supabase
       .from('users')
       .select('id, display_name, is_admin')
-      .in('id', userIdsToResolve)
+      .in('id', [...new Set(userIdsToResolve)])
       .is('deleted_at', null);
     if (userRows) {
       userRows.forEach(u => {
@@ -139,6 +147,26 @@ async function get_delivery_cycle(params, caller_user_id) {
       });
     }
   }
+
+  // ── CC-28-3: enrich artifacts with joined artifact_type_name + attached_by_display_name ──
+  // The Angular CycleArtifact type declares both as optional "Joined" fields.
+  // The Angular checklist matcher in delivery-cycle-detail.component.ts
+  // (gateChecklist) reads a.artifact_type_name to detect specific attachments
+  // (e.g. "uat sign"). Without this enrichment every checklist item silently
+  // returned met:false regardless of actual attachments.
+  const artifactTypeNameMap = {};
+  (artifact_types || []).forEach(t => {
+    artifactTypeNameMap[t.artifact_type_id] = t.artifact_type_name;
+  });
+  const enrichedArtifacts = (artifacts || []).map(a => ({
+    ...a,
+    artifact_type_name: a.artifact_type_id
+      ? (artifactTypeNameMap[a.artifact_type_id] ?? null)
+      : null,
+    attached_by_display_name: a.attached_by_user_id
+      ? (userMap[a.attached_by_user_id] ?? null)
+      : null
+  }));
 
   // ── Compute gate authority per gate for the caller (D-389/D-390/D-391) ────
   // Contract 19 (D-394, CC-19-01): is_admin replaces the 'phil' single-role check.
@@ -199,7 +227,11 @@ async function get_delivery_cycle(params, caller_user_id) {
       gate_records:     enrichedGateRecords,
       workstream:       workstream ? { ...workstream, home_division_name } : null,
       jira_links:       jira_links            || [],
-      artifacts:        artifacts             || [],
+      // CC-28-3: artifacts now carry joined artifact_type_name and
+      // attached_by_display_name — pre-existing gap that made the gate
+      // checklist matcher silently false-negative and the "Attached by"
+      // chip render as Unknown for every attachment.
+      artifacts:        enrichedArtifacts,
       // AC #20: seeded slot definitions for the detail panel's Artifacts zone.
       artifact_types:   artifact_types        || []
     }
