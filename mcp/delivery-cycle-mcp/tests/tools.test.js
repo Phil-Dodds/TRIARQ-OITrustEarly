@@ -277,6 +277,195 @@ describe('submit_gate_for_approval', () => {
     assert.ok(result.error.includes('gate_name'));
   });
 
+  // ── Contract 28 / D-447 / D-448 / D-450: Skip pre-check ───────────────────
+  // These tests assert the source-level skip pre-check shape — gate ordering,
+  // resolved status set, response codes. Behavior tests against a real cycle
+  // happen via UAT — there is no Supabase mock infrastructure in this suite.
+
+  test('skip pre-check: GATE_ORDER constant defines the five-gate sequence', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/submit_gate_for_approval.js'),
+      'utf8'
+    );
+    assert.ok(/const GATE_ORDER\s*=\s*\[/.test(src),
+      'GATE_ORDER constant must be declared');
+    assert.ok(src.includes("'brief_review'"));
+    assert.ok(src.includes("'go_to_build'"));
+    assert.ok(src.includes("'go_to_deploy'"));
+    assert.ok(src.includes("'go_to_release'"));
+    assert.ok(src.includes("'close_review'"));
+  });
+
+  test('skip pre-check: RESOLVED_PREDECESSOR_STATUSES covers approved AND skipped (D-447)', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/submit_gate_for_approval.js'),
+      'utf8'
+    );
+    const match = src.match(/RESOLVED_PREDECESSOR_STATUSES\s*=\s*new Set\(\[([^\]]+)\]\)/);
+    assert.ok(match, 'RESOLVED_PREDECESSOR_STATUSES Set must be declared');
+    assert.ok(match[1].includes("'approved'"), 'approved must be a resolved status');
+    assert.ok(match[1].includes("'skipped'"), 'skipped must be a resolved status');
+  });
+
+  test('skip pre-check: DEPLOY_GATE_SKIP_BLOCKED is backend-enforced (D-450)', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/submit_gate_for_approval.js'),
+      'utf8'
+    );
+    assert.ok(src.includes("'DEPLOY_GATE_SKIP_BLOCKED'"),
+      'DEPLOY_GATE_SKIP_BLOCKED error code must be returned');
+    assert.ok(/gate_name === 'go_to_deploy'/.test(src),
+      'go_to_deploy must be the gate that triggers DEPLOY_GATE_SKIP_BLOCKED');
+    assert.ok(src.includes('gates_requiring_action'),
+      'response must include gates_requiring_action array');
+  });
+
+  test('skip pre-check: REQUIRES_SKIP_CONFIRMATION returns gates_to_skip (D-448)', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/submit_gate_for_approval.js'),
+      'utf8'
+    );
+    assert.ok(src.includes("'REQUIRES_SKIP_CONFIRMATION'"),
+      'REQUIRES_SKIP_CONFIRMATION status must be emitted');
+    assert.ok(src.includes('gates_to_skip'),
+      'response must carry gates_to_skip array');
+    assert.ok(src.includes('submitted_gate'),
+      'response must echo submitted_gate');
+  });
+
+  test('skip pre-check: state is read-only (no mutating write before confirm_gate_skip)', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/submit_gate_for_approval.js'),
+      'utf8'
+    );
+    // The skip pre-check block must not contain an UPDATE on gate_records or
+    // an INSERT on cycle_event_log — only confirm_gate_skip can transition
+    // a gate to 'skipped'.
+    const skipBlock = src.split('// ── D-447 / D-448 / D-450: Skip pre-check')[1]
+                       ?.split('// ── Contract 19 Part 3b')[0] ?? '';
+    assert.ok(skipBlock.length > 0, 'skip pre-check block must be present');
+    assert.ok(!/\.update\(/.test(skipBlock),
+      'skip pre-check must not call .update() on any table');
+    assert.ok(!/\.insert\(/.test(skipBlock),
+      'skip pre-check must not call .insert() on any table');
+  });
+
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// confirm_gate_skip (Contract 28 / D-447 / D-448 / D-449 / D-450)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('confirm_gate_skip', () => {
+
+  test('error path: missing delivery_cycle_id', async () => {
+    const { confirm_gate_skip } = require('../src/tools/confirm_gate_skip');
+    const result = await confirm_gate_skip(
+      { gates_to_skip: ['brief_review'], submitted_gate: 'go_to_build' },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('delivery_cycle_id'));
+  });
+
+  test('error path: gates_to_skip empty array', async () => {
+    const { confirm_gate_skip } = require('../src/tools/confirm_gate_skip');
+    const result = await confirm_gate_skip(
+      { delivery_cycle_id: CYCLE_ID, gates_to_skip: [], submitted_gate: 'go_to_build' },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('gates_to_skip'));
+  });
+
+  test('error path: gates_to_skip not array', async () => {
+    const { confirm_gate_skip } = require('../src/tools/confirm_gate_skip');
+    const result = await confirm_gate_skip(
+      { delivery_cycle_id: CYCLE_ID, gates_to_skip: 'brief_review', submitted_gate: 'go_to_build' },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('gates_to_skip'));
+  });
+
+  test('error path: missing submitted_gate', async () => {
+    const { confirm_gate_skip } = require('../src/tools/confirm_gate_skip');
+    const result = await confirm_gate_skip(
+      { delivery_cycle_id: CYCLE_ID, gates_to_skip: ['brief_review'] },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('submitted_gate'));
+  });
+
+  test('error path: invalid gate name in gates_to_skip', async () => {
+    const { confirm_gate_skip } = require('../src/tools/confirm_gate_skip');
+    const result = await confirm_gate_skip(
+      {
+        delivery_cycle_id: CYCLE_ID,
+        gates_to_skip: ['not_a_gate'],
+        submitted_gate: 'go_to_build'
+      },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.ok(result.error.includes('not_a_gate'));
+  });
+
+  test('D-450: go_to_deploy in gates_to_skip is rejected (backend enforcement)', async () => {
+    const { confirm_gate_skip } = require('../src/tools/confirm_gate_skip');
+    const result = await confirm_gate_skip(
+      {
+        delivery_cycle_id: CYCLE_ID,
+        gates_to_skip: ['brief_review', 'go_to_deploy'],
+        submitted_gate: 'go_to_release'
+      },
+      DS_ID
+    );
+    assert.equal(result.success, false);
+    assert.equal(result.error, 'DEPLOY_GATE_SKIP_BLOCKED');
+    assert.equal(result.data?.code, 'DEPLOY_GATE_SKIP_BLOCKED');
+  });
+
+  test('module shape: exports confirm_gate_skip function', () => {
+    const mod = require('../src/tools/confirm_gate_skip');
+    assert.equal(typeof mod.confirm_gate_skip, 'function');
+  });
+
+  test('source: rejects non-TRIO callers (D-447) — DCS, EPO, or DOL only', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/confirm_gate_skip.js'),
+      'utf8'
+    );
+    // The authority check must exclude Admin — only TRIO members can confirm.
+    assert.ok(/isAssignedDcs/.test(src));
+    assert.ok(/isAssignedEpo/.test(src));
+    assert.ok(/isAssignedDol/.test(src));
+    assert.ok(!/is_admin/.test(src),
+      'confirm_gate_skip must NOT delegate to Admin authority — TRIO only per D-447');
+  });
+
+  test('source: writes gate_skipped events with required metadata fields', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/confirm_gate_skip.js'),
+      'utf8'
+    );
+    assert.ok(/event_type:\s*'gate_skipped'/.test(src));
+    assert.ok(src.includes('gate_name'));
+    assert.ok(src.includes('skipped_at'));
+  });
+
+  test('router: confirm_gate_skip is registered in TOOLS', () => {
+    const indexSrc = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/index.js'),
+      'utf8'
+    );
+    assert.ok(indexSrc.includes("require('./tools/confirm_gate_skip')"),
+      'index.js must import confirm_gate_skip');
+    assert.ok(/^\s*confirm_gate_skip,?\s*$/m.test(indexSrc),
+      'index.js TOOLS object must include confirm_gate_skip');
+  });
+
 });
 
 
@@ -438,6 +627,55 @@ describe('set_milestone_actual_date', () => {
     assert.ok(blockedMsg.includes('override_reason'));
   });
 
+  // ── Contract 28 / D-449 — Backdate path (skipped → complete) ──────────────
+  test('D-449 backdate: isBackdate branch checks date_status === skipped', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/set_milestone_actual_date.js'),
+      'utf8'
+    );
+    assert.ok(/isBackdate\s*=\s*milestone\.date_status\s*===\s*'skipped'/.test(src),
+      'isBackdate must check milestone.date_status === skipped');
+  });
+
+  test('D-449 backdate: updates gate_records.gate_status to approved', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/set_milestone_actual_date.js'),
+      'utf8'
+    );
+    // gate_records update inside the isBackdate branch.
+    const backdateBlock = src.split('if (isBackdate)')[1]?.split('// ── Append event log')[0] ?? '';
+    assert.ok(backdateBlock.length > 0, 'isBackdate block must exist');
+    assert.ok(/\.from\('gate_records'\)/.test(backdateBlock),
+      'backdate must update gate_records');
+    assert.ok(/gate_status:\s*'approved'/.test(backdateBlock),
+      'backdate must set gate_status to approved');
+  });
+
+  test('D-449 backdate: does NOT set approver_user_id (self-asserted historical record)', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/set_milestone_actual_date.js'),
+      'utf8'
+    );
+    const backdateBlock = src.split('if (isBackdate)')[1]?.split('// ── Append event log')[0] ?? '';
+    assert.ok(!/approver_user_id/.test(backdateBlock),
+      'backdate must NOT populate approver_user_id (D-449 — no approval routing)');
+    assert.ok(!/approver_decision_at/.test(backdateBlock),
+      'backdate must NOT populate approver_decision_at');
+  });
+
+  test('D-449 backdate: emits gate_backdated event with required metadata', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/set_milestone_actual_date.js'),
+      'utf8'
+    );
+    assert.ok(/event_type:\s*'gate_backdated'/.test(src),
+      'backdate must use event_type gate_backdated');
+    assert.ok(/backdated_date/.test(src),
+      'backdate metadata must include backdated_date');
+    assert.ok(/previous_status:\s*'skipped'/.test(src),
+      'backdate metadata must include previous_status: skipped');
+  });
+
 });
 
 
@@ -466,14 +704,67 @@ describe('update_milestone_status', () => {
     assert.ok(result.error.includes('date_status'));
   });
 
-  test('error path: reverting from complete requires status_override_reason', async () => {
-    // The tool checks this before the DB call — simulate the validation check
-    const result = {
-      success: false,
-      error: 'status_override_reason is required when reverting a milestone from complete status.'
-    };
-    assert.equal(result.success, false);
-    assert.ok(result.error.includes('status_override_reason'));
+  // ── Contract 28 / D-447 / D-451 — new trigger model ──────────────────────
+
+  test('D-451 source: trigger criterion is milestone.actual_date IS NOT NULL', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/update_milestone_status.js'),
+      'utf8'
+    );
+    assert.ok(/isRevertPath\s*=\s*milestone\.actual_date\s*!==\s*null/.test(src),
+      'trigger must read milestone.actual_date, not milestone.date_status');
+  });
+
+  test('D-451 source: missing confirmation token returns REVERT_CONFIRMATION_REQUIRED', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/update_milestone_status.js'),
+      'utf8'
+    );
+    assert.ok(src.includes("error: 'REVERT_CONFIRMATION_REQUIRED'"));
+    assert.ok(/REVERT_CONFIRMATION_TOKEN\s*=\s*'confirmed-revert'/.test(src),
+      'fixed system token must be confirmed-revert');
+  });
+
+  test('D-451 source: persists fixed system token, not free text', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/update_milestone_status.js'),
+      'utf8'
+    );
+    // The update payload writes the system token when in the revert path —
+    // never the user-supplied status_override_reason directly.
+    assert.ok(/status_override_reason:\s*isRevertPath\s*\?\s*REVERT_CONFIRMATION_TOKEN/.test(src),
+      'update payload must use the system token, not user-supplied text');
+  });
+
+  test('D-451 source: emits milestone_status_reverted event with required metadata', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/update_milestone_status.js'),
+      'utf8'
+    );
+    assert.ok(/event_type:\s*'milestone_status_reverted'/.test(src));
+    assert.ok(/previous_status:/.test(src));
+    assert.ok(/new_status:/.test(src));
+    assert.ok(/previous_actual_date:/.test(src));
+  });
+
+  test('D-447 source: rejects mutation of skipped milestone', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/update_milestone_status.js'),
+      'utf8'
+    );
+    assert.ok(/milestone\.date_status\s*===\s*'skipped'/.test(src),
+      'skipped state must be checked and rejected');
+  });
+
+  test('D-447 source: skipped not in user-settable VALID_STATUSES', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/update_milestone_status.js'),
+      'utf8'
+    );
+    const match = src.match(/VALID_STATUSES\s*=\s*\[([^\]]+)\]/);
+    assert.ok(match, 'VALID_STATUSES array must be declared');
+    assert.ok(!match[1].includes("'skipped'"),
+      'skipped is system-only — not in user-facing valid statuses');
   });
 
 });

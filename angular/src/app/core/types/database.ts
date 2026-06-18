@@ -199,6 +199,28 @@ export interface McpResponse<T = unknown> {
   error?:        string;
   message?:      string;
   stub_message?: string;
+  /** D-448 / Contract 28: submit_gate_for_approval returns
+   *  status: 'REQUIRES_SKIP_CONFIRMATION' (with success: true) when the
+   *  caller is attempting to submit a gate that has unapproved predecessors.
+   *  Angular handles the interstitial; user then calls confirm_gate_skip. */
+  status?:       string;
+}
+
+// ── Contract 28 / D-447–D-450: skip flow response payloads ───────────────────
+export interface GateSkipInterstitialPayload {
+  status:         'REQUIRES_SKIP_CONFIRMATION';
+  gates_to_skip:  GateName[];
+  submitted_gate: GateName;
+  message:        string;
+}
+export interface DeployGateSkipBlockedPayload {
+  code:                  'DEPLOY_GATE_SKIP_BLOCKED';
+  message:               string;
+  gates_requiring_action: GateName[];
+}
+export interface GateSkipConfirmResult {
+  skipped_gates: { gate_name: GateName; gate_status: 'skipped'; skipped_at: string }[];
+  submission:    McpResponse<GateRecord>;
 }
 
 // ── Build C — Delivery Cycle types ────────────────────────────────────────────
@@ -207,16 +229,20 @@ export type TierClassification  = 'tier_1' | 'tier_2' | 'tier_3';
 export type LifecycleStage      = 'BRIEF' | 'DESIGN' | 'SPEC' | 'BUILD' | 'VALIDATE' | 'UAT' | 'PILOT' | 'RELEASE' | 'OUTCOME' | 'COMPLETE' | 'CANCELLED' | 'ON_HOLD';
 export type GateName            = 'brief_review' | 'go_to_build' | 'go_to_deploy' | 'go_to_release' | 'close_review';
 // gate_status: not_started (D-282 seed) | pending (legacy seed) | awaiting_approval (D-345)
-//   | approved | returned | blocked. Migration 029 added 'awaiting_approval'.
-export type GateStatus          = 'not_started' | 'pending' | 'awaiting_approval' | 'approved' | 'returned' | 'blocked';
-export type DateStatus          = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'complete';
+//   | approved | returned | blocked | skipped (D-447 — Contract 28).
+//   Migration 029 added 'awaiting_approval'. Migration 044 added 'skipped'.
+export type GateStatus          = 'not_started' | 'pending' | 'awaiting_approval' | 'approved' | 'returned' | 'blocked' | 'skipped';
+// date_status: not_started | on_track | at_risk | behind | complete | skipped
+//   (D-447 — Contract 28). Migration 044 added 'skipped'.
+export type DateStatus          = 'not_started' | 'on_track' | 'at_risk' | 'behind' | 'complete' | 'skipped';
 export type PointerStatus       = 'external_only' | 'promoted' | 'oi_only';
 export type JiraSyncStatus      = 'unsynced' | 'synced' | 'error';
 // GateDisplayState: stage-track + gate sub-panel rendering vocabulary.
 // 'not_started' = grey diamond, no submission yet. 'pending' = legacy. 'awaiting_approval' = sunray, submitted.
 // 'blocked' = system error. 'complete' = teal approved. 'upcoming' = dim future gate.
-// Source: D-345, gate-submission-flow-spec §2.
-export type GateDisplayState    = 'not_started' | 'pending' | 'awaiting_approval' | 'blocked' | 'complete' | 'upcoming';
+// 'skipped' = hollow Oravive diamond — initiative entered system past this gate (D-447).
+// Source: D-345, gate-submission-flow-spec §2, D-447.
+export type GateDisplayState    = 'not_started' | 'pending' | 'awaiting_approval' | 'blocked' | 'complete' | 'upcoming' | 'skipped';
 
 export interface DeliveryWorkstream {
   workstream_id:           string;

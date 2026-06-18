@@ -86,7 +86,10 @@ function nextUnapprovedGate(records: GateRecordLite[] | undefined): GateName | n
   const byName = new Map<GateName, string>();
   (records ?? []).forEach(r => { byName.set(r.gate_name, r.gate_status); });
   for (const g of GATE_SEQUENCE) {
-    if (byName.get(g) !== 'approved') { return g; }
+    const s = byName.get(g);
+    // D-447 amendment: 'skipped' is a resolved state — treat as transparent
+    // in the walkback chain like 'approved'.
+    if (s !== 'approved' && s !== 'skipped') { return g; }
   }
   return null;
 }
@@ -117,11 +120,13 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
   }
 
   // Rule 2 — Any gate overdue (target_date < today, not approved)
+  // D-447: skipped gates are terminal; they cannot be "overdue".
   for (const g of GATE_SEQUENCE) {
     const ms = milestoneFor(g, milestones);
     if (!ms?.target_date || ms.actual_date) { continue; }
     const rec = (gates ?? []).find(r => r.gate_name === g);
     if (rec?.gate_status === 'approved') { continue; }
+    if (rec?.gate_status === 'skipped')  { continue; }
     if (ms.target_date < today) {
       const d = daysFromToday(ms.target_date, now) ?? 0;
       const days = Math.abs(d);

@@ -13,9 +13,14 @@
 // gateStateMap accepts D-345 awaiting_approval state (sunray, same as pending) and
 // not_started (grey). complete (teal), blocked (red), upcoming (fog) unchanged.
 //
+// Contract 28 / D-447: 'skipped' display state added — hollow Oravive diamond
+// (transparent fill, 2px Oravive stroke). Render is identical in Full and
+// Condensed modes. Full-mode tooltip surfaces the skip date when supplied via
+// gateSkippedAtMap.
+//
 // D-93: No MCP calls. Presentation only — renders what it receives.
 // D-140: Gate blocked state visible to user with tooltip explanation.
-// Source: ARCH-25, D-108, D-154, D-345, Contract 11 §B-61.
+// Source: ARCH-25, D-108, D-154, D-345, D-447, Contract 11 §B-61.
 
 import {
   Component,
@@ -127,10 +132,11 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
             </span>
             <div
               [style.background]="gateColor(node.id)"
+              [style.border]="gateBorder(node.id)"
               [attr.title]="gateTitle(node.id)"
               (click)="onGateClick(node.id)"
               style="width:24px;height:24px;border-radius:4px;transform:rotate(45deg);
-                     cursor:pointer;transition:opacity 0.15s;"
+                     cursor:pointer;transition:opacity 0.15s;box-sizing:border-box;"
             ></div>
           </div>
 
@@ -150,15 +156,16 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
       <div style="display:flex;align-items:center;gap:3px;">
         <ng-container *ngFor="let gate of gateNodes; let i = index">
           <div *ngIf="i > 0"
-               [style.background]="gateDisplayState(gate.id) === 'complete'
-                 ? 'var(--triarq-color-primary)'
-                 : 'var(--triarq-color-fog, #e0e0e0)'"
+               [style.background]="condensedConnectorBg(gate.id, i)"
                style="height:1px;width:6px;flex-shrink:0;"></div>
           <div
             [style.background]="gateColor(gate.id)"
-            [attr.title]="gate.label + ': ' + gateDisplayState(gate.id)"
+            [style.border]="gateBorder(gate.id)"
+            [attr.title]="gateDisplayState(gate.id) === 'skipped'
+                            ? null
+                            : (gate.label + ': ' + gateDisplayState(gate.id))"
             style="width:10px;height:10px;border-radius:2px;
-                   transform:rotate(45deg);flex-shrink:0;"
+                   transform:rotate(45deg);flex-shrink:0;box-sizing:border-box;"
           ></div>
         </ng-container>
       </div>
@@ -175,6 +182,10 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
   @Input() currentStageId: string     = 'BRIEF';
   @Input() gateStateMap:   GateStateMap = {} as GateStateMap;
   @Input() displayMode:    'full' | 'condensed' = 'full';
+  /** D-447: ISO timestamp per gate marked as 'skipped'. Used to build the
+   *  full-mode tooltip "Skipped — [MMM D, YYYY]". Condensed mode never
+   *  shows the tooltip per spec. */
+  @Input() gateSkippedAtMap: Partial<Record<GateName, string | null>> = {};
 
   @Output() gateClicked = new EventEmitter<GateName>();
   /** D-360 Surface 3: emitted when the user clicks the next free stage circle.
@@ -291,14 +302,31 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
     return stageId === this.currentStageId;
   }
 
-  /** True if the connector before track index i should be filled (primary color) */
+  /** True if the connector before track index i should be filled (primary color).
+   *  CC-28-2: 'skipped' gates fill the connector (treated as resolved). Otherwise
+   *  a chain of skipped gates would visually break the track. */
   connectorFilled(i: number): boolean {
     // Connector between index i-1 and i is filled if both adjacent nodes are complete/current
     const prev = this.fullTrack[i - 1];
     if (!prev) { return false; }
     if (prev.type === 'stage') { return this.isComplete(prev.id) || this.isCurrent(prev.id); }
-    if (prev.type === 'gate')  { return this.gateDisplayState(prev.id) === 'complete'; }
+    if (prev.type === 'gate')  {
+      const s = this.gateDisplayState(prev.id);
+      return s === 'complete' || s === 'skipped';
+    }
     return false;
+  }
+
+  /** Condensed-mode connector colour. Skipped (like complete) fills with primary
+   *  per CC-28-2 so the dashboard row reads as continuous through skipped gates. */
+  condensedConnectorBg(gateId: string, _i: number): string {
+    const prevGate = this.gateNodes[_i - 1];
+    if (!prevGate) { return 'var(--triarq-color-fog, #e0e0e0)'; }
+    const prevState = this.gateDisplayState(prevGate.id);
+    if (prevState === 'complete' || prevState === 'skipped') {
+      return 'var(--triarq-color-primary)';
+    }
+    return 'var(--triarq-color-fog, #e0e0e0)';
   }
 
   stageCircleBg(stageId: string): string {
@@ -322,13 +350,34 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
       case 'awaiting_approval':  return 'var(--triarq-color-sunray, #f5a623)';
       case 'blocked':            return 'var(--triarq-color-error, #d32f2f)';
       case 'not_started':        return 'var(--triarq-color-fog, #e0e0e0)';
+      // D-447: hollow Oravive — transparent fill + stroke via gateBorder().
+      case 'skipped':            return 'transparent';
       default:                   return 'var(--triarq-color-fog, #e0e0e0)';
     }
+  }
+
+  /** D-447: hollow Oravive stroke for skipped gates; no border otherwise.
+   *  Stroke is 2px in Full mode and Condensed (spec literal). Box-sizing
+   *  border-box on the diamond keeps the overall 24px / 10px footprint. */
+  gateBorder(gateId: string): string {
+    if (this.gateDisplayState(gateId) === 'skipped') {
+      return '2px solid var(--triarq-color-oravive, #E96127)';
+    }
+    return 'none';
   }
 
   gateTitle(gateId: string): string {
     const state  = this.gateDisplayState(gateId);
     const node   = this.fullTrack.find(n => n.id === gateId);
+    if (state === 'skipped') {
+      // D-447: "Skipped — [MMM D, YYYY]". When no skip date is supplied
+      // (parent has not joined the metadata), fall back to undated label.
+      const isoSkip = this.gateSkippedAtMap[gateId as GateName] ?? null;
+      const formatted = isoSkip ? this.formatSkipDate(isoSkip) : null;
+      return formatted
+        ? `${node?.label ?? gateId} — Skipped — ${formatted}`
+        : `${node?.label ?? gateId} — Skipped`;
+    }
     const hint   = state === 'blocked'           ? ' — workstream inactive, gate blocked'
                  : state === 'awaiting_approval' ? ' — awaiting approver decision'
                  : state === 'pending'           ? ' — awaiting approval'
@@ -336,6 +385,14 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
                  : state === 'not_started'       ? ' — not yet submitted'
                  : ' — not yet reached';
     return `${node?.label ?? gateId}${hint}`;
+  }
+
+  /** D-447 tooltip date format: "MMM D, YYYY" (e.g. "Jun 17, 2026"). */
+  private formatSkipDate(iso: string): string | null {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const month = d.toLocaleString('en-US', { month: 'short' });
+    return `${month} ${d.getDate()}, ${d.getFullYear()}`;
   }
 
   /** Human-readable stage label for condensed mode (Contract 23 Item 2.1).

@@ -78,6 +78,10 @@ const EVENT_TYPE_DISPLAY: Record<string, string> = {
   gate_approved:                  'Gate approved',
   gate_returned:                  'Gate returned',
   gate_blocked:                   'Gate blocked',
+  // Contract 28 / D-447 / D-449 / D-451 — three new event types.
+  gate_skipped:                   'Gate skipped',
+  gate_backdated:                 'Gate backdated',
+  milestone_status_reverted:      'Milestone status reverted',
   milestone_target_date_changed:  'Milestone date set',
   milestone_actual_date_set:      'Milestone actual date set',
   initiative_created:             'Initiative created',

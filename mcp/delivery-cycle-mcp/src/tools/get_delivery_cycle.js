@@ -168,10 +168,13 @@ async function get_delivery_cycle(params, caller_user_id) {
       ? (submitterMap[gr.submitted_by_user_id] ?? null)
       : null,
     current_user_gate_authority: {
-      // can_submit: gate not approved/awaiting_approval and caller has submit authority
+      // can_submit: caller has submit authority AND gate is not in a terminal
+      // or in-flight state. 'skipped' is terminal per D-447 — backdate via
+      // set_milestone_actual_date is the only path off skipped.
       can_submit: callerCanSubmitAny &&
         gr.gate_status !== 'approved' &&
-        gr.gate_status !== 'awaiting_approval',
+        gr.gate_status !== 'awaiting_approval' &&
+        gr.gate_status !== 'skipped',
       // can_approve: caller is Phil, or caller is the designated approver_user_id, AND gate is awaiting
       // When approver_user_id is null (Build C default), Phil is the fallback approver
       can_approve: gr.gate_status === 'awaiting_approval' &&

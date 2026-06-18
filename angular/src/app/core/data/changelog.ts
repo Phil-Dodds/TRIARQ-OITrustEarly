@@ -33,6 +33,42 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-06-17',
+    contractLabel: 'Contract 28 — Gate Skip Flow and Status Revert Fix',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'Initiative Detail — Stage Track gate diamond',
+        description: 'Hollow Oravive diamond renders when a gate is in the new Skipped state. Tooltip in full mode shows "Skipped — [date]". The connector treats Skipped like Complete so the track reads as continuous.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Initiative Detail — Gate Detail Sub-Panel (skip flow)',
+        description: 'Submitting a gate that has unapproved predecessors opens a Skip & Submit interstitial listing the gates that will be marked Skipped. Submitting Go to Deploy with unapproved predecessors opens a separate Close-only blocked dialog — Deploy can never be skipped. The skip interstitial only commits when the user confirms; cancel leaves all state unchanged.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Initiative Detail — Gate Detail Sub-Panel (skipped state)',
+        description: 'Clicking a Skipped gate diamond opens a sub-panel showing a Skipped badge with no Submit, Approve, or Return buttons. A Backdate affordance lets you record the actual completion date for gates completed outside OI Trust; confirming clears the Skipped state and marks the gate as complete with no formal approval.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Initiative Detail — Milestone status dropdown',
+        description: 'Changing the status on a gate with a recorded actual date now opens an inline confirmation panel ("You are reverting a completed gate. This will be logged.") with Continue and Cancel. Cancel restores the previous value with no MCP call. No free-text reason field is ever shown — the system logs the revert event automatically.'
+      },
+      {
+        audience:    'All',
+        surface:     'Activity Feed and Initiative Activity view',
+        description: 'Three new event types appear in activity feeds and are filterable in the cross-Initiative view: Gate skipped, Gate backdated, and Milestone status reverted. Skipped gates are also excluded from Recently Approved Gates and the My Completed Gates home card.'
+      },
+      {
+        audience:    'All',
+        surface:     'Dashboard status dot',
+        description: 'The Initiative status dot walkback now treats Skipped gates as transparent — the next gate in the chain drives the dot. An Initiative with every gate skipped except Deploy derives the dot from Deploy alone.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-17',
     contractLabel: 'Contract 27 — Roadmap Planning Mode',
     items: [
       {

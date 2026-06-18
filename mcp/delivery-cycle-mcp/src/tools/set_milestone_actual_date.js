@@ -16,6 +16,16 @@
 //
 // Source: build-c-spec.md §4.1, build-c-contract16-spec.md §2,
 //   D-205 (user-controlled milestone status), Arch-5 (JWT — middleware).
+//
+// Contract 28 / D-449 — Backdate path (skipped → complete):
+//   When the milestone's current date_status is 'skipped', recording an
+//   actual_date converts the gate to 'approved' without approval routing.
+//   The companion gate_records row is updated: gate_status = 'approved' with
+//   approver_user_id, approver_decision_at, and approver_notes left UNSET so
+//   the record clearly reads as a self-asserted historical event rather than
+//   a real approval. The event log row uses event_type = 'gate_backdated'
+//   with previous_status: 'skipped' in metadata so the activity feed can
+//   render the correct narrative ("[Actor] recorded [Gate] completed on [date]").
 
 'use strict';
 
@@ -116,7 +126,11 @@ async function set_milestone_actual_date(params, caller_user_id) {
   }
 
   const prior_actual_date = milestone.actual_date;
-  const isRevert = prior_actual_date && milestone.date_status === 'complete';
+  const isRevert   = prior_actual_date && milestone.date_status === 'complete';
+  // D-449 — backdate path: the milestone is currently in 'skipped' state and
+  // the caller is recording the actual completion date. This is mutually
+  // exclusive with isRevert (a skipped row has no prior actual_date).
+  const isBackdate = milestone.date_status === 'skipped';
 
   // TODO: re-enable when UI surfaces override_reason input — Contract 16 known gap.
   // The detail panel has no override_reason field; without it, completed actual
@@ -151,26 +165,66 @@ async function set_milestone_actual_date(params, caller_user_id) {
     return { success: false, error: `Failed to set actual date: ${updateErr.message}` };
   }
 
+  // ── D-449: Backdate companion update on gate_records ──────────────────────
+  // The skipped gate transitions to 'approved' with NO approver fields set.
+  // This makes the record auditably distinguishable from a real approval.
+  if (isBackdate) {
+    const { error: gateBackdateErr } = await supabase
+      .from('gate_records')
+      .update({ gate_status: 'approved' })
+      .eq('delivery_cycle_id', delivery_cycle_id)
+      .eq('gate_name', gate_name)
+      .is('deleted_at', null);
+
+    if (gateBackdateErr) {
+      // The milestone row was already updated; surface the partial state to
+      // the caller rather than silently swallowing the error.
+      return {
+        success: false,
+        error:
+          `Milestone updated but gate_records backdate failed: ${gateBackdateErr.message}. ` +
+          'The Initiative may show inconsistent state until corrected.'
+      };
+    }
+  }
+
   // ── Append event log ──────────────────────────────────────────────────────
   const gateNameDisplay = GATE_NAME_DISPLAY[gate_name] ?? gate_name;
-  const eventDescription = isRevert
-    ? `${callerDisplayName} changed ${gateNameDisplay} actual date from ${prior_actual_date} to ${actual_date}.`
-    : `${callerDisplayName} set ${gateNameDisplay} actual date to ${actual_date}.`;
 
-  await supabase
-    .from('cycle_event_log')
-    .insert({
-      delivery_cycle_id,
-      event_type:        'milestone_actual_date_set',
-      event_description: eventDescription,
-      actor_user_id:     caller_user_id,
-      event_metadata:    {
-        gate_name,
-        prior_actual_date: prior_actual_date ?? null,
-        new_actual_date:   actual_date,
-        override_reason:   override_reason ?? null
-      }
-    });
+  if (isBackdate) {
+    await supabase
+      .from('cycle_event_log')
+      .insert({
+        delivery_cycle_id,
+        event_type:        'gate_backdated',
+        event_description: `${callerDisplayName} recorded ${gateNameDisplay} completed on ${actual_date}.`,
+        actor_user_id:     caller_user_id,
+        event_metadata:    {
+          gate_name,
+          backdated_date:  actual_date,
+          previous_status: 'skipped'
+        }
+      });
+  } else {
+    const eventDescription = isRevert
+      ? `${callerDisplayName} changed ${gateNameDisplay} actual date from ${prior_actual_date} to ${actual_date}.`
+      : `${callerDisplayName} set ${gateNameDisplay} actual date to ${actual_date}.`;
+
+    await supabase
+      .from('cycle_event_log')
+      .insert({
+        delivery_cycle_id,
+        event_type:        'milestone_actual_date_set',
+        event_description: eventDescription,
+        actor_user_id:     caller_user_id,
+        event_metadata:    {
+          gate_name,
+          prior_actual_date: prior_actual_date ?? null,
+          new_actual_date:   actual_date,
+          override_reason:   override_reason ?? null
+        }
+      });
+  }
 
   return { success: true, data: updated };
 }

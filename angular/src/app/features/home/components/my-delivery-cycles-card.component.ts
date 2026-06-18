@@ -35,7 +35,11 @@ const STATUS_COLOR: Record<DateStatus, string> = {
   on_track:    '#22c55e',
   at_risk:     '#F2A620',
   behind:      '#E96127',
-  complete:    '#257099'
+  complete:    '#257099',
+  // D-447 + D-419 amendment: skipped gates are transparent in the walkback
+  // chain — this entry should never drive the dot in normal flow. Color
+  // matches the hollow Oravive diamond for any leak-through case.
+  skipped:     '#E96127'
 };
 
 const STAGE_LABEL: Partial<Record<LifecycleStage, string>> = {
@@ -191,16 +195,23 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
       on_track:    'On Track',
       at_risk:     'At Risk',
       behind:      'Behind',
-      complete:    'Complete'
+      complete:    'Complete',
+      // D-447: skipped — rarely surfaces post D-419 amendment.
+      skipped:     'Skipped'
     };
     return map[m.date_status];
   }
 
-  /** D-419 walkback: Go to Deploy → Go to Build → Brief Review. */
+  /** D-419 walkback: Go to Deploy → Go to Build → Brief Review.
+   *  D-447 amendment: skipped gates are treated as transparent — walk past
+   *  them and evaluate the next gate in the chain. */
   private walkbackMilestone(cycle: DeliveryCycle) {
     for (const gate of WALKBACK_CHAIN) {
       const m = cycle.milestone_dates?.find(x => x.gate_name === gate);
-      if (m && m.date_status && m.date_status !== 'not_started') { return m; }
+      if (!m || !m.date_status) continue;
+      if (m.date_status === 'not_started') continue;
+      if (m.date_status === 'skipped')     continue;  // D-447 — transparent in chain
+      return m;
     }
     return null;
   }

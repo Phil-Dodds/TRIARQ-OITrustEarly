@@ -419,6 +419,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         <app-stage-track
           [currentStageId]="cycle.current_lifecycle_stage"
           [gateStateMap]="gateStateMap"
+          [gateSkippedAtMap]="gateSkippedAtMap"
           displayMode="full"
           (gateClicked)="openGatePanel($event)"
           (stageAdvanceRequested)="requestStageAdvance($event)"
@@ -794,16 +795,40 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 </select>
                 <div style="display:flex;gap:4px;margin-top:4px;">
                   <button (click)="saveMilestoneStatus(m.gate_name)"
-                          [disabled]="savingMilestoneStatus"
+                          [disabled]="savingMilestoneStatus || revertConfirmGate === m.gate_name"
                           style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
                                  color:#fff;border:none;border-radius:4px;cursor:pointer;">
                     {{ savingMilestoneStatus ? 'Saving…' : 'Save' }}
                   </button>
                   <button (click)="cancelMilestoneStatusEdit()"
+                          [disabled]="savingMilestoneStatus"
                           style="font-size:11px;padding:2px 8px;background:none;
                                  border:1px solid #D0D0D0;border-radius:4px;cursor:pointer;color:#5A5A5A;">
                     Cancel
                   </button>
+                </div>
+                <!-- D-451: inline revert confirmation. Triggered when the
+                     dropdown changes on a milestone with actual_date set. -->
+                <div *ngIf="revertConfirmGate === m.gate_name"
+                     style="margin-top:6px;padding:8px 10px;border-left:3px solid var(--triarq-color-sunray, #f5a623);
+                            background:rgba(245,166,35,0.08);border-radius:0 5px 5px 0;font-size:11px;">
+                  <div style="margin-bottom:6px;color:var(--triarq-color-text-primary);">
+                    You are reverting a completed gate. This will be logged.
+                  </div>
+                  <div style="display:flex;gap:4px;">
+                    <button (click)="confirmRevertContinue(m.gate_name)"
+                            [disabled]="savingMilestoneStatus"
+                            style="font-size:11px;padding:2px 10px;background:var(--triarq-color-primary);
+                                   color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                      {{ savingMilestoneStatus ? 'Saving…' : 'Continue' }}
+                    </button>
+                    <button (click)="cancelRevertConfirm()"
+                            [disabled]="savingMilestoneStatus"
+                            style="font-size:11px;padding:2px 10px;background:none;
+                                   border:1px solid #D0D0D0;border-radius:4px;cursor:pointer;color:#5A5A5A;">
+                      Cancel
+                    </button>
+                  </div>
                 </div>
                 <div *ngIf="milestoneStatusError" style="font-size:11px;color:var(--triarq-color-error);margin-top:2px;">{{ milestoneStatusError }}</div>
               </ng-container>
@@ -1504,6 +1529,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   milestoneStatusValue:    string          = '';
   savingMilestoneStatus    = false;
   milestoneStatusError     = '';
+  // Contract 28 / D-451 — inline confirmation panel shown when the user
+  // changes the status dropdown on a milestone with actual_date set. Tracks
+  // the gate awaiting confirmation; null when no revert is pending.
+  revertConfirmGate:       GateName | null = null;
+  // Captured previous status — used to restore the dropdown on Cancel.
+  revertPriorStatus:       DateStatus | null = null;
   // Item 1: Unset Complete inline confirmation — Principle 13
   unsetCompleteGate:       GateName | null = null;
   unsetCompleteReason      = new FormControl('', [Validators.required, Validators.minLength(10)]);
@@ -1652,10 +1683,35 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       if (record.gate_status === 'blocked')            { map[gate] = 'blocked';           continue; }
       if (record.gate_status === 'awaiting_approval')  { map[gate] = 'awaiting_approval'; continue; }
       if (record.gate_status === 'not_started')        { map[gate] = 'not_started';       continue; }
+      // D-447: skipped — hollow Oravive diamond. System-only state set by confirm_gate_skip.
+      if (record.gate_status === 'skipped')            { map[gate] = 'skipped';           continue; }
       // 'pending' (legacy) and 'returned' surface as pending (sunray).
       map[gate] = 'pending';
     }
     return map as GateStateMap;
+  }
+
+  /** D-447 tooltip data — ISO timestamp per skipped gate, read from the event
+   *  log. Surfaced to StageTrackComponent via [gateSkippedAtMap] so the
+   *  "Skipped — [MMM D, YYYY]" tooltip can render. Reads this.events, the
+   *  cycle event log loaded alongside the cycle by loadCycle(). */
+  get gateSkippedAtMap(): Partial<Record<GateName, string | null>> {
+    const out: Partial<Record<GateName, string | null>> = {};
+    if (!Array.isArray(this.events) || this.events.length === 0) return out;
+    // Walk newest-first so the latest skip event wins per gate.
+    const ordered = [...this.events].sort((a, b) => {
+      const ta = a.created_at ? Date.parse(a.created_at) : 0;
+      const tb = b.created_at ? Date.parse(b.created_at) : 0;
+      return tb - ta;
+    });
+    for (const e of ordered) {
+      if (e.event_type !== 'gate_skipped') continue;
+      const meta = e.event_metadata ?? {};
+      const gateName = meta['gate_name'] as GateName | undefined;
+      if (!gateName || out[gateName] !== undefined) continue;
+      out[gateName] = (meta['skipped_at'] as string | undefined) ?? e.created_at ?? null;
+    }
+    return out;
   }
 
   get jiraLink(): JiraLink | null {
@@ -2995,6 +3051,8 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       at_risk:     'At Risk',
       behind:      'Behind',
       complete:    'Complete',
+      // D-447: skipped milestone — initiative entered system past this gate.
+      skipped:     'Skipped',
     };
     return labels[s] ?? s;
   }
@@ -3038,19 +3096,44 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   cancelMilestoneStatusEdit(): void {
     this.editingMilestoneStatus = null;
     this.milestoneStatusError   = '';
+    this.revertConfirmGate      = null;
+    this.revertPriorStatus      = null;
     this.cdr.markForCheck();
   }
 
   saveMilestoneStatus(gate: GateName): void {
     if (!this.cycle || !this.milestoneStatusValue) { return; }
+
+    // Contract 28 / D-451 — revert confirmation gate.
+    // When the milestone has an actual_date, any status change is a revert and
+    // must pass through the inline confirmation panel. The MCP also enforces
+    // this with REVERT_CONFIRMATION_REQUIRED — Angular gates first so the
+    // user never sees that error.
+    const milestone = this.cycle.milestone_dates?.find(m => m.gate_name === gate);
+    const hasActualDate = !!milestone?.actual_date;
+    const isChanging   = milestone?.date_status !== this.milestoneStatusValue;
+    if (hasActualDate && isChanging && this.revertConfirmGate !== gate) {
+      this.revertConfirmGate  = gate;
+      this.revertPriorStatus  = milestone?.date_status ?? null;
+      this.milestoneStatusError = '';
+      this.cdr.markForCheck();
+      return;
+    }
+
     this.savingMilestoneStatus = true;
     this.milestoneStatusError  = '';
     this.cdr.markForCheck();
+
+    // D-451: when this is a confirmed revert, pass the system token so the
+    // MCP can persist the override reason marker and emit the
+    // milestone_status_reverted event.
+    const isConfirmedRevert = hasActualDate && isChanging;
 
     this.delivery.updateMilestoneStatus({
       delivery_cycle_id: this.cycle.delivery_cycle_id,
       gate_name:         gate,
       date_status:       this.milestoneStatusValue as DateStatus,
+      ...(isConfirmedRevert ? { status_override_reason: 'confirmed-revert' } : {})
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
@@ -3059,6 +3142,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
             this.cycle!.milestone_dates[idx] = res.data;
           }
           this.editingMilestoneStatus = null;
+          this.revertConfirmGate      = null;
+          this.revertPriorStatus      = null;
+          if (isConfirmedRevert) {
+            // Activity feed needs the new event to render.
+            this.loadEvents(this.cycle!.delivery_cycle_id);
+          }
         } else {
           this.milestoneStatusError = res.error ?? 'Save failed.';
         }
@@ -3071,6 +3160,27 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  /** D-451: user clicked Continue on the revert confirmation panel. Resume the
+   *  save flow — saveMilestoneStatus now sees revertConfirmGate === gate and
+   *  proceeds to the MCP call. */
+  confirmRevertContinue(gate: GateName): void {
+    // revertConfirmGate is already set to gate; saveMilestoneStatus will skip
+    // the confirmation guard on this call.
+    this.saveMilestoneStatus(gate);
+  }
+
+  /** D-451: user clicked Cancel on the revert confirmation panel. Restore the
+   *  dropdown value, dismiss the panel, stay in edit mode so the user can
+   *  pick again. */
+  cancelRevertConfirm(): void {
+    if (this.revertPriorStatus) {
+      this.milestoneStatusValue = this.revertPriorStatus;
+    }
+    this.revertConfirmGate    = null;
+    this.revertPriorStatus    = null;
+    this.cdr.markForCheck();
   }
 
   // ── Item 1: Unset Complete inline confirmation — Principle 13 ──────────────

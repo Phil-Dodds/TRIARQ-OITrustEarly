@@ -30,7 +30,8 @@ import {
   MyCompletedGatesResponse,
   ArtifactTypeRow,
   GateDecisionResult,
-  RoadmapFreezeDate
+  RoadmapFreezeDate,
+  GateSkipConfirmResult
 } from '../types/database';
 
 @Injectable({ providedIn: 'root' })
@@ -199,6 +200,19 @@ export class DeliveryService {
     gate_name:         GateName;
   }): Observable<McpResponse<GateRecord>> {
     return this.mcp.call<GateRecord>('delivery', 'submit_gate_for_approval', params as Record<string, unknown>);
+  }
+
+  /** Contract 28 / D-447 / D-448: confirms a gate skip after the user accepts
+   *  the REQUIRES_SKIP_CONFIRMATION interstitial. Backend rejects go_to_deploy
+   *  in gates_to_skip and requires a TRIO caller (DCS, EPO, or DOL). */
+  confirmGateSkip(params: {
+    delivery_cycle_id: string;
+    gates_to_skip:     GateName[];
+    submitted_gate:    GateName;
+  }): Observable<McpResponse<GateSkipConfirmResult>> {
+    return this.mcp.call<GateSkipConfirmResult>(
+      'delivery', 'confirm_gate_skip', params as Record<string, unknown>
+    );
   }
 
   recordGateDecision(params: {

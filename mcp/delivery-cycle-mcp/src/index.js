@@ -40,6 +40,7 @@ const { assign_roles_to_cycle }          = require('./tools/assign_roles_to_cycl
 const { set_outcome_statement }          = require('./tools/set_outcome_statement');
 
 const { submit_gate_for_approval }       = require('./tools/submit_gate_for_approval');
+const { confirm_gate_skip }              = require('./tools/confirm_gate_skip');
 const { record_gate_decision }           = require('./tools/record_gate_decision');
 const { withdraw_gate_submission }       = require('./tools/withdraw_gate_submission');
 const { list_pending_approvals }         = require('./tools/list_pending_approvals');
@@ -105,6 +106,8 @@ const TOOLS = {
 
   // Gate workflow (D-345)
   submit_gate_for_approval,
+  // Contract 28 — gate skip flow (D-447, D-448, D-449, D-450).
+  confirm_gate_skip,
   record_gate_decision,
   withdraw_gate_submission,
   list_pending_approvals,

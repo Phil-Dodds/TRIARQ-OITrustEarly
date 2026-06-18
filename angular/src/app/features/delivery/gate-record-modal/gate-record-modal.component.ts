@@ -52,7 +52,9 @@ import {
   User,
   DateStatus,
   EpoWipWarning,
-  GateDecisionResult
+  GateDecisionResult,
+  GateSkipInterstitialPayload,
+  DeployGateSkipBlockedPayload
 } from '../../../core/types/database';
 
 export interface GateRecordModalData {
@@ -201,6 +203,44 @@ const GATE_LABELS: Record<GateName, string> = {
         <!-- DEFAULT action area — replaced inline by confirmation when active -->
         <ng-container *ngIf="confirmMode === 'none'">
 
+          <!-- D-447 / D-449: skipped gate state — hollow Oravive badge,
+               no Submit / Approve / Return, Backdate affordance. -->
+          <ng-container *ngIf="isSkippedGate">
+            <div style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px 4px 8px;
+                        border-radius:999px;background:rgba(233,97,39,0.06);margin-bottom:8px;">
+              <span style="width:14px;height:14px;box-sizing:border-box;background:transparent;
+                           border:2px solid #E96127;border-radius:2px;transform:rotate(45deg);
+                           flex-shrink:0;"></span>
+              <span style="font-size:12px;font-weight:600;color:#E96127;letter-spacing:0.04em;">Skipped</span>
+            </div>
+            <div class="grm-meta">
+              This gate was skipped — the Initiative entered OI Trust past this
+              gate. If it was completed outside OI Trust, you can record the
+              actual date below.
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;max-width:280px;">
+              <label class="grm-label-strong" for="grm-backdate-date">
+                Actual completion date
+              </label>
+              <input id="grm-backdate-date"
+                     type="date"
+                     [value]="backdateDateInput"
+                     [disabled]="processing"
+                     (input)="onBackdateInput($any($event.target).value)"
+                     style="box-sizing:border-box;width:100%;border:1.5px solid var(--triarq-color-border);
+                            border-radius:5px;padding:8px 10px;font-size:13px;font-family:var(--triarq-font-family);" />
+              <div *ngIf="backdateError" class="oi-field-error">
+                {{ backdateError }}
+              </div>
+              <button class="grm-btn-primary"
+                      type="button"
+                      [disabled]="processing || !backdateDateInput"
+                      (click)="onBackdateRequest()">
+                Record Date
+              </button>
+            </div>
+          </ng-container>
+
           <!-- Not yet active — advancement guidance, no action -->
           <div *ngIf="!record && isNotYetActive" class="grm-meta">
             Advance the Initiative through earlier stages to unlock this Gate.
@@ -306,6 +346,90 @@ const GATE_LABELS: Record<GateName, string> = {
                       type="button"
                       [disabled]="processing"
                       (click)="cancelConfirm()">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONFIRM: Skip interstitial (D-448) ─────────────────────────── -->
+        <div *ngIf="confirmMode === 'skip-interstitial'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              The following gates will be marked as skipped:
+            </div>
+            <ul style="margin:6px 0 10px;padding-left:20px;font-size:12px;color:var(--triarq-color-text-primary);">
+              <li *ngFor="let label of pendingSkipLabels">{{ label }}</li>
+            </ul>
+            <div class="oi-confirm-text">
+              Continue to submit <strong>{{ gateLabel }}</strong> for approval?
+            </div>
+            <div class="grm-action-row">
+              <button class="grm-btn-primary"
+                      type="button"
+                      [disabled]="processing"
+                      (click)="onConfirmSkip()">
+                {{ processing && processingAction === 'confirm-skip' ? 'Submitting…' : 'Skip & Submit' }}
+              </button>
+              <button class="grm-btn-ghost"
+                      type="button"
+                      [disabled]="processing"
+                      (click)="onCancelSkip()">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── BLOCKED: Deploy gate cannot be skipped (D-450) ─────────────── -->
+        <div *ngIf="confirmMode === 'deploy-blocked'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              The Deploy gate cannot be skipped.
+            </div>
+            <div class="oi-confirm-text">
+              To submit Go to Deploy for approval, the following gates must be
+              completed or backdated first:
+            </div>
+            <ul style="margin:6px 0 10px;padding-left:20px;font-size:12px;color:var(--triarq-color-text-primary);">
+              <li *ngFor="let label of deployBlockedLabels">{{ label }}</li>
+            </ul>
+            <div class="oi-confirm-text">
+              You can backdate gates that were completed outside OI Trust.
+            </div>
+            <div class="grm-action-row">
+              <button class="grm-btn-secondary"
+                      type="button"
+                      (click)="onCloseDeployBlocked()">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONFIRM: Backdate skipped gate (D-449) ─────────────────────── -->
+        <div *ngIf="confirmMode === 'backdate-confirm'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              This will mark <strong>{{ gateLabel }}</strong> as completed on
+              <strong>{{ backdateDateInput }}</strong> and remove the skipped
+              status. The gate will be recorded as complete without a formal
+              approval. Continue?
+            </div>
+            <div class="grm-action-row">
+              <button class="grm-btn-primary"
+                      type="button"
+                      [disabled]="processing"
+                      (click)="onConfirmBackdate()">
+                {{ processing && processingAction === 'backdate' ? 'Recording…' : 'Confirm' }}
+              </button>
+              <button class="grm-btn-ghost"
+                      type="button"
+                      [disabled]="processing"
+                      (click)="onCancelBackdate()">
                 Cancel
               </button>
             </div>
@@ -535,10 +659,46 @@ export class GateRecordModalComponent {
   /** Action state machine — drives inline confirmation replacement of action area.
    *  'post-approve-warning' (Contract 24, AC-18): the gate has just been approved
    *  and the response carried a wip_warning and/or suggestion_warnings. The modal
-   *  stays open showing the warnings until the approver acknowledges. */
-  confirmMode: 'none' | 'approve' | 'withdraw' | 'return' | 'post-approve-warning' = 'none';
+   *  stays open showing the warnings until the approver acknowledges.
+   *  Contract 28 / D-448 / D-449 / D-450: three new modes for the gate skip flow.
+   *    'skip-interstitial'  — submission attempt found unapproved predecessors;
+   *                            user must confirm marking them as skipped.
+   *    'deploy-blocked'     — Deploy gate cannot be skipped; shows list of gates
+   *                            requiring action; Close-only.
+   *    'backdate-confirm'   — user entered an actual_date on a skipped gate;
+   *                            confirm before mutating gate state. */
+  confirmMode:
+    | 'none'
+    | 'approve'
+    | 'withdraw'
+    | 'return'
+    | 'post-approve-warning'
+    | 'skip-interstitial'
+    | 'deploy-blocked'
+    | 'backdate-confirm' = 'none';
   processing      = false;
-  processingAction: 'submit' | 'approve' | 'return' | 'withdraw' | null = null;
+  processingAction:
+    | 'submit'
+    | 'approve'
+    | 'return'
+    | 'withdraw'
+    | 'confirm-skip'
+    | 'backdate'
+    | null = null;
+
+  /** Contract 28 / D-448 — list of predecessor gates flagged to be marked as
+   *  skipped. Populated when submit_gate_for_approval returns
+   *  REQUIRES_SKIP_CONFIRMATION. Cleared when the user cancels or confirms. */
+  pendingSkipGates: GateName[] = [];
+
+  /** Contract 28 / D-450 — list of unresolved predecessor gates blocking the
+   *  Deploy submission. Surfaced in the 'deploy-blocked' confirm state. */
+  deployBlockedGates: GateName[] = [];
+
+  /** Contract 28 / D-449 — user-entered date in the backdate input. Set when
+   *  the user types in the Backdate field on a skipped gate. */
+  backdateDateInput = '';
+  backdateError     = '';
 
   actionError = '';
   actionHint  = '';
@@ -614,11 +774,21 @@ export class GateRecordModalComponent {
   }
 
   get canShowSubmit(): boolean {
+    // D-447: skipped is terminal — no Submit affordance. Backdate (D-449) is
+    // the only path off skipped, and renders via isSkippedGate below.
+    if (this.record?.gate_status === 'skipped') return false;
     if (!this.data.callerCanSubmitGates) return !!this.record && this.record.gate_status !== 'awaiting_approval' && this.record.gate_status !== 'approved' && this.showSubmitMessageOnly;
     if (!this.record) return !this.isNotYetActive;
     return this.record.gate_status === 'returned'
         || this.record.gate_status === 'not_started'
         || this.record.gate_status === 'pending';
+  }
+
+  /** D-447 / D-449: skipped gate renders the dedicated sub-panel state —
+   *  status badge "Skipped" + no Submit / Approve / Return + Backdate
+   *  affordance. */
+  get isSkippedGate(): boolean {
+    return this.record?.gate_status === 'skipped';
   }
 
   get showSubmitMessageOnly(): boolean {
@@ -735,7 +905,10 @@ export class GateRecordModalComponent {
     this.dialogRef.close({ refreshKind });
   }
 
-  /** Submit / Re-submit for Approval — partial refresh per D-345 panel rules. */
+  /** Submit / Re-submit for Approval — partial refresh per D-345 panel rules.
+   *  Contract 28 / D-448 / D-450: response dispatcher branches into the skip
+   *  interstitial or deploy-blocked state when the backend pre-check finds
+   *  unapproved predecessors. Normal path is unchanged. */
   onSubmit(): void {
     this.startProcessing('submit');
 
@@ -744,6 +917,25 @@ export class GateRecordModalComponent {
       gate_name:         this.data.gateName
     }).subscribe({
       next: (res) => {
+        // D-448: skip interstitial — non-error response (success:true) that
+        // carries gates_to_skip and asks the user to confirm.
+        if (res.success && res.status === 'REQUIRES_SKIP_CONFIRMATION') {
+          const payload = (res.data ?? {}) as Partial<GateSkipInterstitialPayload>;
+          this.pendingSkipGates = (payload.gates_to_skip ?? []) as GateName[];
+          this.endProcessing();
+          this.confirmMode = 'skip-interstitial';
+          this.cdr.markForCheck();
+          return;
+        }
+        // D-450: Deploy gate cannot be skipped — error response with code.
+        if (!res.success && res.error === 'DEPLOY_GATE_SKIP_BLOCKED') {
+          const payload = (res.data ?? {}) as Partial<DeployGateSkipBlockedPayload>;
+          this.deployBlockedGates = (payload.gates_requiring_action ?? []) as GateName[];
+          this.endProcessing();
+          this.confirmMode = 'deploy-blocked';
+          this.cdr.markForCheck();
+          return;
+        }
         if (res.success) {
           this.endProcessing();
           this.onGateActionComplete('partial');
@@ -753,6 +945,114 @@ export class GateRecordModalComponent {
       },
       error: (err: { error?: string }) => {
         this.endProcessing(err.error ?? 'Submission failed. Please try again.');
+      }
+    });
+  }
+
+  // ── Contract 28 / D-448: skip interstitial — confirm + cancel ──────────────
+
+  /** D-448: list of skip-flagged gate labels for the interstitial message. */
+  get pendingSkipLabels(): string[] {
+    return this.pendingSkipGates.map(g => GATE_LABELS[g] ?? g);
+  }
+
+  /** D-450: list of blocking gate labels for the deploy-blocked message. */
+  get deployBlockedLabels(): string[] {
+    return this.deployBlockedGates.map(g => GATE_LABELS[g] ?? g);
+  }
+
+  onConfirmSkip(): void {
+    if (this.pendingSkipGates.length === 0) return;
+    this.startProcessing('confirm-skip');
+
+    this.delivery.confirmGateSkip({
+      delivery_cycle_id: this.data.cycle.delivery_cycle_id,
+      gates_to_skip:     this.pendingSkipGates,
+      submitted_gate:    this.data.gateName
+    }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          // Skip writes succeeded AND submit_gate_for_approval ran to completion.
+          // Full refresh — skipped gates change Stage Track, status dot, and the
+          // submitted gate transitions to awaiting_approval.
+          this.pendingSkipGates = [];
+          this.endProcessing();
+          this.onGateActionComplete('full');
+        } else {
+          this.endProcessing(res.error ?? 'Skip confirmation failed. Please try again.');
+        }
+      },
+      error: (err: { error?: string }) => {
+        this.endProcessing(err.error ?? 'Skip confirmation failed. Please try again.');
+      }
+    });
+  }
+
+  onCancelSkip(): void {
+    this.pendingSkipGates = [];
+    this.confirmMode      = 'none';
+    this.cdr.markForCheck();
+  }
+
+  onCloseDeployBlocked(): void {
+    this.deployBlockedGates = [];
+    this.confirmMode        = 'none';
+    this.cdr.markForCheck();
+  }
+
+  // ── Contract 28 / D-449: backdate skipped gate to complete ─────────────────
+
+  onBackdateInput(value: string): void {
+    this.backdateDateInput = value;
+    this.backdateError     = '';
+  }
+
+  /** D-183 two-step: validate date input, then move to backdate-confirm. */
+  onBackdateRequest(): void {
+    const date = this.backdateDateInput.trim();
+    if (!date) {
+      this.backdateError = 'Enter the date this gate was completed (YYYY-MM-DD).';
+      this.cdr.markForCheck();
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      this.backdateError = 'Date must be in YYYY-MM-DD format.';
+      this.cdr.markForCheck();
+      return;
+    }
+    // No future-date guard — backend stores whatever the user records. Visual
+    // confirmation step happens next.
+    this.backdateError = '';
+    this.confirmMode   = 'backdate-confirm';
+    this.cdr.markForCheck();
+  }
+
+  onCancelBackdate(): void {
+    this.confirmMode = 'none';
+    this.cdr.markForCheck();
+  }
+
+  onConfirmBackdate(): void {
+    this.startProcessing('backdate');
+
+    this.delivery.setMilestoneActualDate({
+      delivery_cycle_id: this.data.cycle.delivery_cycle_id,
+      gate_name:         this.data.gateName,
+      actual_date:       this.backdateDateInput
+    }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.backdateDateInput = '';
+          this.endProcessing();
+          // D-449: gate transitions skipped → approved (no approver). Full
+          // refresh — status dot, Stage Track, and milestone row all change.
+          this.onGateActionComplete('full');
+        } else {
+          this.endProcessing(res.error ?? 'Could not record the actual date.');
+        }
+      },
+      error: (err: { error?: string }) => {
+        this.endProcessing(err.error ?? 'Could not record the actual date.');
       }
     });
   }
@@ -862,7 +1162,9 @@ export class GateRecordModalComponent {
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
-  private startProcessing(action: 'submit' | 'approve' | 'return' | 'withdraw'): void {
+  private startProcessing(
+    action: 'submit' | 'approve' | 'return' | 'withdraw' | 'confirm-skip' | 'backdate'
+  ): void {
     this.processing       = true;
     this.processingAction = action;
     this.actionError      = '';
@@ -910,7 +1212,9 @@ export class GateRecordModalComponent {
       on_track:    'On Track',
       at_risk:     'At Risk',
       behind:      'Behind',
-      complete:    'Complete'
+      complete:    'Complete',
+      // D-447: skipped milestone — initiative entered system past this gate.
+      skipped:     'Skipped'
     };
     return labels[s] ?? s;
   }

@@ -743,11 +743,15 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
     return '—';
   }
 
-  /** D-419 walkback: first gate in WALKBACK_CHAIN with non-default status wins. */
+  /** D-419 walkback: first gate in WALKBACK_CHAIN with non-default status wins.
+   *  D-447 amendment: skipped gates are transparent — walk past them. */
   private walkbackMilestone(c: DeliveryCycle): CycleMilestoneDate | null {
     for (const gate of WALKBACK_CHAIN) {
       const m = c.milestone_dates?.find(x => x.gate_name === gate);
-      if (m && m.date_status && m.date_status !== 'not_started') { return m; }
+      if (!m || !m.date_status) continue;
+      if (m.date_status === 'not_started') continue;
+      if (m.date_status === 'skipped')     continue;  // D-447 — transparent in chain
+      return m;
     }
     return null;
   }
@@ -760,7 +764,10 @@ export class DeployScheduleComponent implements OnInit, OnDestroy {
       on_track:    'On Track',
       at_risk:     'At Risk',
       behind:      'Behind',
-      complete:    'Complete'
+      complete:    'Complete',
+      // D-447: skipped is rarely the walkback result — D-419 amendment treats
+      // skipped as transparent — but the entry is required for type safety.
+      skipped:     'Skipped'
     };
     return map[m.date_status] ?? '—';
   }

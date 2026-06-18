@@ -18,6 +18,19 @@
 // Appends event log entry in all cases.
 // Source: D-140, D-345, ARCH-23, D-389, D-390, D-391, Contract 19 Part 3b,
 //   gate-submission-flow-spec-2026-04-19 §3.1.
+//
+// Contract 28 / D-447 / D-448 / D-450 — Skip pre-check:
+//   Before the existing enforcement checks, query predecessor gates. If any
+//   predecessor is neither 'approved' nor 'skipped' the tool short-circuits
+//   with one of two non-mutating responses:
+//     - 'go_to_deploy' submitted → success:false, error:'DEPLOY_GATE_SKIP_BLOCKED'
+//       (Deploy gate cannot be skipped; backend-enforced).
+//     - any other gate          → success:true, status:'REQUIRES_SKIP_CONFIRMATION'
+//       (Angular renders the interstitial; user then calls confirm_gate_skip
+//       which writes the 'skipped' rows and re-invokes this tool to submit
+//       the original gate).
+//   Skip pre-check does NOT mutate state — only confirm_gate_skip transitions
+//   gates to 'skipped'.
 
 'use strict';
 
@@ -33,6 +46,21 @@ const GATE_NAME_DISPLAY = {
   go_to_release: 'Go to Release',
   close_review:  'Close Review'
 };
+
+// Gate sequence — used by the D-447/D-448/D-450 skip pre-check to identify
+// predecessor gates. Order matches gate-submission-flow-spec-2026-04-19 §3.1.
+const GATE_ORDER = [
+  'brief_review',
+  'go_to_build',
+  'go_to_deploy',
+  'go_to_release',
+  'close_review'
+];
+
+// Predecessor statuses that block skip-free submission. A predecessor is
+// "resolved" when it is 'approved' (completed in OI Trust) or 'skipped'
+// (D-447, recorded outside OI Trust).
+const RESOLVED_PREDECESSOR_STATUSES = new Set(['approved', 'skipped']);
 
 /**
  * @param {object} params
@@ -50,11 +78,10 @@ async function submit_gate_for_approval(params, caller_user_id) {
     return { success: false, error: 'gate_name is required.' };
   }
 
-  const VALID_GATES = ['brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'];
-  if (!VALID_GATES.includes(gate_name)) {
+  if (!GATE_ORDER.includes(gate_name)) {
     return {
       success: false,
-      error: `gate_name must be one of: ${VALID_GATES.join(', ')}.`
+      error: `gate_name must be one of: ${GATE_ORDER.join(', ')}.`
     };
   }
 
@@ -93,6 +120,75 @@ async function submit_gate_for_approval(params, caller_user_id) {
       error: 'You do not have authority to submit this gate for approval. ' +
              'Only the assigned Domain Capability Strategist, Engineering Product Owner, Domain Outcome Lead, or an Admin can submit gates.'
     };
+  }
+
+  // ── D-447 / D-448 / D-450: Skip pre-check ─────────────────────────────────
+  // Identify predecessor gates whose state is neither 'approved' nor 'skipped'.
+  // brief_review has no predecessors → always falls through.
+  //   - All resolved → fall through to normal submission flow below.
+  //   - Unresolved + submitted gate is go_to_deploy → DEPLOY_GATE_SKIP_BLOCKED
+  //     (D-450 — Deploy gate cannot be skipped; backend enforcement).
+  //   - Unresolved + any other gate → REQUIRES_SKIP_CONFIRMATION (D-448 —
+  //     Angular handles the interstitial; user then calls confirm_gate_skip).
+  // The actual transition to gate_status='skipped' happens only in
+  // confirm_gate_skip — this tool is read-only at this point.
+  const submittedIdx     = GATE_ORDER.indexOf(gate_name);
+  const predecessorGates = GATE_ORDER.slice(0, submittedIdx);
+
+  if (predecessorGates.length > 0) {
+    const { data: predecessorRecords, error: predErr } = await supabase
+      .from('gate_records')
+      .select('gate_name, gate_status')
+      .eq('delivery_cycle_id', delivery_cycle_id)
+      .in('gate_name', predecessorGates)
+      .is('deleted_at', null);
+
+    if (predErr) {
+      return { success: false, error: `Failed to query predecessor gates: ${predErr.message}` };
+    }
+
+    const statusByGate = new Map(
+      (predecessorRecords ?? []).map(r => [r.gate_name, r.gate_status])
+    );
+    const unresolvedPredecessors = predecessorGates.filter(g => {
+      const s = statusByGate.get(g);
+      return !RESOLVED_PREDECESSOR_STATUSES.has(s);
+    });
+
+    if (unresolvedPredecessors.length > 0) {
+      const unresolvedLabels = unresolvedPredecessors.map(
+        g => GATE_NAME_DISPLAY[g] ?? g
+      );
+
+      if (gate_name === 'go_to_deploy') {
+        return {
+          success: false,
+          error: 'DEPLOY_GATE_SKIP_BLOCKED',
+          data: {
+            code: 'DEPLOY_GATE_SKIP_BLOCKED',
+            message:
+              'The Deploy gate cannot be skipped. To submit Go to Deploy for approval, ' +
+              `the following gates must be completed or backdated first: ${unresolvedLabels.join(', ')}. ` +
+              'You can backdate gates that were completed outside OI Trust.',
+            gates_requiring_action: unresolvedPredecessors
+          }
+        };
+      }
+
+      return {
+        success: true,
+        status: 'REQUIRES_SKIP_CONFIRMATION',
+        data: {
+          status:         'REQUIRES_SKIP_CONFIRMATION',
+          gates_to_skip:  unresolvedPredecessors,
+          submitted_gate: gate_name,
+          message:
+            'The following gates will be marked as skipped: ' +
+            `${unresolvedLabels.join(', ')}. ` +
+            `Continue to submit ${gateNameDisplay} for approval?`
+        }
+      };
+    }
   }
 
   // ── Contract 19 Part 3b: Workstream null check removed. Workstream recommended, not gate-required.
