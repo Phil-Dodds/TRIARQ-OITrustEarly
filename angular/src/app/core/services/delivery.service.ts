@@ -31,7 +31,12 @@ import {
   ArtifactTypeRow,
   GateDecisionResult,
   RoadmapFreezeDate,
-  GateSkipConfirmResult
+  GateSkipConfirmResult,
+  // Contract 29 (WS2/WS3)
+  ConsultationResponse,
+  GateConsultation,
+  GateApproverConfig,
+  GateApproverConfigRow
 } from '../types/database';
 
 @Injectable({ providedIn: 'root' })
@@ -120,6 +125,9 @@ export class DeliveryService {
     assigned_epo_user_id?:   string | null;
     assigned_dol_user_id?:   string | null;
     jira_epic_key?:          string | null;
+    // Contract 29 / D-458 (WS1): full-array replace; [] clears.
+    other_consulted_user_ids?: string[];
+    other_informed_user_ids?:  string[];
   }): Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>('delivery', 'update_delivery_cycle', params as Record<string, unknown>);
   }
@@ -243,6 +251,52 @@ export class DeliveryService {
    */
   listPendingApprovals(): Observable<McpResponse<PendingApprovalItem[]>> {
     return this.mcp.call<PendingApprovalItem[]>('delivery', 'list_pending_approvals', {});
+  }
+
+  // ── Gate consultation tools (Contract 29 WS2, D-459–D-462) ─────────────────
+
+  /** A Consulted party records/updates their response on a gate consultation. */
+  recordConsultationResponse(params: {
+    gate_record_id: string;
+    response:       ConsultationResponse;
+    notes?:         string;
+  }): Observable<McpResponse<GateConsultation>> {
+    return this.mcp.call<GateConsultation>(
+      'delivery', 'record_consultation_response', params as Record<string, unknown>
+    );
+  }
+
+  /** All consultation rows for a gate (Consulted section, D-461). */
+  listGateConsultations(gate_record_id: string): Observable<McpResponse<GateConsultation[]>> {
+    return this.mcp.call<GateConsultation[]>(
+      'delivery', 'list_gate_consultations', { gate_record_id }
+    );
+  }
+
+  // ── Gate approver configuration tools (Contract 29 WS3, D-463/D-464) ───────
+
+  /** Phil-only: upsert a per-Division, per-gate Accountable approver. */
+  setGateApprover(params: {
+    division_id:      string;
+    gate_name:        GateName;
+    approver_user_id: string;
+  }): Observable<McpResponse<GateApproverConfig>> {
+    return this.mcp.call<GateApproverConfig>(
+      'delivery', 'set_gate_approver', params as Record<string, unknown>
+    );
+  }
+
+  /** All gate approver configs, joined to divisions + users. */
+  getGateApproverConfigs(): Observable<McpResponse<GateApproverConfigRow[]>> {
+    return this.mcp.call<GateApproverConfigRow[]>('delivery', 'get_gate_approver_configs', {});
+  }
+
+  /** Phil-only: remove a config row; system falls back to escalation. */
+  deleteGateApproverConfig(params: {
+    division_id: string;
+    gate_name:   GateName;
+  }): Observable<McpResponse<{ division_id: string; gate_name: GateName; deleted: boolean }>> {
+    return this.mcp.call('delivery', 'delete_gate_approver_config', params as Record<string, unknown>);
   }
 
   // ── Milestone date tools ───────────────────────────────────────────────────

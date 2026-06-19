@@ -8,6 +8,11 @@
 // remain for their specific use cases; this tool is the Edit surface save path.
 //
 // Source: D-229, D-389, D-390, D-391, D-393.
+//
+// Contract 29 / D-458 (WS1): other_consulted_user_ids and other_informed_user_ids
+//   added as optional uuid[] params. Both are full-array replace (not append):
+//   pass [] to clear. Each UUID is validated against users before write. These
+//   columns are NOT NULL DEFAULT '{}' (migration 045) — never written as null.
 
 'use strict';
 
@@ -25,8 +30,17 @@ const MUTABLE_FIELD_LABELS = {
   assigned_dcs_user_id:    'Assigned Domain Capability Strategist',
   assigned_epo_user_id:    'Assigned Engineering Product Owner',
   assigned_dol_user_id:    'Assigned Domain Outcome Lead',
-  jira_epic_key:           'Jira Epic Link'
+  jira_epic_key:           'Jira Epic Link',
+  other_consulted_user_ids: 'Other Consulted',
+  other_informed_user_ids:  'Other Informed'
 };
+
+// D-458: uuid[] fields. Handled distinctly from scalar fields — full-array
+// replace, never null, JSON change-detection, per-element user validation.
+const ARRAY_USER_FIELDS = new Set([
+  'other_consulted_user_ids',
+  'other_informed_user_ids'
+]);
 
 /**
  * @param {object} params
@@ -40,6 +54,8 @@ const MUTABLE_FIELD_LABELS = {
  * @param {string|null} [params.assigned_epo_user_id] — Optional; null clears (D-390)
  * @param {string|null} [params.assigned_dol_user_id] — Optional; null clears (D-391)
  * @param {string|null} [params.jira_epic_key]        — Optional; null clears the field
+ * @param {string[]} [params.other_consulted_user_ids] — Optional (D-458); full-array replace, [] clears
+ * @param {string[]} [params.other_informed_user_ids]  — Optional (D-458); full-array replace, [] clears
  * @param {string} caller_user_id - from JWT
  */
 async function update_delivery_cycle(params, caller_user_id) {
@@ -71,10 +87,48 @@ async function update_delivery_cycle(params, caller_user_id) {
     }
   }
 
+  // ── D-458: validate uuid[] participant fields (must be arrays of valid users) ─
+  for (const arrField of ARRAY_USER_FIELDS) {
+    if (fields[arrField] === undefined) { continue; }
+    const arr = fields[arrField];
+    if (!Array.isArray(arr)) {
+      return { success: false, error: `${MUTABLE_FIELD_LABELS[arrField]} must be an array of user ids.` };
+    }
+    // Deduplicate while preserving first-seen order; reject non-string entries.
+    const seen = new Set();
+    const cleaned = [];
+    for (const id of arr) {
+      if (typeof id !== 'string' || !id.trim()) {
+        return { success: false, error: `${MUTABLE_FIELD_LABELS[arrField]} contains an invalid user id.` };
+      }
+      if (!seen.has(id)) { seen.add(id); cleaned.push(id); }
+    }
+    if (cleaned.length > 0) {
+      const { data: foundUsers, error: usersErr } = await supabase
+        .from('users')
+        .select('id')
+        .in('id', cleaned)
+        .is('deleted_at', null);
+      if (usersErr) {
+        return { success: false, error: `Failed to validate ${MUTABLE_FIELD_LABELS[arrField]}: ${usersErr.message}` };
+      }
+      const foundIds = new Set((foundUsers ?? []).map(u => u.id));
+      const missing = cleaned.filter(id => !foundIds.has(id));
+      if (missing.length > 0) {
+        return {
+          success: false,
+          error: `${MUTABLE_FIELD_LABELS[arrField]} contains user id(s) that do not exist: ${missing.join(', ')}.`
+        };
+      }
+    }
+    // Replace the supplied value with the cleaned (deduped) array.
+    fields[arrField] = cleaned;
+  }
+
   // ── Fetch current Initiative record ────────────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, cycle_status, division_id, workstream_id, tier_classification, outcome_statement, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, jira_epic_key')
+    .select('delivery_cycle_id, cycle_title, cycle_status, division_id, workstream_id, tier_classification, outcome_statement, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, jira_epic_key, other_consulted_user_ids, other_informed_user_ids')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -138,8 +192,13 @@ async function update_delivery_cycle(params, caller_user_id) {
   // ── Build update payload — only supplied mutable fields ───────────────────
   const updatePayload = {};
   for (const field of suppliedFields) {
-    // Allow explicit null to clear nullable fields
-    updatePayload[field] = fields[field] ?? null;
+    if (ARRAY_USER_FIELDS.has(field)) {
+      // NOT NULL uuid[] columns — write the cleaned array, never null. [] clears.
+      updatePayload[field] = Array.isArray(fields[field]) ? fields[field] : [];
+    } else {
+      // Allow explicit null to clear nullable scalar fields
+      updatePayload[field] = fields[field] ?? null;
+    }
   }
   if (updatePayload.cycle_title) {
     updatePayload.cycle_title = String(updatePayload.cycle_title).trim();
@@ -166,6 +225,12 @@ async function update_delivery_cycle(params, caller_user_id) {
   // ── Log field_edit event per D-229 ────────────────────────────────────────
   // One event entry per changed field.
   const changedFields = suppliedFields.filter(field => {
+    if (ARRAY_USER_FIELDS.has(field)) {
+      // Compare as ordered JSON. cycle[field] is the prior uuid[] (defaults to []).
+      const oldArr = Array.isArray(cycle[field]) ? cycle[field] : [];
+      const newArr = Array.isArray(updatePayload[field]) ? updatePayload[field] : [];
+      return JSON.stringify(oldArr) !== JSON.stringify(newArr);
+    }
     const oldVal = cycle[field] ?? null;
     const newVal = updatePayload[field] ?? null;
     return String(oldVal) !== String(newVal);

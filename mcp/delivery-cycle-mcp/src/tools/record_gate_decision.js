@@ -38,6 +38,10 @@ const {
   nextStage
 } = require('../lifecycle');
 const { computeArtifactSuggestionWarnings } = require('./helpers/artifact-warnings');
+// Contract 29 WS3 (D-465): Phil super-approver override side-effects.
+const { getPhil } = require('./helpers/phil');
+const { upsertDisplacedApproverConsultation } = require('./helpers/consultations');
+const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 // D-400: gates whose approval transitions a cycle INTO a counted WIP zone.
 // brief_review transitions BRIEF → DESIGN (pre_build), but Contract 20 spec §2.3
@@ -148,13 +152,18 @@ async function record_gate_decision(params, caller_user_id) {
   // Build C: approver_user_id is null → Admin fallback approves.
   const { data: caller } = await supabase
     .from('users')
-    .select('is_admin, display_name')
+    .select('is_admin, is_super_admin, display_name')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
 
   const isAdmin              = caller?.is_admin === true;
+  // Contract 29 WS3 (D-465, CC-29-5): Phil = the super-admin. Only Phil triggers
+  // the displaced-approver override — not every admin.
+  const isPhil               = caller?.is_super_admin === true;
   const isDesignatedApprover = gate_record.approver_user_id === caller_user_id;
+  // Captured BEFORE the gate update overwrites approver_user_id with the caller.
+  const original_approver_user_id = gate_record.approver_user_id;
   const callerDisplayName    = caller?.display_name ?? 'Approver';
   const gateNameDisplay      = GATE_NAME_DISPLAY[gate_name] ?? gate_name;
   // When no approver configured, any Admin can approve (Build C default).
@@ -272,6 +281,54 @@ async function record_gate_decision(params, caller_user_id) {
           gate_name
         }
       });
+  }
+
+  // ── WS3 (D-465): Phil super-approver override ─────────────────────────────
+  // When Phil approves a gate whose stored approver was someone else, convert
+  // the displaced approver to a Consulted party (pending response), log the
+  // override, and email them. The gate update above already set
+  // approver_user_id = Phil. Scoped to the approval path per spec ("Before
+  // executing approval"). original_approver_user_id was captured pre-update.
+  if (isPhil && original_approver_user_id && original_approver_user_id !== caller_user_id) {
+    await supabase
+      .from('cycle_event_log')
+      .insert({
+        delivery_cycle_id,
+        event_type:        'approver_overridden',
+        event_description: `${callerDisplayName} overrode the assigned approver for ${gateNameDisplay}.`,
+        actor_user_id:     caller_user_id,
+        event_metadata:    {
+          gate_name,
+          original_approver_user_id,
+          overridden_by: caller_user_id
+        }
+      });
+
+    // Convert displaced approver to Consulted (leaves any existing response as-is).
+    await upsertDisplacedApproverConsultation({
+      gate_record_id:    gate_record.gate_record_id,
+      consulted_user_id: original_approver_user_id
+    });
+
+    // WS4: notify the displaced approver that they are now a consulted party.
+    const { data: displaced } = await supabase
+      .from('users')
+      .select('display_name, email')
+      .eq('id', original_approver_user_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (displaced?.email) {
+      await sendGateNotificationEmail({
+        recipients:       [{ email: displaced.email, display_name: displaced.display_name }],
+        subject:          `${cycle.cycle_title} — ${gateNameDisplay} approved by ${callerDisplayName}`,
+        initiativeName:   cycle.cycle_title,
+        gateNameDisplay,
+        contextParagraph: `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title}. ` +
+                          `You were the assigned approver and have been added as a consulted party — your review is still welcome.`,
+        delivery_cycle_id,
+        email_type:       'approver_override'
+      });
+    }
   }
 
   // ── EPO WIP check (D-400, Contract 20) ────────────────────────────────────

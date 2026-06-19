@@ -42,10 +42,10 @@ async function list_pending_approvals(_params, caller_user_id) {
 
   const isAdmin = caller?.is_admin === true;
 
-  // ── Pending gate records the caller is the approver for ──────────────────
+  // ── Accountable items: pending gate records the caller approves ──────────
   let gateQuery = supabase
     .from('gate_records')
-    .select('gate_record_id, delivery_cycle_id, gate_name, submitted_at, submitted_by_user_id, approver_user_id')
+    .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id')
     .eq('gate_status', 'awaiting_approval')
     .is('deleted_at', null);
 
@@ -55,11 +55,51 @@ async function list_pending_approvals(_params, caller_user_id) {
     gateQuery = gateQuery.eq('approver_user_id', caller_user_id);
   }
 
-  const { data: gates, error: gateErr } = await gateQuery;
+  const { data: accountableGates, error: gateErr } = await gateQuery;
   if (gateErr) {
     return { success: false, error: `Failed to list pending approvals: ${gateErr.message}` };
   }
-  if (!gates || gates.length === 0) {
+
+  // ── Consulted items (WS2, D-462/D-468): gates where the caller has a ──────
+  // pending consultation. Includes both awaiting_approval (active) and approved
+  // (post-approval relabeled) gates — Angular differentiates via gate_status.
+  const { data: myPendingConsults, error: consultErr } = await supabase
+    .from('gate_consultations')
+    .select('gate_record_id')
+    .eq('consulted_user_id', caller_user_id)
+    .eq('response', 'pending');
+  if (consultErr) {
+    return { success: false, error: `Failed to list consulted items: ${consultErr.message}` };
+  }
+
+  const accountableIds = new Set((accountableGates || []).map(g => g.gate_record_id));
+  const consultGateIds = [...new Set(
+    (myPendingConsults || [])
+      .map(c => c.gate_record_id)
+      .filter(id => id && !accountableIds.has(id)) // accountable wins if both
+  )];
+
+  let consultedGates = [];
+  if (consultGateIds.length > 0) {
+    const { data: cg, error: cgErr } = await supabase
+      .from('gate_records')
+      .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id')
+      .in('gate_record_id', consultGateIds)
+      .in('gate_status', ['awaiting_approval', 'approved'])
+      .is('deleted_at', null);
+    if (cgErr) {
+      return { success: false, error: `Failed to load consulted gates: ${cgErr.message}` };
+    }
+    consultedGates = cg || [];
+  }
+
+  // Tag with item_type before enrichment (D-468 — Angular reads item_type + gate_status).
+  const gates = [
+    ...(accountableGates || []).map(g => ({ ...g, item_type: 'accountable' })),
+    ...consultedGates.map(g => ({ ...g, item_type: 'consulted' }))
+  ];
+
+  if (gates.length === 0) {
     return { success: true, data: [] };
   }
 
@@ -120,6 +160,8 @@ async function list_pending_approvals(_params, caller_user_id) {
       workstream_display_name_short: w.display_name_short || w.workstream_name || '',
       gate_name:                     g.gate_name,
       gate_name_display:             GATE_NAME_DISPLAY[g.gate_name] || g.gate_name,
+      gate_status:                   g.gate_status,   // 'awaiting_approval' | 'approved' (D-468)
+      item_type:                     g.item_type,     // 'accountable' | 'consulted'
       submitted_at:                  g.submitted_at,
       submitted_by_display_name:     submitterMap[g.submitted_by_user_id] || 'Unknown',
       tier_classification:           c.tier_classification

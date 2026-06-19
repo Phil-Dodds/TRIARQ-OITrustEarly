@@ -204,6 +204,9 @@ export interface McpResponse<T = unknown> {
    *  caller is attempting to submit a gate that has unapproved predecessors.
    *  Angular handles the interstitial; user then calls confirm_gate_skip. */
   status?:       string;
+  /** Contract 29 WS3 (D-463): submit_gate_for_approval returns the resolved
+   *  Accountable approver so the submitter sees who the gate routed to. */
+  assigned_approver?: { id: string; display_name: string | null };
 }
 
 // ── Contract 28 / D-447–D-450: skip flow response payloads ───────────────────
@@ -276,6 +279,9 @@ export interface DeliveryCycle {
   assigned_dcs_user_id:    string | null;  // Domain Capability Strategist — required before Brief Review
   assigned_epo_user_id:    string | null;  // Engineering Product Owner — required before Go to Build
   assigned_dol_user_id:    string | null;  // Domain Outcome Lead — required before Brief Review
+  // Contract 29 / D-458 (WS1): participant arrays (write) — full-array replace.
+  other_consulted_user_ids?: string[];
+  other_informed_user_ids?:  string[];
   pre_hold_lifecycle_stage: LifecycleStage | null;  // Stores stage before ON_HOLD — migration 024
   jira_epic_key:           string | null;
   created_at:              string;
@@ -288,6 +294,9 @@ export interface DeliveryCycle {
   assigned_dcs_display_name?: string;
   assigned_epo_display_name?: string;
   assigned_dol_display_name?: string;
+  // Contract 29 / D-458 (WS1): resolved participant lists from get_delivery_cycle.
+  other_consulted_users?:  EntityUserRef[];
+  other_informed_users?:   EntityUserRef[];
   milestone_dates?:        CycleMilestoneDate[];
   gate_records?:           GateRecord[];
   jira_links?:             JiraLink[];
@@ -453,9 +462,60 @@ export interface PendingApprovalItem {
   workstream_display_name_short: string;  // falls back to workstream_name
   gate_name:                     GateName;
   gate_name_display:             string;  // human-readable e.g. "Brief Review"
+  // Contract 29 / D-462, D-468 (WS2): item_type distinguishes accountable vs
+  // consulted; gate_status drives post-approval relabeling of consulted items.
+  gate_status:                   GateStatus;
+  item_type:                     'accountable' | 'consulted';
   submitted_at:                  string;
   submitted_by_display_name:     string;
   tier_classification:           TierClassification;
+}
+
+// ── Contract 29 — Gate consultation + approver configuration types ───────────
+
+/** {id, display_name} reference used for resolved participant lists (D-458). */
+export interface EntityUserRef {
+  id:           string;
+  display_name: string | null;
+}
+
+export type ConsultationResponse =
+  'pending' | 'approved' | 'declined' | 'declined_post_approval';
+
+/** A row from list_gate_consultations (D-461/D-462). */
+export interface GateConsultation {
+  id:                string;
+  consulted_user_id: string;
+  display_name:      string;
+  response:          ConsultationResponse;
+  notes:             string | null;
+  responded_at:      string | null;
+  is_auto_approved:  boolean;
+  created_at?:       string;
+}
+
+/** Persisted gate_approver_configs row (set_gate_approver return shape). */
+export interface GateApproverConfig {
+  id:                 string;
+  division_id:        string;
+  gate_name:          GateName;
+  approver_user_id:   string;
+  updated_at:         string;
+  updated_by_user_id: string | null;
+}
+
+/** Enriched row from get_gate_approver_configs (admin grid, D-464). */
+export interface GateApproverConfigRow {
+  id:                          string;
+  division_id:                 string;
+  division_name:               string;
+  division_display_name_short: string;
+  gate_name:                   GateName;
+  gate_name_display:           string;
+  approver_user_id:            string;
+  approver_display_name:       string;
+  updated_at:                  string;
+  updated_by_display_name:     string | null;
 }
 
 // ── Build C — Dashboard summary types (D-171–D-176) ──────────────────────────

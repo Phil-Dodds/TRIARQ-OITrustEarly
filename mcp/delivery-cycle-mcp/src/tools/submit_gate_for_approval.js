@@ -36,6 +36,10 @@
 
 const { supabase } = require('../db');
 const { computeArtifactSuggestionWarnings } = require('./helpers/artifact-warnings');
+// Contract 29: WS3 approver resolution, WS2 consultation setup, WS4 email.
+const { resolveGateApprover } = require('./helpers/approver');
+const { deriveConsultedUserIds, setupGateConsultations } = require('./helpers/consultations');
+const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 // Gate-name display strings — used in event_description and surfaced to UI text.
 // Source: gate-submission-flow-spec-2026-04-19 §3.1.
@@ -89,7 +93,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   // D-424 / Contract 23 Item 3.6: division_id added — used to look up dol_required.
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, workstream_id, division_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
+    .select('delivery_cycle_id, cycle_title, workstream_id, division_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, other_consulted_user_ids')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -343,6 +347,14 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
+  // ── WS3 (D-463): resolve and store the Accountable approver at submission ──
+  // Resolution order: gate_approver_configs → divisions.owner_user_id → Phil.
+  // Stored on gate_records.approver_user_id (existing column, migration 019).
+  const { approver_user_id: resolvedApproverId } = await resolveGateApprover({
+    division_id: cycle.division_id,
+    gate_name
+  });
+
   // ── Submission path — Workstream active OR Workstream not assigned ───────
   //   workstream_active_at_clearance:
   //     true   — Workstream assigned + active
@@ -355,6 +367,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
       gate_status:                    'awaiting_approval',
       submitted_at:                   new Date().toISOString(),
       submitted_by_user_id:           caller_user_id,
+      approver_user_id:               resolvedApproverId,
       workstream_active_at_clearance: workstream_clearance
     })
     .eq('gate_record_id', gate_record.gate_record_id)
@@ -375,6 +388,65 @@ async function submit_gate_for_approval(params, caller_user_id) {
       event_metadata:    { gate_name }
     });
 
+  // ── WS2 (D-459/D-460): derive Consulted set and create consultation rows ──
+  // Set = non-null DCS/EPO/DOL trio + other_consulted_user_ids, deduplicated.
+  // Submitter row auto-approved (no inbox/email). Idempotent on re-submit.
+  const consultedUserIds = deriveConsultedUserIds(cycle);
+  const { nonSubmitterConsultedUserIds } = await setupGateConsultations({
+    gate_record_id:       gate_record.gate_record_id,
+    submitted_by_user_id: caller_user_id,
+    consultedUserIds
+  });
+
+  // ── Resolve approver + Consulted display names/emails in one lookup ────────
+  const lookupIds = [...new Set(
+    [resolvedApproverId, ...nonSubmitterConsultedUserIds].filter(Boolean)
+  )];
+  let assigned_approver = resolvedApproverId
+    ? { id: resolvedApproverId, display_name: null }
+    : null;
+
+  if (lookupIds.length > 0) {
+    const { data: recipientRows } = await supabase
+      .from('users')
+      .select('id, display_name, email')
+      .in('id', lookupIds)
+      .is('deleted_at', null);
+    const byId = {};
+    (recipientRows || []).forEach(u => { byId[u.id] = u; });
+
+    if (assigned_approver && byId[resolvedApproverId]) {
+      assigned_approver.display_name = byId[resolvedApproverId].display_name;
+    }
+
+    // ── WS4 (D-467): gate submission email — approver + non-submitter consulted ──
+    // Submitter excluded (they submitted it, AC #43). Same body for both roles.
+    const emailRecipients = [];
+    if (resolvedApproverId && byId[resolvedApproverId]?.email) {
+      emailRecipients.push({
+        email:        byId[resolvedApproverId].email,
+        display_name: byId[resolvedApproverId].display_name
+      });
+    }
+    for (const id of nonSubmitterConsultedUserIds) {
+      if (byId[id]?.email) {
+        emailRecipients.push({ email: byId[id].email, display_name: byId[id].display_name });
+      }
+    }
+    if (emailRecipients.length > 0) {
+      await sendGateNotificationEmail({
+        recipients:       emailRecipients,
+        subject:          `${cycle.cycle_title} — ${gateNameDisplay} submitted for approval`,
+        initiativeName:   cycle.cycle_title,
+        gateNameDisplay,
+        contextParagraph: `${callerDisplayName} has submitted ${gateNameDisplay} for ${cycle.cycle_title}. ` +
+                          `You have been notified as an approver or a consulted party.`,
+        delivery_cycle_id,
+        email_type:       'gate_submission'
+      });
+    }
+  }
+
   // ── D-438 (Contract 25): non-blocking artifact suggestion warnings ────────
   // Compute artifact gaps AFTER submission succeeds, using the shared
   // primary_gate / gate_warning_behavior rule from helpers/artifact-warnings.
@@ -386,7 +458,8 @@ async function submit_gate_for_approval(params, caller_user_id) {
   );
   const suggestion_warnings = warningEntries.map(w => w.artifact_type_name);
 
-  return { success: true, data: updated_gate, suggestion_warnings };
+  // assigned_approver (WS3 D-463): Angular shows "Submitted for approval by [chip]".
+  return { success: true, data: updated_gate, suggestion_warnings, assigned_approver };
 }
 
 module.exports = { submit_gate_for_approval };

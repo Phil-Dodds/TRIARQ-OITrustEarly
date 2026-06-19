@@ -22,7 +22,9 @@ import { IonicModule }  from '@ionic/angular';
       // Contract 24 (D-437): Artifact Type management admin screen.
       { path: 'artifact-types', loadComponent: () => import('./artifact-types/artifact-types.component').then(c => c.ArtifactTypesComponent) },
       // Contract 27 (D-444): Deploy Roadmap Baselines admin screen.
-      { path: 'deploy-baselines', loadComponent: () => import('./deploy-baselines/deploy-baselines.component').then(c => c.DeployBaselinesComponent) }
+      { path: 'deploy-baselines', loadComponent: () => import('./deploy-baselines/deploy-baselines.component').then(c => c.DeployBaselinesComponent) },
+      // Contract 29 (D-464): Gate Approvers admin screen (Phil-only).
+      { path: 'gate-approvers', loadComponent: () => import('./gate-approvers/gate-approvers.component').then(c => c.GateApproversComponent) }
     ])
   ]
 })

@@ -273,8 +273,15 @@ function avatarColorFromName(name: string): string {
   `]
 })
 export class UserPickerComponent implements OnInit, OnDestroy {
-  /** Role to filter the picker — D-389/D-390/D-391. */
+  /** Role to filter the picker — D-389/D-390/D-391. Ignored when allUsers=true. */
   @Input() userRole: SystemRole = SYSTEM_ROLES.DCS;
+  /**
+   * Contract 29: when true, the picker lists ALL active users regardless of
+   * role (no role-flag filter). Used by surfaces that select an arbitrary user
+   * — Other Consulted / Other Informed (D-458) and gate approver (D-464).
+   * Defaults false → existing role-scoped behavior is unchanged.
+   */
+  @Input() allUsers = false;
   /** Division ID for "This Division" scope. Null → skip division scope, default to All. */
   @Input() divisionId: string | null = null;
   /** Pre-selected user ID (current value on the cycle). */
@@ -306,6 +313,7 @@ export class UserPickerComponent implements OnInit, OnDestroy {
   createOverlayOpen = false;
 
   get roleLabel(): string {
+    if (this.allUsers) { return 'User'; }
     return ROLE_DISPLAY_NAMES[this.userRole] ?? this.userRole;
   }
 
@@ -402,9 +410,10 @@ export class UserPickerComponent implements OnInit, OnDestroy {
         // Contract 19 (D-394): boolean flag predicate replaces system_role equality.
         //   A user with is_admin = true AND is_dcs = true appears in BOTH DCS and Admin
         //   role views — multi-role membership is the explicit intent.
+        // Contract 29: allUsers mode bypasses the role-flag filter entirely.
         const roleFlag = userRoleToFlag(this.userRole);
         const users = (res.data ?? []).filter(u =>
-          u[roleFlag] === true && !u.deleted_at
+          !u.deleted_at && (this.allUsers || u[roleFlag] === true)
         );
         // B-13 fix: distinguish empty result from error. When scope is 'division' and
         // MCP succeeded but no users of this role exist in the Division, show plain message.

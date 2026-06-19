@@ -43,6 +43,7 @@ import { IonicModule } from '@ionic/angular';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { DeliveryService } from '../../../core/services/delivery.service';
 import { UserProfileService } from '../../../core/services/user-profile.service';
+import { GateConsultationSectionComponent } from './gate-consultation-section.component';
 import {
   DeliveryCycle,
   GateName,
@@ -82,7 +83,7 @@ const GATE_LABELS: Record<GateName, string> = {
   selector:        'app-gate-record-modal',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, ReactiveFormsModule, IonicModule, MatDialogModule],
+  imports:         [CommonModule, ReactiveFormsModule, IonicModule, MatDialogModule, GateConsultationSectionComponent],
   template: `
     <div class="grm-shell" [attr.aria-busy]="processing ? 'true' : null">
 
@@ -160,6 +161,13 @@ const GATE_LABELS: Record<GateName, string> = {
             </span>
           </div>
         </section>
+
+        <!-- CONSULTED — Contract 29 WS2 (D-461). Self-hides when no records. -->
+        <app-gate-consultation-section
+          [gateRecordId]="record?.gate_record_id ?? null"
+          [gateStatus]="record?.gate_status ?? null"
+          [currentUserId]="currentUserId">
+        </app-gate-consultation-section>
 
         <!-- GATE CHECKLIST -->
         <section class="grm-section">
@@ -405,6 +413,27 @@ const GATE_LABELS: Record<GateName, string> = {
                       (click)="onCloseDeployBlocked()">
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONFIRM: Submitted for approval — Contract 29 WS3 (D-463/AC-32) ── -->
+        <div *ngIf="confirmMode === 'submitted'"
+             style="display:flex;gap:12px;padding:14px;border-radius:8px;
+                    background:rgba(46,125,50,0.06);border-left:3px solid #2e7d32;margin-top:8px;">
+          <div style="color:#2e7d32;font-size:18px;line-height:1;">✓</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text" *ngIf="submittedApprover?.display_name">
+              Submitted for approval by
+              <span style="display:inline-block;padding:2px 10px;border-radius:999px;
+                           background:rgba(37,112,153,0.10);color:#257099;font-size:12px;font-weight:500;">
+                {{ submittedApprover!.display_name }}</span>.
+            </div>
+            <div class="oi-confirm-text" *ngIf="!submittedApprover?.display_name">
+              Submitted for approval.
+            </div>
+            <div class="grm-action-row">
+              <button class="grm-btn-primary" type="button" (click)="onSubmittedDone()">Done</button>
             </div>
           </div>
         </div>
@@ -675,7 +704,10 @@ export class GateRecordModalComponent {
     | 'post-approve-warning'
     | 'skip-interstitial'
     | 'deploy-blocked'
+    | 'submitted'                       // Contract 29 WS3 — post-submit approver confirmation
     | 'backdate-confirm' = 'none';
+  /** Contract 29 WS3 (D-463/AC-32): resolved approver shown in the submit confirmation. */
+  submittedApprover: { id: string; display_name: string | null } | null = null;
   processing      = false;
   processingAction:
     | 'submit'
@@ -821,6 +853,11 @@ export class GateRecordModalComponent {
     return `${this.currentUserDisplayName} (escalation default — no Accountable configured)`;
   }
 
+  /** Contract 29 WS2: current user id for the Consulted section's own-row edit. */
+  get currentUserId(): string | null {
+    return this.profile.getCurrentProfile()?.id ?? null;
+  }
+
   private get currentUserDisplayName(): string {
     return this.profile.getCurrentProfile()?.display_name ?? 'Phil';
   }
@@ -905,6 +942,14 @@ export class GateRecordModalComponent {
     this.dialogRef.close({ refreshKind });
   }
 
+  /** Contract 29 WS3: dismiss the post-submit approver confirmation and trigger
+   *  the same partial refresh the immediate-close path used. */
+  onSubmittedDone(): void {
+    this.submittedApprover = null;
+    this.confirmMode = 'none';
+    this.onGateActionComplete('partial');
+  }
+
   /** Submit / Re-submit for Approval — partial refresh per D-345 panel rules.
    *  Contract 28 / D-448 / D-450: response dispatcher branches into the skip
    *  interstitial or deploy-blocked state when the backend pre-check finds
@@ -937,8 +982,12 @@ export class GateRecordModalComponent {
           return;
         }
         if (res.success) {
+          // Contract 29 WS3 (D-463/AC-32): show the resolved approver before
+          // closing, so the submitter sees who the gate routed to.
+          this.submittedApprover = res.assigned_approver ?? null;
           this.endProcessing();
-          this.onGateActionComplete('partial');
+          this.confirmMode = 'submitted';
+          this.cdr.markForCheck();
         } else {
           this.endProcessing(res.error ?? 'Submission failed. Please try again.');
         }

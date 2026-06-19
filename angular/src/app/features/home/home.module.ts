@@ -19,7 +19,6 @@ import { OnboardingMessageCardComponent } from './components/onboarding-message-
 @NgModule({
   declarations: [
     HomeComponent,
-    MyActionQueueCardComponent,
     MyNotificationsCardComponent,
     SystemHealthCardComponent,
     OILibraryCardComponent,
@@ -31,6 +30,7 @@ import { OnboardingMessageCardComponent } from './components/onboarding-message-
   imports: [
     CommonModule,
     IonicModule,
+    MyActionQueueCardComponent,
     MyDeliveryCyclesCardComponent,
     MyActivityCardComponent,
     MyCompletedGatesCardComponent,

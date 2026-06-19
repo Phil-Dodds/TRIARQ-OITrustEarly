@@ -124,12 +124,18 @@ async function get_delivery_cycle(params, caller_user_id) {
   const artifactAttacherIds = (artifacts || [])
     .map(a => a.attached_by_user_id)
     .filter(Boolean);
+  // D-458 (WS1): resolve display names for the Other Consulted / Other Informed
+  // participant arrays. Columns are uuid[] NOT NULL DEFAULT '{}' (migration 045).
+  const otherConsultedIds = Array.isArray(cycle.other_consulted_user_ids) ? cycle.other_consulted_user_ids : [];
+  const otherInformedIds  = Array.isArray(cycle.other_informed_user_ids)  ? cycle.other_informed_user_ids  : [];
   const userIdsToResolve = [
     cycle.assigned_dcs_user_id,
     cycle.assigned_epo_user_id,
     cycle.assigned_dol_user_id,
     caller_user_id,
-    ...artifactAttacherIds
+    ...artifactAttacherIds,
+    ...otherConsultedIds,
+    ...otherInformedIds
   ].filter(Boolean);
 
   let userMap = {};
@@ -223,6 +229,10 @@ async function get_delivery_cycle(params, caller_user_id) {
       assigned_dcs_display_name: cycle.assigned_dcs_user_id ? (userMap[cycle.assigned_dcs_user_id] ?? null) : null,
       assigned_epo_display_name: cycle.assigned_epo_user_id ? (userMap[cycle.assigned_epo_user_id] ?? null) : null,
       assigned_dol_display_name: cycle.assigned_dol_user_id ? (userMap[cycle.assigned_dol_user_id] ?? null) : null,
+      // D-458 (WS1): resolved participant lists, order preserved. display_name
+      // is null for any soft-deleted user still referenced in the array.
+      other_consulted_users: otherConsultedIds.map(id => ({ id, display_name: userMap[id] ?? null })),
+      other_informed_users:  otherInformedIds.map(id => ({ id, display_name: userMap[id] ?? null })),
       milestone_dates:  milestone_dates       || [],
       gate_records:     enrichedGateRecords,
       workstream:       workstream ? { ...workstream, home_division_name } : null,

@@ -44,6 +44,12 @@ const { confirm_gate_skip }              = require('./tools/confirm_gate_skip');
 const { record_gate_decision }           = require('./tools/record_gate_decision');
 const { withdraw_gate_submission }       = require('./tools/withdraw_gate_submission');
 const { list_pending_approvals }         = require('./tools/list_pending_approvals');
+// Contract 29 (D-459–D-465): gate consultation + approver configuration.
+const { record_consultation_response }   = require('./tools/record_consultation_response');
+const { list_gate_consultations }        = require('./tools/list_gate_consultations');
+const { set_gate_approver }              = require('./tools/set_gate_approver');
+const { get_gate_approver_configs }      = require('./tools/get_gate_approver_configs');
+const { delete_gate_approver_config }    = require('./tools/delete_gate_approver_config');
 // Contract 24 — approved gate queries (D-430, D-431).
 const { list_approved_gates }            = require('./tools/list_approved_gates');
 const { list_my_completed_gates }        = require('./tools/list_my_completed_gates');
@@ -111,6 +117,12 @@ const TOOLS = {
   record_gate_decision,
   withdraw_gate_submission,
   list_pending_approvals,
+  // Contract 29 — gate consultation + approver configuration (D-459–D-465)
+  record_consultation_response,
+  list_gate_consultations,
+  set_gate_approver,
+  get_gate_approver_configs,
+  delete_gate_approver_config,
   // Contract 24 — approved gate analytical views (D-430, D-431).
   list_approved_gates,
   list_my_completed_gates,

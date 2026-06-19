@@ -5,9 +5,12 @@
 // Principle 3 (Visible Context): each card states what, why, and how.
 // Rule 2: Presentation only — no business logic.
 
-import { Component, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ChangeDetectorRef, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
+
+import { UserProfileService } from '../../core/services/user-profile.service';
 
 interface AdminCard {
   title:       string;
@@ -15,6 +18,8 @@ interface AdminCard {
   who:         string;
   route:       string;
   icon:        string;
+  // Contract 29 (D-464): when true, the card renders only for Phil (is_super_admin).
+  philOnly?:   boolean;
 }
 
 const ADMIN_CARDS: AdminCard[] = [
@@ -63,6 +68,15 @@ const ADMIN_CARDS: AdminCard[] = [
     who:         'Phil and Admin',
     route:       'deploy-baselines',
     icon:        '◇'
+  },
+  // Contract 29 (D-464): seventh admin card — Gate Approvers (Phil-only).
+  {
+    title:       'Gate Approvers',
+    description: 'Assign the Accountable approver for each gate per Division.',
+    who:         'Phil only',
+    route:       'gate-approvers',
+    icon:        '◈',
+    philOnly:    true
   }
 ];
 
@@ -122,6 +136,26 @@ const ADMIN_CARDS: AdminCard[] = [
     </div>
   `
 })
-export class AdminHubComponent {
-  readonly cards = ADMIN_CARDS;
+export class AdminHubComponent implements OnInit, OnDestroy {
+  // philOnly cards are hidden until the profile confirms is_super_admin (D-464).
+  cards: AdminCard[] = ADMIN_CARDS.filter(c => !c.philOnly);
+
+  private readonly subs = new Subscription();
+
+  constructor(
+    private readonly profile: UserProfileService,
+    private readonly cdr:     ChangeDetectorRef
+  ) {}
+
+  ngOnInit(): void {
+    this.subs.add(
+      this.profile.profile$.subscribe(p => {
+        const isPhil = p?.is_super_admin === true;
+        this.cards = ADMIN_CARDS.filter(c => !c.philOnly || isPhil);
+        this.cdr.markForCheck();
+      })
+    );
+  }
+
+  ngOnDestroy(): void { this.subs.unsubscribe(); }
 }

@@ -582,6 +582,28 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </span>
           </div>
 
+          <!-- Other Consulted — D-458 (WS1). Read-only chips; hidden when empty in View mode. -->
+          <div *ngIf="cycle.other_consulted_users?.length">
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Other Consulted</div>
+            <span *ngFor="let u of cycle.other_consulted_users"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;margin:0 4px 4px 0;
+                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
+              {{ u.display_name || 'Unknown' }}
+            </span>
+          </div>
+
+          <!-- Other Informed — D-458 (WS1). Read-only chips; hidden when empty in View mode. -->
+          <div *ngIf="cycle.other_informed_users?.length">
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Other Informed</div>
+            <span *ngFor="let u of cycle.other_informed_users"
+                  style="display:inline-block;padding:3px 10px;border-radius:999px;margin:0 4px 4px 0;
+                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
+              {{ u.display_name || 'Unknown' }}
+            </span>
+          </div>
+
           <!-- Tier — badge chip per Visual Layout Standards 1.7. CC-Decision-2026-04-12-A: Contract 5 restores badge. -->
           <div>
             <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
@@ -1571,6 +1593,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       external_url: ['', Validators.required]
     });
     const id = this.cycleId ?? this.route.snapshot.paramMap.get('cycle_id');
+    // Contract 29: in route mode (deep link from the Action Queue), read ?gate=
+    // to auto-expand the relevant gate after load — reuses the D-345 §8 mechanism.
+    if (!this.cycleId && !this.autoExpandGate) {
+      const gateParam = this.route.snapshot.queryParamMap.get('gate');
+      if (gateParam) { this.autoExpandGate = gateParam as GateName; }
+    }
     if (id) { this.loadCycle(id); }
   }
 
