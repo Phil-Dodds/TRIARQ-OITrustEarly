@@ -13,7 +13,10 @@
 //   MCP-side (Render env) to build the CTA link; initiative_id is forwarded for
 //   the Edge Function's own logging. Single template location, testable in MCP.
 //
-// CC-decision (CC-29-7): email provider is Resend (confirmed by Phil 2026-06-18).
+// CC-decision (CC-29-7, AMENDED 2026-06-19): email provider is Microsoft 365 SMTP
+//   (was Resend). The send-notification-email Edge Function relays via the existing
+//   O365 SMTP account (OITrust@triarqhealth.com). This MCP side is provider-agnostic
+//   — it only invokes the function; the SMTP credentials live in the function's secrets.
 
 'use strict';
 
