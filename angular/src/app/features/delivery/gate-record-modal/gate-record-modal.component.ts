@@ -930,7 +930,11 @@ export class GateRecordModalComponent {
    */
   onDismiss(): void {
     if (this.processing) return;
-    this.dialogRef.close({ refreshKind: 'none' });
+    // A gate was just submitted in this session (confirmation showing) — even
+    // if the user dismisses via the ✕, the submission succeeded, so the parent
+    // must refresh to show the new awaiting_approval state (Contract 29 WS3).
+    const refreshKind = this.confirmMode === 'submitted' ? 'partial' : 'none';
+    this.dialogRef.close({ refreshKind });
   }
 
   /**
@@ -983,8 +987,13 @@ export class GateRecordModalComponent {
         }
         if (res.success) {
           // Contract 29 WS3 (D-463/AC-32): show the resolved approver before
-          // closing, so the submitter sees who the gate routed to.
+          // closing, so the submitter sees who the gate routed to. The submit
+          // already succeeded server-side, so any way the user leaves this
+          // confirmation must still trigger the parent's partial refresh —
+          // block ESC/backdrop dismissal (forces the Done button), and
+          // onDismiss() also maps the 'submitted' state to a partial refresh.
           this.submittedApprover = res.assigned_approver ?? null;
+          this.dialogRef.disableClose = true;
           this.endProcessing();
           this.confirmMode = 'submitted';
           this.cdr.markForCheck();

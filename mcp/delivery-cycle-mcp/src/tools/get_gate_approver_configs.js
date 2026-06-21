@@ -10,21 +10,7 @@
 'use strict';
 
 const { supabase } = require('../db');
-
-const GATE_NAME_DISPLAY = {
-  brief_review:  'Brief Review',
-  go_to_build:   'Go to Build',
-  go_to_deploy:  'Go to Deploy',
-  go_to_release: 'Go to Release',
-  close_review:  'Close Review'
-};
-const GATE_SEQUENCE = {
-  brief_review:  1,
-  go_to_build:   2,
-  go_to_deploy:  3,
-  go_to_release: 4,
-  close_review:  5
-};
+const { GATE_NAME_DISPLAY, GATE_SEQUENCE } = require('./helpers/gates');
 
 /**
  * @param {object} _params

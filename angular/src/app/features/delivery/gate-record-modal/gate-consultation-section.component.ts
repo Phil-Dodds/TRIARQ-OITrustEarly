@@ -127,7 +127,10 @@ export class GateConsultationSectionComponent implements OnChanges {
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['gateRecordId']) { this.load(); }
+    // Reload on gate change AND on status change — when a gate is approved in
+    // the same session, the response options (declined_post_approval) and the
+    // summary must reflect fresh data, not the awaiting_approval snapshot.
+    if (changes['gateRecordId'] || changes['gateStatus']) { this.load(); }
   }
 
   private load(): void {

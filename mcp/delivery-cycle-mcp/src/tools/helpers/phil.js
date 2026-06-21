@@ -46,4 +46,20 @@ async function getPhilUserId() {
   return phil ? phil.id : null;
 }
 
-module.exports = { getPhil, getPhilUserId };
+/**
+ * True iff the caller is Phil (the super-admin). Used by the Phil-only gate
+ * approver config tools to avoid duplicating the is_super_admin check.
+ * @param {string} caller_user_id
+ * @returns {Promise<boolean>}
+ */
+async function isPhil(caller_user_id) {
+  const { data: caller } = await supabase
+    .from('users')
+    .select('is_super_admin')
+    .eq('id', caller_user_id)
+    .is('deleted_at', null)
+    .single();
+  return caller?.is_super_admin === true;
+}
+
+module.exports = { getPhil, getPhilUserId, isPhil };

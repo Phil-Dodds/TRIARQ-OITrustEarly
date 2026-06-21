@@ -17,16 +17,9 @@
 const { supabase }                  = require('../db');
 const { getPhil }                   = require('./helpers/phil');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
+const { GATE_NAME_DISPLAY } = require('./helpers/gates');
 
 const VALID_RESPONSES = ['approved', 'declined', 'declined_post_approval'];
-
-const GATE_NAME_DISPLAY = {
-  brief_review:  'Brief Review',
-  go_to_build:   'Go to Build',
-  go_to_deploy:  'Go to Deploy',
-  go_to_release: 'Go to Release',
-  close_review:  'Close Review'
-};
 
 /**
  * @param {object} params

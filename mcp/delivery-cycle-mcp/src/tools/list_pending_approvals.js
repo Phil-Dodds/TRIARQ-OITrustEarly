@@ -148,7 +148,12 @@ async function list_pending_approvals(_params, caller_user_id) {
   (submitters  || []).forEach(u => { submitterMap[u.id] = u.display_name; });
 
   // ── Assemble response items ──────────────────────────────────────────────
-  const items = gates.map(g => {
+  // Drop gates whose cycle is missing (soft-deleted initiative). cycleMap is
+  // built from delivery_cycles filtered to deleted_at IS NULL, so a missing
+  // entry means the initiative was soft-deleted — otherwise a pending
+  // consultation on a deleted initiative would surface a blank, un-navigable
+  // ghost row in the Action Queue (Contract 29 review #5).
+  const items = gates.filter(g => cycleMap[g.delivery_cycle_id]).map(g => {
     const c  = cycleMap[g.delivery_cycle_id]      || {};
     const d  = divisionMap[c.division_id]         || {};
     const w  = workstreamMap[c.workstream_id]     || {};

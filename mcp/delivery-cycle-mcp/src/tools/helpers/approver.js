@@ -22,8 +22,16 @@ const { getPhilUserId }  = require('./phil');
  *   source ∈ 'config' | 'division_owner' | 'phil' | 'unresolved'
  */
 async function resolveGateApprover({ division_id, gate_name }) {
-  // 1. Configured approver for this Division + gate.
+  // Build the resolution tiers in priority order, then return the FIRST tier
+  // whose user is live (not soft-deleted). A configured approver or division
+  // owner who was later soft-deleted must NOT be returned — that would route
+  // the gate to a user who can never act and silently drop the submission
+  // email. Falling through to the next tier (ultimately Phil) keeps the gate
+  // approvable. Phil's own row is already deleted_at-checked in getPhilUserId.
+  const candidates = [];
+
   if (division_id) {
+    // 1. Configured approver for this Division + gate.
     const { data: config } = await supabase
       .from('gate_approver_configs')
       .select('approver_user_id')
@@ -31,7 +39,7 @@ async function resolveGateApprover({ division_id, gate_name }) {
       .eq('gate_name', gate_name)
       .maybeSingle();
     if (config?.approver_user_id) {
-      return { approver_user_id: config.approver_user_id, source: 'config' };
+      candidates.push({ id: config.approver_user_id, source: 'config' });
     }
 
     // 2. Division Owner escalation.
@@ -42,14 +50,27 @@ async function resolveGateApprover({ division_id, gate_name }) {
       .is('deleted_at', null)
       .maybeSingle();
     if (division?.owner_user_id) {
-      return { approver_user_id: division.owner_user_id, source: 'division_owner' };
+      candidates.push({ id: division.owner_user_id, source: 'division_owner' });
     }
   }
 
   // 3. Phil fallback.
   const philId = await getPhilUserId();
   if (philId) {
-    return { approver_user_id: philId, source: 'phil' };
+    candidates.push({ id: philId, source: 'phil' });
+  }
+
+  // Return the first candidate that is a live (non-deleted) user.
+  for (const c of candidates) {
+    const { data: live } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', c.id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (live) {
+      return { approver_user_id: c.id, source: c.source };
+    }
   }
 
   return { approver_user_id: null, source: 'unresolved' };

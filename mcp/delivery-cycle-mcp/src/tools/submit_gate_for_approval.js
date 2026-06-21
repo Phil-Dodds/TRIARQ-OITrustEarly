@@ -392,11 +392,23 @@ async function submit_gate_for_approval(params, caller_user_id) {
   // Set = non-null DCS/EPO/DOL trio + other_consulted_user_ids, deduplicated.
   // Submitter row auto-approved (no inbox/email). Idempotent on re-submit.
   const consultedUserIds = deriveConsultedUserIds(cycle);
-  const { nonSubmitterConsultedUserIds } = await setupGateConsultations({
+  const { nonSubmitterConsultedUserIds, error: consultationError } = await setupGateConsultations({
     gate_record_id:       gate_record.gate_record_id,
     submitted_by_user_id: caller_user_id,
     consultedUserIds
   });
+  if (consultationError) {
+    // Non-fatal: the gate is already submitted. Surface the failure in the
+    // server log rather than swallowing it — consultation rows may be missing
+    // even though submission reported success.
+    console.error(JSON.stringify({
+      tool_name:         'submit_gate_for_approval',
+      step:              'setupGateConsultations',
+      delivery_cycle_id,
+      gate_record_id:    gate_record.gate_record_id,
+      error:             consultationError
+    }));
+  }
 
   // ── Resolve approver + Consulted display names/emails in one lookup ────────
   const lookupIds = [...new Set(

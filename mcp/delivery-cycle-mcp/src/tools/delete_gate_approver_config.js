@@ -15,8 +15,8 @@
 'use strict';
 
 const { supabase } = require('../db');
-
-const VALID_GATES = ['brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'];
+const { VALID_GATES } = require('./helpers/gates');
+const { isPhil } = require('./helpers/phil');
 
 /**
  * @param {object} params
@@ -35,13 +35,7 @@ async function delete_gate_approver_config(params, caller_user_id) {
   }
 
   // ── Phil-only ─────────────────────────────────────────────────────────────
-  const { data: caller } = await supabase
-    .from('users')
-    .select('is_super_admin')
-    .eq('id', caller_user_id)
-    .is('deleted_at', null)
-    .single();
-  if (caller?.is_super_admin !== true) {
+  if (!(await isPhil(caller_user_id))) {
     return { success: false, error: 'Only Phil can remove gate approver configs.' };
   }
 
