@@ -32,6 +32,47 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-06-20',
+    contractLabel: 'Contract 29 — Gate Approval, Consultation, and Notification',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'Initiative Edit panel — Other Consulted / Other Informed',
+        description: 'Two new multi-person pickers let you add anyone (any user, not just a role) as a standing Other Consulted or Other Informed party on the initiative. Other Consulted parties are pulled into every gate submission for review.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Detail — Identity zone',
+        description: 'Two new read-only rows, Other Consulted and Other Informed, show the extra people attached to the initiative beyond the DCS/EPO/DOL. Each row is hidden when no one is set.'
+      },
+      {
+        audience:    'All',
+        surface:     'Gate Record Modal — Consulted section',
+        description: 'When a gate is submitted, a Consulted section lists the DCS/EPO/DOL plus any Other Consulted, each with their response (Approved / Declined / Pending) and a summary line. You can record or change your own response — including a post-approval decline after a gate is already approved — and add notes.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Gate Record Modal — submission confirmation',
+        description: 'After submitting a gate for approval, a confirmation shows who it routed to: "Submitted for approval by [approver]."'
+      },
+      {
+        audience:    'All',
+        surface:     'Action Queue — consultation items',
+        description: 'Consultation requests now appear in your Action Queue as "Review requested: [Gate] — [Initiative]". After the gate is approved, an unanswered request relabels to "Gate approved — your review still welcome", renders muted, does not add to your badge count, and can be dismissed.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Admin — Gate Approvers (Phil only)',
+        description: 'New Gate Approvers screen (/admin/gate-approvers) to assign the accountable approver for each Division and gate. At submission the approver resolves in order: configured approver → Division owner → Phil. Phil approving a gate routed to someone else converts that person to a consulted reviewer.'
+      },
+      {
+        audience:    'All',
+        surface:     'Email notifications',
+        description: 'Gate submissions email the assigned approver and all consulted parties; a post-approval decline emails the approver and Phil. Notifications are sent from OITrust@triarqhealth.com.'
+      }
+    ]
+  },
+  {
     date:          '2026-06-17',
     contractLabel: 'Contract 28 — Gate Skip Flow and Status Revert Fix',
     items: [
