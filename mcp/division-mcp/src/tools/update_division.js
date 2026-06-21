@@ -78,7 +78,7 @@ async function update_division(params, caller_user_id) {
   // Verify caller is Admin — Contract 19 (D-394, CC-19-01).
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('is_admin, is_active')
+    .select('is_admin, is_super_admin, is_active')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -90,6 +90,15 @@ async function update_division(params, caller_user_id) {
     return {
       success: false,
       error: 'Updating Divisions requires Admin role. Your current role does not have this permission.'
+    };
+  }
+  // WS4 (D-471): Division Leader (owner_user_id) is a Phil-only field. Enforce the
+  // super-admin gate server-side — the Angular field is Phil-only, this prevents a
+  // non-Phil admin from setting it via a direct tool call.
+  if (Object.prototype.hasOwnProperty.call(updates, 'owner_user_id') && caller.is_super_admin !== true) {
+    return {
+      success: false,
+      error: 'Only Phil can change the Division Leader. Other admins can edit the rest of the Division.'
     };
   }
 

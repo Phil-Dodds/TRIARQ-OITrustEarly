@@ -58,6 +58,9 @@ export const SCREEN_KEYS = {
   // Contract 27 (D-446): per-view dismissal flag for the pre-Contract-23 data-gap notice.
   INITIATIVES_EPO_DEPLOY_DATA_GAP_DISMISSED:   'initiatives.epo-deploy.data-gap-dismissed',
   DELIVERY_DEPLOY_SCHEDULE_DATA_GAP_DISMISSED: 'delivery.deploy-schedule.data-gap-dismissed',
+  // Contract 30 (D-472): My Actions tabs — filter + sort memory per tab.
+  ACTIONS_GATE_APPROVALS:   'actions.gate-approvals',
+  ACTIONS_GATE_REVIEWS:     'actions.gate-reviews',
 } as const;
 
 export type ScreenKey = typeof SCREEN_KEYS[keyof typeof SCREEN_KEYS];

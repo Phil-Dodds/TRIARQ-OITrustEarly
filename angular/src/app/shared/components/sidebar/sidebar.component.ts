@@ -6,8 +6,9 @@
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { UserProfileService } from '../../../core/services/user-profile.service';
 import { AuthService }        from '../../../core/services/auth.service';
+import { DeliveryService }    from '../../../core/services/delivery.service';
 import { Router }             from '@angular/router';
-import { User }               from '../../../core/types/database';
+import { User, PendingApprovalItem } from '../../../core/types/database';
 import { RoleFlag }           from '../../../core/constants/roles';
 import { Subscription }       from 'rxjs';
 
@@ -26,6 +27,10 @@ interface NavItem {
 // devStatus reflects current build stage. Update when a feature advances.
 const NAV_ITEMS: NavItem[] = [
   { label: 'Home',                 route: '/home',           devStatus: 'uat'         },
+  // Contract 30 / D-472 (WS1.1): My Actions — the gate-action surface (was a Home
+  // card only; no prior Action Queue / Notifications nav items existed). Badge =
+  // pending action count, rendered from actionBadge (see computeActionBadge).
+  { label: 'My Actions',           route: '/actions',        devStatus: 'uat'         },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started' },
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'pilot'       },
   { label: 'Chat',                 route: '/chat',           devStatus: 'not-started' },
@@ -49,6 +54,10 @@ const NAV_ITEMS: NavItem[] = [
              class="oi-nav-item"
              [attr.aria-label]="item.label">
             <span class="oi-nav-label">{{ item.label }}</span>
+            <!-- D-472 (WS1.1): pending-action badge on My Actions only. -->
+            <span *ngIf="item.route === '/actions' && actionBadge > 0"
+                  class="oi-nav-badge"
+                  [attr.aria-label]="actionBadge + ' pending actions'">{{ actionBadge }}</span>
             <span class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
               {{ statusLabel(item.devStatus) }}
             </span>
@@ -86,6 +95,17 @@ const NAV_ITEMS: NavItem[] = [
       flex-shrink: 0;
       opacity: 0.85;
     }
+    /* D-472 (WS1.1): pending-action badge pill on the My Actions nav item. */
+    .oi-nav-badge {
+      flex-shrink: 0;
+      background: var(--triarq-color-primary, #257099);
+      color: #fff;
+      border-radius: var(--triarq-radius-pill, 999px);
+      padding: 1px 7px;
+      font-size: 10px;
+      font-weight: var(--triarq-font-weight-bold, 700);
+      line-height: 1.4;
+    }
 
     /* Status colors */
     .status-new         { color: #6fcf97; }
@@ -106,12 +126,17 @@ export class SidebarComponent implements OnInit, OnDestroy {
   displayName = '';
   /** D-426: About Panel show/hide state. */
   aboutOpen = false;
+  /** D-472 (WS1.1): pending-action count on the My Actions nav badge.
+   *  Accountable awaiting_approval + active Consulted pending; post-approval
+   *  Consulted items (D-468) are excluded — same rule as the Home card badge. */
+  actionBadge = 0;
 
   private sub = new Subscription();
 
   constructor(
     private readonly profileService: UserProfileService,
     private readonly auth:           AuthService,
+    private readonly delivery:       DeliveryService,
     private readonly router:         Router,
     private readonly cdr:            ChangeDetectorRef
   ) {}
@@ -125,6 +150,24 @@ export class SidebarComponent implements OnInit, OnDestroy {
           !item.requiresFlag || (profile && (profile as User)[item.requiresFlag] === true)
         );
         this.cdr.markForCheck();
+      })
+    );
+    this.loadActionBadge();
+  }
+
+  /** D-472 (WS1.1): fetch the pending-action count for the My Actions badge. */
+  private loadActionBadge(): void {
+    this.sub.add(
+      this.delivery.listPendingApprovals().subscribe({
+        next: res => {
+          const items: PendingApprovalItem[] = (res.success && res.data) ? res.data : [];
+          // Exclude post-approval Consulted items (D-468: stone, not counted).
+          this.actionBadge = items.filter(
+            i => !(i.item_type === 'consulted' && i.gate_status === 'approved')
+          ).length;
+          this.cdr.markForCheck();
+        },
+        error: () => { /* badge stays 0 — non-blocking */ }
       })
     );
   }

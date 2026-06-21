@@ -119,7 +119,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         <span style="font-size:26px;font-weight:400;color:#1a1a1a;white-space:nowrap;flex-shrink:0;">Initiatives</span>
         <!-- S-015 / D-288: surface description. Source: Contract 6 Step 4.1. -->
         <span style="font-size:12px;font-style:italic;color:#777;flex:1;padding-top:8px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          Track and manage Initiatives across your divisions and workstreams.
+          Track Initiatives through five governance gates — from Context Brief to achieved Outcome.
         </span>
       </div>
 
@@ -631,14 +631,16 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           (mouseleave)="$any($event.currentTarget).style.background = selectedCycleId === cycle.delivery_cycle_id ? '#E8F0FE' : ''">
 
           <!-- Col 1: Division chip — D-203: always chip, empty chip if null -->
-          <!-- CC-Decision-2026-04-10-A: using division_name from MCP; display_name_short pending ARCH-29 -->
+          <!-- WS3.2 (D-203): render display_name_short (≤10 chars, grid-designed) supplied by
+               list_delivery_cycles; fall back to full division_name only if short is null.
+               Full name kept in hover title. Supersedes CC-Decision-2026-04-10-A. -->
           <div style="overflow:hidden;padding-top:6px;">
             <span style="display:inline-block;padding:2px 6px;border-radius:4px;
                          background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:11px;
                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
                          max-width:80px;cursor:pointer;"
                   title="{{ cycle.division_name ?? '' }}">
-              {{ cycle.division_name ?? '' }}
+              {{ cycle.display_name_short ?? cycle.division_name ?? '' }}
             </span>
           </div>
 
@@ -702,7 +704,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </div>
           </div>
 
-          <!-- Col 6: Team — EPO / Workstream / DCS / DOL stacked chips. D-265, D-389/D-390/D-391: null values collapse. -->
+          <!-- Col 6: Team — EPO / Workstream / DCS / DOL stacked chips. D-265, D-389/D-390/D-391: null values collapse.
+               WS3.3 (CC-30, Phil direction): Workstream chip is conditional — shown ONLY while a
+               Workstream filter is active (filterWorkstream truthy). Hidden otherwise to save
+               vertical height. Supersedes CC-Decision-2026-04-10-C (unconditional Workstream chip). -->
           <div style="overflow:hidden;padding-top:4px;display:flex;flex-direction:column;gap:3px;"
                (click)="$event.stopPropagation()">
             <span *ngIf="cycle.assigned_epo_display_name"
@@ -713,7 +718,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   title="EPO: {{ cycle.assigned_epo_display_name }}">
               {{ cycle.assigned_epo_display_name }}
             </span>
-            <span *ngIf="cycle.workstream?.workstream_name || workstreamName(cycle.workstream_id ?? '')"
+            <span *ngIf="filterWorkstream && (cycle.workstream?.workstream_name || workstreamName(cycle.workstream_id ?? ''))"
                   style="display:inline-block;padding:2px 6px;border-radius:4px;
                          background:rgba(90,90,90,0.06);color:#5A5A5A;font-size:11px;
                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -737,7 +742,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   title="DOL: {{ cycle.assigned_dol_display_name }}">
               {{ cycle.assigned_dol_display_name }}
             </span>
-            <span *ngIf="!cycle.assigned_epo_display_name && !cycle.workstream?.workstream_name && !cycle.workstream_id && !cycle.assigned_dcs_display_name && !cycle.assigned_dol_display_name"
+            <span *ngIf="!cycle.assigned_epo_display_name && !cycle.assigned_dcs_display_name && !cycle.assigned_dol_display_name
+                         && !(filterWorkstream && (cycle.workstream?.workstream_name || workstreamName(cycle.workstream_id ?? '')))"
                   style="color:#9E9E9E;font-style:italic;font-size:11px;">—</span>
           </div>
 
@@ -2078,9 +2084,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       if (record?.gate_status === 'blocked')     { map[gate] = 'blocked';           continue; }
       if (isOverdue)                             { map[gate] = 'blocked';           continue; }
       if (record?.gate_status === 'awaiting_approval') { map[gate] = 'awaiting_approval'; continue; }
-      if (record?.gate_status === 'pending' || record?.gate_status === 'returned') {
-        map[gate] = 'pending'; continue;
-      }
+      // D-469 (WS2.2): returned — hollow Oravive diamond, distinct from skipped by tooltip.
+      if (record?.gate_status === 'returned')          { map[gate] = 'returned';          continue; }
+      if (record?.gate_status === 'pending')           { map[gate] = 'pending';           continue; }
       map[gate] = 'upcoming';
     }
     return map as GateStateMap;

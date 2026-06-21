@@ -40,6 +40,12 @@ const routes: Routes = [
     canActivate: [authGuard],
     loadChildren: () => import('./features/delivery/delivery.module').then(m => m.DeliveryModule)
   },
+  // Contract 30 / D-472 (WS1.3): My Actions screen — tabbed gate approvals + reviews.
+  {
+    path: 'actions',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/actions/my-actions.component').then(m => m.MyActionsComponent)
+  },
   // D-392: Legacy /delivery/* routes redirect to /initiatives/*. Preserves bookmarks and saved links.
   { path: 'delivery',           redirectTo: 'initiatives',                  pathMatch: 'full' },
   { path: 'delivery/cycles',    redirectTo: 'initiatives/list',             pathMatch: 'full' },

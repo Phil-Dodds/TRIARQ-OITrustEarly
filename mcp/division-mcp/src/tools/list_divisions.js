@@ -63,8 +63,26 @@ async function list_divisions(params, caller_user_id) {
 
   const divisions = data || [];
 
+  // WS4 (D-471): resolve Division Leader (owner) display names in one batch so
+  // the Division Management panel can render the owner chip without a per-row
+  // lookup. owner_display_name is null when unassigned or the user is gone.
+  const ownerIds = [...new Set(divisions.map(d => d.owner_user_id).filter(Boolean))];
+  const ownerNameById = {};
+  if (ownerIds.length > 0) {
+    const { data: owners } = await supabase
+      .from('users')
+      .select('id, display_name')
+      .in('id', ownerIds)
+      .is('deleted_at', null);
+    (owners || []).forEach(u => { ownerNameById[u.id] = u.display_name; });
+  }
+  const withOwner = d => ({
+    ...d,
+    owner_display_name: d.owner_user_id ? (ownerNameById[d.owner_user_id] ?? null) : null
+  });
+
   if (!with_member_counts || divisions.length === 0) {
-    return { success: true, data: divisions };
+    return { success: true, data: divisions.map(withOwner) };
   }
 
   // Member-count enrichment — one batch query joining division_memberships.
@@ -78,7 +96,7 @@ async function list_divisions(params, caller_user_id) {
 
   if (memErr) {
     // Non-fatal — return divisions with member_count = 0 rather than failing the list.
-    return { success: true, data: divisions.map(d => ({ ...d, member_count: 0 })) };
+    return { success: true, data: divisions.map(d => ({ ...withOwner(d), member_count: 0 })) };
   }
 
   const countByDivision = new Map();
@@ -87,7 +105,7 @@ async function list_divisions(params, caller_user_id) {
   }
 
   const enriched = divisions.map(d => ({
-    ...d,
+    ...withOwner(d),
     member_count: countByDivision.get(d.id) || 0
   }));
 

@@ -30,11 +30,12 @@ import { RouterModule } from '@angular/router';
 
 import { DeliveryService }    from '../../../core/services/delivery.service';
 import { PendingApprovalItem } from '../../../core/types/database';
+import { ConsultedStatusIndicatorComponent } from '../../../shared/components/consulted-status-indicator/consulted-status-indicator.component';
 
 @Component({
   selector:        'app-my-action-queue-card',
   standalone:      true,
-  imports:         [CommonModule, RouterModule],
+  imports:         [CommonModule, RouterModule, ConsultedStatusIndicatorComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="oi-card oi-home-card">
@@ -52,7 +53,9 @@ import { PendingApprovalItem } from '../../../core/types/database';
       </p>
 
       <ul *ngIf="!loading && items.length > 0" class="oi-action-list">
-        <li *ngFor="let item of items; trackBy: trackByItem"
+        <!-- WS1.2 (D-472): home card shows the top 7 by created_at desc only.
+             "View all →" reaches the full /actions surface. -->
+        <li *ngFor="let item of displayItems; trackBy: trackByItem"
             class="oi-action-item"
             [class.oi-action-item--post-approval]="isPostApprovalConsulted(item)">
 
@@ -62,7 +65,13 @@ import { PendingApprovalItem } from '../../../core/types/database';
           <a class="oi-action-link"
              [routerLink]="['/initiatives', item.delivery_cycle_id]"
              [queryParams]="{ gate: item.gate_name }">
-            <span class="oi-action-title">{{ labelFor(item) }}</span>
+            <span class="oi-action-main">
+              <span class="oi-action-title">{{ labelFor(item) }}</span>
+              <!-- WS1.2 (D-468): Consulted status indicator, inline right of the gate text. -->
+              <app-consulted-status-indicator
+                [summary]="item.consulted_summary"
+                [gateStatus]="item.gate_status"></app-consulted-status-indicator>
+            </span>
             <span *ngIf="item.item_type !== 'consulted'" class="oi-action-role">Approve</span>
           </a>
 
@@ -75,6 +84,11 @@ import { PendingApprovalItem } from '../../../core/types/database';
                   (click)="dismiss(item)">×</button>
         </li>
       </ul>
+
+      <!-- WS1.2 (D-472): always-visible footer link to the full My Actions surface. -->
+      <a *ngIf="!loading"
+         class="oi-action-viewall"
+         [routerLink]="['/actions']">View all →</a>
     </div>
   `,
   styles: [`
@@ -87,7 +101,12 @@ import { PendingApprovalItem } from '../../../core/types/database';
     .oi-action-item:last-of-type { border-bottom: 0; }
     .oi-action-link { display: flex; align-items: center; justify-content: space-between; gap: var(--triarq-space-sm); flex: 1 1 auto; text-decoration: none; color: inherit; min-width: 0; }
     .oi-action-link:hover .oi-action-title { text-decoration: underline; }
-    .oi-action-title { overflow: hidden; text-overflow: ellipsis; }
+    /* WS1.2: gate text + Consulted indicator grouped left; role pushed right. */
+    .oi-action-main { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; }
+    .oi-action-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* WS1.2: footer link to the full My Actions surface. */
+    .oi-action-viewall { display: inline-block; margin-top: var(--triarq-space-sm); font-size: var(--triarq-text-caption); color: var(--triarq-color-primary, #257099); text-decoration: none; }
+    .oi-action-viewall:hover { text-decoration: underline; }
     .oi-action-role { color: var(--triarq-color-primary); font-weight: var(--triarq-font-weight-medium); flex-shrink: 0; }
     /* D-468: post-approval consulted rows render in Stone — informational, not actionable. */
     .oi-action-item--post-approval .oi-action-title { color: var(--triarq-color-stone, #8a9ba8); }
@@ -113,6 +132,17 @@ export class MyActionQueueCardComponent implements OnInit {
    */
   get badgeCount(): number {
     return this.items.filter(i => !this.isPostApprovalConsulted(i)).length;
+  }
+
+  /**
+   * WS1.2 (D-472): home card renders the top 7 items only, ordered by created_at
+   * descending. No date filter — top-7 is the only constraint. The badge above
+   * still reflects the full pending count (this getter governs display only).
+   */
+  get displayItems(): PendingApprovalItem[] {
+    return [...this.items]
+      .sort((a, b) => Date.parse(b.created_at ?? '') - Date.parse(a.created_at ?? ''))
+      .slice(0, 7);
   }
 
   /** Post-approval consulted item: stone styling + dismissible + badge-excluded. */

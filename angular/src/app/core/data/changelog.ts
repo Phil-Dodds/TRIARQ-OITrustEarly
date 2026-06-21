@@ -32,6 +32,37 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-06-21',
+    contractLabel: 'Contract 30 — My Actions, Gate Return, Grid & Division Leader',
+    items: [
+      {
+        audience:    'All',
+        surface:     'My Actions screen',
+        description: 'A new My Actions page (in the sidebar, with a pending-count badge) collects everything needing your attention in two tabs: Gate Approvals (gates awaiting your decision) and Gate Reviews (gates you were consulted on). Each tab is filterable and sortable and defaults to the last 21 days.'
+      },
+      {
+        audience:    'All',
+        surface:     'Home — My Action Queue card',
+        description: 'The home card now shows your 7 most recent actions with a "View all →" link to My Actions, and a small amber ○ / red ✕ marker when a consulted party is still pending or has declined.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative grid',
+        description: 'New subtitle; the Division column now shows the short Division name; and the Workstream name appears in the Team column only while a Workstream filter is active — saving row height otherwise.'
+      },
+      {
+        audience:    'All',
+        surface:     'Gate return',
+        description: 'When an approver returns a gate it now shows a hollow orange diamond on the Stage Track, and the initiative stays in its current stage (it no longer slips back). Re-submitting clears the prior return notes from the active panel and re-notifies the approver.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Division Management — Division Leader',
+        description: 'The Division panel now shows a Division Leader. Phil can set, change, or clear the leader from the Edit panel; everyone else sees it read-only.'
+      }
+    ]
+  },
+  {
     date:          '2026-06-20',
     contractLabel: 'Contract 29 — Gate Approval, Consultation, and Notification',
     items: [

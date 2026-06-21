@@ -53,10 +53,24 @@ async function get_division(params, caller_user_id) {
     return { success: false, error: `Failed to fetch member count: ${countErr.message}` };
   }
 
+  // WS4 (D-471): resolve Division Leader display name. owner_user_id is already
+  // present on `division` (select *); owner_display_name is null when unassigned.
+  let owner_display_name = null;
+  if (division.owner_user_id) {
+    const { data: owner } = await supabase
+      .from('users')
+      .select('display_name')
+      .eq('id', division.owner_user_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    owner_display_name = owner?.display_name ?? null;
+  }
+
   return {
     success: true,
     data: {
       ...division,
+      owner_display_name,
       child_divisions: children || [],
       active_member_count: count || 0
     }

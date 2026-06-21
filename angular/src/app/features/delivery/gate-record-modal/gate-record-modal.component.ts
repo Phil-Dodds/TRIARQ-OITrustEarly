@@ -186,8 +186,15 @@ const GATE_LABELS: Record<GateName, string> = {
           </div>
         </section>
 
-        <!-- REVIEW NOTES (existing returned/blocked notes) -->
-        <section *ngIf="record?.approver_notes" class="grm-section">
+        <!-- REVIEW NOTES (returned/blocked notes only).
+             WS2.3 (D-469): notes are the approver's return/block reason. Once the gate is
+             re-submitted (gate_status → awaiting_approval) the prior return notes must NOT be
+             visible in the active sub-panel. Gating to returned/blocked hides them on re-submit
+             without nulling the record (notes stay on gate_records for history). D-345 forbids
+             copying approver_notes into the event log, so display-gating — not event-log move —
+             is how "cleared from active display" is satisfied. See CC-30. -->
+        <section *ngIf="record?.approver_notes && (record?.gate_status === 'returned' || record?.gate_status === 'blocked')"
+                 class="grm-section">
           <div class="grm-label">Review Notes</div>
           <div class="grm-review-notes">{{ record!.approver_notes }}</div>
         </section>

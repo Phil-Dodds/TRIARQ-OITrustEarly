@@ -350,8 +350,9 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
       case 'awaiting_approval':  return 'var(--triarq-color-sunray, #f5a623)';
       case 'blocked':            return 'var(--triarq-color-error, #d32f2f)';
       case 'not_started':        return 'var(--triarq-color-fog, #e0e0e0)';
-      // D-447: hollow Oravive — transparent fill + stroke via gateBorder().
+      // D-447 / D-469: hollow Oravive — transparent fill + stroke via gateBorder().
       case 'skipped':            return 'transparent';
+      case 'returned':           return 'transparent';
       default:                   return 'var(--triarq-color-fog, #e0e0e0)';
     }
   }
@@ -360,7 +361,9 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
    *  Stroke is 2px in Full mode and Condensed (spec literal). Box-sizing
    *  border-box on the diamond keeps the overall 24px / 10px footprint. */
   gateBorder(gateId: string): string {
-    if (this.gateDisplayState(gateId) === 'skipped') {
+    const state = this.gateDisplayState(gateId);
+    // D-447 (skipped) + D-469 (returned): both render as a hollow Oravive diamond.
+    if (state === 'skipped' || state === 'returned') {
       return '2px solid var(--triarq-color-oravive, #E96127)';
     }
     return 'none';
@@ -380,6 +383,7 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
     }
     const hint   = state === 'blocked'           ? ' — workstream inactive, gate blocked'
                  : state === 'awaiting_approval' ? ' — awaiting approver decision'
+                 : state === 'returned'          ? ' — returned for revision'
                  : state === 'pending'           ? ' — awaiting approval'
                  : state === 'complete'          ? ' — cleared'
                  : state === 'not_started'       ? ' — not yet submitted'

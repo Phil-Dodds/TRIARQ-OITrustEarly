@@ -135,6 +135,23 @@ describe('update_division', () => {
     assert.ok(result.error.includes('division_id'));
   });
 
+  // WS4 (D-471): owner_user_id (Division Leader) is mutable but Phil-only.
+  test('owner_user_id is a mutable field gated to super-admin (D-471)', () => {
+    const fs   = require('node:fs');
+    const path = require('node:path');
+    const src  = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'tools', 'update_division.js'), 'utf8'
+    );
+    // It is updatable…
+    assert.ok(/MUTABLE_FIELDS\s*=\s*\[[^\]]*'owner_user_id'/.test(src),
+      'owner_user_id must be a mutable field');
+    // …but only by a super-admin (Phil).
+    assert.ok(src.includes("hasOwnProperty.call(updates, 'owner_user_id')"),
+      'owner_user_id changes must be gated');
+    assert.ok(/is_super_admin !== true/.test(src),
+      'the owner_user_id gate must require is_super_admin');
+  });
+
 });
 
 

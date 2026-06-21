@@ -52,6 +52,9 @@ export interface Division {
   division_level:     number;
   division_type_label: string | null;
   owner_user_id:      string | null;
+  // WS4 (D-471): resolved Division Leader display name from list_divisions /
+  // get_division. Null when unassigned. owner_user_id is the backing field.
+  owner_display_name?: string | null;
   // Contract 21 (D-413/D-414/S-032): soft-block flag added by Migration 036.
   // When false, new Initiatives and new user assignments are blocked at MCP.
   active_status?:     boolean;
@@ -244,8 +247,10 @@ export type JiraSyncStatus      = 'unsynced' | 'synced' | 'error';
 // 'not_started' = grey diamond, no submission yet. 'pending' = legacy. 'awaiting_approval' = sunray, submitted.
 // 'blocked' = system error. 'complete' = teal approved. 'upcoming' = dim future gate.
 // 'skipped' = hollow Oravive diamond — initiative entered system past this gate (D-447).
-// Source: D-345, gate-submission-flow-spec §2, D-447.
-export type GateDisplayState    = 'not_started' | 'pending' | 'awaiting_approval' | 'blocked' | 'complete' | 'upcoming' | 'skipped';
+// 'returned' = hollow Oravive diamond — approver returned the gate for revision (D-469, WS2.2).
+//              Same visual treatment as 'skipped'; distinguished only by tooltip.
+// Source: D-345, gate-submission-flow-spec §2, D-447, D-469.
+export type GateDisplayState    = 'not_started' | 'pending' | 'awaiting_approval' | 'blocked' | 'complete' | 'upcoming' | 'skipped' | 'returned';
 
 export interface DeliveryWorkstream {
   workstream_id:           string;
@@ -290,6 +295,9 @@ export interface DeliveryCycle {
   // Joined
   workstream?:             DeliveryWorkstream;
   division_name?:          string;
+  // WS3.2 (D-203): Division short display name from list_delivery_cycles. ≤10 chars;
+  // null when the Division has no short name configured (fall back to division_name).
+  display_name_short?:     string | null;
   owner_display_name?:     string;
   assigned_dcs_display_name?: string;
   assigned_epo_display_name?: string;
@@ -469,6 +477,14 @@ export interface PendingApprovalItem {
   submitted_at:                  string;
   submitted_by_display_name:     string;
   tier_classification:           TierClassification;
+  // Contract 30 / D-472 (WS1.2/WS1.3): gate_records.created_at — drives the
+  // My Actions 21-day default filter and ordering on the home card.
+  created_at:                    string;
+  // Contract 30 (WS1.3): gate milestone target_date for the Due column. Null when unset.
+  gate_target_date:              string | null;
+  // Contract 30 / D-468 (WS1.2): per-gate Consulted summary for the status
+  // indicator. Omitted entirely when both counts are zero.
+  consulted_summary?:            { pending_count: number; declined_count: number };
 }
 
 // ── Contract 29 — Gate consultation + approver configuration types ───────────

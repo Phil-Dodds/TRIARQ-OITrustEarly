@@ -39,6 +39,8 @@ import {
 }                                       from '../../../core/services/screen-state.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
+import { UserPickerComponent }         from '../../../shared/pickers/user-picker/user-picker.component';
+import { UserProfileService }          from '../../../core/services/user-profile.service';
 import { Division, User }              from '../../../core/types/database';
 import {
   ALL_ROLE_FLAGS,
@@ -73,7 +75,8 @@ const LEVEL_LABELS: Record<number, string> = {
     ReactiveFormsModule,
     IonicModule,
     BlockedActionComponent,
-    LoadingOverlayComponent
+    LoadingOverlayComponent,
+    UserPickerComponent
   ],
   styles: [`
     :host{display:block}
@@ -108,6 +111,10 @@ const LEVEL_LABELS: Record<number, string> = {
     .dm-role-pill{font-size:10px;padding:1px 6px;border-radius:999px;background:var(--triarq-color-background-subtle);color:var(--triarq-color-text-secondary)}
     .dm-confirm{background:rgba(243,150,30,0.08);border-left:3px solid var(--triarq-color-sunray,#f3961e);padding:8px 10px;margin-top:8px;border-radius:5px;font-size:12px}
     .dm-confirm-actions{margin-top:6px;display:flex;gap:6px;justify-content:flex-end}
+    /* WS4 (D-471): Division Leader — "None assigned" stone italic; owner chip + clear. */
+    .dm-none-assigned{font-style:italic;color:var(--triarq-color-stone,#8a9ba8);font-size:13px}
+    .dm-owner-clear{background:none;border:none;color:var(--triarq-color-primary,#257099);cursor:pointer;font-size:12px;padding:0 4px}
+    .dm-owner-readonly{font-size:11px;color:var(--triarq-color-text-secondary);font-style:italic;margin-top:4px}
   `],
   template: `
     <div class="dm-page">
@@ -337,6 +344,14 @@ const LEVEL_LABELS: Record<number, string> = {
                     {{ levelLabel(selectedDivision.division_level) }}
                   </span>
                 </div>
+                <!-- WS4 (D-471): Division Leader — read-only in View, below Active Status.
+                     owner_user_id is the backing field; "None assigned" (stone) when null. -->
+                <div class="oi-field-row">
+                  <span class="oi-field-label">Division Leader</span>
+                  <span *ngIf="selectedDivision.owner_user_id"
+                        class="oi-filter-chip">{{ selectedDivision.owner_display_name || 'Assigned' }}</span>
+                  <span *ngIf="!selectedDivision.owner_user_id" class="dm-none-assigned">None assigned</span>
+                </div>
                 <div class="oi-field-row" *ngIf="parentName(selectedDivision)">
                   <span class="oi-field-label">Parent Division</span>
                   <span class="oi-filter-chip"
@@ -487,6 +502,31 @@ const LEVEL_LABELS: Record<number, string> = {
                     </span>
                   </label>
                 </div>
+                <!-- WS4 (D-471): Division Leader — Phil-only edit (is_super_admin);
+                     non-Phil sees it read-only. UserPicker: single, nullable, clearable.
+                     Backing field divisions.owner_user_id (no schema change). -->
+                <div class="oi-field-row">
+                  <label class="oi-field-label">Division Leader</label>
+                  <ng-container *ngIf="isPhil">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                      <span *ngIf="editOwnerUserId" class="oi-filter-chip">{{ editOwnerDisplayName || 'Assigned' }}</span>
+                      <span *ngIf="!editOwnerUserId" class="dm-none-assigned">None assigned</span>
+                      <button type="button" class="dm-owner-clear" *ngIf="editOwnerUserId" (click)="clearOwner()">Clear</button>
+                      <button type="button" class="oi-btn-secondary" (click)="ownerPickerOpen = !ownerPickerOpen">
+                        {{ editOwnerUserId ? 'Change' : 'Assign' }}
+                      </button>
+                    </div>
+                    <app-user-picker *ngIf="ownerPickerOpen"
+                      [allUsers]="true"
+                      [currentUserId]="editOwnerUserId"
+                      (userSelected)="onOwnerSelected($event)"></app-user-picker>
+                  </ng-container>
+                  <ng-container *ngIf="!isPhil">
+                    <span *ngIf="editOwnerUserId" class="oi-filter-chip">{{ editOwnerDisplayName || 'Assigned' }}</span>
+                    <span *ngIf="!editOwnerUserId" class="dm-none-assigned">None assigned</span>
+                    <div class="dm-owner-readonly">Only Phil can change the Division Leader.</div>
+                  </ng-container>
+                </div>
                 <div class="oi-zone-explain">
                   Level and Parent Division are structural — changes require a Design session.
                 </div>
@@ -541,6 +581,12 @@ export class DivisionsComponent implements OnInit {
   editError      = '';
   showDeactivateConfirm = false;
 
+  // ── WS4 (D-471): Division Leader edit state. Phil-only (is_super_admin). ────
+  isPhil = false;
+  editOwnerUserId: string | null = null;
+  editOwnerDisplayName: string | null = null;
+  ownerPickerOpen = false;
+
   // ── Members state ─────────────────────────────────────────────────────────
   members: User[]      = [];
   loadingMembers       = false;
@@ -558,12 +604,19 @@ export class DivisionsComponent implements OnInit {
     private readonly mcp:         McpService,
     private readonly screenState: ScreenStateService,
     private readonly fb:          FormBuilder,
+    private readonly profile:     UserProfileService,
     private readonly cdr:         ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
     this.editForm = this.fb.group({
       division_name: ['', [Validators.required, Validators.maxLength(120)]]
+    });
+    // WS4 (D-471): Division Leader edit is Phil-only — gated on is_super_admin
+    // (the established super-admin/"Phil" flag, per record_gate_decision).
+    this.profile.profile$.subscribe(p => {
+      this.isPhil = p?.is_super_admin === true;
+      this.cdr.markForCheck();
     });
     this.loadDivisions();
     this.loadUsersOnce();
@@ -818,9 +871,30 @@ export class DivisionsComponent implements OnInit {
     // D-424 / Contract 23 Item 3.4: dol_required defaults to true at DB level, but undefined
     // on a Division loaded before Migration 038 ran. Treat undefined as true.
     this.editDolRequiredValue = d.dol_required !== false;
+    // WS4 (D-471): seed Division Leader edit state from the selected Division.
+    this.editOwnerUserId      = d.owner_user_id ?? null;
+    this.editOwnerDisplayName = d.owner_display_name ?? null;
+    this.ownerPickerOpen      = false;
     this.showDeactivateConfirm = false;
     this.editError = '';
     this.panelMode = 'edit';
+    this.cdr.markForCheck();
+  }
+
+  /** WS4 (D-471): Division Leader picker selection. Null clears the assignment. */
+  onOwnerSelected(user: User | null): void {
+    this.editOwnerUserId      = user?.id ?? null;
+    this.editOwnerDisplayName = user?.display_name ?? null;
+    this.ownerPickerOpen      = false;
+    this.editForm.markAsDirty();
+    this.cdr.markForCheck();
+  }
+
+  /** WS4 (D-471): clear the Division Leader (sets owner_user_id null on save). */
+  clearOwner(): void {
+    this.editOwnerUserId      = null;
+    this.editOwnerDisplayName = null;
+    this.editForm.markAsDirty();
     this.cdr.markForCheck();
   }
 
@@ -894,6 +968,12 @@ export class DivisionsComponent implements OnInit {
     if (this.selectedDivision && this.editDolRequiredValue !== (this.selectedDivision.dol_required !== false)) {
       updates['dol_required'] = this.editDolRequiredValue;
     }
+    // WS4 (D-471): Phil-only — include owner_user_id only when Phil changed it.
+    // null clears the Division Leader. Non-Phil users never send this field.
+    if (this.isPhil && this.selectedDivision
+        && this.editOwnerUserId !== (this.selectedDivision.owner_user_id ?? null)) {
+      updates['owner_user_id'] = this.editOwnerUserId;
+    }
 
     this.mcp.call<Division>('division', 'update_division', {
       division_id: this.selectedDivisionId,
@@ -903,9 +983,11 @@ export class DivisionsComponent implements OnInit {
         if (res.success && res.data) {
           this.successMsg = 'Division updated.';
           setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
-          // Reload the grid + refresh selected.
+          // Reload the grid + refresh selected. update_division returns the raw
+          // Division row without owner_display_name — carry the edited name so the
+          // View panel's Division Leader chip renders immediately (WS4, D-471).
           this.loadDivisions();
-          this.selectedDivision = res.data;
+          this.selectedDivision = { ...res.data, owner_display_name: this.editOwnerDisplayName };
           this.panelMode = 'view';
           this.editForm.markAsPristine();
         } else {

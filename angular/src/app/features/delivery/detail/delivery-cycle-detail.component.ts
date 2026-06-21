@@ -1713,7 +1713,9 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       if (record.gate_status === 'not_started')        { map[gate] = 'not_started';       continue; }
       // D-447: skipped — hollow Oravive diamond. System-only state set by confirm_gate_skip.
       if (record.gate_status === 'skipped')            { map[gate] = 'skipped';           continue; }
-      // 'pending' (legacy) and 'returned' surface as pending (sunray).
+      // D-469 (WS2.2): returned — hollow Oravive diamond, distinct from skipped by tooltip.
+      if (record.gate_status === 'returned')           { map[gate] = 'returned';          continue; }
+      // 'pending' (legacy) surfaces as pending (sunray).
       map[gate] = 'pending';
     }
     return map as GateStateMap;

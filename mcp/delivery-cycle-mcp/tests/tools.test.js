@@ -569,6 +569,37 @@ describe('record_gate_decision', () => {
     assert.ok(result.error.includes('reason'));
   });
 
+  // ── WS2.1 / D-469: Stage freeze on return ─────────────────────────────────
+  // Conformance test (spec WS2.1): after a 'returned' decision, the cycle's
+  // current_lifecycle_stage must equal its prior value — the return path must
+  // NOT touch it. Structural regression guard: the only current_lifecycle_stage
+  // write in the tool lives on the approval path, which the 'returned' branch
+  // exits before reaching via an early return. Encodes the conformance test at
+  // the unit level so a future edit cannot reintroduce the regression the spec
+  // describes (a regression not present in the current code — see CC-30 note).
+  test('return path does not write current_lifecycle_stage (D-469 WS2.1)', () => {
+    const src = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', 'src', 'tools', 'record_gate_decision.js'),
+      'utf8'
+    );
+    const returnedBranchIdx = src.indexOf("if (decision === 'returned')");
+    const earlyReturnIdx    = src.indexOf('stage_advanced: false', returnedBranchIdx);
+    const stageWriteIdx     = src.indexOf('current_lifecycle_stage: target_stage');
+
+    // The returned branch and its early return exist.
+    assert.ok(returnedBranchIdx > -1, "returned branch must exist");
+    assert.ok(earlyReturnIdx > returnedBranchIdx, "returned branch must early-return with stage_advanced:false");
+    // The stage write exists exactly once and only after the returned early return.
+    assert.ok(stageWriteIdx > -1, "approval path stage write must exist");
+    assert.ok(stageWriteIdx > earlyReturnIdx,
+      "stage write must come AFTER the returned early return — never reached on return");
+    assert.equal(
+      src.indexOf('current_lifecycle_stage: target_stage', stageWriteIdx + 1),
+      -1,
+      "there must be exactly one current_lifecycle_stage write"
+    );
+  });
+
 });
 
 
@@ -1294,6 +1325,46 @@ describe('get_delivery_summary — epo_summaries shape (Contract 20 Session 2)',
     assert.ok(tool.includes('buildEpoSummaries'));
     assert.ok(tool.includes('epo_summaries'));
     assert.ok(tool.includes('epo_wip_limits'));
+  });
+
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// list_pending_approvals — WS1.2 Consulted summary (Contract 30, D-468)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('list_pending_approvals — consulted_summary (Contract 30, D-468)', () => {
+
+  test('counts pending and declined from gate_consultations.response', () => {
+    const src = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', 'src', 'tools', 'list_pending_approvals.js'),
+      'utf8'
+    );
+    assert.ok(src.includes("from('gate_consultations')"),
+      'must query gate_consultations for the summary');
+    assert.ok(/response === 'pending'.*pending_count\+\+/s.test(src),
+      'pending responses increment pending_count');
+    assert.ok(/response === 'declined'.*declined_count\+\+/s.test(src),
+      'declined responses increment declined_count');
+  });
+
+  test('consulted_summary omitted when both counts are zero', () => {
+    const src = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', 'src', 'tools', 'list_pending_approvals.js'),
+      'utf8'
+    );
+    // The item only carries consulted_summary when there is something to show.
+    assert.ok(src.includes('cs.pending_count > 0 || cs.declined_count > 0'),
+      'consulted_summary attached only when a count is non-zero');
+    assert.ok(src.includes('consulted_summary: cs'));
+  });
+
+  test('exposes created_at and gate_target_date for My Actions tabs', () => {
+    const src = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '..', 'src', 'tools', 'list_pending_approvals.js'),
+      'utf8'
+    );
+    assert.ok(src.includes('created_at:'), 'item exposes created_at for the 21-day filter');
+    assert.ok(src.includes('gate_target_date:'), 'item exposes gate_target_date for the Due column');
   });
 
 });

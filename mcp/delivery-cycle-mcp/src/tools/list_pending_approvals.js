@@ -45,7 +45,7 @@ async function list_pending_approvals(_params, caller_user_id) {
   // ── Accountable items: pending gate records the caller approves ──────────
   let gateQuery = supabase
     .from('gate_records')
-    .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id')
+    .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, created_at')
     .eq('gate_status', 'awaiting_approval')
     .is('deleted_at', null);
 
@@ -83,7 +83,7 @@ async function list_pending_approvals(_params, caller_user_id) {
   if (consultGateIds.length > 0) {
     const { data: cg, error: cgErr } = await supabase
       .from('gate_records')
-      .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id')
+      .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, created_at')
       .in('gate_record_id', consultGateIds)
       .in('gate_status', ['awaiting_approval', 'approved'])
       .is('deleted_at', null);
@@ -101,6 +101,41 @@ async function list_pending_approvals(_params, caller_user_id) {
 
   if (gates.length === 0) {
     return { success: true, data: [] };
+  }
+
+  // ── WS1.2 (D-468): per-gate Consulted summary for the status indicator ────
+  // {pending_count, declined_count} from gate_consultations, keyed by
+  // gate_record_id. Omitted from the item entirely when both counts are zero.
+  const gateRecordIds = [...new Set(gates.map(g => g.gate_record_id))];
+  const consultSummaryMap = {};
+  {
+    const { data: consultRows, error: csErr } = await supabase
+      .from('gate_consultations')
+      .select('gate_record_id, response')
+      .in('gate_record_id', gateRecordIds);
+    if (csErr) {
+      return { success: false, error: `Failed to load Consulted summary: ${csErr.message}` };
+    }
+    (consultRows || []).forEach(r => {
+      const s = consultSummaryMap[r.gate_record_id] || { pending_count: 0, declined_count: 0 };
+      if (r.response === 'pending')  { s.pending_count++; }
+      if (r.response === 'declined') { s.declined_count++; }
+      consultSummaryMap[r.gate_record_id] = s;
+    });
+  }
+
+  // ── WS1.3: gate milestone target dates for the My Actions "Due" column ────
+  // Keyed by `${delivery_cycle_id}|${gate_name}`. Null when no milestone row.
+  const milestoneTargetMap = {};
+  {
+    const { data: msRows } = await supabase
+      .from('cycle_milestone_dates')
+      .select('delivery_cycle_id, gate_name, target_date')
+      .in('delivery_cycle_id', [...new Set(gates.map(g => g.delivery_cycle_id))])
+      .is('deleted_at', null);
+    (msRows || []).forEach(m => {
+      milestoneTargetMap[`${m.delivery_cycle_id}|${m.gate_name}`] = m.target_date || null;
+    });
   }
 
   // ── Resolve cycles, divisions, workstreams, submitters in parallel ──────
@@ -157,6 +192,7 @@ async function list_pending_approvals(_params, caller_user_id) {
     const c  = cycleMap[g.delivery_cycle_id]      || {};
     const d  = divisionMap[c.division_id]         || {};
     const w  = workstreamMap[c.workstream_id]     || {};
+    const cs = consultSummaryMap[g.gate_record_id];
     return {
       gate_record_id:                g.gate_record_id,
       delivery_cycle_id:             g.delivery_cycle_id,
@@ -169,7 +205,12 @@ async function list_pending_approvals(_params, caller_user_id) {
       item_type:                     g.item_type,     // 'accountable' | 'consulted'
       submitted_at:                  g.submitted_at,
       submitted_by_display_name:     submitterMap[g.submitted_by_user_id] || 'Unknown',
-      tier_classification:           c.tier_classification
+      tier_classification:           c.tier_classification,
+      // WS1.2/WS1.3 (D-472): created_at for the 21-day filter; gate_target_date for the Due column.
+      created_at:                    g.created_at,
+      gate_target_date:              milestoneTargetMap[`${g.delivery_cycle_id}|${g.gate_name}`] ?? null,
+      // WS1.2 (D-468): Consulted summary — omitted when both counts are zero.
+      ...(cs && (cs.pending_count > 0 || cs.declined_count > 0) ? { consulted_summary: cs } : {})
     };
   });
 
