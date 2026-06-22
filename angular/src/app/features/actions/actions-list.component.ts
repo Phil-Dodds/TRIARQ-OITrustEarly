@@ -160,7 +160,7 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
     .ga-grid { border:1px solid var(--triarq-color-border,#e8e8e8);border-radius:8px;overflow:hidden; }
     .ga-grid-head, .ga-row { display:grid;grid-template-columns:130px 1.7fr 90px 110px 110px 120px;gap:8px;padding:12px 16px;align-items:start; }
     .ga-init-cell { display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap; }
-    .ga-init-submitter { font-size:11px;color:var(--triarq-color-stone,#8a9ba8); }
+    .ga-init-submitter { font-size:12px;color:#5A5A5A;font-style:italic;white-space:nowrap; }
     .ga-grid-head { background:#F7F9FB;font-size:12px;font-weight:600;color:#5A5A5A;border-bottom:1px solid #E8E8E8; }
     .ga-row { border-bottom:1px solid #F0F0F0;font-size:13px; }
     .ga-row:last-child { border-bottom:none; }
