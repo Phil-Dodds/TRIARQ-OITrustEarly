@@ -182,24 +182,33 @@ async function get_delivery_cycle(params, caller_user_id) {
   // Caller can submit if they are an Admin, or the assigned DCS, EPO, or DOL on this Initiative.
   const callerCanSubmitAny = callerIsAdmin || isAssignedDcs || isAssignedEpo || isAssignedDol;
 
-  // Resolve submitter display names for gate records that have submitted_by_user_id (D-345).
-  const submitterIds = (gate_records || [])
-    .map(gr => gr.submitted_by_user_id)
-    .filter(Boolean);
-  const submitterMap = {};
-  if (submitterIds.length > 0) {
-    const { data: submitterRows } = await supabase
+  // Resolve submitter + approver display names for gate records (D-345). The
+  // approver name is resolved server-side so the modal never has to look it up in
+  // a client list that may omit the approver (Phil/admins) — that caused the
+  // "Unknown user" Accountable label.
+  const gateUserIds = [...new Set(
+    (gate_records || [])
+      .flatMap(gr => [gr.submitted_by_user_id, gr.approver_user_id])
+      .filter(Boolean)
+  )];
+  const gateUserMap = {};
+  if (gateUserIds.length > 0) {
+    const { data: gateUserRows } = await supabase
       .from('users')
       .select('id, display_name')
-      .in('id', submitterIds)
+      .in('id', gateUserIds)
       .is('deleted_at', null);
-    (submitterRows || []).forEach(u => { submitterMap[u.id] = u.display_name; });
+    (gateUserRows || []).forEach(u => { gateUserMap[u.id] = u.display_name; });
   }
 
   const enrichedGateRecords = (gate_records || []).map(gr => ({
     ...gr,
     submitted_by_display_name: gr.submitted_by_user_id
-      ? (submitterMap[gr.submitted_by_user_id] ?? null)
+      ? (gateUserMap[gr.submitted_by_user_id] ?? null)
+      : null,
+    // Server-resolved Accountable approver name (fixes "Unknown user").
+    approver_display_name: gr.approver_user_id
+      ? (gateUserMap[gr.approver_user_id] ?? null)
       : null,
     current_user_gate_authority: {
       // can_submit: caller has submit authority AND gate is not in a terminal

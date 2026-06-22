@@ -154,7 +154,7 @@ const GATE_LABELS: Record<GateName, string> = {
             <span class="grm-raci-badge">A</span>
             <span class="grm-raci-role">Accountable</span>
             <span *ngIf="record?.approver_user_id" class="grm-raci-name">
-              {{ approverDisplayName(record!.approver_user_id!) }}
+              {{ record!.approver_display_name || approverDisplayName(record!.approver_user_id!) }}
             </span>
             <span *ngIf="!record?.approver_user_id" class="grm-raci-default">
               {{ escalationDefaultLabel }}
@@ -314,9 +314,10 @@ const GATE_LABELS: Record<GateName, string> = {
             Only the designated approver or Phil can record a decision on this gate.
           </div>
 
-          <!-- approved — read-only -->
+          <!-- approved — the approver has no further action, but a consulted
+               reviewer can still record their response in the Consulted section above. -->
           <div *ngIf="record?.gate_status === 'approved'" class="grm-meta">
-            This Gate has been approved. No further action available.
+            This gate has been approved. Consulted reviewers can still record their response above.
           </div>
 
           <!-- legacy 'pending' with approver authority -->

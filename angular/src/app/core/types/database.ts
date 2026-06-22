@@ -361,6 +361,9 @@ export interface GateRecord {
   };
   // Joined — display name of submitter for the "Submitted by" line in sub-panel
   submitted_by_display_name?:  string | null;
+  // Joined — server-resolved Accountable approver name (get_delivery_cycle). Fixes
+  // the "Unknown user" label when the approver isn't in the client allUsers list.
+  approver_display_name?:      string | null;
 }
 
 export interface CycleEventLogEntry {

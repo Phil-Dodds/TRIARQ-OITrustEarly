@@ -67,11 +67,15 @@ import { decisionDateTime }   from '../../actions/actions-util';
              [routerLink]="['/initiatives', item.delivery_cycle_id]"
              [queryParams]="{ gate: item.gate_name, returnTo: '/home' }">
             <span class="oi-action-main">
-              <span class="oi-action-title">{{ labelFor(item) }}</span>
-              <!-- WS1.2 (D-468): Consulted status indicator, inline right of the gate text. -->
-              <app-consulted-status-indicator
-                [summary]="item.consulted_summary"
-                [gateStatus]="item.gate_status"></app-consulted-status-indicator>
+              <span class="oi-action-titlerow">
+                <span class="oi-action-title">{{ labelFor(item) }}</span>
+                <!-- WS1.2 (D-468): Consulted status indicator, inline right of the gate text. -->
+                <app-consulted-status-indicator
+                  [summary]="item.consulted_summary"
+                  [gateStatus]="item.gate_status"></app-consulted-status-indicator>
+              </span>
+              <!-- Resolved consulted rows: approver decision as a secondary note. -->
+              <span *ngIf="subLabelFor(item) as sub" class="oi-action-sub">{{ sub }}</span>
             </span>
             <span *ngIf="item.item_type !== 'consulted'" class="oi-action-role">Approve</span>
           </a>
@@ -102,9 +106,12 @@ import { decisionDateTime }   from '../../actions/actions-util';
     .oi-action-item:last-of-type { border-bottom: 0; }
     .oi-action-link { display: flex; align-items: center; justify-content: space-between; gap: var(--triarq-space-sm); flex: 1 1 auto; text-decoration: none; color: inherit; min-width: 0; }
     .oi-action-link:hover .oi-action-title { text-decoration: underline; }
-    /* WS1.2: gate text + Consulted indicator grouped left; role pushed right. */
-    .oi-action-main { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; }
+    /* WS1.2: gate text + Consulted indicator grouped left; role pushed right.
+       Resolved consulted rows add a secondary stone note below the title. */
+    .oi-action-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+    .oi-action-titlerow { display: flex; align-items: center; gap: 6px; min-width: 0; }
     .oi-action-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .oi-action-sub { font-size: 11px; color: var(--triarq-color-stone, #8a9ba8); line-height: 1.3; }
     /* WS1.2: footer link to the full My Actions surface. */
     .oi-action-viewall { display: inline-block; margin-top: var(--triarq-space-sm); font-size: var(--triarq-text-caption); color: var(--triarq-color-primary, #257099); text-decoration: none; }
     .oi-action-viewall:hover { text-decoration: underline; }
@@ -163,17 +170,27 @@ export class MyActionQueueCardComponent implements OnInit {
   labelFor(item: PendingApprovalItem): string {
     const gate  = item.gate_name_display;
     const cycle = item.cycle_title;
-    if (item.item_type === 'consulted') {
-      if (this.isResolvedConsulted(item)) {
-        const verb = item.gate_status === 'returned' ? 'Returned' : 'Approved';
-        const who  = item.approver_display_name || 'the approver';
-        const when = decisionDateTime(item.approver_decision_at);
-        const head = when ? `${verb} by ${who} on ${when}` : `${verb} by ${who}`;
-        return `${head} — ${cycle}`;
-      }
+    // Awaiting consulted rows are flagged as a review request; everything else
+    // (accountable, and resolved consulted) leads with gate — initiative, with
+    // the decision shown as a secondary note (subLabelFor).
+    if (item.item_type === 'consulted' && !this.isResolvedConsulted(item)) {
       return `Review requested: ${gate} — ${cycle}`;
     }
     return `${gate} — ${cycle}`;
+  }
+
+  /**
+   * Secondary stone note for a resolved consulted row — the approver's decision.
+   * Approved gates add "your review still welcome" so it's clear the consulted
+   * can still respond. Null for rows with no sub-note.
+   */
+  subLabelFor(item: PendingApprovalItem): string | null {
+    if (!this.isResolvedConsulted(item)) { return null; }
+    const verb = item.gate_status === 'returned' ? 'Returned' : 'Approved';
+    const who  = item.approver_display_name || 'the approver';
+    const when = decisionDateTime(item.approver_decision_at);
+    const base = when ? `${verb} by ${who} on ${when}` : `${verb} by ${who}`;
+    return item.gate_status === 'returned' ? base : `${base} · your review still welcome`;
   }
 
   trackByItem(_: number, item: PendingApprovalItem): string {

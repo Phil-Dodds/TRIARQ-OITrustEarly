@@ -48,24 +48,27 @@ import { GateConsultation, ConsultationResponse, GateStatus } from '../../../cor
                 (click)="toggleNotes(c.id)" [attr.aria-expanded]="expandedNotesId === c.id"
                 aria-label="Show notes">🗨</button>
 
+        <!-- Current user's own row: clear Approve / Decline affordance.
+             "Approve / Decline" when they haven't responded; "Edit response" after. -->
         <button *ngIf="c.consulted_user_id === currentUserId && editingId !== c.id"
-                type="button" class="gcs-edit-btn" (click)="startEdit(c)">
-          Edit response
+                type="button"
+                [class.gcs-respond-btn]="c.response === 'pending'"
+                [class.gcs-edit-btn]="c.response !== 'pending'"
+                (click)="startEdit(c)">
+          {{ c.response === 'pending' ? 'Approve / Decline' : 'Edit response' }}
         </button>
 
         <div *ngIf="expandedNotesId === c.id && c.notes" class="gcs-notes">{{ c.notes }}</div>
 
-        <!-- Inline response editor — current user's own row only -->
+        <!-- Inline response editor — current user's own row only. A clean two-way
+             Approve / Decline; once the gate is approved, Decline is recorded as a
+             post-approval decline (D-460). -->
         <div *ngIf="editingId === c.id" class="gcs-editor">
           <label class="gcs-opt">
-            <input type="radio" name="resp" value="approved" [(ngModel)]="draftResponse" /> Approved
+            <input type="radio" name="resp" value="approved" [(ngModel)]="draftResponse" /> Approve
           </label>
           <label class="gcs-opt">
-            <input type="radio" name="resp" value="declined" [(ngModel)]="draftResponse" /> Declined
-          </label>
-          <label *ngIf="gateStatus === 'approved'" class="gcs-opt">
-            <input type="radio" name="resp" value="declined_post_approval" [(ngModel)]="draftResponse" />
-            Declined (post-approval)
+            <input type="radio" name="resp" [value]="declineValue" [(ngModel)]="draftResponse" /> Decline
           </label>
           <textarea class="gcs-notes-input" [(ngModel)]="draftNotes" rows="2"
                     placeholder="Optional notes…"></textarea>
@@ -92,6 +95,10 @@ import { GateConsultation, ConsultationResponse, GateStatus } from '../../../cor
     .gcs-notes-btn { color: #5A5A5A; }
     .gcs-edit-btn { color: #257099; margin-left: auto; }
     .gcs-edit-btn:hover { text-decoration: underline; }
+    /* Prominent Approve / Decline button for a consulted party who hasn't responded. */
+    .gcs-respond-btn { margin-left: auto; background: var(--triarq-color-primary, #257099); border: none;
+                       border-radius: 5px; padding: 5px 14px; color: #fff; font: 600 12px Roboto; cursor: pointer; }
+    .gcs-respond-btn:hover { background: #1d5a7d; }
     .gcs-notes { flex-basis: 100%; padding: 6px 10px; margin: 2px 0 0; background: #FAFAFA; border-radius: 5px; font: 400 12px/1.4 Roboto; color: #262626; }
     .gcs-editor { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; padding: 8px 0 2px; }
     .gcs-opt { font: 400 13px Roboto; color: #262626; display: inline-flex; align-items: center; gap: 6px; }
@@ -120,6 +127,11 @@ export class GateConsultationSectionComponent implements OnChanges {
   draftNotes = '';
   saving = false;
   editError = '';
+
+  /** Decline maps to a post-approval decline once the gate is approved (D-460). */
+  get declineValue(): ConsultationResponse {
+    return this.gateStatus === 'approved' ? 'declined_post_approval' : 'declined';
+  }
 
   constructor(
     private readonly delivery: DeliveryService,
