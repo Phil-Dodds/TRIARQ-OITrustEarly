@@ -36,7 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'My Actions',           route: '/actions',        devStatus: 'uat'         },
   // Raised above OI Library (Phil).
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'pilot'       },
-  { label: 'Important To Dos',                               devStatus: 'not-started' },
+  { label: 'To Dos',                                         devStatus: 'not-started' },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
     children: [
       { label: 'Skills Management',                          devStatus: 'not-started' },
@@ -67,8 +67,8 @@ const NAV_ITEMS: NavItem[] = [
       <ul class="oi-nav-list">
         <li *ngFor="let item of visibleItems">
           <ng-container *ngTemplateOutlet="entry; context: { $implicit: item, sub: false }"></ng-container>
-          <!-- One level of sub-menu items, indented. -->
-          <ul *ngIf="item.children?.length" class="oi-nav-sublist">
+          <!-- One level of sub-menu items — shown only while the parent is expanded. -->
+          <ul *ngIf="item.children?.length && isExpanded(item.label)" class="oi-nav-sublist">
             <li *ngFor="let child of item.children">
               <ng-container *ngTemplateOutlet="entry; context: { $implicit: child, sub: true }"></ng-container>
             </li>
@@ -76,8 +76,9 @@ const NAV_ITEMS: NavItem[] = [
         </li>
       </ul>
 
-      <!-- Renders one nav entry: a router link when it has a route, else a
-           non-navigating placeholder (Coming Soon surfaces not yet built). -->
+      <!-- One nav entry: a router link when it has a route, else a non-navigating
+           placeholder. Parents with children show a ▸/▾ chevron that toggles their
+           sub-menu (collapsed by default). -->
       <ng-template #entry let-item let-sub="sub">
         <a *ngIf="item.route"
            [routerLink]="item.route"
@@ -90,15 +91,22 @@ const NAV_ITEMS: NavItem[] = [
           <span *ngIf="item.route === '/actions' && actionBadge > 0"
                 class="oi-nav-badge"
                 [attr.aria-label]="actionBadge + ' pending actions'">{{ actionBadge }}</span>
+          <button *ngIf="item.children?.length"
+                  type="button" class="oi-nav-chevron"
+                  [attr.aria-label]="(isExpanded(item.label) ? 'Collapse ' : 'Expand ') + item.label"
+                  (click)="$event.preventDefault(); $event.stopPropagation(); toggle(item.label)">{{ isExpanded(item.label) ? '▾' : '▸' }}</button>
           <span class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
             {{ statusLabel(item.devStatus) }}
           </span>
         </a>
         <span *ngIf="!item.route"
               class="oi-nav-item oi-nav-item--static"
+              [class.oi-nav-item--toggle]="item.children?.length"
               [class.oi-nav-subitem]="sub"
-              [attr.aria-label]="item.label">
+              [attr.aria-label]="item.label"
+              (click)="item.children?.length && toggle(item.label)">
           <span class="oi-nav-label">{{ item.label }}</span>
+          <span *ngIf="item.children?.length" class="oi-nav-chevron">{{ isExpanded(item.label) ? '▾' : '▸' }}</span>
           <span class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
             {{ statusLabel(item.devStatus) }}
           </span>
@@ -135,6 +143,11 @@ const NAV_ITEMS: NavItem[] = [
     .oi-nav-subitem .oi-nav-label { font-size: var(--triarq-text-caption); }
     /* Non-navigating placeholder (Coming Soon, not yet built): no pointer, dimmed. */
     .oi-nav-item--static { cursor: default; opacity: 0.7; }
+    /* Routeless parent with a sub-menu is clickable (toggles its children). */
+    .oi-nav-item--toggle { cursor: pointer; }
+    /* ▸/▾ expand chevron on parents with sub-menus. */
+    .oi-nav-chevron { background: none; border: none; color: inherit; cursor: pointer;
+                      font-size: 11px; line-height: 1; padding: 0 4px; flex-shrink: 0; }
     .oi-dev-status {
       display: inline;
       font-size: 10px;
@@ -174,6 +187,16 @@ export class SidebarComponent implements OnInit, OnDestroy {
   displayName = '';
   /** D-426: About Panel show/hide state. */
   aboutOpen = false;
+  /** Labels of parent items whose sub-menu is currently expanded. Collapsed by
+   *  default to keep the sidebar short (avoids the vertical scrollbar). */
+  private readonly expanded = new Set<string>();
+  isExpanded(label: string): boolean { return this.expanded.has(label); }
+  toggle(label: string): void {
+    if (this.expanded.has(label)) { this.expanded.delete(label); }
+    else { this.expanded.add(label); }
+    this.cdr.markForCheck();
+  }
+
   /** D-472 (WS1.1): pending-action count on the My Actions nav badge.
    *  Accountable awaiting_approval + active Consulted pending; post-approval
    *  Consulted items (D-468) are excluded — same rule as the Home card badge. */
