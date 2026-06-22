@@ -116,16 +116,20 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
           {{ item.gate_target_date ? item.gate_target_date : '—' }}
         </span>
         <app-consulted-status-indicator [summary]="item.consulted_summary" [gateStatus]="item.gate_status"></app-consulted-status-indicator>
-        <!-- Consulted rows reflect the approver's decision; only awaiting gates are actionable. -->
-        <ng-container *ngIf="isResolvedConsulted(item); else actionBtn">
-          <span class="ga-decision" [class.ga-decision--returned]="item.gate_status === 'returned'">
-            {{ decisionText(item) }}
-          </span>
-        </ng-container>
-        <ng-template #actionBtn>
-          <a class="ga-action-btn" [routerLink]="['/initiatives', item.delivery_cycle_id]"
+        <!-- Action cell by row mode (Contract 30 follow-up):
+             approved consulted → decision text + Approve/Decline link (post-approval response, D-460/D-466);
+             returned consulted → decision text only (pending action cancelled);
+             everything else    → Approve / Deny. -->
+        <ng-container [ngSwitch]="rowActionMode(item)">
+          <div *ngSwitchCase="'approved'" class="ga-decision-cell">
+            <span class="ga-decision">{{ decisionText(item) }}</span>
+            <a class="ga-decision-link" [routerLink]="['/initiatives', item.delivery_cycle_id]"
+               [queryParams]="{ gate: item.gate_name }">Approve / Decline</a>
+          </div>
+          <span *ngSwitchCase="'returned'" class="ga-decision ga-decision--returned">{{ decisionText(item) }}</span>
+          <a *ngSwitchDefault class="ga-action-btn" [routerLink]="['/initiatives', item.delivery_cycle_id]"
              [queryParams]="{ gate: item.gate_name }">Approve / Deny</a>
-        </ng-template>
+        </ng-container>
       </div>
 
       <div *ngIf="view.length === 0" class="ga-empty">
@@ -165,6 +169,10 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
     /* Consulted decision text — stone for approved, Oravive for returned. */
     .ga-decision { font-size:11px;color:var(--triarq-color-stone,#8a9ba8);line-height:1.3; }
     .ga-decision--returned { color:var(--triarq-color-oravive,#E96127); }
+    /* Approved consulted: decision text stacked above the Approve/Decline link. */
+    .ga-decision-cell { display:flex;flex-direction:column;gap:3px;align-items:flex-start; }
+    .ga-decision-link { font-size:12px;color:var(--triarq-color-primary,#257099);text-decoration:none;white-space:nowrap; }
+    .ga-decision-link:hover { text-decoration:underline; }
     .ga-empty { padding:24px 16px;color:#5A5A5A;font-style:italic;font-size:13px; }
     .ga-empty-link { color:var(--triarq-color-primary,#257099);cursor:pointer;margin-left:6px;font-style:normal; }
     .ga-skeleton { display:flex;flex-direction:column;gap:8px; }
@@ -303,11 +311,23 @@ export class ActionsListComponent implements OnChanges {
   trackByItem(_: number, item: PendingApprovalItem): string { return item.gate_record_id; }
 
   /** A consulted row whose gate the approver has already decided (approved/returned)
-   *  is informational only — no Approve/Deny action. Approver rows are always
-   *  awaiting_approval, so they stay actionable. */
+   *  is informational. Approver rows are always awaiting_approval, so stay actionable. */
   isResolvedConsulted(item: PendingApprovalItem): boolean {
     return item.item_type === 'consulted'
       && (item.gate_status === 'approved' || item.gate_status === 'returned');
+  }
+
+  /**
+   * Action-cell mode:
+   *  'approved' — consulted on an approved gate: show decision text + an
+   *               Approve/Decline link (post-approval response stays available, D-460/D-466).
+   *  'returned' — consulted on a returned gate: decision text only, no action.
+   *  'action'   — awaiting gate (approver or consulted): Approve / Deny button.
+   */
+  rowActionMode(item: PendingApprovalItem): 'approved' | 'returned' | 'action' {
+    if (item.item_type === 'consulted' && item.gate_status === 'approved') { return 'approved'; }
+    if (item.item_type === 'consulted' && item.gate_status === 'returned') { return 'returned'; }
+    return 'action';
   }
 
   /** "Approved by {name} on {date}" / "Returned by {name} on {date}" for a resolved consulted row. */
