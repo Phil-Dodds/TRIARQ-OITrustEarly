@@ -12,7 +12,7 @@ import { User, PendingApprovalItem } from '../../../core/types/database';
 import { RoleFlag }           from '../../../core/constants/roles';
 import { Subscription }       from 'rxjs';
 
-type DevStatus = 'new' | 'uat' | 'pilot' | 'not-started';
+type DevStatus = 'new' | 'uat' | 'pilot' | 'live' | 'not-started';
 
 interface NavItem {
   label:     string;
@@ -31,11 +31,11 @@ interface NavItem {
 // devStatus reflects current build stage. Update when a feature advances.
 // Coming-soon items with no route are placeholders for not-yet-built surfaces.
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home',                 route: '/home',           devStatus: 'uat'         },
+  { label: 'Home',                 route: '/home',           devStatus: 'pilot'       },
   // Contract 30 / D-472 (WS1.1): My Actions — gate-action surface; badge = pending count.
-  { label: 'My Actions',           route: '/actions',        devStatus: 'uat'         },
+  { label: 'My Actions',           route: '/actions',        devStatus: 'pilot'       },
   // Raised above OI Library (Phil).
-  { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'pilot'       },
+  { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'live'        },
   { label: 'To Dos',                                         devStatus: 'not-started' },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
     children: [
@@ -51,8 +51,8 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Meeting Archives',                           devStatus: 'not-started' },
     ] },
   { label: 'Policy Committee',                               devStatus: 'not-started' },
-  { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'pilot'       },
-  { label: 'Admin',                route: '/admin',          requiresFlag: 'is_admin', devStatus: 'pilot' },
+  { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'live'        },
+  { label: 'Admin',                route: '/admin',          requiresFlag: 'is_admin', devStatus: 'live' },
 ];
 
 @Component({
@@ -172,6 +172,7 @@ const NAV_ITEMS: NavItem[] = [
     .status-new         { color: #6fcf97; }
     .status-uat         { color: var(--triarq-color-sunray, #f5a623); }
     .status-pilot       { color: #56ccf2; }
+    .status-live        { color: #34c759; }
     .status-not-started { color: rgba(255,255,255,0.35); }
 
     .oi-sidebar-footer { padding: var(--triarq-space-md); border-top: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; gap: var(--triarq-space-xs); }
@@ -252,6 +253,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
       case 'new':         return '** New';
       case 'uat':         return '** UAT';
       case 'pilot':       return '** Pilot';
+      case 'live':        return '** Live';
       // D-356 (Contract 13): unbuilt nav surfaces use "Coming Soon" wording.
       case 'not-started': return '** Coming Soon';
     }
