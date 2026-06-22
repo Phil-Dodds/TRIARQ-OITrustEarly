@@ -65,7 +65,7 @@ import { decisionDateTime }   from '../../actions/actions-util';
                plus the gate query param the detail panel reads to auto-expand. -->
           <a class="oi-action-link"
              [routerLink]="['/initiatives', item.delivery_cycle_id]"
-             [queryParams]="{ gate: item.gate_name }">
+             [queryParams]="{ gate: item.gate_name, returnTo: '/home' }">
             <span class="oi-action-main">
               <span class="oi-action-title">{{ labelFor(item) }}</span>
               <!-- WS1.2 (D-468): Consulted status indicator, inline right of the gate text. -->

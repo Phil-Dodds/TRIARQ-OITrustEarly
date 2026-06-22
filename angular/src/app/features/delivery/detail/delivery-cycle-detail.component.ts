@@ -30,7 +30,7 @@ import {
   HostListener
 } from '@angular/core';
 import { CommonModule }       from '@angular/common';
-import { RouterModule, ActivatedRoute } from '@angular/router';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import {
   ReactiveFormsModule,
   FormsModule,
@@ -140,6 +140,14 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
          [ngStyle]="panelMode
            ? {padding: 'var(--triarq-space-md)'}
            : {'max-width': '860px', margin: 'var(--triarq-space-xl) auto', padding: '0 var(--triarq-space-md)'}">
+
+      <!-- Contract 30: Back to origin (My Actions tab / Home card) when deep-linked. -->
+      <a *ngIf="!panelMode && returnTo"
+         role="button" tabindex="0"
+         (click)="goBack()" (keydown.enter)="goBack()"
+         style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;
+                color:var(--triarq-color-primary,#257099);font-size:13px;
+                margin-bottom:12px;text-decoration:none;">← Back</a>
 
       <!-- Edit Cycle panel overlay — S-006 push pattern. Replaces editCycleStub(). Contract 2 2026-04-10. -->
       <!-- B-12 fix: [cancelSignal] routes scrim-click through edit panel's dirty-state check. -->
@@ -1461,6 +1469,14 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   /** True when component is embedded as a right panel (cycleId provided via @Input). */
   get panelMode(): boolean { return !!this.cycleId; }
 
+  /** Contract 30: ?returnTo= origin (My Actions tab / Home card). Route mode only. */
+  returnTo: string | null = null;
+
+  /** Navigate back to the originating surface when arrived via a returnTo deep link. */
+  goBack(): void {
+    if (this.returnTo) { this.router.navigateByUrl(this.returnTo); }
+  }
+
   cycle:         DeliveryCycle | null    = null;
   events:        CycleEventLogEntry[]    = [];
   loading        = false;
@@ -1580,6 +1596,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   constructor(
     private readonly route:          ActivatedRoute,
+    private readonly router:         Router,
     private readonly delivery:       DeliveryService,
     private readonly profileService: UserProfileService,
     private readonly fb:             FormBuilder,
@@ -1598,6 +1615,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     if (!this.cycleId && !this.autoExpandGate) {
       const gateParam = this.route.snapshot.queryParamMap.get('gate');
       if (gateParam) { this.autoExpandGate = gateParam as GateName; }
+    }
+    // Contract 30 follow-up: ?returnTo= lets the routed detail offer a "Back" link
+    // to the originating surface (My Actions tab / Home card) instead of a dead end.
+    if (!this.cycleId) {
+      this.returnTo = this.route.snapshot.queryParamMap.get('returnTo');
     }
     if (id) { this.loadCycle(id); }
   }

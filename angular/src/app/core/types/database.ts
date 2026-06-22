@@ -492,6 +492,21 @@ export interface PendingApprovalItem {
   approver_decision_at?:         string | null;
 }
 
+// Contract 30 follow-up: a completed action the caller took — powers the My Actions
+// "Completed" tab. Either an approver decision or a consultation response.
+export interface CompletedActionItem {
+  gate_record_id:                string;
+  delivery_cycle_id:             string;
+  cycle_title:                   string;
+  division_display_name_short:   string;
+  gate_name:                     GateName;
+  gate_name_display:             string;
+  item_type:                     'accountable' | 'consulted';
+  // 'Approved' | 'Returned' | 'Declined' | 'Declined (post-approval)'
+  decision:                      string;
+  acted_at:                      string;
+}
+
 // ── Contract 29 — Gate consultation + approver configuration types ───────────
 
 /** {id, display_name} reference used for resolved participant lists (D-458). */

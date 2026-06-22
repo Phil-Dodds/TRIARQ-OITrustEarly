@@ -23,6 +23,7 @@ import {
   PointerStatus,
   DeliverySummary,
   PendingApprovalItem,
+  CompletedActionItem,
   EpoWipLimitRow,
   InitiativeActivityPage,
   InitiativeActivityCount,
@@ -251,6 +252,12 @@ export class DeliveryService {
    */
   listPendingApprovals(): Observable<McpResponse<PendingApprovalItem[]>> {
     return this.mcp.call<PendingApprovalItem[]>('delivery', 'list_pending_approvals', {});
+  }
+
+  /** Contract 30: actions the caller has completed — approver decisions
+   *  (approved/returned) plus consultation responses. Powers the Completed tab. */
+  listCompletedActions(): Observable<McpResponse<CompletedActionItem[]>> {
+    return this.mcp.call<CompletedActionItem[]>('delivery', 'list_completed_actions', {});
   }
 
   // ── Gate consultation tools (Contract 29 WS2, D-459–D-462) ─────────────────

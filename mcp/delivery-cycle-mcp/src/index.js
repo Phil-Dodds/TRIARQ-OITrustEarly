@@ -44,6 +44,8 @@ const { confirm_gate_skip }              = require('./tools/confirm_gate_skip');
 const { record_gate_decision }           = require('./tools/record_gate_decision');
 const { withdraw_gate_submission }       = require('./tools/withdraw_gate_submission');
 const { list_pending_approvals }         = require('./tools/list_pending_approvals');
+// Contract 30 follow-up — My Actions "Completed" tab.
+const { list_completed_actions }         = require('./tools/list_completed_actions');
 // Contract 29 (D-459–D-465): gate consultation + approver configuration.
 const { record_consultation_response }   = require('./tools/record_consultation_response');
 const { list_gate_consultations }        = require('./tools/list_gate_consultations');
@@ -117,6 +119,7 @@ const TOOLS = {
   record_gate_decision,
   withdraw_gate_submission,
   list_pending_approvals,
+  list_completed_actions,
   // Contract 29 — gate consultation + approver configuration (D-459–D-465)
   record_consultation_response,
   list_gate_consultations,

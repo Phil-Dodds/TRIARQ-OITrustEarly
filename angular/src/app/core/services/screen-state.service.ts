@@ -62,6 +62,7 @@ export const SCREEN_KEYS = {
   // filter + sort memory. (The per-tab keys below predate the merge; retained so
   // any stored per-tab state degrades gracefully.)
   ACTIONS_LIST:             'actions.list',
+  ACTIONS_COMPLETED:        'actions.completed',
   ACTIONS_GATE_APPROVALS:   'actions.gate-approvals',
   ACTIONS_GATE_REVIEWS:     'actions.gate-reviews',
 } as const;

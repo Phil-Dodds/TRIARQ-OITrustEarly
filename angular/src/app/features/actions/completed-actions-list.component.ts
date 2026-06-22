@@ -1,17 +1,13 @@
-// actions-list.component.ts — Pathways OI Trust
-// Contract 30 / D-472 (WS1.3), revised. Single merged My Actions list — approver
-// (Accountable) and consulted rows together, treated uniformly: every row's action
-// is "Approve / Deny" and opens the gate sub-panel. No Type column, no type filter
-// (Phil direction — approvers and consulteds are doing the same thing).
+// completed-actions-list.component.ts — Pathways OI Trust
+// Contract 30 follow-up. The "Completed" tab of My Actions — actions the caller
+// already took (approver decisions + consultation responses) from
+// list_completed_actions. Read-only history: no Approve/Deny action; the
+// Initiative chip clicks through to the initiative detail (read-only), carrying
+// returnTo so exit returns to this tab.
 //
-// Date filter keys on submitted_at (when the gate entered your queue), NOT created_at
-// (gate records are seeded at Initiative creation, so created_at is stale). Default
-// last 21 days, clearable. Filter pattern replicates S-011/S-012/S-013 locally; sort
-// per S-036; full load before interactive (D-346). Screen key actions.list (D-171).
-//
-// Action + Initiative chip navigate to /initiatives/:id?gate= — reuse the detail
-// auto-expand gate sub-panel (D-345), not a fork.
-// Source: D-472, D-468, D-181, D-203, D-346, S-011/S-012/S-013, S-036, D-171.
+// Same locally-replicated S-011/S-012/S-013 filter pattern + S-036 sort as the
+// Open list. Date filter keys on acted_at (when the caller acted). Default last
+// 21 days, clearable. Screen key actions.completed (D-171). Full load (D-346).
 
 import {
   Component, Input, OnChanges, ChangeDetectionStrategy, ChangeDetectorRef
@@ -19,17 +15,16 @@ import {
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 
-import { PendingApprovalItem } from '../../core/types/database';
-import { ConsultedStatusIndicatorComponent } from '../../shared/components/consulted-status-indicator/consulted-status-indicator.component';
+import { CompletedActionItem } from '../../core/types/database';
 import { ScreenStateService, SCREEN_KEYS } from '../../core/services/screen-state.service';
-import { GATE_DISPLAY, GATE_KEYS, relativeDays, daysAgoIso, isPastDue, decisionDateTime, ACTIONS_DEFAULT_FILTER_DAYS } from './actions-util';
+import { GATE_DISPLAY, GATE_KEYS, relativeDays, daysAgoIso, ACTIONS_DEFAULT_FILTER_DAYS } from './actions-util';
 
-type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
+type SortField = 'gate' | 'initiative' | 'division' | 'decision' | 'acted';
 
 @Component({
-  selector:        'app-actions-list',
+  selector:        'app-completed-actions-list',
   standalone:      true,
-  imports:         [CommonModule, RouterModule, ConsultedStatusIndicatorComponent],
+  imports:         [CommonModule, RouterModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="ga-controls">
@@ -39,7 +34,7 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
       </button>
       <div class="ga-chips" *ngIf="activeFilterCount > 0">
         <span *ngIf="appliedDateActive" class="ga-chip">
-          Submitted last {{ days }} days
+          Acted in last {{ days }} days
           <button type="button" (click)="removeDate()" aria-label="Clear date filter">×</button>
         </span>
         <span *ngFor="let g of appliedGates" class="ga-chip">
@@ -77,11 +72,11 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
       </div>
       <div class="ga-panel-row">
         <button class="ga-panel-rowhead" type="button" (click)="toggleRow('date')">
-          <span>Submitted date</span><span>{{ openRow === 'date' ? '▲' : '▼' }}</span>
+          <span>Action date</span><span>{{ openRow === 'date' ? '▲' : '▼' }}</span>
         </button>
         <div *ngIf="openRow === 'date'" class="ga-panel-opts">
           <label class="ga-opt">
-            <input type="checkbox" [checked]="stagedDateActive" (change)="stagedDateActive = !stagedDateActive" /> Submitted in the last {{ days }} days
+            <input type="checkbox" [checked]="stagedDateActive" (change)="stagedDateActive = !stagedDateActive" /> Acted in the last {{ days }} days
           </label>
         </div>
       </div>
@@ -100,10 +95,8 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
         <span class="ga-sort" [class.ga-sort--active]="sortField==='gate'" (click)="setSort('gate')">Gate {{ icon('gate') }}</span>
         <span class="ga-sort" [class.ga-sort--active]="sortField==='initiative'" (click)="setSort('initiative')">Initiative {{ icon('initiative') }}</span>
         <span class="ga-sort" [class.ga-sort--active]="sortField==='division'" (click)="setSort('division')">Division {{ icon('division') }}</span>
-        <span class="ga-sort" [class.ga-sort--active]="sortField==='submitted'" (click)="setSort('submitted')">Submitted {{ icon('submitted') }}</span>
-        <span class="ga-sort" [class.ga-sort--active]="sortField==='due'" (click)="setSort('due')">Due {{ icon('due') }}</span>
-        <span>Consulted</span>
-        <span>Action</span>
+        <span class="ga-sort" [class.ga-sort--active]="sortField==='decision'" (click)="setSort('decision')">Your decision {{ icon('decision') }}</span>
+        <span class="ga-sort" [class.ga-sort--active]="sortField==='acted'" (click)="setSort('acted')">When {{ icon('acted') }}</span>
       </div>
 
       <div class="ga-row" role="row" *ngFor="let item of view; trackBy: trackByItem">
@@ -111,29 +104,12 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
         <a class="ga-init-chip" [routerLink]="['/initiatives', item.delivery_cycle_id]"
            [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">{{ item.cycle_title }}</a>
         <span class="ga-muted">{{ item.division_display_name_short }}</span>
-        <span class="ga-muted" [title]="item.submitted_at">{{ rel(item.submitted_at) }}</span>
-        <span [style.color]="pastDue(item) ? 'var(--triarq-color-oravive,#E96127)' : 'inherit'">
-          {{ item.gate_target_date ? item.gate_target_date : '—' }}
-        </span>
-        <app-consulted-status-indicator [summary]="item.consulted_summary" [gateStatus]="item.gate_status"></app-consulted-status-indicator>
-        <!-- Action cell by row mode (Contract 30 follow-up):
-             approved consulted → decision text + Approve/Decline link (post-approval response, D-460/D-466);
-             returned consulted → decision text only (pending action cancelled);
-             everything else    → Approve / Deny. -->
-        <ng-container [ngSwitch]="rowActionMode(item)">
-          <div *ngSwitchCase="'approved'" class="ga-decision-cell">
-            <span class="ga-decision">{{ decisionText(item) }}</span>
-            <a class="ga-decision-link" [routerLink]="['/initiatives', item.delivery_cycle_id]"
-               [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">Approve / Decline</a>
-          </div>
-          <span *ngSwitchCase="'returned'" class="ga-decision ga-decision--returned">{{ decisionText(item) }}</span>
-          <a *ngSwitchDefault class="ga-action-btn" [routerLink]="['/initiatives', item.delivery_cycle_id]"
-             [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">Approve / Deny</a>
-        </ng-container>
+        <span [class.ca-neg]="isNegative(item)">{{ item.decision }}</span>
+        <span class="ga-muted" [title]="item.acted_at">{{ rel(item.acted_at) }}</span>
       </div>
 
       <div *ngIf="view.length === 0" class="ga-empty">
-        {{ appliedDateActive ? ('No actions submitted in the last ' + days + ' days.') : 'No actions. You\\'re all caught up.' }}
+        {{ appliedDateActive ? ('No actions completed in the last ' + days + ' days.') : 'No completed actions yet.' }}
         <a *ngIf="appliedDateActive" (click)="removeDate()" class="ga-empty-link">Clear date filter</a>
       </div>
     </div>
@@ -155,7 +131,7 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
     .ga-btn-primary { background:var(--triarq-color-primary,#257099);color:#fff;border:none;border-radius:5px;padding:6px 14px;cursor:pointer;font-size:13px; }
     .ga-btn-text { background:none;border:none;color:var(--triarq-color-primary,#257099);cursor:pointer;font-size:13px; }
     .ga-grid { border:1px solid var(--triarq-color-border,#e8e8e8);border-radius:8px;overflow:hidden; }
-    .ga-grid-head, .ga-row { display:grid;grid-template-columns:130px 1.4fr 90px 110px 110px 80px 120px;gap:8px;padding:12px 16px;align-items:center; }
+    .ga-grid-head, .ga-row { display:grid;grid-template-columns:130px 1.6fr 90px 150px 130px;gap:8px;padding:12px 16px;align-items:center; }
     .ga-grid-head { background:#F7F9FB;font-size:12px;font-weight:600;color:#5A5A5A;border-bottom:1px solid #E8E8E8; }
     .ga-row { border-bottom:1px solid #F0F0F0;font-size:13px; }
     .ga-row:last-child { border-bottom:none; }
@@ -163,28 +139,20 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
     .ga-sort:hover::after { content:' ↕';opacity:0.5; }
     .ga-sort--active { font-weight:700;color:#1E1E1E; }
     .ga-muted { color:#5A5A5A; }
+    .ca-neg { color:var(--triarq-color-oravive,#E96127); }
     .ga-init-chip { color:var(--triarq-color-primary,#257099);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
     .ga-init-chip:hover { text-decoration:underline; }
-    .ga-action-btn { display:inline-block;background:var(--triarq-color-primary,#257099);color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;text-decoration:none;text-align:center;white-space:nowrap; }
-    /* Consulted decision text — stone for approved, Oravive for returned. */
-    .ga-decision { font-size:11px;color:var(--triarq-color-stone,#8a9ba8);line-height:1.3; }
-    .ga-decision--returned { color:var(--triarq-color-oravive,#E96127); }
-    /* Approved consulted: decision text stacked above the Approve/Decline link. */
-    .ga-decision-cell { display:flex;flex-direction:column;gap:3px;align-items:flex-start; }
-    .ga-decision-link { font-size:12px;color:var(--triarq-color-primary,#257099);text-decoration:none;white-space:nowrap; }
-    .ga-decision-link:hover { text-decoration:underline; }
     .ga-empty { padding:24px 16px;color:#5A5A5A;font-style:italic;font-size:13px; }
     .ga-empty-link { color:var(--triarq-color-primary,#257099);cursor:pointer;margin-left:6px;font-style:normal; }
     .ga-skeleton { display:flex;flex-direction:column;gap:8px; }
     .ga-skel-row { height:44px;border-radius:6px;background:linear-gradient(90deg,#f0f0f0,#f7f7f7,#f0f0f0); }
   `]
 })
-export class ActionsListComponent implements OnChanges {
-  /** All pending items — both Accountable and Consulted. Treated uniformly. */
-  @Input() items: PendingApprovalItem[] = [];
+export class CompletedActionsListComponent implements OnChanges {
+  @Input() items: CompletedActionItem[] = [];
   @Input() loading = true;
-  /** Where the detail returns on exit — this is the Open tab. */
-  readonly returnTo = '/actions';
+  /** Where the detail should return on exit (this tab). */
+  readonly returnTo = '/actions?tab=completed';
 
   readonly days     = ACTIONS_DEFAULT_FILTER_DAYS;
   readonly gateKeys = GATE_KEYS;
@@ -200,7 +168,7 @@ export class ActionsListComponent implements OnChanges {
   panelOpen = false;
   openRow: 'gate' | 'division' | 'date' | null = null;
 
-  sortField: SortField = 'submitted';
+  sortField: SortField = 'acted';
   sortDir: 'asc' | 'desc' = 'desc';
 
   private restored = false;
@@ -213,7 +181,7 @@ export class ActionsListComponent implements OnChanges {
   ngOnChanges(): void {
     if (!this.restored) {
       this.restored = true;
-      this.screenState.restore(SCREEN_KEYS.ACTIONS_LIST).then(state => {
+      this.screenState.restore(SCREEN_KEYS.ACTIONS_COMPLETED).then(state => {
         if (state) {
           const f = state.filter_state || {};
           const s = state.sort_state   || {};
@@ -229,13 +197,12 @@ export class ActionsListComponent implements OnChanges {
     }
   }
 
-  // ── Derived view: filter (date on submitted_at) then sort ─────────────────
-  get view(): PendingApprovalItem[] {
+  get view(): CompletedActionItem[] {
     const cutoff  = this.appliedDateActive ? daysAgoIso(this.days) : null;
     const gateSet = new Set(this.appliedGates);
     const divSet  = new Set(this.appliedDivisions);
     const rows = this.items.filter(i => {
-      if (cutoff && (i.submitted_at ?? '') < cutoff) { return false; }
+      if (cutoff && (i.acted_at ?? '') < cutoff) { return false; }
       if (gateSet.size && !gateSet.has(i.gate_name)) { return false; }
       if (divSet.size && !divSet.has(i.division_display_name_short)) { return false; }
       return true;
@@ -244,14 +211,14 @@ export class ActionsListComponent implements OnChanges {
     return rows.sort((a, b) => dir * this.cmp(a, b));
   }
 
-  private cmp(a: PendingApprovalItem, b: PendingApprovalItem): number {
+  private cmp(a: CompletedActionItem, b: CompletedActionItem): number {
     switch (this.sortField) {
       case 'gate':       return (a.gate_name_display || '').localeCompare(b.gate_name_display || '');
       case 'initiative': return (a.cycle_title || '').localeCompare(b.cycle_title || '');
       case 'division':   return (a.division_display_name_short || '').localeCompare(b.division_display_name_short || '');
-      case 'due':        return (a.gate_target_date || '').localeCompare(b.gate_target_date || '');
-      case 'submitted':
-      default:           return (a.submitted_at || '').localeCompare(b.submitted_at || '');
+      case 'decision':   return (a.decision || '').localeCompare(b.decision || '');
+      case 'acted':
+      default:           return (a.acted_at || '').localeCompare(b.acted_at || '');
     }
   }
 
@@ -261,6 +228,11 @@ export class ActionsListComponent implements OnChanges {
 
   get activeFilterCount(): number {
     return (this.appliedDateActive ? 1 : 0) + this.appliedGates.length + this.appliedDivisions.length;
+  }
+
+  /** Returned / declined decisions render in Oravive. */
+  isNegative(item: CompletedActionItem): boolean {
+    return /returned|declined/i.test(item.decision || '');
   }
 
   setSort(field: SortField): void {
@@ -301,7 +273,7 @@ export class ActionsListComponent implements OnChanges {
 
   private persist(): void {
     this.screenState.save(
-      SCREEN_KEYS.ACTIONS_LIST,
+      SCREEN_KEYS.ACTIONS_COMPLETED,
       { dateActive: this.appliedDateActive, gates: this.appliedGates, divisions: this.appliedDivisions },
       { field: this.sortField, dir: this.sortDir }
     );
@@ -309,34 +281,5 @@ export class ActionsListComponent implements OnChanges {
 
   gateDisplay(g: string): string { return GATE_DISPLAY[g] ?? g; }
   rel(iso: string): string { return relativeDays(iso); }
-  pastDue(item: PendingApprovalItem): boolean { return isPastDue(item.gate_target_date); }
-  trackByItem(_: number, item: PendingApprovalItem): string { return item.gate_record_id; }
-
-  /** A consulted row whose gate the approver has already decided (approved/returned)
-   *  is informational. Approver rows are always awaiting_approval, so stay actionable. */
-  isResolvedConsulted(item: PendingApprovalItem): boolean {
-    return item.item_type === 'consulted'
-      && (item.gate_status === 'approved' || item.gate_status === 'returned');
-  }
-
-  /**
-   * Action-cell mode:
-   *  'approved' — consulted on an approved gate: show decision text + an
-   *               Approve/Decline link (post-approval response stays available, D-460/D-466).
-   *  'returned' — consulted on a returned gate: decision text only, no action.
-   *  'action'   — awaiting gate (approver or consulted): Approve / Deny button.
-   */
-  rowActionMode(item: PendingApprovalItem): 'approved' | 'returned' | 'action' {
-    if (item.item_type === 'consulted' && item.gate_status === 'approved') { return 'approved'; }
-    if (item.item_type === 'consulted' && item.gate_status === 'returned') { return 'returned'; }
-    return 'action';
-  }
-
-  /** "Approved by {name} on {date}" / "Returned by {name} on {date}" for a resolved consulted row. */
-  decisionText(item: PendingApprovalItem): string {
-    const verb = item.gate_status === 'returned' ? 'Returned' : 'Approved';
-    const who  = item.approver_display_name || 'the approver';
-    const when = decisionDateTime(item.approver_decision_at);
-    return when ? `${verb} by ${who} on ${when}` : `${verb} by ${who}`;
-  }
+  trackByItem(_: number, item: CompletedActionItem): string { return item.gate_record_id + '|' + item.item_type; }
 }
