@@ -16,23 +16,39 @@ type DevStatus = 'new' | 'uat' | 'pilot' | 'not-started';
 
 interface NavItem {
   label:     string;
-  route:     string;
+  // Optional: placeholder ("Coming Soon") items have no destination yet and render
+  // as non-navigating labels.
+  route?:    string;
   // Contract 19 (D-394): boolean flag gates the item. undefined = visible to all.
   requiresFlag?: RoleFlag;
   devStatus: DevStatus;
+  // One level of sub-menu items, rendered indented under the parent.
+  children?: NavItem[];
 }
 
 // D-163: Every feature must have a declared entry point in this list.
 // D-164: Admin functions are never individual sidebar links — they belong under /admin (Admin hub).
 // devStatus reflects current build stage. Update when a feature advances.
+// Coming-soon items with no route are placeholders for not-yet-built surfaces.
 const NAV_ITEMS: NavItem[] = [
   { label: 'Home',                 route: '/home',           devStatus: 'uat'         },
-  // Contract 30 / D-472 (WS1.1): My Actions — the gate-action surface (was a Home
-  // card only; no prior Action Queue / Notifications nav items existed). Badge =
-  // pending action count, rendered from actionBadge (see computeActionBadge).
+  // Contract 30 / D-472 (WS1.1): My Actions — gate-action surface; badge = pending count.
   { label: 'My Actions',           route: '/actions',        devStatus: 'uat'         },
-  { label: 'OI Library',           route: '/library',        devStatus: 'not-started' },
+  // Raised above OI Library (Phil).
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'pilot'       },
+  { label: 'Important To Dos',                               devStatus: 'not-started' },
+  { label: 'AI Governance Boards',                           devStatus: 'not-started',
+    children: [
+      { label: 'AI Inventory',                               devStatus: 'not-started' },
+      { label: 'Meeting Archives',                           devStatus: 'not-started' },
+    ] },
+  { label: 'Policy Committee',                               devStatus: 'not-started' },
+  { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
+    children: [
+      { label: 'Skills Management',                          devStatus: 'not-started' },
+      { label: 'Context',                                    devStatus: 'not-started' },
+      { label: 'Artifact',                                   devStatus: 'not-started' },
+    ] },
   { label: 'Chat',                 route: '/chat',           devStatus: 'not-started' },
   { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'pilot'       },
   { label: 'Admin',                route: '/admin',          requiresFlag: 'is_admin', devStatus: 'pilot' },
@@ -49,21 +65,44 @@ const NAV_ITEMS: NavItem[] = [
 
       <ul class="oi-nav-list">
         <li *ngFor="let item of visibleItems">
-          <a [routerLink]="item.route"
-             routerLinkActive="active"
-             class="oi-nav-item"
-             [attr.aria-label]="item.label">
-            <span class="oi-nav-label">{{ item.label }}</span>
-            <!-- D-472 (WS1.1): pending-action badge on My Actions only. -->
-            <span *ngIf="item.route === '/actions' && actionBadge > 0"
-                  class="oi-nav-badge"
-                  [attr.aria-label]="actionBadge + ' pending actions'">{{ actionBadge }}</span>
-            <span class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
-              {{ statusLabel(item.devStatus) }}
-            </span>
-          </a>
+          <ng-container *ngTemplateOutlet="entry; context: { $implicit: item, sub: false }"></ng-container>
+          <!-- One level of sub-menu items, indented. -->
+          <ul *ngIf="item.children?.length" class="oi-nav-sublist">
+            <li *ngFor="let child of item.children">
+              <ng-container *ngTemplateOutlet="entry; context: { $implicit: child, sub: true }"></ng-container>
+            </li>
+          </ul>
         </li>
       </ul>
+
+      <!-- Renders one nav entry: a router link when it has a route, else a
+           non-navigating placeholder (Coming Soon surfaces not yet built). -->
+      <ng-template #entry let-item let-sub="sub">
+        <a *ngIf="item.route"
+           [routerLink]="item.route"
+           routerLinkActive="active"
+           class="oi-nav-item"
+           [class.oi-nav-subitem]="sub"
+           [attr.aria-label]="item.label">
+          <span class="oi-nav-label">{{ item.label }}</span>
+          <!-- D-472 (WS1.1): pending-action badge on My Actions only. -->
+          <span *ngIf="item.route === '/actions' && actionBadge > 0"
+                class="oi-nav-badge"
+                [attr.aria-label]="actionBadge + ' pending actions'">{{ actionBadge }}</span>
+          <span class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
+            {{ statusLabel(item.devStatus) }}
+          </span>
+        </a>
+        <span *ngIf="!item.route"
+              class="oi-nav-item oi-nav-item--static"
+              [class.oi-nav-subitem]="sub"
+              [attr.aria-label]="item.label">
+          <span class="oi-nav-label">{{ item.label }}</span>
+          <span class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
+            {{ statusLabel(item.devStatus) }}
+          </span>
+        </span>
+      </ng-template>
 
       <div class="oi-sidebar-footer">
         <span class="oi-sidebar-user">{{ displayName }}</span>
@@ -87,6 +126,11 @@ const NAV_ITEMS: NavItem[] = [
     .oi-nav-item { display: flex; flex-direction: row; align-items: center;
                    justify-content: space-between; gap: 6px; }
     .oi-nav-label { flex: 1; }
+    /* Sub-list: indented children under a parent nav item. */
+    .oi-nav-sublist { list-style: none; padding: 0 0 0 var(--triarq-space-md, 16px); margin: 0; }
+    .oi-nav-subitem .oi-nav-label { font-size: var(--triarq-text-caption); }
+    /* Non-navigating placeholder (Coming Soon, not yet built): no pointer, dimmed. */
+    .oi-nav-item--static { cursor: default; opacity: 0.7; }
     .oi-dev-status {
       display: inline;
       font-size: 10px;
