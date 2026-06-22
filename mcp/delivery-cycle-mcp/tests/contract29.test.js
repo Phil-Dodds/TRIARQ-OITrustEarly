@@ -86,6 +86,22 @@ describe('buildHtmlBody (D-467)', () => {
     assert.ok(html.includes('TRIARQ Health'));
   });
 
+  // Contract 30 follow-up: the approve/review email sends the recipient to their
+  // My Actions grid (/actions), not the Initiative detail.
+  test('gate_submission CTA links to My Actions, not the Initiative detail', () => {
+    const html = buildHtmlBody({
+      initiativeName: 'Patient Intake Redesign',
+      gateNameDisplay: 'Brief Review',
+      contextParagraph: 'Please review this gate.',
+      initiativeId: 'init-123',
+      emailType: 'gate_submission'
+    });
+    assert.ok(html.includes('/actions'));
+    assert.ok(html.includes('Go to My Actions'));
+    assert.ok(!html.includes('/initiatives/init-123'));
+    assert.ok(!html.includes('View Initiative'));
+  });
+
   test('omits CTA button when initiativeId is null', () => {
     const html = buildHtmlBody({
       initiativeName: 'X',

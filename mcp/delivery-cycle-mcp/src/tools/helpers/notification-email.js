@@ -52,13 +52,23 @@ function esc(s) {
  * @param {string} args.initiativeName
  * @param {string} args.gateNameDisplay
  * @param {string} args.contextParagraph - plain text; escaped here
- * @param {string|null} args.initiativeId - drives CTA link; CTA omitted if null
+ * @param {string|null} args.initiativeId - drives the Initiative-detail CTA link
+ * @param {string} [args.emailType] - drives the CTA destination (see below)
  * @returns {string} full HTML document
  */
-function buildHtmlBody({ initiativeName, gateNameDisplay, contextParagraph, initiativeId }) {
-  const ctaHref = initiativeId
-    ? `${APP_BASE_URL}/initiatives/${encodeURIComponent(initiativeId)}`
-    : null;
+function buildHtmlBody({ initiativeName, gateNameDisplay, contextParagraph, initiativeId, emailType }) {
+  // CTA destination:
+  //   gate_submission ("please approve / review this gate") → the recipient's
+  //     My Actions grid (/actions), where they act on the gate directly.
+  //   everything else (informational notices) → the Initiative detail.
+  let ctaHref  = null;
+  let ctaLabel = 'View Initiative';
+  if (emailType === 'gate_submission') {
+    ctaHref  = `${APP_BASE_URL}/actions`;
+    ctaLabel = 'Go to My Actions';
+  } else if (initiativeId) {
+    ctaHref  = `${APP_BASE_URL}/initiatives/${encodeURIComponent(initiativeId)}`;
+  }
 
   const ctaButton = ctaHref
     ? `<tr><td style="padding:24px 0 8px 0;">
@@ -66,7 +76,7 @@ function buildHtmlBody({ initiativeName, gateNameDisplay, contextParagraph, init
             style="background:${ORAVIVE};color:#ffffff;text-decoration:none;
                    display:inline-block;padding:12px 28px;border-radius:999px;
                    font-family:Roboto,Arial,sans-serif;font-weight:600;font-size:15px;">
-           View Initiative
+           ${esc(ctaLabel)}
          </a>
        </td></tr>`
     : '';
@@ -150,7 +160,8 @@ async function sendGateNotificationEmail({
     initiativeName,
     gateNameDisplay,
     contextParagraph,
-    initiativeId: delivery_cycle_id || null
+    initiativeId: delivery_cycle_id || null,
+    emailType:    email_type
   });
 
   let sendError = null;
