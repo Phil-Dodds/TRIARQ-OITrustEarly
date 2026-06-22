@@ -75,6 +75,18 @@ describe('create_division', () => {
     assert.ok(result.error.includes('division_name'));
   });
 
+  test('Contract 31: create_division is restricted to Phil (is_super_admin)', () => {
+    const fs   = require('node:fs');
+    const path = require('node:path');
+    const src  = fs.readFileSync(
+      path.join(__dirname, '..', 'src', 'tools', 'create_division.js'), 'utf8'
+    );
+    assert.ok(/is_super_admin !== true/.test(src),
+      'create_division must gate creation on is_super_admin');
+    assert.ok(src.includes('Only Phil can create Divisions'),
+      'create_division must return the Phil-only message');
+  });
+
   test('error path: non-admin caller is rejected with explanation', async () => {
     // The tool fetches caller from DB — mock returns a DCS-only user
     // (is_admin = false, is_dcs = true). We test the validation message shape.

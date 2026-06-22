@@ -196,4 +196,29 @@ The API Keys screen is reached via the Admin hub, not a top-level `NAV_ITEMS` en
 
 `C:\Users\PhilipDodds\OneDrive - Triarq Health\Desktop\OI Trust Project Keepsakes\OI TRUST Early Builds\OITrust-CodeClose-Contract31-2026-06-22.md`
 
-*Pathways OI Trust · CONFIDENTIAL · Contract 31 · 2026-06-22*
+---
+
+## Follow-on (post-Contract-31, same session) — Division creation in the UI
+
+After Contract 31 deployed, Phil directed an in-session change to **Division Management**: add Division **creation** to the UI, Phil-only.
+
+**Built:**
+- `division-mcp/create_division.js` — tightened from admin-level to **Phil-only (`is_super_admin`)**, with a guard test (`tools.test.js`). Tool already computes `division_level` from the parent (null parent → Trust level 0).
+- `admin/divisions/divisions.component.ts` — **"+ Add Trust"** (toolbar) creates a top-level Trust; **"+ Add Service Line"** (in a Trust's View) and **"+ Add Functional Team"** (in a Service Line's View) create children. New Create panel (modal, mirrors Edit) with Division Name + optional Short Name; on save expands the parent, refreshes the grid (S-008), opens the new Division's View. All gated on `is_super_admin`. Subheading + stale `+ New Division REMOVED` comment updated.
+
+**Verification:** division-mcp 65/65; Angular `npm run build` exit 0.
+
+### ⚠️ NOTE TO DESIGN — D-number required (reverses a locked decision)
+
+This **reverses D-413 / D-414**, which deliberately removed Division creation from the UI ("structural changes require a Design session"), and the divisions spec §2.1 "+ New Division REMOVED." It was built on Phil's direct in-session instruction. **Code cannot mint a D-number (D-317)** — Design must assign one and ratify the following:
+
+1. **New decision** authorizing Phil-only Division creation in the UI, superseding the relevant clause of D-413/D-414. State its number and back-reference here.
+2. **Scope boundary** (as built): only **creation** is opened. **Re-parenting and level changes remain Design-gated** — no UI to move or re-level a Division. Confirm this is the intended boundary.
+3. **Authorization level:** built as **Phil-only (`is_super_admin`)**, enforced both in the UI and server-side in `create_division` (stricter than the tool's prior admin-level contract). Confirm, or decide whether Division Admins should create children within their own branch (the tool's original "downward-only" design — currently gated off by the super-admin check).
+4. **Field set** (no governing spec existed — Rule 6): create form collects **Division Name** (required) + **Short Name** (optional, ≤10, derived if blank); parent/level/type are derived from context; `division_type_label` set to the level label. Confirm or extend (e.g., set Division Leader at creation).
+
+Until a D-number is assigned, this ships as a CC-decision pending Design ratification.
+
+---
+
+*Pathways OI Trust · CONFIDENTIAL · Contract 31 (+ follow-on) · 2026-06-22*

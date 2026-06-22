@@ -9,7 +9,10 @@
 //     per-row Remove uses D-183 two-step.
 //   - Right-panel Edit (S-019): Division Name + Active toggle; deactivation uses
 //     D-183 two-step naming the soft-block consequence (S-032).
-//   - + New Division REMOVED — structural changes require Design session (spec §2.1).
+//   - Add Trust / Service Line / Functional Team (Contract 31 follow-on, Phil-only):
+//     "+ Add Trust" (toolbar) and "+ Add [child]" (View footer) call create_division.
+//     Re-parenting and level changes remain Design-gated. (Reverses the earlier
+//     spec §2.1 "+ New Division REMOVED" — Phil directed in-session; D-number TBD.)
 //
 // D-93:  McpService only — no direct Supabase access.
 // D-140: Blocked action UX on all errors.
@@ -48,7 +51,17 @@ import {
   RoleFlag
 } from '../../../core/constants/roles';
 
-type PanelMode = 'view' | 'edit' | null;
+type PanelMode = 'view' | 'edit' | 'create' | null;
+
+// Contract 31 follow-on: context for the Add Trust / Service Line / Functional
+// Team create panel. parentId null = top-level Trust (level 0); otherwise the
+// child's level is parent.level + 1.
+interface CreateContext {
+  parentId:   string | null;
+  parentName: string | null;
+  level:      number;
+  typeLabel:  string;
+}
 type LevelFilter = 'all' | 0 | 1 | 2;
 type ActiveFilter = 'all' | 'active' | 'inactive';
 
@@ -125,7 +138,8 @@ const LEVEL_LABELS: Record<number, string> = {
           <h2>Division Management</h2>
           <div class="dm-desc">
             TRIARQ organizational hierarchy: Trust → Service Line → Functional Team.
-            Tap a row to view details. Structural changes require a Design session.
+            Tap a row to view details. Phil can add new Divisions; re-parenting and
+            level changes still require a Design session.
           </div>
         </div>
       </div>
@@ -145,6 +159,9 @@ const LEVEL_LABELS: Record<number, string> = {
         <span class="oi-filter-row-val" *ngIf="!loading">
           {{ visibleDivisionCount }} division{{ visibleDivisionCount === 1 ? '' : 's' }}
         </span>
+        <span style="flex:1"></span>
+        <!-- Contract 31 follow-on (Phil-only): create a new top-level Trust. -->
+        <button *ngIf="isPhil" class="oi-btn-primary" (click)="openCreateTrust()">+ Add Trust</button>
       </div>
 
       <!-- Active filter chips (S-012) ───────────────────────────────────── -->
@@ -306,7 +323,7 @@ const LEVEL_LABELS: Record<number, string> = {
       </div>
 
       <!-- Right panel — View / Edit ─────────────────────────────────────── -->
-      <ng-container *ngIf="panelMode && selectedDivision">
+      <ng-container *ngIf="(panelMode === 'view' || panelMode === 'edit') && selectedDivision">
         <div class="oi-scrim oi-scrim-detail"
              *ngIf="panelMode === 'edit'"
              (click)="onScrimClick()"></div>
@@ -444,7 +461,13 @@ const LEVEL_LABELS: Record<number, string> = {
 
             </div>
             <div class="oi-side-foot oi-side-foot-split">
-              <span></span>
+              <!-- Contract 31 follow-on (Phil-only): add a child Division inside this one.
+                   Trust → Service Line, Service Line → Functional Team. Leaf (level 2) has none. -->
+              <button *ngIf="isPhil && selectedDivision.division_level < 2"
+                      class="oi-btn-secondary" (click)="openCreateChild()">
+                + Add {{ childTypeLabel }}
+              </button>
+              <span *ngIf="!(isPhil && selectedDivision.division_level < 2)"></span>
               <button class="oi-btn-primary" (click)="startEdit()">Edit</button>
             </div>
           </ng-container>
@@ -546,6 +569,52 @@ const LEVEL_LABELS: Record<number, string> = {
         </div>
       </ng-container>
 
+      <!-- Right panel — Create (Contract 31 follow-on, Phil-only) ────────── -->
+      <ng-container *ngIf="panelMode === 'create'">
+        <div class="oi-scrim oi-scrim-detail" (click)="onCreateScrimClick()"></div>
+        <div class="oi-side-panel oi-side-detail" role="dialog" aria-modal="true" aria-label="Create Division">
+          <app-loading-overlay [visible]="saving" message="Creating…"></app-loading-overlay>
+          <div class="oi-side-head">
+            <strong>New {{ createContext.typeLabel }}</strong>
+            <button class="oi-close-btn" (click)="onCreateScrimClick()" aria-label="Close">✕</button>
+          </div>
+          <div class="oi-side-body">
+            <form [formGroup]="createForm">
+              <div class="oi-field-row" *ngIf="createContext.parentName">
+                <span class="oi-field-label">Parent Division</span>
+                <span class="oi-filter-chip">{{ createContext.parentName }}</span>
+              </div>
+              <div class="oi-field-row" *ngIf="!createContext.parentName">
+                <span class="oi-zone-explain">Top-level Trust — no parent Division.</span>
+              </div>
+              <div class="oi-field-row">
+                <label class="oi-field-label">{{ createContext.typeLabel }} Name *</label>
+                <input formControlName="division_name" class="oi-input" maxlength="120" />
+                <div class="oi-err"
+                     *ngIf="createForm.get('division_name')?.invalid && createForm.get('division_name')?.touched">
+                  Name is required.
+                </div>
+              </div>
+              <div class="oi-field-row">
+                <label class="oi-field-label">Short Name</label>
+                <input formControlName="display_name_short" class="oi-input" maxlength="10"
+                       placeholder="Optional — max 10 chars" />
+                <div class="oi-zone-explain">Used in compact displays. Defaults from the name if left blank.</div>
+              </div>
+              <div class="oi-err" *ngIf="createError">{{ createError }}</div>
+            </form>
+          </div>
+          <div class="oi-side-foot oi-side-foot-split">
+            <button class="oi-btn-secondary" (click)="onCreateScrimClick()">Cancel</button>
+            <button class="oi-btn-primary"
+                    [disabled]="createForm.invalid || saving"
+                    (click)="submitCreate()">
+              {{ saving ? 'Creating…' : 'Create ' + createContext.typeLabel }}
+            </button>
+          </div>
+        </div>
+      </ng-container>
+
     </div>
   `
 })
@@ -575,6 +644,11 @@ export class DivisionsComponent implements OnInit {
 
   editForm!: FormGroup;
   editActiveValue: boolean = true;
+
+  // ── Create state (Contract 31 follow-on, Phil-only) ─────────────────────────
+  createForm!: FormGroup;
+  createContext: CreateContext = { parentId: null, parentName: null, level: 0, typeLabel: 'Trust' };
+  createError = '';
   // D-424 / Contract 23 Item 3.4: DOL Required edit state. Initialized from selected Division on startEdit().
   editDolRequiredValue: boolean = true;
   saving         = false;
@@ -612,6 +686,11 @@ export class DivisionsComponent implements OnInit {
     this.editForm = this.fb.group({
       division_name: ['', [Validators.required, Validators.maxLength(120)]]
     });
+    // Contract 31 follow-on: create form for Add Trust / Service Line / Functional Team.
+    this.createForm = this.fb.group({
+      division_name:      ['', [Validators.required, Validators.maxLength(120)]],
+      display_name_short: ['', [Validators.maxLength(10)]]
+    });
     // WS4 (D-471): Division Leader edit is Phil-only — gated on is_super_admin
     // (the established super-admin/"Phil" flag, per record_gate_decision).
     this.profile.profile$.subscribe(p => {
@@ -625,6 +704,7 @@ export class DivisionsComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEsc(): void {
+    if (this.panelMode === 'create') { this.onCreateScrimClick(); return; }
     if (this.panelMode) { this.onScrimClick(); return; }
     if (this.filterPanelOpen) { this.closeFilterPanel(); }
   }
@@ -861,6 +941,89 @@ export class DivisionsComponent implements OnInit {
     if (!this.selectedDivision?.parent_division_id) { return; }
     const parent = this.allDivisions.find(d => d.id === this.selectedDivision!.parent_division_id);
     if (parent) { this.openView(parent); }
+  }
+
+  // ── Create (Contract 31 follow-on, Phil-only) ───────────────────────────────
+  /** Label of the child type addable inside the selected Division (Service Line / Functional Team). */
+  get childTypeLabel(): string {
+    const lvl = (this.selectedDivision?.division_level ?? -1) + 1;
+    return LEVEL_LABELS[lvl] ?? '';
+  }
+
+  /** Open the create panel for a new top-level Trust (no parent). */
+  openCreateTrust(): void {
+    this.selectedDivision   = null;
+    this.selectedDivisionId = null;
+    this.createContext = { parentId: null, parentName: null, level: 0, typeLabel: LEVEL_LABELS[0] };
+    this.createForm.reset({ division_name: '', display_name_short: '' });
+    this.createError = '';
+    this.panelMode = 'create';
+    this.cdr.markForCheck();
+  }
+
+  /** Open the create panel for a child of the currently-viewed Division. */
+  openCreateChild(): void {
+    if (!this.selectedDivision) { return; }
+    const lvl = this.selectedDivision.division_level + 1;
+    if (lvl > 2) { return; }
+    this.createContext = {
+      parentId:   this.selectedDivision.id,
+      parentName: this.selectedDivision.division_name,
+      level:      lvl,
+      typeLabel:  LEVEL_LABELS[lvl]
+    };
+    this.createForm.reset({ division_name: '', display_name_short: '' });
+    this.createError = '';
+    this.panelMode = 'create';
+    this.cdr.markForCheck();
+  }
+
+  onCreateScrimClick(): void {
+    if (this.createForm.dirty && !confirm('Discard unsaved changes?')) { return; }
+    this.createForm.reset({ division_name: '', display_name_short: '' });
+    this.createForm.markAsPristine();
+    this.createError = '';
+    // Return to the parent's View when adding a child; close entirely for a Trust.
+    this.panelMode = this.selectedDivision ? 'view' : null;
+    this.cdr.markForCheck();
+  }
+
+  submitCreate(): void {
+    if (this.createForm.invalid) { return; }
+    this.saving = true;
+    this.createError = '';
+    this.cdr.markForCheck();
+
+    const shortRaw = (this.createForm.value.display_name_short as string || '').trim();
+    this.mcp.call<Division>('division', 'create_division', {
+      division_name:       (this.createForm.value.division_name as string).trim(),
+      display_name_short:  shortRaw || undefined,
+      parent_division_id:  this.createContext.parentId || undefined,
+      division_type_label: this.createContext.typeLabel
+    }).subscribe({
+      next: (res) => {
+        this.saving = false;
+        if (res.success && res.data) {
+          this.successMsg = `${this.createContext.typeLabel} created.`;
+          setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
+          // Expand the parent so the new child is visible on return; then open
+          // the new Division's View (S-008 parent refresh runs in loadDivisions).
+          if (this.createContext.parentId) { this.expandedIds.add(this.createContext.parentId); }
+          this.createForm.reset({ division_name: '', display_name_short: '' });
+          this.createForm.markAsPristine();
+          this.loadDivisions();
+          this.openView(res.data);
+        } else {
+          this.createError = res.error ?? 'Could not create the Division.';
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.saving = false;
+        this.createError = err.error ?? 'Could not create the Division.';
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   startEdit(): void {

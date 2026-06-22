@@ -1,7 +1,7 @@
 // create_division.js
-// Creates a new Division. Admin-only.
-// If parent_division_id provided, validates caller has admin access to that parent.
-// division_level is computed from parent (parent.division_level + 1), or 0 for root.
+// Creates a new Division. Phil-only (is_super_admin) — Contract 31 follow-on.
+// If parent_division_id provided, division_level is computed from parent
+// (parent.division_level + 1), or 0 for a root Trust.
 
 'use strict';
 
@@ -71,6 +71,18 @@ async function create_division(params, caller_user_id) {
     return {
       success: false,
       error: 'Creating Divisions requires Admin role. Your current role does not have this permission. Contact your System Admin to request access.'
+    };
+  }
+  // Contract 31 follow-on (CC): Division creation is restricted to Phil
+  // (is_super_admin). The Add Trust / Service Line / Functional Team UI is
+  // Phil-only; this server-side gate enforces it (defense in depth, mirrors the
+  // api_key tools). Stricter than the historical admin-level contract and
+  // overrides the D-413/D-414 "structural changes require a Design session"
+  // removal — Phil directed it in-session; D-number to be assigned by Design.
+  if (caller.is_super_admin !== true) {
+    return {
+      success: false,
+      error: 'Only Phil can create Divisions. Creating a Trust, Service Line, or Functional Team is restricted to the super-admin.'
     };
   }
 
