@@ -37,12 +37,6 @@ const NAV_ITEMS: NavItem[] = [
   // Raised above OI Library (Phil).
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'pilot'       },
   { label: 'Important To Dos',                               devStatus: 'not-started' },
-  { label: 'AI Governance Boards',                           devStatus: 'not-started',
-    children: [
-      { label: 'AI Inventory',                               devStatus: 'not-started' },
-      { label: 'Meeting Archives',                           devStatus: 'not-started' },
-    ] },
-  { label: 'Policy Committee',                               devStatus: 'not-started' },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
     children: [
       { label: 'Skills Management',                          devStatus: 'not-started' },
@@ -50,6 +44,13 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Artifact',                                   devStatus: 'not-started' },
     ] },
   { label: 'Chat',                 route: '/chat',           devStatus: 'not-started' },
+  // Lowered below Chat (Phil).
+  { label: 'AI Governance Boards',                           devStatus: 'not-started',
+    children: [
+      { label: 'AI Inventory',                               devStatus: 'not-started' },
+      { label: 'Meeting Archives',                           devStatus: 'not-started' },
+    ] },
+  { label: 'Policy Committee',                               devStatus: 'not-started' },
   { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'pilot'       },
   { label: 'Admin',                route: '/admin',          requiresFlag: 'is_admin', devStatus: 'pilot' },
 ];
@@ -125,7 +126,10 @@ const NAV_ITEMS: NavItem[] = [
 
     .oi-nav-item { display: flex; flex-direction: row; align-items: center;
                    justify-content: space-between; gap: 6px; }
-    .oi-nav-label { flex: 1; }
+    /* Long labels wrap/shrink within the fixed sidebar width — never widen it. */
+    .oi-nav-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    /* Belt-and-braces: clip any horizontal overflow so the panel width is stable. */
+    .oi-nav-list { overflow-x: hidden; }
     /* Sub-list: indented children under a parent nav item. */
     .oi-nav-sublist { list-style: none; padding: 0 0 0 var(--triarq-space-md, 16px); margin: 0; }
     .oi-nav-subitem .oi-nav-label { font-size: var(--triarq-text-caption); }
