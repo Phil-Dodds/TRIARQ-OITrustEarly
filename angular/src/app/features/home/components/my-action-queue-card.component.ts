@@ -135,13 +135,15 @@ export class MyActionQueueCardComponent implements OnInit {
   }
 
   /**
-   * WS1.2 (D-472): home card renders the top 7 items only, ordered by created_at
-   * descending. No date filter — top-7 is the only constraint. The badge above
+   * WS1.2 (D-472): home card renders the top 7 items only — both approver and
+   * consulted rows — ordered by submitted_at descending (most recently submitted
+   * first; created_at is stale because gate records are seeded at Initiative
+   * creation). No date filter — top-7 is the only constraint. The badge above
    * still reflects the full pending count (this getter governs display only).
    */
   get displayItems(): PendingApprovalItem[] {
     return [...this.items]
-      .sort((a, b) => Date.parse(b.created_at ?? '') - Date.parse(a.created_at ?? ''))
+      .sort((a, b) => Date.parse(b.submitted_at ?? '') - Date.parse(a.submitted_at ?? ''))
       .slice(0, 7);
   }
 

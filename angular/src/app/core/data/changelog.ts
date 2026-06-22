@@ -38,7 +38,7 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
       {
         audience:    'All',
         surface:     'My Actions screen',
-        description: 'A new My Actions page (in the sidebar, with a pending-count badge) collects everything needing your attention in two tabs: Gate Approvals (gates awaiting your decision) and Gate Reviews (gates you were consulted on). Each tab is filterable and sortable and defaults to the last 21 days.'
+        description: 'A new My Actions page (in the sidebar, with a pending-count badge) lists every gate awaiting your approval or review in one place, each with an Approve / Deny action. Filterable by Gate and Division and sortable; defaults to gates submitted in the last 21 days.'
       },
       {
         audience:    'All',

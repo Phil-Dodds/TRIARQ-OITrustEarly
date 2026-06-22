@@ -58,7 +58,10 @@ export const SCREEN_KEYS = {
   // Contract 27 (D-446): per-view dismissal flag for the pre-Contract-23 data-gap notice.
   INITIATIVES_EPO_DEPLOY_DATA_GAP_DISMISSED:   'initiatives.epo-deploy.data-gap-dismissed',
   DELIVERY_DEPLOY_SCHEDULE_DATA_GAP_DISMISSED: 'delivery.deploy-schedule.data-gap-dismissed',
-  // Contract 30 (D-472): My Actions tabs — filter + sort memory per tab.
+  // Contract 30 (D-472): My Actions. Single merged list (approvals + reviews) —
+  // filter + sort memory. (The per-tab keys below predate the merge; retained so
+  // any stored per-tab state degrades gracefully.)
+  ACTIONS_LIST:             'actions.list',
   ACTIONS_GATE_APPROVALS:   'actions.gate-approvals',
   ACTIONS_GATE_REVIEWS:     'actions.gate-reviews',
 } as const;
