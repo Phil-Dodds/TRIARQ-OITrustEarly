@@ -102,20 +102,22 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
         <span class="ga-sort" [class.ga-sort--active]="sortField==='division'" (click)="setSort('division')">Division {{ icon('division') }}</span>
         <span class="ga-sort" [class.ga-sort--active]="sortField==='submitted'" (click)="setSort('submitted')">Submitted {{ icon('submitted') }}</span>
         <span class="ga-sort" [class.ga-sort--active]="sortField==='due'" (click)="setSort('due')">Due {{ icon('due') }}</span>
-        <span>Consulted</span>
         <span>Action</span>
       </div>
 
       <div class="ga-row" role="row" *ngFor="let item of view; trackBy: trackByItem">
         <span>{{ item.gate_name_display }}</span>
-        <a class="ga-init-chip" [routerLink]="['/initiatives', item.delivery_cycle_id]"
-           [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">{{ item.cycle_title }}</a>
+        <!-- Initiative chip + inline Consulted note (replaces the old Consulted column). -->
+        <span class="ga-init-cell">
+          <a class="ga-init-chip" [routerLink]="['/initiatives', item.delivery_cycle_id]"
+             [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">{{ item.cycle_title }}</a>
+          <app-consulted-status-indicator [summary]="item.consulted_summary" [gateStatus]="item.gate_status" [showLabel]="true"></app-consulted-status-indicator>
+        </span>
         <span class="ga-muted">{{ item.division_display_name_short }}</span>
         <span class="ga-muted" [title]="item.submitted_at">{{ rel(item.submitted_at) }}</span>
         <span [style.color]="pastDue(item) ? 'var(--triarq-color-oravive,#E96127)' : 'inherit'">
           {{ item.gate_target_date ? item.gate_target_date : '—' }}
         </span>
-        <app-consulted-status-indicator [summary]="item.consulted_summary" [gateStatus]="item.gate_status"></app-consulted-status-indicator>
         <!-- Action cell by row mode (Contract 30 follow-up):
              approved consulted → decision text + Approve/Decline link (post-approval response, D-460/D-466);
              returned consulted → decision text only (pending action cancelled);
@@ -155,7 +157,8 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
     .ga-btn-primary { background:var(--triarq-color-primary,#257099);color:#fff;border:none;border-radius:5px;padding:6px 14px;cursor:pointer;font-size:13px; }
     .ga-btn-text { background:none;border:none;color:var(--triarq-color-primary,#257099);cursor:pointer;font-size:13px; }
     .ga-grid { border:1px solid var(--triarq-color-border,#e8e8e8);border-radius:8px;overflow:hidden; }
-    .ga-grid-head, .ga-row { display:grid;grid-template-columns:130px 1.4fr 90px 110px 110px 80px 120px;gap:8px;padding:12px 16px;align-items:center; }
+    .ga-grid-head, .ga-row { display:grid;grid-template-columns:130px 1.7fr 90px 110px 110px 120px;gap:8px;padding:12px 16px;align-items:center; }
+    .ga-init-cell { display:flex;align-items:center;gap:8px;min-width:0; }
     .ga-grid-head { background:#F7F9FB;font-size:12px;font-weight:600;color:#5A5A5A;border-bottom:1px solid #E8E8E8; }
     .ga-row { border-bottom:1px solid #F0F0F0;font-size:13px; }
     .ga-row:last-child { border-bottom:none; }
@@ -163,7 +166,7 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
     .ga-sort:hover::after { content:' ↕';opacity:0.5; }
     .ga-sort--active { font-weight:700;color:#1E1E1E; }
     .ga-muted { color:#5A5A5A; }
-    .ga-init-chip { color:var(--triarq-color-primary,#257099);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .ga-init-chip { color:var(--triarq-color-primary,#257099);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0; }
     .ga-init-chip:hover { text-decoration:underline; }
     .ga-action-btn { display:inline-block;background:var(--triarq-color-primary,#257099);color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;text-decoration:none;text-align:center;white-space:nowrap; }
     /* Consulted decision text — stone for approved, Oravive for returned. */

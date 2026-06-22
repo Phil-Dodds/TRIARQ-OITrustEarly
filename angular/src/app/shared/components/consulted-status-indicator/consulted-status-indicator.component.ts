@@ -29,16 +29,18 @@ export interface ConsultedSummary {
     <span *ngIf="showDeclined"
           class="csi csi--declined"
           aria-label="A consulted party declined"
-          title="A consulted party declined">✕</span>
+          title="A consulted party declined">✕<span *ngIf="showLabel" class="csi-label">Consulted declined</span></span>
     <span *ngIf="!showDeclined && showPending"
           class="csi csi--pending"
           aria-label="A consulted party has not yet responded"
-          title="Awaiting a consulted party's response">○</span>
+          title="Awaiting a consulted party's response">○<span *ngIf="showLabel" class="csi-label">Consulted pending</span></span>
   `,
   styles: [`
-    .csi { display: inline-block; font-size: 10px; line-height: 1; font-weight: 700; flex-shrink: 0; }
+    .csi { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; line-height: 1; font-weight: 700; flex-shrink: 0; }
     .csi--declined { color: var(--triarq-color-error, #d32f2f); }
     .csi--pending  { color: var(--triarq-color-sunray, #f5a623); }
+    /* Optional inline note (used where there is no dedicated Consulted column). */
+    .csi-label { font-size: 11px; font-weight: 500; }
   `]
 })
 export class ConsultedStatusIndicatorComponent {
@@ -46,6 +48,8 @@ export class ConsultedStatusIndicatorComponent {
   @Input() summary?: ConsultedSummary;
   /** Gate status — amber only shows while the gate is still awaiting approval. */
   @Input() gateStatus?: GateStatus;
+  /** When true, render a text label beside the icon (inline row note, no column). */
+  @Input() showLabel = false;
 
   /** Red ✕ — any declined consult. Takes precedence over the amber pending state. */
   get showDeclined(): boolean {
