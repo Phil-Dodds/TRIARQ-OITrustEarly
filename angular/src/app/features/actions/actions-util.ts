@@ -43,3 +43,14 @@ export function isPastDue(targetDate: string | null | undefined): boolean {
   const today = new Date().toISOString().slice(0, 10);
   return targetDate < today;
 }
+
+/** Readable decision timestamp, e.g. "Jun 21, 2026, 3:45 PM". Empty when unset. */
+export function decisionDateTime(iso: string | null | undefined): string {
+  if (!iso) { return ''; }
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) { return ''; }
+  return d.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit'
+  });
+}

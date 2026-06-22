@@ -45,7 +45,7 @@ async function list_pending_approvals(_params, caller_user_id) {
   // ── Accountable items: pending gate records the caller approves ──────────
   let gateQuery = supabase
     .from('gate_records')
-    .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, created_at')
+    .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, approver_decision_at, created_at')
     .eq('gate_status', 'awaiting_approval')
     .is('deleted_at', null);
 
@@ -61,8 +61,9 @@ async function list_pending_approvals(_params, caller_user_id) {
   }
 
   // ── Consulted items (WS2, D-462/D-468): gates where the caller has a ──────
-  // pending consultation. Includes both awaiting_approval (active) and approved
-  // (post-approval relabeled) gates — Angular differentiates via gate_status.
+  // pending consultation. Includes awaiting_approval (actionable), approved, and
+  // returned (Contract 30 follow-up) gates — Angular shows the approver's decision
+  // ("Approved by…" / "Returned by…") and drops the action for non-awaiting gates.
   const { data: myPendingConsults, error: consultErr } = await supabase
     .from('gate_consultations')
     .select('gate_record_id')
@@ -83,9 +84,9 @@ async function list_pending_approvals(_params, caller_user_id) {
   if (consultGateIds.length > 0) {
     const { data: cg, error: cgErr } = await supabase
       .from('gate_records')
-      .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, created_at')
+      .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, approver_decision_at, created_at')
       .in('gate_record_id', consultGateIds)
-      .in('gate_status', ['awaiting_approval', 'approved'])
+      .in('gate_status', ['awaiting_approval', 'approved', 'returned'])
       .is('deleted_at', null);
     if (cgErr) {
       return { success: false, error: `Failed to load consulted gates: ${cgErr.message}` };
@@ -140,7 +141,11 @@ async function list_pending_approvals(_params, caller_user_id) {
 
   // ── Resolve cycles, divisions, workstreams, submitters in parallel ──────
   const cycleIds     = [...new Set(gates.map(g => g.delivery_cycle_id))];
-  const submitterIds = [...new Set(gates.map(g => g.submitted_by_user_id).filter(Boolean))];
+  // Resolve submitter + approver display names from one users lookup.
+  const userIds = [...new Set([
+    ...gates.map(g => g.submitted_by_user_id),
+    ...gates.map(g => g.approver_user_id)
+  ].filter(Boolean))];
 
   const { data: cycles } = await supabase
     .from('delivery_cycles')
@@ -167,20 +172,20 @@ async function list_pending_approvals(_params, caller_user_id) {
           .in('workstream_id', workstreamIds)
           .is('deleted_at', null)
       : Promise.resolve({ data: [] }),
-    submitterIds.length
+    userIds.length
       ? supabase.from('users')
           .select('id, display_name')
-          .in('id', submitterIds)
+          .in('id', userIds)
           .is('deleted_at', null)
       : Promise.resolve({ data: [] })
   ]);
 
   const divisionMap   = {};
   const workstreamMap = {};
-  const submitterMap  = {};
+  const userNameMap   = {};
   (divisions   || []).forEach(d => { divisionMap[d.id] = d; });
   (workstreams || []).forEach(w => { workstreamMap[w.workstream_id] = w; });
-  (submitters  || []).forEach(u => { submitterMap[u.id] = u.display_name; });
+  (submitters  || []).forEach(u => { userNameMap[u.id] = u.display_name; });
 
   // ── Assemble response items ──────────────────────────────────────────────
   // Drop gates whose cycle is missing (soft-deleted initiative). cycleMap is
@@ -201,11 +206,15 @@ async function list_pending_approvals(_params, caller_user_id) {
       workstream_display_name_short: w.display_name_short || w.workstream_name || '',
       gate_name:                     g.gate_name,
       gate_name_display:             GATE_NAME_DISPLAY[g.gate_name] || g.gate_name,
-      gate_status:                   g.gate_status,   // 'awaiting_approval' | 'approved' (D-468)
+      gate_status:                   g.gate_status,   // 'awaiting_approval' | 'approved' | 'returned'
       item_type:                     g.item_type,     // 'accountable' | 'consulted'
       submitted_at:                  g.submitted_at,
-      submitted_by_display_name:     submitterMap[g.submitted_by_user_id] || 'Unknown',
+      submitted_by_display_name:     userNameMap[g.submitted_by_user_id] || 'Unknown',
       tier_classification:           c.tier_classification,
+      // Contract 30 follow-up: approver decision attribution for consulted rows
+      // ("Approved by …" / "Returned by …"). Null until the approver decides.
+      approver_display_name:         g.approver_user_id ? (userNameMap[g.approver_user_id] || null) : null,
+      approver_decision_at:          g.approver_decision_at ?? null,
       // WS1.2/WS1.3 (D-472): created_at for the 21-day filter; gate_target_date for the Due column.
       created_at:                    g.created_at,
       gate_target_date:              milestoneTargetMap[`${g.delivery_cycle_id}|${g.gate_name}`] ?? null,

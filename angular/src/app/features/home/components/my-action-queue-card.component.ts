@@ -31,6 +31,7 @@ import { RouterModule } from '@angular/router';
 import { DeliveryService }    from '../../../core/services/delivery.service';
 import { PendingApprovalItem } from '../../../core/types/database';
 import { ConsultedStatusIndicatorComponent } from '../../../shared/components/consulted-status-indicator/consulted-status-indicator.component';
+import { decisionDateTime }   from '../../actions/actions-util';
 
 @Component({
   selector:        'app-my-action-queue-card',
@@ -57,7 +58,7 @@ import { ConsultedStatusIndicatorComponent } from '../../../shared/components/co
              "View all →" reaches the full /actions surface. -->
         <li *ngFor="let item of displayItems; trackBy: trackByItem"
             class="oi-action-item"
-            [class.oi-action-item--post-approval]="isPostApprovalConsulted(item)">
+            [class.oi-action-item--post-approval]="isResolvedConsulted(item)">
 
           <!-- Tap target: opens Initiative detail with the gate sub-panel
                auto-expanded. Same nav the sibling cards use (/initiatives/:id),
@@ -76,7 +77,7 @@ import { ConsultedStatusIndicatorComponent } from '../../../shared/components/co
           </a>
 
           <!-- D-468: post-approval consulted items are client-side dismissible. -->
-          <button *ngIf="isPostApprovalConsulted(item)"
+          <button *ngIf="isResolvedConsulted(item)"
                   type="button"
                   class="oi-action-dismiss"
                   aria-label="Dismiss"
@@ -126,12 +127,12 @@ export class MyActionQueueCardComponent implements OnInit {
   ) {}
 
   /**
-   * D-468: badge / unread count = approval-actionable items only.
-   * Post-approval consulted items (gate_status='approved') are informational —
-   * they must NOT increment the count.
+   * Badge / unread count = approval-actionable items only. Resolved consulted
+   * items (the approver already approved or returned the gate) are informational —
+   * they must NOT increment the count (D-468 + Contract 30 follow-up).
    */
   get badgeCount(): number {
-    return this.items.filter(i => !this.isPostApprovalConsulted(i)).length;
+    return this.items.filter(i => !this.isResolvedConsulted(i)).length;
   }
 
   /**
@@ -147,19 +148,30 @@ export class MyActionQueueCardComponent implements OnInit {
       .slice(0, 7);
   }
 
-  /** Post-approval consulted item: stone styling + dismissible + badge-excluded. */
-  isPostApprovalConsulted(item: PendingApprovalItem): boolean {
-    return item.item_type === 'consulted' && item.gate_status === 'approved';
+  /** Resolved consulted item: the approver already approved OR returned the gate.
+   *  Informational — stone styling + dismissible + badge-excluded (Contract 30). */
+  isResolvedConsulted(item: PendingApprovalItem): boolean {
+    return item.item_type === 'consulted'
+      && (item.gate_status === 'approved' || item.gate_status === 'returned');
   }
 
-  /** Row label per D-468. Accountable items keep their gate/cycle title. */
+  /**
+   * Row label. Resolved consulted rows show the approver's decision
+   * ("Approved by …" / "Returned by …"); awaiting consulted rows show the review
+   * request; accountable rows keep their gate/cycle title.
+   */
   labelFor(item: PendingApprovalItem): string {
     const gate  = item.gate_name_display;
     const cycle = item.cycle_title;
     if (item.item_type === 'consulted') {
-      return item.gate_status === 'approved'
-        ? `Gate approved — your review still welcome: ${gate} — ${cycle}`
-        : `Review requested: ${gate} — ${cycle}`;
+      if (this.isResolvedConsulted(item)) {
+        const verb = item.gate_status === 'returned' ? 'Returned' : 'Approved';
+        const who  = item.approver_display_name || 'the approver';
+        const when = decisionDateTime(item.approver_decision_at);
+        const head = when ? `${verb} by ${who} on ${when}` : `${verb} by ${who}`;
+        return `${head} — ${cycle}`;
+      }
+      return `Review requested: ${gate} — ${cycle}`;
     }
     return `${gate} — ${cycle}`;
   }

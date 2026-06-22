@@ -22,7 +22,7 @@ import { RouterModule } from '@angular/router';
 import { PendingApprovalItem } from '../../core/types/database';
 import { ConsultedStatusIndicatorComponent } from '../../shared/components/consulted-status-indicator/consulted-status-indicator.component';
 import { ScreenStateService, SCREEN_KEYS } from '../../core/services/screen-state.service';
-import { GATE_DISPLAY, GATE_KEYS, relativeDays, daysAgoIso, isPastDue, ACTIONS_DEFAULT_FILTER_DAYS } from './actions-util';
+import { GATE_DISPLAY, GATE_KEYS, relativeDays, daysAgoIso, isPastDue, decisionDateTime, ACTIONS_DEFAULT_FILTER_DAYS } from './actions-util';
 
 type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
 
@@ -116,8 +116,16 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
           {{ item.gate_target_date ? item.gate_target_date : '—' }}
         </span>
         <app-consulted-status-indicator [summary]="item.consulted_summary" [gateStatus]="item.gate_status"></app-consulted-status-indicator>
-        <a class="ga-action-btn" [routerLink]="['/initiatives', item.delivery_cycle_id]"
-           [queryParams]="{ gate: item.gate_name }">Approve / Deny</a>
+        <!-- Consulted rows reflect the approver's decision; only awaiting gates are actionable. -->
+        <ng-container *ngIf="isResolvedConsulted(item); else actionBtn">
+          <span class="ga-decision" [class.ga-decision--returned]="item.gate_status === 'returned'">
+            {{ decisionText(item) }}
+          </span>
+        </ng-container>
+        <ng-template #actionBtn>
+          <a class="ga-action-btn" [routerLink]="['/initiatives', item.delivery_cycle_id]"
+             [queryParams]="{ gate: item.gate_name }">Approve / Deny</a>
+        </ng-template>
       </div>
 
       <div *ngIf="view.length === 0" class="ga-empty">
@@ -154,6 +162,9 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
     .ga-init-chip { color:var(--triarq-color-primary,#257099);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
     .ga-init-chip:hover { text-decoration:underline; }
     .ga-action-btn { display:inline-block;background:var(--triarq-color-primary,#257099);color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;text-decoration:none;text-align:center;white-space:nowrap; }
+    /* Consulted decision text — stone for approved, Oravive for returned. */
+    .ga-decision { font-size:11px;color:var(--triarq-color-stone,#8a9ba8);line-height:1.3; }
+    .ga-decision--returned { color:var(--triarq-color-oravive,#E96127); }
     .ga-empty { padding:24px 16px;color:#5A5A5A;font-style:italic;font-size:13px; }
     .ga-empty-link { color:var(--triarq-color-primary,#257099);cursor:pointer;margin-left:6px;font-style:normal; }
     .ga-skeleton { display:flex;flex-direction:column;gap:8px; }
@@ -290,4 +301,20 @@ export class ActionsListComponent implements OnChanges {
   rel(iso: string): string { return relativeDays(iso); }
   pastDue(item: PendingApprovalItem): boolean { return isPastDue(item.gate_target_date); }
   trackByItem(_: number, item: PendingApprovalItem): string { return item.gate_record_id; }
+
+  /** A consulted row whose gate the approver has already decided (approved/returned)
+   *  is informational only — no Approve/Deny action. Approver rows are always
+   *  awaiting_approval, so they stay actionable. */
+  isResolvedConsulted(item: PendingApprovalItem): boolean {
+    return item.item_type === 'consulted'
+      && (item.gate_status === 'approved' || item.gate_status === 'returned');
+  }
+
+  /** "Approved by {name} on {date}" / "Returned by {name} on {date}" for a resolved consulted row. */
+  decisionText(item: PendingApprovalItem): string {
+    const verb = item.gate_status === 'returned' ? 'Returned' : 'Approved';
+    const who  = item.approver_display_name || 'the approver';
+    const when = decisionDateTime(item.approver_decision_at);
+    return when ? `${verb} by ${who} on ${when}` : `${verb} by ${who}`;
+  }
 }

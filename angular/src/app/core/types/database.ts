@@ -485,6 +485,11 @@ export interface PendingApprovalItem {
   // Contract 30 / D-468 (WS1.2): per-gate Consulted summary for the status
   // indicator. Omitted entirely when both counts are zero.
   consulted_summary?:            { pending_count: number; declined_count: number };
+  // Contract 30 follow-up: approver decision attribution. On a consulted row the
+  // UI shows "Approved by {approver} on {date}" / "Returned by {approver} on {date}"
+  // once the approver decides. Null while the gate is still awaiting approval.
+  approver_display_name?:        string | null;
+  approver_decision_at?:         string | null;
 }
 
 // ── Contract 29 — Gate consultation + approver configuration types ───────────
