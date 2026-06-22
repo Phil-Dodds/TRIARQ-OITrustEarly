@@ -40,7 +40,7 @@ type ActiveTab = 'open' | 'completed';
                 [class.ma-tab--active]="activeTab === 'open'"
                 [attr.aria-selected]="activeTab === 'open'"
                 (click)="selectTab('open')">
-          Open
+          Approve Initiative Gates
           <span *ngIf="openCount > 0" class="ma-tab-badge">{{ openCount }}</span>
         </button>
         <button class="ma-tab" role="tab"
