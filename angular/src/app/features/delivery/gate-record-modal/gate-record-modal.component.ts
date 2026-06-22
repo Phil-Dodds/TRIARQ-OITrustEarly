@@ -172,14 +172,17 @@ const GATE_LABELS: Record<GateName, string> = {
         <!-- GATE CHECKLIST -->
         <section class="grm-section">
           <div class="grm-label">Gate Checklist</div>
-          <div *ngFor="let item of data.checklist" class="grm-checklist-row">
-            <span class="grm-checklist-icon"
-                  [style.color]="item.met ? '#2e7d32' : '#f5a623'">
-              {{ item.met ? '✓' : '⚠' }}
-            </span>
-            <span [style.color]="item.met ? 'var(--triarq-color-text-primary)' : 'var(--triarq-color-text-secondary)'">
-              {{ item.label }}
-            </span>
+          <!-- Two columns to save vertical space. -->
+          <div class="grm-checklist-grid">
+            <div *ngFor="let item of data.checklist" class="grm-checklist-row">
+              <span class="grm-checklist-icon"
+                    [style.color]="item.met ? '#2e7d32' : '#f5a623'">
+                {{ item.met ? '✓' : '⚠' }}
+              </span>
+              <span [style.color]="item.met ? 'var(--triarq-color-text-primary)' : 'var(--triarq-color-text-secondary)'">
+                {{ item.label }}
+              </span>
+            </div>
           </div>
           <div *ngIf="data.checklist.length === 0" class="grm-checklist-empty">
             No checklist items defined for this Gate.
@@ -632,6 +635,11 @@ const GATE_LABELS: Record<GateName, string> = {
     }
     .grm-raci-default, .grm-routing-note { font-style: italic; font-size: 11px; }
     .grm-routing-note { margin-top: 4px; }
+    /* Two-column checklist — saves vertical height; collapses to one column when narrow. */
+    .grm-checklist-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px;
+    }
+    @media (max-width: 520px) { .grm-checklist-grid { grid-template-columns: 1fr; } }
     .grm-checklist-row {
       display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 12px;
     }
