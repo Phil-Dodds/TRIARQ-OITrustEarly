@@ -117,9 +117,18 @@ export class AppComponent implements OnInit {
     // never called, profile$ stays null, and the sidebar filters out every
     // role-restricted item. Symptom: Phil sees five sidebar items instead of
     // six on routes other than /home.
-    this.auth.waitForInit().then(() => {
+    this.auth.waitForInit().then(async () => {
       if (this.auth.isAuthenticated()) {
-        this.profileService.loadProfile();
+        // SECURITY: an authenticated session with no active public.users row is
+        // not permitted (Supabase OTP authenticates any email). Bounce such a
+        // session back to /login. Only act on a definitive 'unregistered' — a
+        // transient lookup 'error' must NOT sign a legitimate user out.
+        const access = await this.profileService.resolveAccess();
+        if (access === 'unregistered') {
+          await this.auth.signOut();
+          this.profileService.clearProfile();
+          this.router.navigate(['/login'], { replaceUrl: true });
+        }
       }
     });
   }

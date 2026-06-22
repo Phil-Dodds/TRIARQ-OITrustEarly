@@ -15,6 +15,21 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key';
 // ── Mock supabase db module before requiring middleware ───────────────────────
 // We override require cache so jwt.js gets a mock supabase client.
 const mockGetUser = { fn: null };
+// Registered-user lookup result for the security gate (defaults to an active row).
+const mockUserRow = { row: { id: 'user-abc', is_active: true }, error: null };
+
+// Chainable stub covering both the gate
+// (.select().eq().is().maybeSingle()) and the last_login stamp (.update().eq().then()).
+function chainableUsers() {
+  const chain = {};
+  chain.select = () => chain;
+  chain.eq     = () => chain;
+  chain.is     = () => chain;
+  chain.maybeSingle = async () => ({ data: mockUserRow.row, error: mockUserRow.error });
+  chain.update = () => chain;
+  chain.then   = (resolve) => resolve({ data: null, error: null });
+  return chain;
+}
 
 require.cache[require.resolve('../src/db')] = {
   id: require.resolve('../src/db'),
@@ -24,7 +39,8 @@ require.cache[require.resolve('../src/db')] = {
     supabase: {
       auth: {
         getUser: (token) => mockGetUser.fn(token)
-      }
+      },
+      from: () => chainableUsers()
     }
   }
 };
@@ -96,11 +112,13 @@ describe('validateJwt middleware', () => {
     assert.equal(nextCalled, false);
   });
 
-  test('accepts valid token and attaches auth to req', async () => {
+  test('accepts valid token from a registered active user', async () => {
     mockGetUser.fn = async () => ({
       data: { user: { id: 'user-abc', email: 'user@test.com' } },
       error: null
     });
+    mockUserRow.row = { id: 'user-abc', is_active: true };
+    mockUserRow.error = null;
 
     const req = { headers: { authorization: 'Bearer valid-token' } };
     const res = mockRes();
@@ -112,6 +130,50 @@ describe('validateJwt middleware', () => {
     assert.equal(req.auth.user_id, 'user-abc');
     assert.equal(req.auth.email, 'user@test.com');
     assert.equal(res._status, null); // no error response sent
+  });
+
+  // SECURITY (D-302/D-354): a valid Supabase token whose identity has no active
+  // public.users row must be refused — Supabase OTP authenticates any email.
+  test('rejects a valid token with no registered public.users row', async () => {
+    mockGetUser.fn = async () => ({
+      data: { user: { id: 'ghost-user', email: 'unregistered@triarqhealth.com' } },
+      error: null
+    });
+    mockUserRow.row = null;       // no matching row
+    mockUserRow.error = null;     // lookup succeeded — definitive refusal
+
+    const req = { headers: { authorization: 'Bearer valid-but-unregistered' } };
+    const res = mockRes();
+    let nextCalled = false;
+
+    await validateJwt(req, res, () => { nextCalled = true; });
+
+    assert.equal(res._status, 401);
+    assert.equal(nextCalled, false);
+    assert.ok(res._body.error.includes('not provisioned'));
+
+    // Restore default for any later tests.
+    mockUserRow.row = { id: 'user-abc', is_active: true };
+  });
+
+  test('rejects a valid token for a deactivated user', async () => {
+    mockGetUser.fn = async () => ({
+      data: { user: { id: 'user-abc', email: 'user@test.com' } },
+      error: null
+    });
+    mockUserRow.row = { id: 'user-abc', is_active: false };
+    mockUserRow.error = null;
+
+    const req = { headers: { authorization: 'Bearer valid-deactivated' } };
+    const res = mockRes();
+    let nextCalled = false;
+
+    await validateJwt(req, res, () => { nextCalled = true; });
+
+    assert.equal(res._status, 401);
+    assert.equal(nextCalled, false);
+
+    mockUserRow.row = { id: 'user-abc', is_active: true };
   });
 
   test('rejects when auth.getUser throws unexpectedly', async () => {

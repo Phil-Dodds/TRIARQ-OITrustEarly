@@ -42,6 +42,25 @@ async function validateJwt(req, res, next) {
       email:   data.user.email || null
     };
 
+    // SECURITY: a valid Supabase token is necessary but NOT sufficient — Supabase
+    // OTP authenticates ANY email. The identity must map to an active public.users
+    // row (id = Supabase auth uuid). Fail closed on a definitive "no active row"
+    // (unregistered or deactivated); fail open on a transient lookup error —
+    // getUser already validated the identity, so a DB blip must never lock out
+    // legitimate users. Source: D-302/D-354 registration gate; Arch-5.
+    const { data: userRow, error: userErr } = await supabase
+      .from('users')
+      .select('id, is_active')
+      .eq('id', data.user.id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!userErr && (!userRow || userRow.is_active === false)) {
+      return res.status(401).json({
+        success: false,
+        error: 'Your account is not provisioned for OI Trust access. Contact your System Admin.'
+      });
+    }
+
     // D-422 / D-166: stamp users.last_login_at on every validated JWT. Fire-and-forget —
     // failures here must not block the request. Surfaced by list_users + User View panel
     // Login Activity zone. Column added by Migration 037.

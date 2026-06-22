@@ -51,6 +51,38 @@ export class UserProfileService {
     return this._profile$.value;
   }
 
+  /**
+   * Security gate helper. Resolves whether the authenticated identity is allowed
+   * into the app, distinguishing a definitive refusal from a transient failure:
+   *   'registered'   — an active public.users row matches the Supabase auth id.
+   *   'unregistered' — the lookup SUCCEEDED but no active row matched (refuse).
+   *   'error'        — the lookup failed (transient) — do NOT sign a user out on this.
+   * Supabase OTP authenticates any email, so this is what actually gates access.
+   */
+  async resolveAccess(): Promise<'registered' | 'unregistered' | 'error'> {
+    const authUser = this.auth.getCurrentUser();
+    if (!authUser) return 'error';
+
+    this._loading$.next(true);
+    try {
+      const response = await firstValueFrom(
+        this.mcp.call<User[]>('division', 'list_users', {})
+      );
+      if (!response.success || !response.data) return 'error';
+
+      const profile = response.data.find(u => u.id === authUser.id) ?? null;
+      this._profile$.next(profile);
+
+      if (!profile) return 'unregistered';
+      if (profile.is_active === false) return 'unregistered';
+      return 'registered';
+    } catch {
+      return 'error';
+    } finally {
+      this._loading$.next(false);
+    }
+  }
+
   /** True if user has at least one Division membership (determines onboarding vs home). */
   hasAnyDivision(): boolean {
     // Resolved by checking get_user_divisions in the home screen component

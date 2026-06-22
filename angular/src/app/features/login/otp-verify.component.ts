@@ -24,6 +24,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { UserProfileService } from '../../core/services/user-profile.service';
 
 type OtpState = 'idle' | 'verifying' | 'sending' | 'error';
 
@@ -185,10 +186,11 @@ export class OtpVerifyComponent implements OnInit, OnDestroy {
   otpForm: FormGroup;
 
   constructor(
-    private readonly fb:     FormBuilder,
-    private readonly auth:   AuthService,
-    private readonly router: Router,
-    private readonly cdr:    ChangeDetectorRef
+    private readonly fb:      FormBuilder,
+    private readonly auth:    AuthService,
+    private readonly profile: UserProfileService,
+    private readonly router:  Router,
+    private readonly cdr:     ChangeDetectorRef
   ) {
     this.otpForm = this.fb.group({
       code: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(6), Validators.pattern(/^\d{6}$/)]]
@@ -228,6 +230,23 @@ export class OtpVerifyComponent implements OnInit, OnDestroy {
     if (!result.success) {
       this.state        = 'error';
       this.errorMessage = 'Invalid or expired code. Please try again.';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    // SECURITY GATE: a valid OTP only proves the person controls the email —
+    // Supabase will OTP ANY address. Access requires a registered, active
+    // public.users row (matched by Supabase auth id). Anything other than
+    // 'registered' signs them out and refuses entry, even though the OTP
+    // succeeded. Without this, anyone with a @triarqhealth.com inbox could enter.
+    const access = await this.profile.resolveAccess();
+    if (access !== 'registered') {
+      await this.auth.signOut();
+      this.profile.clearProfile();
+      this.state        = 'error';
+      this.errorMessage = access === 'unregistered'
+        ? 'This email is not set up for OI Trust access. Contact your System Admin to request access.'
+        : 'We could not verify your access just now. Please try again.';
       this.cdr.markForCheck();
       return;
     }
