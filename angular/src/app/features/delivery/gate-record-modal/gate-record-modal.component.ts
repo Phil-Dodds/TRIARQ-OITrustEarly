@@ -107,6 +107,8 @@ const GATE_LABELS: Record<GateName, string> = {
       <!-- ── Body ─────────────────────────────────────────────────────────── -->
       <div class="grm-body">
 
+        <!-- GATE STATUS + MILESTONE DATE side by side to save vertical space. -->
+        <div class="grm-status-milestone-row">
         <!-- GATE STATUS -->
         <section class="grm-section">
           <div class="grm-label">Gate Status</div>
@@ -146,6 +148,7 @@ const GATE_LABELS: Record<GateName, string> = {
             </span>
           </div>
         </section>
+        </div>
 
         <!-- APPROVAL ROUTING -->
         <section class="grm-section">
@@ -635,6 +638,9 @@ const GATE_LABELS: Record<GateName, string> = {
     }
     .grm-raci-default, .grm-routing-note { font-style: italic; font-size: 11px; }
     .grm-routing-note { margin-top: 4px; }
+    /* Gate Status + Milestone Date side by side; stacks when the modal is narrow. */
+    .grm-status-milestone-row { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }
+    .grm-status-milestone-row > .grm-section { flex: 1 1 220px; min-width: 200px; }
     /* Two-column checklist — saves vertical height; collapses to one column when narrow. */
     .grm-checklist-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px;
