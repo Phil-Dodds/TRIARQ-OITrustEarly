@@ -557,6 +557,31 @@ export interface GateApproverConfigRow {
   updated_by_display_name:     string | null;
 }
 
+// ── Contract 31 (D-474) — API Keys ───────────────────────────────────────────
+// Shape returned by division-mcp list_api_keys / get_api_key. Never carries
+// key_hash or the raw key. raw_key appears ONLY on the create_api_key response
+// (ApiKeyCreated) — shown once and never retrievable again.
+export interface ApiKey {
+  key_id:          string;
+  display_name:    string;
+  user_label:      string;
+  scope_type:      string;          // Phase 1: always 'all'
+  created_at:      string;
+  last_used_at:    string | null;
+  revoked_at:      string | null;
+  is_active:       boolean;         // derived: revoked_at === null
+  created_by_name: string | null;
+}
+
+/** create_api_key response — the only place raw_key ever appears. */
+export interface ApiKeyCreated {
+  key_id:       string;
+  raw_key:      string;             // oitrust_… — shown once, never stored
+  display_name: string;
+  user_label:   string;
+  created_at:   string;
+}
+
 // ── Build C — Dashboard summary types (D-171–D-176) ──────────────────────────
 
 /** WIP zone counts per workstream.

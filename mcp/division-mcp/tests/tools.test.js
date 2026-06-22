@@ -411,11 +411,13 @@ describe('update_user_email', () => {
     assert.ok(/try\s*\{[\s\S]*getUserById/.test(src),
       'auth lookup must be wrapped in try/catch (B-92 C15)');
     // public.users update must come AFTER the auth try/catch, not nested in it.
+    // Line-ending tolerant (CC-31): the file is CRLF on Windows/OneDrive, so the
+    // matcher searches whitespace-flexibly rather than for a literal "\n    ".
     const tryStart  = src.indexOf('try {');
     const catchEnd  = src.indexOf('} catch', tryStart);
     const closeIdx  = src.indexOf('}', catchEnd + 1);
-    const publicUpdateIdx = src.indexOf("from('users')\n    .update", closeIdx);
-    assert.ok(publicUpdateIdx > closeIdx,
+    const publicUpdateIdx = src.slice(closeIdx).search(/from\('users'\)\s*\.update/);
+    assert.ok(publicUpdateIdx >= 0,
       'public.users update must run after the auth try/catch block (B-92 C15)');
   });
 

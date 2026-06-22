@@ -77,6 +77,15 @@ const ADMIN_CARDS: AdminCard[] = [
     route:       'gate-approvers',
     icon:        '◈',
     philOnly:    true
+  },
+  // Contract 31 (D-475): eighth admin card — API Keys (Phil-only).
+  {
+    title:       'API Keys',
+    description: 'Issue and manage API keys for executive MCP access to Initiative data. Each key connects a leader’s Claude Desktop to OI Trust as a read-only Initiative source.',
+    who:         'Phil only',
+    route:       'api-keys',
+    icon:        '◆',
+    philOnly:    true
   }
 ];
 

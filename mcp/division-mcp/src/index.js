@@ -32,6 +32,14 @@ const { resend_invite }            = require('./tools/resend_invite');
 // Contract 17 §2 / D-380: screen state mediated by MCP. user_id from JWT only.
 const { get_user_screen_state }    = require('./tools/get_user_screen_state');
 const { upsert_user_screen_state } = require('./tools/upsert_user_screen_state');
+// Contract 31 / D-474: API key infrastructure. All six tools are Phil-only
+// (is_super_admin) — enforced inside each tool via helpers/phil.js.
+const { create_api_key }           = require('./tools/create_api_key');
+const { list_api_keys }            = require('./tools/list_api_keys');
+const { get_api_key }              = require('./tools/get_api_key');
+const { update_api_key }           = require('./tools/update_api_key');
+const { inactivate_api_key }       = require('./tools/inactivate_api_key');
+const { reactivate_api_key }       = require('./tools/reactivate_api_key');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -82,7 +90,13 @@ app.post('/tools/:toolName', async (req, res) => {
     get_user_invite_statuses,
     resend_invite,
     get_user_screen_state,
-    upsert_user_screen_state
+    upsert_user_screen_state,
+    create_api_key,
+    list_api_keys,
+    get_api_key,
+    update_api_key,
+    inactivate_api_key,
+    reactivate_api_key
   };
 
   if (!tools[toolName]) {
@@ -149,7 +163,13 @@ app.get('/tools', (req, res) => {
       { name: 'get_user_invite_statuses', method: 'POST', path: '/tools/get_user_invite_statuses' },
       { name: 'resend_invite',            method: 'POST', path: '/tools/resend_invite' },
       { name: 'get_user_screen_state',    method: 'POST', path: '/tools/get_user_screen_state' },
-      { name: 'upsert_user_screen_state', method: 'POST', path: '/tools/upsert_user_screen_state' }
+      { name: 'upsert_user_screen_state', method: 'POST', path: '/tools/upsert_user_screen_state' },
+      { name: 'create_api_key',           method: 'POST', path: '/tools/create_api_key' },
+      { name: 'list_api_keys',            method: 'POST', path: '/tools/list_api_keys' },
+      { name: 'get_api_key',              method: 'POST', path: '/tools/get_api_key' },
+      { name: 'update_api_key',           method: 'POST', path: '/tools/update_api_key' },
+      { name: 'inactivate_api_key',       method: 'POST', path: '/tools/inactivate_api_key' },
+      { name: 'reactivate_api_key',       method: 'POST', path: '/tools/reactivate_api_key' }
     ]
   });
 });

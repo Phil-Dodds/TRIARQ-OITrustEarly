@@ -55,6 +55,8 @@ export const SCREEN_KEYS = {
   ADMIN_DEPLOY_BASELINES:   'admin.deploy-baselines',
   // Contract 29 (D-464): Gate Approvers admin screen (Phil-only) filter + sort.
   ADMIN_GATE_APPROVERS:     'admin.gate-approvers',
+  // Contract 31 (D-475): API Keys admin screen (Phil-only) status filter + sort.
+  ADMIN_API_KEYS:           'admin.api-keys',
   // Contract 27 (D-446): per-view dismissal flag for the pre-Contract-23 data-gap notice.
   INITIATIVES_EPO_DEPLOY_DATA_GAP_DISMISSED:   'initiatives.epo-deploy.data-gap-dismissed',
   DELIVERY_DEPLOY_SCHEDULE_DATA_GAP_DISMISSED: 'delivery.deploy-schedule.data-gap-dismissed',

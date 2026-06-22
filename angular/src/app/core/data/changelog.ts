@@ -32,6 +32,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-06-22',
+    contractLabel: 'Contract 31 — API Keys & Public Initiative MCP',
+    items: [
+      {
+        audience:    'Admin',
+        surface:     'Admin — API Keys (Phil only)',
+        description: 'New API Keys screen (/admin/api-keys) to issue and manage keys that let an executive’s Claude Desktop read Initiative data through the new public Initiative MCP. Creating a key shows it once — copy it before closing. Each key has Setup Instructions (a ready-to-paste Claude Desktop config), can be edited, inactivated (two-step), or reactivated, and the grid filters by Active / Inactive / All.'
+      }
+    ]
+  },
+  {
     date:          '2026-06-21',
     contractLabel: 'Contract 30 — My Actions, Gate Return, Grid & Division Leader',
     items: [

@@ -24,7 +24,9 @@ import { IonicModule }  from '@ionic/angular';
       // Contract 27 (D-444): Deploy Roadmap Baselines admin screen.
       { path: 'deploy-baselines', loadComponent: () => import('./deploy-baselines/deploy-baselines.component').then(c => c.DeployBaselinesComponent) },
       // Contract 29 (D-464): Gate Approvers admin screen (Phil-only).
-      { path: 'gate-approvers', loadComponent: () => import('./gate-approvers/gate-approvers.component').then(c => c.GateApproversComponent) }
+      { path: 'gate-approvers', loadComponent: () => import('./gate-approvers/gate-approvers.component').then(c => c.GateApproversComponent) },
+      // Contract 31 (D-475): API Keys admin screen (Phil-only).
+      { path: 'api-keys', loadComponent: () => import('./api-keys/api-keys.component').then(c => c.ApiKeysComponent) }
     ])
   ]
 })
