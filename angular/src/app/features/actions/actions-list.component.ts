@@ -107,15 +107,12 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
 
       <div class="ga-row" role="row" *ngFor="let item of view; trackBy: trackByItem">
         <span>{{ item.gate_name_display }}</span>
-        <!-- Initiative chip (wraps to multiple lines) + inline Consulted note,
-             with the submitter on a second line. -->
+        <!-- Initiative chip (wraps) + submitter name (muted, inline) + Consulted note. -->
         <span class="ga-init-cell">
-          <span class="ga-init-line">
-            <a class="ga-init-chip" [routerLink]="['/initiatives', item.delivery_cycle_id]"
-               [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">{{ item.cycle_title }}</a>
-            <app-consulted-status-indicator [summary]="item.consulted_summary" [gateStatus]="item.gate_status" [showLabel]="true"></app-consulted-status-indicator>
-          </span>
-          <span class="ga-init-sub">Submitted by {{ item.submitted_by_display_name }}</span>
+          <a class="ga-init-chip" [routerLink]="['/initiatives', item.delivery_cycle_id]"
+             [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">{{ item.cycle_title }}</a>
+          <span class="ga-init-submitter">{{ item.submitted_by_display_name }}</span>
+          <app-consulted-status-indicator [summary]="item.consulted_summary" [gateStatus]="item.gate_status" [showLabel]="true"></app-consulted-status-indicator>
         </span>
         <span class="ga-muted">{{ item.division_display_name_short }}</span>
         <span class="ga-muted" [title]="item.submitted_at">{{ rel(item.submitted_at) }}</span>
@@ -162,9 +159,8 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
     .ga-btn-text { background:none;border:none;color:var(--triarq-color-primary,#257099);cursor:pointer;font-size:13px; }
     .ga-grid { border:1px solid var(--triarq-color-border,#e8e8e8);border-radius:8px;overflow:hidden; }
     .ga-grid-head, .ga-row { display:grid;grid-template-columns:130px 1.7fr 90px 110px 110px 120px;gap:8px;padding:12px 16px;align-items:start; }
-    .ga-init-cell { display:flex;flex-direction:column;gap:2px;min-width:0; }
-    .ga-init-line { display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap; }
-    .ga-init-sub { font-size:11px;color:var(--triarq-color-stone,#8a9ba8); }
+    .ga-init-cell { display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap; }
+    .ga-init-submitter { font-size:11px;color:var(--triarq-color-stone,#8a9ba8); }
     .ga-grid-head { background:#F7F9FB;font-size:12px;font-weight:600;color:#5A5A5A;border-bottom:1px solid #E8E8E8; }
     .ga-row { border-bottom:1px solid #F0F0F0;font-size:13px; }
     .ga-row:last-child { border-bottom:none; }
