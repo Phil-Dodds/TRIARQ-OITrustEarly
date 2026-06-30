@@ -1,0 +1,1 @@
+var o=!0;export{o as ɵɵtsModuleIndicatorApiExtractorWorkaround};
