@@ -42,7 +42,10 @@ const CONFIDENCE = {
     <div class="oi-page" style="max-width:1300px;margin:0 auto;padding:var(--triarq-space-lg);">
 
       <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-        <h2 style="margin:0;">Initiative Status Dashboard</h2>
+        <div>
+          <h2 class="isd-title">Initiative Status Dashboard</h2>
+          <p class="isd-subtitle">Org-wide initiative status for meeting-ready triage — latest update, confidence, escalation, and why each row needs review. Filter by Division or toggle Needs Review only.</p>
+        </div>
         <div style="display:flex;align-items:center;gap:12px;">
           <label class="isd-toggle">
             <input type="checkbox" [checked]="needsReviewOnly" (change)="toggleNeedsReview()" />
@@ -74,11 +77,11 @@ const CONFIDENCE = {
         <table *ngIf="visibleRows.length" class="isd-table">
           <thead>
             <tr>
-              <th (click)="setSort('initiative')">Initiative Name {{ arrow('initiative') }}</th>
-              <th (click)="setSort('division')">Division {{ arrow('division') }}</th>
-              <th (click)="setSort('stage')">Stage {{ arrow('stage') }}</th>
-              <th (click)="setSort('last_update')">Last Update {{ arrow('last_update') }}</th>
-              <th (click)="setSort('updated_by')">Updated By {{ arrow('updated_by') }}</th>
+              <th class="isd-sortable" [class.isd-sorted]="sortField==='initiative'" (click)="setSort('initiative')">Initiative Name{{ activeArrow('initiative') }}</th>
+              <th class="isd-sortable" [class.isd-sorted]="sortField==='division'" (click)="setSort('division')">Division{{ activeArrow('division') }}</th>
+              <th class="isd-sortable" [class.isd-sorted]="sortField==='stage'" (click)="setSort('stage')">Stage{{ activeArrow('stage') }}</th>
+              <th class="isd-sortable" [class.isd-sorted]="sortField==='last_update'" (click)="setSort('last_update')">Last Update{{ activeArrow('last_update') }}</th>
+              <th class="isd-sortable" [class.isd-sorted]="sortField==='updated_by'" (click)="setSort('updated_by')">Updated By{{ activeArrow('updated_by') }}</th>
               <th>Escalation</th>
               <th>Confidence</th>
               <th>Needs Review Reason</th>
@@ -90,7 +93,7 @@ const CONFIDENCE = {
               <td><a class="isd-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
               <td>{{ r.division_name || '—' }}</td>
               <td>{{ stageLabel(r.current_lifecycle_stage) }}</td>
-              <td>{{ r.saved_at ? formatDateTime(r.saved_at) : 'Never' }}</td>
+              <td><span *ngIf="r.saved_at">{{ formatDateTime(r.saved_at) }}</span><span *ngIf="!r.saved_at" class="isd-never">Never</span></td>
               <td>{{ r.saved_by_name || '—' }}</td>
               <td>
                 <span *ngIf="r.escalation_needed" class="isd-esc">Yes</span>
@@ -168,7 +171,14 @@ const CONFIDENCE = {
     .isd-chip { background:var(--triarq-color-fog,#f4f4f4); border-radius:999px; padding:2px 10px; font-size:12px; display:inline-flex; align-items:center; gap:6px; }
     .isd-chip-x { cursor:pointer; color:var(--triarq-color-text-secondary); }
     .isd-table { width:100%; border-collapse:collapse; font-size:13px; }
-    .isd-table th { text-align:left; padding:8px; border-bottom:1px solid var(--triarq-color-border,#e0e0e0); cursor:pointer; user-select:none; color:var(--triarq-color-text-secondary); font-weight:500; white-space:nowrap; }
+    .isd-title { font-family:'Gill Sans', var(--triarq-font-family, Roboto), sans-serif; font-weight:700;
+                 color:var(--triarq-color-deep-navy,#1a2b4a); font-size:28px; margin:0; }
+    .isd-subtitle { font-size:11px; font-style:italic; color:#5A5A5A; margin:4px 0 0; max-width:640px; line-height:1.5; }
+    .isd-never { font-style:italic; color:#5A5A5A; }
+    .isd-table th { text-align:left; padding:8px; border-bottom:1px solid var(--triarq-color-border,#e0e0e0); color:var(--triarq-color-text-secondary); font-weight:500; white-space:nowrap; }
+    .isd-table th.isd-sortable { cursor:pointer; user-select:none; }
+    .isd-table th.isd-sortable.isd-sorted { color:var(--triarq-color-primary,#257099); font-weight:600; }
+    .isd-table th.isd-sortable:not(.isd-sorted):hover::after { content:' ↕'; opacity:0.5; }
     .isd-table td { padding:8px; border-bottom:1px solid var(--triarq-color-fog,#f4f4f4); vertical-align:top; }
     .isd-link { color:var(--triarq-color-primary,#257099); cursor:pointer; }
     .isd-esc { background:var(--triarq-color-error,#E96127); color:#fff; border-radius:999px; padding:1px 8px; font-size:11px; }
@@ -279,7 +289,7 @@ export class InitiativeStatusDashboardComponent implements OnInit {
     else { this.sortField = field; this.sortDir = 'asc'; }
     this.persistFilter();
   }
-  arrow(f: DashSort): string { return this.sortField === f ? (this.sortDir === 'asc' ? '↑' : '↓') : '↕'; }
+  activeArrow(f: DashSort): string { return this.sortField === f ? (this.sortDir === 'asc' ? ' ↑' : ' ↓') : ''; }
 
   openDetail(id: string): void { this.detailCycleId = id; this.cdr.markForCheck(); }
   openStatus(id: string, name: string): void { this.viewId = id; this.viewName = name; this.cdr.markForCheck(); }
