@@ -46,12 +46,9 @@ const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/actions/my-actions.component').then(m => m.MyActionsComponent)
   },
-  // Contract 32 / D-484: My Initiative Status — My Actions section.
-  {
-    path: 'my-initiative-status',
-    canActivate: [authGuard],
-    loadComponent: () => import('./features/delivery/my-initiative-status/my-initiative-status.component').then(m => m.MyInitiativeStatusComponent)
-  },
+  // Contract 32 / D-484 (amended): "My Initiative Status" is no longer a
+  // standalone route — its two tabs are folded into the My Actions screen.
+  { path: 'my-initiative-status', redirectTo: 'actions', pathMatch: 'full' },
   // D-392: Legacy /delivery/* routes redirect to /initiatives/*. Preserves bookmarks and saved links.
   { path: 'delivery',           redirectTo: 'initiatives',                  pathMatch: 'full' },
   { path: 'delivery/cycles',    redirectTo: 'initiatives/list',             pathMatch: 'full' },

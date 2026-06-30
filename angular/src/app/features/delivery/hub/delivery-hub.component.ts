@@ -35,7 +35,7 @@ interface HubCard {
   /** Optional id; required for cards that surface an async headline (D-396 / spec §4). */
   id?:         'all-initiatives' | 'epo-summary' | 'epo-schedule' | 'epo-deploy'
             |  'workstream-summary' | 'gate-schedule' | 'deploy-schedule'
-            |  'initiative-activity' | 'gates-approved';
+            |  'initiative-activity' | 'gates-approved' | 'status-dashboard';
 }
 
 /** Spec §4 headline color semantics. */
@@ -61,6 +61,17 @@ const HUB_CARDS: HubCard[] = [
     description: 'The full list of active Initiatives with filtering by stage, tier, workstream, ' +
                  'division, and next gate. Use this when you know the Initiative you are looking ' +
                  'for, or want to apply a combination of filters.'
+  },
+  {
+    // Contract 32 / D-485 (amended): Initiative Status Dashboard moved from a
+    // standalone nav item to a hub card near the top of the list.
+    id:          'status-dashboard',
+    title:       'Initiative Status Dashboard',
+    route:       '/initiatives/status-dashboard',
+    icon:        '◎',
+    description: 'Org-wide initiative status at a glance — latest update, confidence, escalation, ' +
+                 'and a Needs Review column (overdue, escalation, gate-date slip, or At Risk). ' +
+                 'Filter by Division and toggle Needs Review to triage for a meeting.'
   },
   {
     id:          'epo-summary',
@@ -334,6 +345,21 @@ export class DeliveryHubComponent implements OnInit {
       error: () => { /* card stays without headline on failure — navigable */ }
     });
 
+    // Contract 32 (D-485) — Initiative Status Dashboard card headline:
+    // count of initiatives currently flagged Needs Review (division-scoped).
+    this.delivery.getInitiativeStatusDashboard({ needs_review_only: true }).subscribe({
+      next: (res) => {
+        if (res.success && Array.isArray(res.data)) {
+          const n = res.data.length;
+          this.headlines['status-dashboard'] = n === 0
+            ? { text: 'No initiatives need review', tone: 'green' }
+            : { text: `${n} initiative${n === 1 ? '' : 's'} need review`, tone: 'amber' };
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => { /* card stays without headline on failure — navigable */ }
+    });
+
     // Contract 24 (D-431) — Recently Approved Gates card 9 headline.
     // Reuses list_approved_gates and counts the array (no count_only variant
     // since the endpoint is small and not yet paginated).
@@ -409,7 +435,8 @@ export class DeliveryHubComponent implements OnInit {
         || id === 'epo-schedule'
         || id === 'epo-deploy'
         || id === 'initiative-activity'
-        || id === 'gates-approved';
+        || id === 'gates-approved'
+        || id === 'status-dashboard';
   }
 
   onCardEnter(event: MouseEvent): void {

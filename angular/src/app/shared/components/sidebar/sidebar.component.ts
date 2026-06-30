@@ -32,14 +32,14 @@ interface NavItem {
 // Coming-soon items with no route are placeholders for not-yet-built surfaces.
 const NAV_ITEMS: NavItem[] = [
   { label: 'Home',                 route: '/home',           devStatus: 'pilot'       },
-  // Contract 30 / D-472 (WS1.1): My Actions — gate-action surface; badge = pending count.
+  // Contract 30 / D-472 + Contract 32 / D-484: My Actions — gate actions +
+  // initiative status tabs (Updates Due, Needs Acknowledgment). Badge sums all
+  // three actionable tabs. (Standalone "My Initiative Status" nav item removed.)
   { label: 'My Actions',           route: '/actions',        devStatus: 'pilot'       },
-  // Contract 32 / D-484: My Initiative Status — My Actions section.
-  { label: 'My Initiative Status', route: '/my-initiative-status', devStatus: 'uat'   },
   // Raised above OI Library (Phil).
+  // Contract 32 / D-485: Initiative Status Dashboard is now a card on this hub
+  // (not a standalone nav item).
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'live'        },
-  // Contract 32 / D-485: Initiative Status Dashboard — Initiative Tracking section.
-  { label: 'Initiative Status Dashboard', route: '/initiatives/status-dashboard', devStatus: 'uat' },
   { label: 'To Dos',                                         devStatus: 'not-started' },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
     children: [
@@ -202,10 +202,14 @@ export class SidebarComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  /** D-472 (WS1.1): pending-action count on the My Actions nav badge.
-   *  Accountable awaiting_approval + active Consulted pending; post-approval
-   *  Consulted items (D-468) are excluded — same rule as the Home card badge. */
+  /** My Actions nav badge. D-472 (pending approvals) + Contract 32 (D-484):
+   *  now also sums Updates Due + Needs Acknowledgment so the single nav number
+   *  reflects all three actionable My Actions tabs. Post-approval Consulted
+   *  items (D-468) are excluded from the pending count. */
   actionBadge = 0;
+  private pendingCount = 0;
+  private dueCount = 0;
+  private ackCount = 0;
 
   private sub = new Subscription();
 
@@ -231,21 +235,38 @@ export class SidebarComponent implements OnInit, OnDestroy {
     this.loadActionBadge();
   }
 
-  /** D-472 (WS1.1): fetch the pending-action count for the My Actions badge. */
+  /** Fetch the three actionable counts for the My Actions badge (D-472 + D-484). */
   private loadActionBadge(): void {
     this.sub.add(
       this.delivery.listPendingApprovals().subscribe({
         next: res => {
           const items: PendingApprovalItem[] = (res.success && res.data) ? res.data : [];
           // Exclude post-approval Consulted items (D-468: stone, not counted).
-          this.actionBadge = items.filter(
+          this.pendingCount = items.filter(
             i => !(i.item_type === 'consulted' && i.gate_status === 'approved')
           ).length;
-          this.cdr.markForCheck();
+          this.recomputeActionBadge();
         },
-        error: () => { /* badge stays 0 — non-blocking */ }
+        error: () => { /* badge contribution stays 0 — non-blocking */ }
       })
     );
+    this.sub.add(
+      this.delivery.getMyStatusDue().subscribe({
+        next: res => { this.dueCount = (res.success && res.data) ? res.data.length : 0; this.recomputeActionBadge(); },
+        error: () => { /* non-blocking */ }
+      })
+    );
+    this.sub.add(
+      this.delivery.getMyAcknowledgmentsDue().subscribe({
+        next: res => { this.ackCount = (res.success && res.data) ? res.data.length : 0; this.recomputeActionBadge(); },
+        error: () => { /* non-blocking */ }
+      })
+    );
+  }
+
+  private recomputeActionBadge(): void {
+    this.actionBadge = this.pendingCount + this.dueCount + this.ackCount;
+    this.cdr.markForCheck();
   }
 
   ngOnDestroy(): void {

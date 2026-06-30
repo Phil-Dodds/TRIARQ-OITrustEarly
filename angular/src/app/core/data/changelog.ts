@@ -33,6 +33,23 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-06-30',
+    builtAt:       '17:10 UTC',
+    contractLabel: 'Contract 32 follow-on — Navigation restructure',
+    items: [
+      {
+        audience:    'All',
+        surface:     'My Actions',
+        description: 'My Actions now has four tabs: Approve Initiative Gates, Initiative Gate Approvals Completed, Updates Due, and Needs Acknowledgment. The sidebar badge on My Actions counts all three actionable tabs together. The separate "My Initiative Status" sidebar item has been removed — its Updates Due and Needs Acknowledgment views live here now.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Tracking',
+        description: 'The Initiative Status Dashboard is now a card on the Initiative Tracking page (with a "needs review" headline) instead of a separate sidebar item.'
+      }
+    ]
+  },
+  {
+    date:          '2026-06-30',
     builtAt:       '14:48 UTC',
     contractLabel: 'Contract 32 — Initiative Status Updates',
     items: [

@@ -1,15 +1,20 @@
-// my-initiative-status.component.ts — Contract 32 (WS3)
-// "My Initiative Status" screen (D-484). My Actions nav. Two tabs with count
-// badges: Updates Due and Needs Acknowledgment. Refresh Status triggers the
-// overdue recompute (D-482) and shows the last-calculated time (D-484).
+// my-initiative-status.component.ts — Contract 32 (WS3), restructured.
+// EMBEDDED in My Actions as the body of the "Updates Due" and "Needs
+// Acknowledgment" tabs (D-484 amended: the standalone screen + nav item were
+// removed; these two tabs now live inside My Actions, D-472). My Actions owns
+// the tab strip + badges; this component renders the active status grid, the
+// Refresh strip, and the embedded detail/status panels, and emits its counts up.
 //
-// D-346 Context A (Refresh button), Context B (skeleton on load). S-018 row tap
-// opens the initiative detail panel. S-036 column sort persisted per D-171.
+// D-346 Context A (Refresh), Context B (skeleton). S-018 row tap → detail.
+// S-036 column sort persisted per D-171.
 
 import {
   Component,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
+  Input,
+  Output,
+  EventEmitter,
   OnInit
 } from '@angular/core';
 import { CommonModule }    from '@angular/common';
@@ -29,110 +34,91 @@ type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, IonicModule, DeliveryCycleDetailComponent, InitiativeStatusUpdatePanelComponent],
   template: `
-    <div class="oi-page" style="max-width:1100px;margin:0 auto;padding:var(--triarq-space-lg);">
-
-      <!-- Header -->
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-        <h2 style="margin:0;">My Initiative Status</h2>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:12px;color:var(--triarq-color-text-secondary);">
-            Status last calculated: {{ lastCalculated }}
-          </span>
-          <button class="oi-btn-secondary" (click)="refresh()" [disabled]="refreshing">
-            {{ refreshing ? 'Refreshing…' : 'Refresh Status' }}
-          </button>
-        </div>
-      </div>
-      <div *ngIf="refreshError" class="oi-err" style="margin-top:6px;">{{ refreshError }}</div>
-
-      <!-- Tabs -->
-      <div class="mis-tabs">
-        <button class="mis-tab" [class.mis-tab-active]="tab === 'due'" (click)="tab = 'due'">
-          Updates Due <span class="mis-badge">{{ dueRows.length }}</span>
-        </button>
-        <button class="mis-tab" [class.mis-tab-active]="tab === 'ack'" (click)="tab = 'ack'">
-          Needs Acknowledgment <span class="mis-badge">{{ ackRows.length }}</span>
-        </button>
-      </div>
-
-      <!-- D-346 Context B skeleton -->
-      <div *ngIf="loading" class="oi-card" style="margin-top:12px;">
-        <ion-skeleton-text animated style="width:100%;height:40px;"></ion-skeleton-text>
-        <ion-skeleton-text animated style="width:100%;height:40px;"></ion-skeleton-text>
-      </div>
-
-      <ng-container *ngIf="!loading">
-
-        <!-- ===== Tab 1: Updates Due ===== -->
-        <div *ngIf="tab === 'due'" class="oi-card" style="margin-top:12px;">
-          <div *ngIf="dueRows.length === 0" class="mis-empty">
-            ✓ No initiatives currently require a status update.
-          </div>
-          <table *ngIf="dueRows.length" class="mis-table">
-            <thead>
-              <tr>
-                <th (click)="sortDue('initiative')">Initiative Name {{ dueArrow('initiative') }}</th>
-                <th (click)="sortDue('division')">Division {{ dueArrow('division') }}</th>
-                <th (click)="sortDue('last_update')">Last Update {{ dueArrow('last_update') }}</th>
-                <th (click)="sortDue('cadence')">Cadence {{ dueArrow('cadence') }}</th>
-                <th (click)="sortDue('next_meeting')">Next Meeting {{ dueArrow('next_meeting') }}</th>
-                <th>Update Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let r of dueRowsSorted">
-                <td><a class="mis-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
-                <td>{{ r.division_name || '—' }}</td>
-                <td>{{ r.last_saved_at ? formatDateTime(r.last_saved_at) : neverText() }}</td>
-                <td>{{ r.cadence || '—' }}</td>
-                <td>{{ nextMeeting(r.status_due_at) }}</td>
-                <td><button class="oi-btn-secondary mis-sm" (click)="openUpdate(r.initiative_id, r.cycle_title)">Update Status</button></td>
-              </tr>
-            </tbody>
-          </table>
-          <div *ngIf="dueRows.length" class="mis-foot">{{ dueRows.length }} initiatives</div>
-        </div>
-
-        <!-- ===== Tab 2: Needs Acknowledgment ===== -->
-        <div *ngIf="tab === 'ack'" class="oi-card" style="margin-top:12px;">
-          <div *ngIf="ackRows.length === 0" class="mis-empty">No status updates pending your review.</div>
-          <table *ngIf="ackRows.length" class="mis-table">
-            <thead>
-              <tr>
-                <th (click)="sortAck('initiative')">Initiative Name {{ ackArrow('initiative') }}</th>
-                <th (click)="sortAck('division')">Division {{ ackArrow('division') }}</th>
-                <th (click)="sortAck('updated_by')">Updated By {{ ackArrow('updated_by') }}</th>
-                <th (click)="sortAck('updated_at')">Updated At {{ ackArrow('updated_at') }}</th>
-                <th>View &amp; Acknowledge</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let r of ackRowsSorted">
-                <td><a class="mis-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
-                <td>{{ r.division_name || '—' }}</td>
-                <td>{{ r.saved_by_name }}</td>
-                <td>{{ formatDateTime(r.saved_at) }}</td>
-                <td><button class="oi-btn-secondary mis-sm" (click)="openReview(r.initiative_id, r.cycle_title)">View &amp; Acknowledge</button></td>
-              </tr>
-            </tbody>
-          </table>
-          <div *ngIf="ackRows.length" class="mis-foot">{{ ackRows.length }} updates</div>
-        </div>
-      </ng-container>
+    <!-- Refresh strip — only while a status tab is visible. -->
+    <div *ngIf="visibleTab" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:8px;">
+      <span style="font-size:12px;color:var(--triarq-color-text-secondary);">
+        Status last calculated: {{ lastCalculated }}
+      </span>
+      <button class="oi-btn-secondary" (click)="refresh()" [disabled]="refreshing">
+        {{ refreshing ? 'Refreshing…' : 'Refresh Status' }}
+      </button>
     </div>
+    <div *ngIf="visibleTab && refreshError" class="oi-err" style="margin-bottom:8px;">{{ refreshError }}</div>
+
+    <div *ngIf="loading && visibleTab" class="oi-card">
+      <ion-skeleton-text animated style="width:100%;height:40px;"></ion-skeleton-text>
+      <ion-skeleton-text animated style="width:100%;height:40px;"></ion-skeleton-text>
+    </div>
+
+    <ng-container *ngIf="!loading">
+
+      <!-- ===== Updates Due ===== -->
+      <div *ngIf="visibleTab === 'due'" class="oi-card">
+        <div *ngIf="dueRows.length === 0" class="mis-empty">
+          ✓ No initiatives currently require a status update.
+        </div>
+        <table *ngIf="dueRows.length" class="mis-table">
+          <thead>
+            <tr>
+              <th (click)="sortDue('initiative')">Initiative Name {{ dueArrow('initiative') }}</th>
+              <th (click)="sortDue('division')">Division {{ dueArrow('division') }}</th>
+              <th (click)="sortDue('last_update')">Last Update {{ dueArrow('last_update') }}</th>
+              <th (click)="sortDue('cadence')">Cadence {{ dueArrow('cadence') }}</th>
+              <th (click)="sortDue('next_meeting')">Next Meeting {{ dueArrow('next_meeting') }}</th>
+              <th>Update Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of dueRowsSorted">
+              <td><a class="mis-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
+              <td>{{ r.division_name || '—' }}</td>
+              <td>{{ r.last_saved_at ? formatDateTime(r.last_saved_at) : 'Never' }}</td>
+              <td>{{ r.cadence || '—' }}</td>
+              <td>{{ nextMeeting(r.status_due_at) }}</td>
+              <td><button class="oi-btn-secondary mis-sm" (click)="openUpdate(r.initiative_id, r.cycle_title)">Update Status</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="dueRows.length" class="mis-foot">{{ dueRows.length }} initiatives</div>
+      </div>
+
+      <!-- ===== Needs Acknowledgment ===== -->
+      <div *ngIf="visibleTab === 'ack'" class="oi-card">
+        <div *ngIf="ackRows.length === 0" class="mis-empty">No status updates pending your review.</div>
+        <table *ngIf="ackRows.length" class="mis-table">
+          <thead>
+            <tr>
+              <th (click)="sortAck('initiative')">Initiative Name {{ ackArrow('initiative') }}</th>
+              <th (click)="sortAck('division')">Division {{ ackArrow('division') }}</th>
+              <th (click)="sortAck('updated_by')">Updated By {{ ackArrow('updated_by') }}</th>
+              <th (click)="sortAck('updated_at')">Updated At {{ ackArrow('updated_at') }}</th>
+              <th>View &amp; Acknowledge</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of ackRowsSorted">
+              <td><a class="mis-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
+              <td>{{ r.division_name || '—' }}</td>
+              <td>{{ r.saved_by_name }}</td>
+              <td>{{ formatDateTime(r.saved_at) }}</td>
+              <td><button class="oi-btn-secondary mis-sm" (click)="openReview(r.initiative_id, r.cycle_title)">View &amp; Acknowledge</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="ackRows.length" class="mis-foot">{{ ackRows.length }} updates</div>
+      </div>
+    </ng-container>
 
     <!-- Embedded initiative detail — standard right panel (S-006), fixed overlay + scrim. -->
     <div *ngIf="detailCycleId" class="oi-scrim oi-scrim-detail" (click)="detailCycleId = null; reload()"></div>
     <div *ngIf="detailCycleId"
          style="position:fixed;top:0;right:0;width:60%;max-width:980px;height:100vh;background:#fff;
                 border-left:1px solid #E0E0E0;overflow-y:auto;z-index:1000;">
-      <app-delivery-cycle-detail
-        [cycleId]="detailCycleId"
-        (close)="detailCycleId = null; reload()">
+      <app-delivery-cycle-detail [cycleId]="detailCycleId" (close)="detailCycleId = null; reload()">
       </app-delivery-cycle-detail>
     </div>
 
-    <!-- Embedded status panels -->
+    <!-- Status panels -->
     <app-initiative-status-update-panel
       *ngIf="editId"
       [initiativeId]="editId"
@@ -155,12 +141,6 @@ type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
   `,
   styles: [`
     :host { display:block; }
-    .mis-tabs { display:flex; gap:8px; margin-top:16px; border-bottom:1px solid var(--triarq-color-border,#e0e0e0); }
-    .mis-tab { background:none; border:none; padding:8px 12px; cursor:pointer; font-size:14px;
-               color:var(--triarq-color-text-secondary); border-bottom:2px solid transparent; }
-    .mis-tab-active { color:var(--triarq-color-primary,#257099); border-bottom-color:var(--triarq-color-primary,#257099); font-weight:500; }
-    .mis-badge { display:inline-block; background:var(--triarq-color-primary,#257099); color:#fff;
-                 border-radius:999px; padding:0 7px; font-size:11px; margin-left:4px; }
     .mis-table { width:100%; border-collapse:collapse; font-size:13px; }
     .mis-table th { text-align:left; padding:8px; border-bottom:1px solid var(--triarq-color-border,#e0e0e0);
                     cursor:pointer; user-select:none; color:var(--triarq-color-text-secondary); font-weight:500; }
@@ -172,7 +152,11 @@ type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
   `]
 })
 export class MyInitiativeStatusComponent implements OnInit {
-  tab: 'due' | 'ack' = 'due';
+  /** Which status tab body to render. null = mounted for count loading only (no body). */
+  @Input() visibleTab: 'due' | 'ack' | null = null;
+  /** Emits live counts so the host (My Actions) can show tab badges + the nav badge. */
+  @Output() countsChanged = new EventEmitter<{ due: number; ack: number }>();
+
   loading    = false;
   refreshing = false;
   refreshError: string | null = null;
@@ -182,7 +166,7 @@ export class MyInitiativeStatusComponent implements OnInit {
   ackRows: MyAcknowledgmentDueRow[] = [];
 
   dueSortField: DueSort = 'last_update';
-  dueSortDir: 'asc' | 'desc' = 'asc';     // oldest first = most urgent
+  dueSortDir: 'asc' | 'desc' = 'asc';
   ackSortField: AckSort = 'updated_at';
   ackSortDir: 'asc' | 'desc' = 'desc';
 
@@ -219,7 +203,13 @@ export class MyInitiativeStatusComponent implements OnInit {
     this.loading = true;
     this.cdr.markForCheck();
     let pending = 2;
-    const done = () => { if (--pending === 0) { this.loading = false; this.cdr.markForCheck(); } };
+    const done = () => {
+      if (--pending === 0) {
+        this.loading = false;
+        this.countsChanged.emit({ due: this.dueRows.length, ack: this.ackRows.length });
+        this.cdr.markForCheck();
+      }
+    };
     this.delivery.getMyStatusDue().subscribe({
       next: (res) => { this.dueRows = (res.success && res.data) ? res.data : []; done(); },
       error: () => { this.dueRows = []; done(); }
@@ -245,7 +235,7 @@ export class MyInitiativeStatusComponent implements OnInit {
       next: (res) => {
         this.refreshing = false;
         if (!res.success) { this.refreshError = res.error || 'Status refresh failed.'; }
-        this.loadLastRun();   // always re-read the authoritative timestamp from system_config
+        this.loadLastRun();
         this.reload();
       },
       error: (err) => {
@@ -257,14 +247,12 @@ export class MyInitiativeStatusComponent implements OnInit {
     });
   }
 
-  // ── Row actions ───────────────────────────────────────────────────────────
   openDetail(id: string): void { this.detailCycleId = id; this.cdr.markForCheck(); }
   openUpdate(id: string, name: string): void { this.editId = id; this.editName = name; this.cdr.markForCheck(); }
   openReview(id: string, name: string): void { this.reviewId = id; this.reviewName = name; this.cdr.markForCheck(); }
   onPanelSaved(): void { this.editId = null; this.reload(); }
   onAcknowledged(): void { this.reviewId = null; this.reload(); }
 
-  // ── Sorting (S-036, persisted D-171) ────────────────────────────────────────
   sortDue(field: DueSort): void {
     if (this.dueSortField === field) { this.dueSortDir = this.dueSortDir === 'asc' ? 'desc' : 'asc'; }
     else { this.dueSortField = field; this.dueSortDir = 'asc'; }
@@ -305,8 +293,6 @@ export class MyInitiativeStatusComponent implements OnInit {
     return [...this.ackRows].sort((a, b) => key(a).localeCompare(key(b)) * dir);
   }
 
-  // ── Formatting ──────────────────────────────────────────────────────────────
-  neverText(): string { return 'Never'; }
   nextMeeting(statusDueAt: string | null): string {
     if (!statusDueAt) { return '—'; }
     const d = new Date(statusDueAt);
