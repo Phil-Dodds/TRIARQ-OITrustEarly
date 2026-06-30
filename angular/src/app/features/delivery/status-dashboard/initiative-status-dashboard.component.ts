@@ -137,12 +137,16 @@ const CONFIDENCE = {
       </div>
     </div>
 
-    <!-- Row-tap detail (S-018) -->
-    <app-delivery-cycle-detail
-      *ngIf="detailCycleId"
-      [cycleId]="detailCycleId"
-      (close)="detailCycleId = null; load()">
-    </app-delivery-cycle-detail>
+    <!-- Row-tap detail — standard right panel (S-006), fixed overlay + scrim. -->
+    <div *ngIf="detailCycleId" class="oi-scrim oi-scrim-detail" (click)="detailCycleId = null; load()"></div>
+    <div *ngIf="detailCycleId"
+         style="position:fixed;top:0;right:0;width:60%;max-width:980px;height:100vh;background:#fff;
+                border-left:1px solid #E0E0E0;overflow-y:auto;z-index:1000;">
+      <app-delivery-cycle-detail
+        [cycleId]="detailCycleId"
+        (close)="detailCycleId = null; load()">
+      </app-delivery-cycle-detail>
+    </div>
 
     <!-- View Status read-only panel -->
     <app-initiative-status-update-panel

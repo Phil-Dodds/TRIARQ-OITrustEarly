@@ -539,6 +539,69 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </div>
       </div>
 
+      <!-- ── Contract 32: Current Status — D-478 §4.4 A (below Outcome per UAT) ── -->
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--triarq-space-sm);">
+          <span style="font-weight:500;">Current Status</span>
+          <button *ngIf="callerIsTrioMember"
+                  (click)="openStatusPanel()"
+                  style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
+                         background:none;border:1px solid var(--triarq-color-primary);
+                         border-radius:5px;padding:3px 8px;cursor:pointer;">
+            Update Status
+          </button>
+        </div>
+
+        <!-- D-346 Context B skeleton — loads independently of the rest of the panel. -->
+        <div *ngIf="loadingStatus" style="display:flex;flex-direction:column;gap:6px;">
+          <ion-skeleton-text animated style="width:45%;height:13px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="width:85%;height:13px;"></ion-skeleton-text>
+        </div>
+
+        <ng-container *ngIf="!loadingStatus">
+          <div *ngIf="!latestStatus?.latest"
+               style="font-size:13px;font-style:italic;color:#5A5A5A;">
+            No status updates recorded.
+          </div>
+
+          <ng-container *ngIf="latestStatus?.latest as u">
+            <div style="font-size:12px;color:var(--triarq-color-text-secondary);margin-bottom:8px;">
+              Last updated: {{ latestStatus!.saved_by_name || 'Unknown' }} · {{ formatStatusDateTime(u.saved_at) }}
+            </div>
+            <div style="margin-bottom:6px;"><span style="font-weight:500;">Accomplished Last Cycle:</span>
+              {{ truncate(u.accomplished_last_cycle) }}</div>
+            <div style="margin-bottom:6px;"><span style="font-weight:500;">Plan for Next Cycle:</span>
+              {{ truncate(u.plan_next_cycle) }}</div>
+            <div style="margin-bottom:6px;"><span style="font-weight:500;">Blockers:</span>
+              {{ truncate(u.blockers) }}</div>
+            <div style="margin-bottom:6px;">
+              <span style="font-weight:500;">Escalation Needed:</span>
+              <span *ngIf="u.escalation_needed"
+                    style="background:var(--triarq-color-error,#E96127);color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;margin-left:4px;">Yes</span>
+              <span *ngIf="!u.escalation_needed" style="color:#5A5A5A;"> No</span>
+            </div>
+            <div *ngIf="u.pilot_confidence_applicable" style="margin-bottom:6px;">
+              <span style="font-weight:500;">Go to Deploy Confidence:</span> {{ confidenceLabel(u.pilot_confidence) }}
+            </div>
+            <div *ngIf="u.close_confidence_applicable" style="margin-bottom:6px;">
+              <span style="font-weight:500;">Close Review Confidence:</span> {{ confidenceLabel(u.close_confidence) }}
+            </div>
+
+            <div *ngIf="latestStatus!.needs_review_reasons.length"
+                 style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+              <span *ngFor="let r of latestStatus!.needs_review_reasons"
+                    style="background:var(--triarq-color-error,#E96127);color:#fff;border-radius:999px;padding:2px 10px;font-size:11px;">{{ r }}</span>
+            </div>
+
+            <button *ngIf="statusHasLongText"
+                    (click)="statusExpanded = !statusExpanded"
+                    style="background:none;border:none;color:var(--triarq-color-primary,#257099);cursor:pointer;font-size:12px;padding:4px 0 0 0;">
+              {{ statusExpanded ? 'Show less' : 'Show more' }}
+            </button>
+          </ng-container>
+        </ng-container>
+      </div>
+
       <!-- ── Identity zone — D-273 zone 4: Division / Workstream / DS / CB / Tier / Jira Epic ── -->
       <!-- D-181: tappable chips. 2-column grid. Unset values: dashed-border chip italic gray.    -->
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
@@ -941,60 +1004,6 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         <p style="margin:var(--triarq-space-sm) 0 0 0;font-size:11px;font-style:italic;color:#5A5A5A;">
           Click a gate diamond on the Stage Track to open its record.
         </p>
-      </div>
-
-      <!-- ── Contract 32 (WS2): Current Status — D-478 §4.4 A ────────────── -->
-      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
-        <div style="font-weight:500;margin-bottom:var(--triarq-space-sm);">Current Status</div>
-
-        <!-- D-346 Context B skeleton — loads independently of the rest of the panel. -->
-        <div *ngIf="loadingStatus" style="display:flex;flex-direction:column;gap:6px;">
-          <ion-skeleton-text animated style="width:45%;height:13px;"></ion-skeleton-text>
-          <ion-skeleton-text animated style="width:85%;height:13px;"></ion-skeleton-text>
-        </div>
-
-        <ng-container *ngIf="!loadingStatus">
-          <div *ngIf="!latestStatus?.latest"
-               style="font-size:13px;font-style:italic;color:#5A5A5A;">
-            No status updates recorded.
-          </div>
-
-          <ng-container *ngIf="latestStatus?.latest as u">
-            <div style="font-size:12px;color:var(--triarq-color-text-secondary);margin-bottom:8px;">
-              Last updated: {{ latestStatus!.saved_by_name || 'Unknown' }} · {{ formatStatusDateTime(u.saved_at) }}
-            </div>
-            <div style="margin-bottom:6px;"><span style="font-weight:500;">Accomplished Last Cycle:</span>
-              {{ truncate(u.accomplished_last_cycle) }}</div>
-            <div style="margin-bottom:6px;"><span style="font-weight:500;">Plan for Next Cycle:</span>
-              {{ truncate(u.plan_next_cycle) }}</div>
-            <div style="margin-bottom:6px;"><span style="font-weight:500;">Blockers:</span>
-              {{ truncate(u.blockers) }}</div>
-            <div style="margin-bottom:6px;">
-              <span style="font-weight:500;">Escalation Needed:</span>
-              <span *ngIf="u.escalation_needed"
-                    style="background:var(--triarq-color-error,#E96127);color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;margin-left:4px;">Yes</span>
-              <span *ngIf="!u.escalation_needed" style="color:#5A5A5A;"> No</span>
-            </div>
-            <div *ngIf="u.pilot_confidence_applicable" style="margin-bottom:6px;">
-              <span style="font-weight:500;">Go to Deploy Confidence:</span> {{ confidenceLabel(u.pilot_confidence) }}
-            </div>
-            <div *ngIf="u.close_confidence_applicable" style="margin-bottom:6px;">
-              <span style="font-weight:500;">Close Review Confidence:</span> {{ confidenceLabel(u.close_confidence) }}
-            </div>
-
-            <div *ngIf="latestStatus!.needs_review_reasons.length"
-                 style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
-              <span *ngFor="let r of latestStatus!.needs_review_reasons"
-                    style="background:var(--triarq-color-error,#E96127);color:#fff;border-radius:999px;padding:2px 10px;font-size:11px;">{{ r }}</span>
-            </div>
-
-            <button *ngIf="statusHasLongText"
-                    (click)="statusExpanded = !statusExpanded"
-                    style="background:none;border:none;color:var(--triarq-color-primary,#257099);cursor:pointer;font-size:12px;padding:4px 0 0 0;">
-              {{ statusExpanded ? 'Show less' : 'Show more' }}
-            </button>
-          </ng-container>
-        </ng-container>
       </div>
 
       <!-- ── Artifact Slots ────────────────────────────────────────────── -->

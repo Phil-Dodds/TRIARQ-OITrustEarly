@@ -80,7 +80,7 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
             <label class="oi-field-label">Escalation Needed?</label>
             <label class="isp-toggle">
               <input type="checkbox" formControlName="escalation_needed" />
-              <span>{{ form.value.escalation_needed ? 'Yes' : 'No' }}</span>
+              <span>Yes</span>
             </label>
           </div>
 

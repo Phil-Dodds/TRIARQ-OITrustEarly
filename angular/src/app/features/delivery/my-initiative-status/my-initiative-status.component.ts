@@ -43,6 +43,7 @@ type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
           </button>
         </div>
       </div>
+      <div *ngIf="refreshError" class="oi-err" style="margin-top:6px;">{{ refreshError }}</div>
 
       <!-- Tabs -->
       <div class="mis-tabs">
@@ -120,12 +121,16 @@ type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
       </ng-container>
     </div>
 
-    <!-- Embedded initiative detail panel (S-018 row tap) -->
-    <app-delivery-cycle-detail
-      *ngIf="detailCycleId"
-      [cycleId]="detailCycleId"
-      (close)="detailCycleId = null; reload()">
-    </app-delivery-cycle-detail>
+    <!-- Embedded initiative detail — standard right panel (S-006), fixed overlay + scrim. -->
+    <div *ngIf="detailCycleId" class="oi-scrim oi-scrim-detail" (click)="detailCycleId = null; reload()"></div>
+    <div *ngIf="detailCycleId"
+         style="position:fixed;top:0;right:0;width:60%;max-width:980px;height:100vh;background:#fff;
+                border-left:1px solid #E0E0E0;overflow-y:auto;z-index:1000;">
+      <app-delivery-cycle-detail
+        [cycleId]="detailCycleId"
+        (close)="detailCycleId = null; reload()">
+      </app-delivery-cycle-detail>
+    </div>
 
     <!-- Embedded status panels -->
     <app-initiative-status-update-panel
@@ -170,6 +175,7 @@ export class MyInitiativeStatusComponent implements OnInit {
   tab: 'due' | 'ack' = 'due';
   loading    = false;
   refreshing = false;
+  refreshError: string | null = null;
   lastCalculated = 'Not yet calculated';
 
   dueRows: MyStatusDueRow[] = [];
@@ -233,13 +239,21 @@ export class MyInitiativeStatusComponent implements OnInit {
 
   refresh(): void {
     this.refreshing = true;
+    this.refreshError = null;
+    this.cdr.markForCheck();
     this.delivery.triggerStatusRefresh().subscribe({
       next: (res) => {
         this.refreshing = false;
-        if (res.success && res.data) { this.lastCalculated = this.fmtLastRun(res.data.last_run); }
+        if (!res.success) { this.refreshError = res.error || 'Status refresh failed.'; }
+        this.loadLastRun();   // always re-read the authoritative timestamp from system_config
         this.reload();
       },
-      error: () => { this.refreshing = false; this.cdr.markForCheck(); }
+      error: (err) => {
+        this.refreshing = false;
+        this.refreshError = (err && err.error) ? err.error : 'Status refresh failed.';
+        this.loadLastRun();
+        this.cdr.markForCheck();
+      }
     });
   }
 
