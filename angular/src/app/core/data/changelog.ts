@@ -32,6 +32,33 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-06-30',
+    builtAt:       '14:48 UTC',
+    contractLabel: 'Contract 32 — Initiative Status Updates',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'My Initiative Status screen',
+        description: 'A new My Initiative Status page (sidebar, under My Actions) with two tabs: Updates Due — initiatives where you are the DOL/DCS/EPO and a status update is overdue for the division’s meeting cadence; and Needs Acknowledgment — recent updates by a teammate awaiting your one-click acknowledgment. A Refresh Status button recomputes overdue state on demand and shows when it last ran.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Status Dashboard',
+        description: 'A new Initiative Status Dashboard (sidebar, under Initiative Tracking) showing every initiative you can see with its latest status, confidence, escalation flag, and a Needs Review reason column (overdue, escalation, gate-date slip, or At Risk). Filter by Division, toggle Needs Review only, and open any initiative’s status or full detail.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Initiative Status Update panel',
+        description: 'On an initiative’s detail view, Update Status (trio only) opens a panel to record what was accomplished, the plan, blockers, an escalation flag, and gate confidence — confidence writes through to the gate status. View Status History shows every past update with acknowledgments, and a Current Status section summarizes the latest one.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Division — Initiative Update Cycle',
+        description: 'The Division admin panel gains an Initiative Update Cycle section to set how often each division’s initiatives need a status update (weekly, every three weeks, or monthly) with a plain-English preview. Divisions without their own setting inherit from their parent.'
+      }
+    ]
+  },
+  {
     date:          '2026-06-22',
     contractLabel: 'Contract 31 — API Keys & Public Initiative MCP',
     items: [
