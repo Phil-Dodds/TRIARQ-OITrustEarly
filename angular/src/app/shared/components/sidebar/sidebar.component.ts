@@ -34,8 +34,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Home',                 route: '/home',           devStatus: 'pilot'       },
   // Contract 30 / D-472 (WS1.1): My Actions — gate-action surface; badge = pending count.
   { label: 'My Actions',           route: '/actions',        devStatus: 'pilot'       },
+  // Contract 32 / D-484: My Initiative Status — My Actions section.
+  { label: 'My Initiative Status', route: '/my-initiative-status', devStatus: 'uat'   },
   // Raised above OI Library (Phil).
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'live'        },
+  // Contract 32 / D-485: Initiative Status Dashboard — Initiative Tracking section.
+  { label: 'Initiative Status Dashboard', route: '/initiatives/status-dashboard', devStatus: 'uat' },
   { label: 'To Dos',                                         devStatus: 'not-started' },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
     children: [

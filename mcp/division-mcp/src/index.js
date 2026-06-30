@@ -40,6 +40,10 @@ const { get_api_key }              = require('./tools/get_api_key');
 const { update_api_key }           = require('./tools/update_api_key');
 const { inactivate_api_key }       = require('./tools/inactivate_api_key');
 const { reactivate_api_key }       = require('./tools/reactivate_api_key');
+// Contract 32 / D-480, D-481: per-Division initiative-status cadence config.
+const { save_division_status_config }  = require('./tools/save_division_status_config');
+const { get_division_status_config }   = require('./tools/get_division_status_config');
+const { clear_division_status_config } = require('./tools/clear_division_status_config');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -96,7 +100,10 @@ app.post('/tools/:toolName', async (req, res) => {
     get_api_key,
     update_api_key,
     inactivate_api_key,
-    reactivate_api_key
+    reactivate_api_key,
+    save_division_status_config,
+    get_division_status_config,
+    clear_division_status_config
   };
 
   if (!tools[toolName]) {
@@ -169,7 +176,10 @@ app.get('/tools', (req, res) => {
       { name: 'get_api_key',              method: 'POST', path: '/tools/get_api_key' },
       { name: 'update_api_key',           method: 'POST', path: '/tools/update_api_key' },
       { name: 'inactivate_api_key',       method: 'POST', path: '/tools/inactivate_api_key' },
-      { name: 'reactivate_api_key',       method: 'POST', path: '/tools/reactivate_api_key' }
+      { name: 'reactivate_api_key',       method: 'POST', path: '/tools/reactivate_api_key' },
+      { name: 'save_division_status_config',  method: 'POST', path: '/tools/save_division_status_config' },
+      { name: 'get_division_status_config',   method: 'POST', path: '/tools/get_division_status_config' },
+      { name: 'clear_division_status_config', method: 'POST', path: '/tools/clear_division_status_config' }
     ]
   });
 });

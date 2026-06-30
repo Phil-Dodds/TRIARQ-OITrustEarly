@@ -42,6 +42,7 @@ import {
 }                                       from '../../../core/services/screen-state.service';
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
+import { DivisionInitiativeCycleComponent } from './initiative-cycle/division-initiative-cycle.component';
 import { UserPickerComponent }         from '../../../shared/pickers/user-picker/user-picker.component';
 import { UserProfileService }          from '../../../core/services/user-profile.service';
 import { Division, User }              from '../../../core/types/database';
@@ -89,7 +90,8 @@ const LEVEL_LABELS: Record<number, string> = {
     IonicModule,
     BlockedActionComponent,
     LoadingOverlayComponent,
-    UserPickerComponent
+    UserPickerComponent,
+    DivisionInitiativeCycleComponent
   ],
   styles: [`
     :host{display:block}
@@ -457,6 +459,17 @@ const LEVEL_LABELS: Record<number, string> = {
                   </div>
                   <div class="oi-err" *ngIf="memberError">{{ memberError }}</div>
                 </div>
+              </div>
+
+              <!-- Contract 32 (WS5): Initiative Update Cycle — cadence config
+                   section (CC-32: spec §4.7 "tab" → section; panel has no tab
+                   strip). Extracted child component per S-030 / D-252. -->
+              <div class="oi-zone">
+                <div class="oi-zone-title">Initiative Update Cycle</div>
+                <app-division-initiative-cycle
+                  [divisionId]="selectedDivision.id"
+                  [divisionName]="selectedDivision.division_name">
+                </app-division-initiative-cycle>
               </div>
 
             </div>

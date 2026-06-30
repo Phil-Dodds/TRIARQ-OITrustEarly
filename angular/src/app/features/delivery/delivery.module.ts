@@ -95,6 +95,13 @@ import { IonicModule }  from '@ionic/angular';
           import('./gates-approved/gates-approved.component')
             .then(c => c.GatesApprovedComponent)
       },
+      // Contract 32 (D-485): Initiative Status Dashboard — Initiative Tracking.
+      {
+        path: 'status-dashboard',
+        loadComponent: () =>
+          import('./status-dashboard/initiative-status-dashboard.component')
+            .then(c => c.InitiativeStatusDashboardComponent)
+      },
       // ── Initiative detail — must be last (param route) ────────────────────
       {
         path: ':cycle_id',

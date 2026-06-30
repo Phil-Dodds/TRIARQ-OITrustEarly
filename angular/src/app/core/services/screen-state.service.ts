@@ -67,6 +67,10 @@ export const SCREEN_KEYS = {
   ACTIONS_COMPLETED:        'actions.completed',
   ACTIONS_GATE_APPROVALS:   'actions.gate-approvals',
   ACTIONS_GATE_REVIEWS:     'actions.gate-reviews',
+  // Contract 32 (D-484, D-485): Initiative Status surfaces — sort/filter memory.
+  MY_INITIATIVE_STATUS_DUE:             'my-initiative-status.due',
+  MY_INITIATIVE_STATUS_ACKNOWLEDGMENTS: 'my-initiative-status.acknowledgments',
+  INITIATIVE_STATUS_DASHBOARD:          'initiative-status-dashboard',
 } as const;
 
 export type ScreenKey = typeof SCREEN_KEYS[keyof typeof SCREEN_KEYS];

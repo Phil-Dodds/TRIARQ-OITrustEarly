@@ -39,6 +39,18 @@ import {
   GateApproverConfig,
   GateApproverConfigRow
 } from '../types/database';
+import {
+  LatestInitiativeStatus,
+  SaveStatusResult,
+  SaveInitiativeStatusParams,
+  InitiativeStatusUpdate,
+  AcknowledgeResult,
+  MyStatusDueRow,
+  MyAcknowledgmentDueRow,
+  StatusRefreshResult,
+  LastRunResult,
+  InitiativeStatusDashboardRow
+} from '../types/initiative-status';
 
 @Injectable({ providedIn: 'root' })
 export class DeliveryService {
@@ -80,6 +92,54 @@ export class DeliveryService {
     active_status?:     boolean;
   } = {}): Observable<McpResponse<DeliveryWorkstream[]>> {
     return this.mcp.call<DeliveryWorkstream[]>('delivery', 'list_delivery_workstreams', params as Record<string, unknown>);
+  }
+
+  // ── Contract 32 — Initiative Status Updates (D-476–D-486) ───────────────────
+
+  /** Trio member saves a status update. Confidence values write through to gate status (D-477). */
+  saveInitiativeStatusUpdate(params: SaveInitiativeStatusParams): Observable<McpResponse<SaveStatusResult>> {
+    return this.mcp.call<SaveStatusResult>('delivery', 'save_initiative_status_update', params as unknown as Record<string, unknown>);
+  }
+
+  /** Latest status + per-trio acknowledgment state + Needs Review reasons (D-485). */
+  getLatestInitiativeStatus(initiative_id: string): Observable<McpResponse<LatestInitiativeStatus>> {
+    return this.mcp.call<LatestInitiativeStatus>('delivery', 'get_latest_initiative_status', { initiative_id });
+  }
+
+  /** Reverse-chronological status history with acknowledgment lists (D-483). */
+  getInitiativeStatusHistory(initiative_id: string, limit = 20): Observable<McpResponse<InitiativeStatusUpdate[]>> {
+    return this.mcp.call<InitiativeStatusUpdate[]>('delivery', 'get_initiative_status_history', { initiative_id, limit });
+  }
+
+  /** Non-save trio member acknowledges the latest update (D-483). */
+  acknowledgeStatusUpdate(status_update_id: string): Observable<McpResponse<AcknowledgeResult>> {
+    return this.mcp.call<AcknowledgeResult>('delivery', 'acknowledge_status_update', { status_update_id });
+  }
+
+  /** My Initiative Status — Updates Due tab (D-484). */
+  getMyStatusDue(): Observable<McpResponse<MyStatusDueRow[]>> {
+    return this.mcp.call<MyStatusDueRow[]>('delivery', 'get_my_status_due', {});
+  }
+
+  /** My Initiative Status — Needs Acknowledgment tab (D-484). */
+  getMyAcknowledgmentsDue(): Observable<McpResponse<MyAcknowledgmentDueRow[]>> {
+    return this.mcp.call<MyAcknowledgmentDueRow[]>('delivery', 'get_my_acknowledgments_due', {});
+  }
+
+  /** Initiative Status Dashboard rows (D-485). */
+  getInitiativeStatusDashboard(params: { division_ids?: string[]; needs_review_only?: boolean } = {}):
+    Observable<McpResponse<InitiativeStatusDashboardRow[]>> {
+    return this.mcp.call<InitiativeStatusDashboardRow[]>('delivery', 'get_initiative_status_dashboard', params as Record<string, unknown>);
+  }
+
+  /** On-demand overdue refresh (D-482). */
+  triggerStatusRefresh(): Observable<McpResponse<StatusRefreshResult>> {
+    return this.mcp.call<StatusRefreshResult>('delivery', 'trigger_status_refresh', {});
+  }
+
+  /** Last refresh timestamp for the My Initiative Status header (D-484). */
+  getStatusRefreshLastRun(): Observable<McpResponse<LastRunResult>> {
+    return this.mcp.call<LastRunResult>('delivery', 'get_status_refresh_last_run', {});
   }
 
   updateWorkstreamActiveStatus(params: {

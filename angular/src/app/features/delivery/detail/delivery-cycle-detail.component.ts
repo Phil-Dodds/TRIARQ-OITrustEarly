@@ -46,6 +46,9 @@ import { UserProfileService }      from '../../../core/services/user-profile.ser
 import { StageTrackComponent, LIFECYCLE_TRACK } from '../stage-track/stage-track.component';
 import { LoadingOverlayComponent }          from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DeliveryCycleEditPanelComponent }  from '../edit-panel/delivery-cycle-edit-panel.component';
+import { InitiativeStatusUpdatePanelComponent }  from '../status-panel/initiative-status-update-panel.component';
+import { InitiativeStatusHistoryPanelComponent } from '../status-panel/initiative-status-history-panel.component';
+import { LatestInitiativeStatus } from '../../../core/types/initiative-status';
 import {
   GateRecordModalComponent,
   GateRecordModalData,
@@ -97,7 +100,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent, InitiativeStatusUpdatePanelComponent, InitiativeStatusHistoryPanelComponent],
   styles: [`:host { display: block; position: relative; }`],
   template: `
 
@@ -159,6 +162,26 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         (saved)="onEditSaved()"
         (cancelled)="onEditCancelled()">
       </app-delivery-cycle-edit-panel>
+
+      <!-- Contract 32 (WS2): Initiative Status Update panel (edit mode) — D-478. -->
+      <app-initiative-status-update-panel
+        *ngIf="showStatusPanel && cycle"
+        [initiativeId]="cycle.delivery_cycle_id"
+        [initiativeName]="cycle.cycle_title"
+        mode="edit"
+        [pilotApplicable]="pilotConfidenceApplicable"
+        [closeApplicable]="closeConfidenceApplicable"
+        (saved)="onStatusSaved()"
+        (cancelled)="onStatusCancelled()">
+      </app-initiative-status-update-panel>
+
+      <!-- Contract 32 (WS2): Status History panel — D-478 §4.3. -->
+      <app-initiative-status-history-panel
+        *ngIf="showHistoryPanel && cycle"
+        [initiativeId]="cycle.delivery_cycle_id"
+        [initiativeName]="cycle.cycle_title"
+        (close)="showHistoryPanel = false">
+      </app-initiative-status-history-panel>
 
       <!-- D-291 (amended by D-416): sticky outer wrapper. × close button lives
            INSIDE this sticky wrapper at upper-right so it stays visible while the
@@ -230,6 +253,21 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     class="oi-btn-primary"
                     style="white-space:nowrap;font-size:var(--triarq-text-small);">
               ✎ Edit Initiative
+            </button>
+
+            <!-- Contract 32 (WS2) — D-348 Tier 2 record-level actions. -->
+            <button *ngIf="callerIsTrioMember"
+                    (click)="openStatusPanel()"
+                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
+                           background:none;border:1px solid var(--triarq-color-primary);
+                           border-radius:5px;padding:3px 8px;cursor:pointer;">
+              Update Status
+            </button>
+            <button (click)="openHistoryPanel()"
+                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-text-secondary);
+                           background:none;border:1px solid var(--triarq-color-border,#e0e0e0);
+                           border-radius:5px;padding:3px 8px;cursor:pointer;">
+              View Status History
             </button>
 
             <!-- 2. D-349 dual entry point — submittable: opens gate sub-panel
@@ -905,6 +943,60 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </p>
       </div>
 
+      <!-- ── Contract 32 (WS2): Current Status — D-478 §4.4 A ────────────── -->
+      <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
+        <div style="font-weight:500;margin-bottom:var(--triarq-space-sm);">Current Status</div>
+
+        <!-- D-346 Context B skeleton — loads independently of the rest of the panel. -->
+        <div *ngIf="loadingStatus" style="display:flex;flex-direction:column;gap:6px;">
+          <ion-skeleton-text animated style="width:45%;height:13px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="width:85%;height:13px;"></ion-skeleton-text>
+        </div>
+
+        <ng-container *ngIf="!loadingStatus">
+          <div *ngIf="!latestStatus?.latest"
+               style="font-size:13px;font-style:italic;color:#5A5A5A;">
+            No status updates recorded.
+          </div>
+
+          <ng-container *ngIf="latestStatus?.latest as u">
+            <div style="font-size:12px;color:var(--triarq-color-text-secondary);margin-bottom:8px;">
+              Last updated: {{ latestStatus!.saved_by_name || 'Unknown' }} · {{ formatStatusDateTime(u.saved_at) }}
+            </div>
+            <div style="margin-bottom:6px;"><span style="font-weight:500;">Accomplished Last Cycle:</span>
+              {{ truncate(u.accomplished_last_cycle) }}</div>
+            <div style="margin-bottom:6px;"><span style="font-weight:500;">Plan for Next Cycle:</span>
+              {{ truncate(u.plan_next_cycle) }}</div>
+            <div style="margin-bottom:6px;"><span style="font-weight:500;">Blockers:</span>
+              {{ truncate(u.blockers) }}</div>
+            <div style="margin-bottom:6px;">
+              <span style="font-weight:500;">Escalation Needed:</span>
+              <span *ngIf="u.escalation_needed"
+                    style="background:var(--triarq-color-error,#E96127);color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;margin-left:4px;">Yes</span>
+              <span *ngIf="!u.escalation_needed" style="color:#5A5A5A;"> No</span>
+            </div>
+            <div *ngIf="u.pilot_confidence_applicable" style="margin-bottom:6px;">
+              <span style="font-weight:500;">Go to Deploy Confidence:</span> {{ confidenceLabel(u.pilot_confidence) }}
+            </div>
+            <div *ngIf="u.close_confidence_applicable" style="margin-bottom:6px;">
+              <span style="font-weight:500;">Close Review Confidence:</span> {{ confidenceLabel(u.close_confidence) }}
+            </div>
+
+            <div *ngIf="latestStatus!.needs_review_reasons.length"
+                 style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+              <span *ngFor="let r of latestStatus!.needs_review_reasons"
+                    style="background:var(--triarq-color-error,#E96127);color:#fff;border-radius:999px;padding:2px 10px;font-size:11px;">{{ r }}</span>
+            </div>
+
+            <button *ngIf="statusHasLongText"
+                    (click)="statusExpanded = !statusExpanded"
+                    style="background:none;border:none;color:var(--triarq-color-primary,#257099);cursor:pointer;font-size:12px;padding:4px 0 0 0;">
+              {{ statusExpanded ? 'Show less' : 'Show more' }}
+            </button>
+          </ng-container>
+        </ng-container>
+      </div>
+
       <!-- ── Artifact Slots ────────────────────────────────────────────── -->
       <!-- Item 2 (Part 3): collapsible stage sections; Principle 5 (progressive disclosure). -->
       <!-- Current+past stages expanded by default; future stages collapsed.                  -->
@@ -1486,6 +1578,14 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   // Edit Cycle panel — S-006 push/pop. Contract 2 2026-04-10.
   showEditPanel  = false;
 
+  // Contract 32 (WS2): Initiative Status surfaces.
+  showStatusPanel  = false;
+  showHistoryPanel = false;
+  latestStatus: LatestInitiativeStatus | null = null;
+  loadingStatus    = false;
+  statusExpanded   = false;
+  private readonly STATUS_TRUNC = 200;
+
   // B-97 (Contract 16): tracked synchronously around dialog.open / afterClosed
   // to guard onEscKey against firing close.emit while the Gate Record Modal is
   // open. Replaces unreliable dialog.openDialogs.length check.
@@ -1678,6 +1778,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           this.rebuildArtifactsByGate();   // stable reference for *ngFor (B-69 / focus-loss fix)
           this.initExpandedGates(); // Zone 6: expand current + past gates by default
           this.loadEvents(cycleId);
+          this.loadLatestStatus(cycleId); // Contract 32 (WS2): Current Status section
           // B-69: Stage Track scrollIntoView (B-61) and panel mount sometimes leave
           // an ambient text selection on Gate Record content. Clear it once on load.
           if (typeof window !== 'undefined') {
@@ -1718,6 +1819,84 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
         this.loadingEvents = false;
         this.cdr.markForCheck();
       }
+    });
+  }
+
+  // ── Contract 32 (WS2): Initiative Status ─────────────────────────────────
+
+  private loadLatestStatus(cycleId: string): void {
+    this.loadingStatus = true;
+    this.statusExpanded = false;
+    this.cdr.markForCheck();
+    this.delivery.getLatestInitiativeStatus(cycleId).subscribe({
+      next: (res) => {
+        this.latestStatus = (res.success && res.data) ? res.data : null;
+        this.loadingStatus = false;
+        this.cdr.markForCheck();
+      },
+      error: () => { this.loadingStatus = false; this.cdr.markForCheck(); }
+    });
+  }
+
+  /** True when the logged-in user is DOL/DCS/EPO on this Initiative (D-478). */
+  get callerIsTrioMember(): boolean {
+    const me = this.profileService.getCurrentProfile()?.id;
+    const c = this.cycle;
+    if (!me || !c) { return false; }
+    return [c.assigned_dol_user_id, c.assigned_dcs_user_id, c.assigned_epo_user_id].includes(me);
+  }
+
+  /** D-479 applicability for the edit panel's confidence fields. */
+  private confidenceApplicability(): { pilot: boolean; close: boolean } {
+    const c = this.cycle;
+    if (!c) { return { pilot: false, close: false }; }
+    const ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','PILOT','UAT','RELEASE','OUTCOME','COMPLETE'];
+    const idx = ORDER.indexOf(c.current_lifecycle_stage as string);
+    const reached = idx >= 0 && idx >= ORDER.indexOf('PILOT');
+    const md = c.milestone_dates || [];
+    const gd = md.find(m => m.gate_name === 'go_to_deploy')?.date_status;
+    const cr = md.find(m => m.gate_name === 'close_review')?.date_status;
+    const bothComplete = gd === 'complete' && cr === 'complete';
+    return { pilot: !bothComplete && !reached, close: !bothComplete && reached };
+  }
+  get pilotConfidenceApplicable(): boolean { return this.confidenceApplicability().pilot; }
+  get closeConfidenceApplicable(): boolean { return this.confidenceApplicability().close; }
+
+  openStatusPanel(): void { this.showStatusPanel = true; this.cdr.markForCheck(); }
+  onStatusSaved(): void {
+    this.showStatusPanel = false;
+    if (this.cycle) { this.loadCycle(this.cycle.delivery_cycle_id); } // S-008 refresh
+  }
+  onStatusCancelled(): void { this.showStatusPanel = false; this.cdr.markForCheck(); }
+  openHistoryPanel(): void { this.showHistoryPanel = true; this.cdr.markForCheck(); }
+
+  get statusHasLongText(): boolean {
+    const u = this.latestStatus?.latest;
+    if (!u) { return false; }
+    return [u.accomplished_last_cycle, u.plan_next_cycle, u.blockers]
+      .some(t => (t?.length ?? 0) > this.STATUS_TRUNC);
+  }
+
+  truncate(text: string | null): string {
+    if (!text) { return '—'; }
+    if (this.statusExpanded || text.length <= this.STATUS_TRUNC) { return text; }
+    return text.slice(0, this.STATUS_TRUNC) + '…';
+  }
+
+  confidenceLabel(v: string | null): string {
+    const map: Record<string, string> = {
+      not_started: 'Not Started', on_track: 'On Track', at_risk: 'At Risk',
+      behind: 'Behind', complete: 'Complete'
+    };
+    return v ? (map[v] || v) : 'N/A';
+  }
+
+  formatStatusDateTime(iso: string | null): string {
+    if (!iso) { return '—'; }
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) { return iso; }
+    return d.toLocaleString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
     });
   }
 

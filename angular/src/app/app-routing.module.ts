@@ -46,6 +46,12 @@ const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/actions/my-actions.component').then(m => m.MyActionsComponent)
   },
+  // Contract 32 / D-484: My Initiative Status — My Actions section.
+  {
+    path: 'my-initiative-status',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/delivery/my-initiative-status/my-initiative-status.component').then(m => m.MyInitiativeStatusComponent)
+  },
   // D-392: Legacy /delivery/* routes redirect to /initiatives/*. Preserves bookmarks and saved links.
   { path: 'delivery',           redirectTo: 'initiatives',                  pathMatch: 'full' },
   { path: 'delivery/cycles',    redirectTo: 'initiatives/list',             pathMatch: 'full' },

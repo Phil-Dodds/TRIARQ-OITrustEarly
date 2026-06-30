@@ -87,6 +87,17 @@ const { create_roadmap_freeze_date }     = require('./tools/create_roadmap_freez
 const { update_roadmap_freeze_date }     = require('./tools/update_roadmap_freeze_date');
 const { delete_roadmap_freeze_date }     = require('./tools/delete_roadmap_freeze_date');
 
+// Contract 32 (D-476–D-486): Initiative Status Updates.
+const { save_initiative_status_update }  = require('./tools/save_initiative_status_update');
+const { get_latest_initiative_status }   = require('./tools/get_latest_initiative_status');
+const { get_initiative_status_history }  = require('./tools/get_initiative_status_history');
+const { acknowledge_status_update }      = require('./tools/acknowledge_status_update');
+const { get_my_status_due }              = require('./tools/get_my_status_due');
+const { get_my_acknowledgments_due }     = require('./tools/get_my_acknowledgments_due');
+const { get_initiative_status_dashboard } = require('./tools/get_initiative_status_dashboard');
+const { trigger_status_refresh }         = require('./tools/trigger_status_refresh');
+const { get_status_refresh_last_run }    = require('./tools/get_status_refresh_last_run');
+
 const app  = express();
 const PORT = process.env.PORT || 3003;
 
@@ -166,7 +177,18 @@ const TOOLS = {
   list_roadmap_freeze_dates,
   create_roadmap_freeze_date,
   update_roadmap_freeze_date,
-  delete_roadmap_freeze_date
+  delete_roadmap_freeze_date,
+
+  // Contract 32 — Initiative Status Updates (D-476–D-486)
+  save_initiative_status_update,
+  get_latest_initiative_status,
+  get_initiative_status_history,
+  acknowledge_status_update,
+  get_my_status_due,
+  get_my_acknowledgments_due,
+  get_initiative_status_dashboard,
+  trigger_status_refresh,
+  get_status_refresh_last_run
 };
 
 // ── CORS — allow GitHub Pages and local dev origins ───────────────────────────
