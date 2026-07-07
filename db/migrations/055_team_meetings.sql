@@ -33,7 +33,7 @@ CREATE TABLE team_meeting_bullets (
   id                    uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   section_id            uuid        NOT NULL REFERENCES team_meeting_sections(id) ON DELETE CASCADE,
   text                  text        NOT NULL,
-  initiative_id         uuid        REFERENCES delivery_cycles(id) ON DELETE SET NULL,
+  initiative_id         uuid        REFERENCES delivery_cycles(delivery_cycle_id) ON DELETE SET NULL,
   sort_order            int         NOT NULL DEFAULT 0,
   carried_from_bullet_id uuid       REFERENCES team_meeting_bullets(id) ON DELETE SET NULL,
   created_at            timestamptz NOT NULL DEFAULT now()

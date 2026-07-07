@@ -65,7 +65,7 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
   // Active initiatives assigned to these DCS users, scoped to accessible divisions.
   let cycleQuery = supabase
     .from('delivery_cycles')
-    .select('id, delivery_cycle_name, lifecycle_stage, assigned_dcs_user_id, division_id')
+    .select('delivery_cycle_id, delivery_cycle_name, lifecycle_stage, assigned_dcs_user_id, division_id')
     .in('assigned_dcs_user_id', dcsIds)
     .neq('lifecycle_stage', 'closed')
     .is('deleted_at', null)
@@ -78,7 +78,7 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
   const { data: cycles, error: cycleErr } = await cycleQuery;
   if (cycleErr) return { success: false, error: cycleErr.message };
 
-  const cycleIds = (cycles || []).map(c => c.id);
+  const cycleIds = (cycles || []).map(c => c.delivery_cycle_id);
 
   // Milestone dates for D-419 walkback.
   let milestonesByCycle = {};
@@ -113,11 +113,11 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
   (cycles || []).forEach(c => {
     const list = cyclesByDcs[c.assigned_dcs_user_id] || [];
     list.push({
-      id:                     c.id,
+      id:                     c.delivery_cycle_id,
       name:                   c.delivery_cycle_name,
       stage:                  c.lifecycle_stage,
-      gate_status:            resolveGateStatus(milestonesByCycle[c.id] || []),
-      last_status_update_date: lastStatusDateByCycle[c.id] ?? null
+      gate_status:            resolveGateStatus(milestonesByCycle[c.delivery_cycle_id] || []),
+      last_status_update_date: lastStatusDateByCycle[c.delivery_cycle_id] ?? null
     });
     cyclesByDcs[c.assigned_dcs_user_id] = list;
   });
