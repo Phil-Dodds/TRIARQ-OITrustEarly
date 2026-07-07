@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.52 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.59 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-452**
+**Next available: D-493**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -355,6 +355,47 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-449 | Gate Skip Reversal via Backdate | LOCKED | specced | D-447, D-448, D-419 |
 | D-450 | Deploy Gate Skip Prevention | LOCKED | specced | D-447, D-448, D-449 |
 | D-451 | Gate Status Revert: Trigger Fix and Confirmation Dialog | LOCKED | specced | D-427, D-205 |
+| D-452 | C-07: Validator impl_status Consistency Check | LOCKED | 2026-06-17 | Governance | not-specced |
+| D-453 | C-08: Validator Unexpected Section H Absence Check | LOCKED | 2026-06-17 | Governance | not-specced |
+| D-454 | Rule 25 Positional Fix | LOCKED | 2026-06-17 | Governance | not-specced |
+| D-455 | Rule 37: Document Author Visible Pre-Pack Checklist | LOCKED | 2026-06-17 | Governance | not-specced |
+| D-456 | Rule 36: Validator Response Compression | LOCKED | 2026-06-18 | Governance | not-specced |
+| D-457 | Rule 38: Document Author Per-Instruction Execution Confirmation | LOCKED | 2026-06-18 | Governance | not-specced |
+| D-458 | Initiative Other Consulted and Other Informed Fields | LOCKED | 2026-06-18 | Product | built |
+| D-459 | Gate Consultation: Consulted Set Derived at Submission Time | LOCKED | 2026-06-18 | Product | built |
+| D-460 | Submitter Auto-Consultation and Post-Approval Consulted Response Window | LOCKED | 2026-06-18 | Product | built |
+| D-461 | Gate Sub-Panel: Consulted Summary Section | LOCKED | 2026-06-18 | Product | built |
+| D-462 | gate_consultations Schema and MCP Tools | LOCKED | 2026-06-18 | Product | built |
+| D-463 | Gate Approver Stored at Submission Time | LOCKED | 2026-06-18 | Product | built |
+| D-464 | Gate Approvers Admin Screen | LOCKED | 2026-06-18 | Product | built |
+| D-465 | Phil Super-Approver: Displaced Approver Converted to Consulted | LOCKED | 2026-06-18 | Product | built |
+| D-466 | Post-Approval Decline Notification to Approver and Phil | LOCKED | 2026-06-18 | Product | built |
+| D-467 | Transactional Email Infrastructure: Supabase Edge Function | LOCKED | 2026-06-18 | Product | built |
+| D-468 | Consulted Action Queue Item Behavior Post-Approval | LOCKED | 2026-06-18 | Product | built |
+| D-469 | Gate Return: Stage Freeze, Visual Treatment, Re-Submit | LOCKED | 2026-06-19 | Product | built |
+| D-470 | Initiative Grid Subtitle | LOCKED | 2026-06-19 | Product | built |
+| D-471 | Division Leader: Role Assignment and Capabilities | LOCKED | 2026-06-19 | Product | built |
+| D-472 | My Actions Screen: Tabbed Multi-List Architecture | LOCKED | 2026-06-19 | Product | built |
+| D-473 | Public Initiative MCP (initiative-public-mcp) | LOCKED | 2026-06-22 | Product | not-specced |
+| D-474 | API Key Infrastructure: Schema and MCP Tools | LOCKED | 2026-06-22 | Product | not-specced |
+| D-475 | API Key Management Admin Screen | LOCKED | 2026-06-22 | Product | not-specced |
+| D-476 | Initiative Status Update Data Model | 2026-06-23 | specced |
+| D-477 | Confidence Fields Are Gate Status | 2026-06-23 | specced |
+| D-478 | Status Update Entry and Panel Design | 2026-06-23 | specced |
+| D-479 | Confidence Field Applicability Logic | 2026-06-23 | specced |
+| D-480 | Division Cadence Configuration Model | 2026-06-23 | specced |
+| D-481 | Cadence Inheritance | 2026-06-23 | specced |
+| D-482 | Overdue Detection and Scheduled Function | 2026-06-23 | specced |
+| D-483 | Acknowledgment Model | 2026-06-23 | specced |
+| D-484 | My Initiative Status Screen | 2026-06-23 | specced |
+| D-485 | Initiative Status Dashboard | 2026-06-23 | specced |
+| D-486 | Gate Date Slip Detection | 2026-06-23 | specced |
+| D-487 | Roadmap Theme: Division-Scoped Vocabulary and Tagging | 2026-06-30 | specced |
+| D-488 | Roadmap Theme: Display and Filtering | 2026-06-30 | specced |
+| D-489 | Gate Submission Justification Note | 2026-06-30 | specced |
+| D-490 | Team Meetings Feature | 2026-06-30 | specced |
+| D-491 | Amendment to D-484: My Initiative Status Nav Placement | 2026-06-30 | specced |
+| D-492 | Amendment to D-485: Initiative Status Dashboard Nav Placement | 2026-06-30 | specced |
 
 ---
 

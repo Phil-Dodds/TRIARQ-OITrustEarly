@@ -32,6 +32,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-07',
+    contractLabel: 'Contract 33 — Team Meetings',
+    items: [
+      {
+        audience:    'Admin',
+        surface:     'Team Meetings list',
+        description: 'New "Team Meetings" sidebar item (Admin only). Lists all Product Ops prep meetings sorted by date. Create a new meeting with a pre-filled title for the current week.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Meeting prep / run screen',
+        description: 'Two-column meeting workspace: five color-coded sections (Hot Topics, Escalation, Comms, Initiatives & Gates, Training) with bullet entry, @ initiative picker, and auto-saving notes. DCS Initiative Reference Panel on the right — add initiatives directly to the Initiatives & Gates section.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Prior meeting read-only view',
+        description: 'Prior meetings open in read-only mode with a "→ This week" carry-forward action on each bullet. Carry forward preserves the lineage FK — never a text copy.'
+      }
+    ]
+  },
+  {
     date:          '2026-06-30',
     builtAt:       '17:10 UTC',
     contractLabel: 'Contract 32 follow-on — Navigation restructure',

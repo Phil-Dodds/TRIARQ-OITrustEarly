@@ -40,6 +40,10 @@ const NAV_ITEMS: NavItem[] = [
   // Contract 32 / D-485: Initiative Status Dashboard is now a card on this hub
   // (not a standalone nav item).
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'live'        },
+  // Contract 33 / D-490: Team Meetings — Admin-only meeting prep and run tool.
+  // Placed below Initiative Tracking per spec Step 8. Visibility: is_admin only.
+  // CC-005 (icon): calendar-outline — already in Ionic icon set, not used by adjacent items.
+  { label: 'Team Meetings', route: '/team-meetings', requiresFlag: 'is_admin', devStatus: 'not-started' },
   { label: 'To Dos',                                         devStatus: 'not-started' },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
     children: [

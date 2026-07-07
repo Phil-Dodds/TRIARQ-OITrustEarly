@@ -13,5 +13,7 @@ export const environment = {
   // to render the Setup Instructions config block on /admin/api-keys — Angular
   // never calls this server (it is API-key authed for external Claude Desktop
   // clients). Phil sets the real deployed value in environment.production.ts.
-  initiativeMcpBaseUrl: 'http://localhost:3004'
+  initiativeMcpBaseUrl: 'http://localhost:3004',
+  // Contract 33 (D-490): Team Meetings admin-only MCP server.
+  teamMeetingsMcpUrl: 'http://localhost:3005'
 };

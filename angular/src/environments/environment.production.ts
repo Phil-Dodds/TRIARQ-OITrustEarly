@@ -11,5 +11,7 @@ export const environment = {
   // Contract 31 (D-473/D-475): public initiative-public-mcp base URL, surfaced in
   // the /admin/api-keys Setup Instructions block. PLACEHOLDER — Phil sets the real
   // Render URL at deploy time. Angular never calls this server.
-  initiativeMcpBaseUrl: 'https://oi-trust-initiative-public-mcp.onrender.com'
+  initiativeMcpBaseUrl: 'https://oi-trust-initiative-public-mcp.onrender.com',
+  // Contract 33 (D-490): Team Meetings admin-only MCP server. Phil sets Render URL at deploy.
+  teamMeetingsMcpUrl: 'https://team-meetings-mcp.onrender.com'
 };

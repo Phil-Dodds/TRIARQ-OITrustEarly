@@ -59,6 +59,12 @@ const routes: Routes = [
   // Param redirect for legacy detail link: /delivery/:cycle_id → /initiatives/:cycle_id
   { path: 'delivery/:cycle_id',       redirectTo: 'initiatives/:cycle_id',        pathMatch: 'full' },
 
+  // Contract 33 (D-490): Team Meetings — Admin-only meeting prep and run tool.
+  {
+    path: 'team-meetings',
+    canActivate: [authGuard],
+    loadChildren: () => import('./features/team-meetings/team-meetings.module').then(m => m.TeamMeetingsModule)
+  },
   {
     path: 'contact-admin',
     canActivate: [authGuard],
