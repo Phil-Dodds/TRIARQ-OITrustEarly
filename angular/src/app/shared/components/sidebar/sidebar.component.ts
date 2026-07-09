@@ -43,7 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   // Contract 33 / D-490: Team Meetings — Admin-only meeting prep and run tool.
   // Placed below Initiative Tracking per spec Step 8. Visibility: is_admin only.
   // CC-005 (icon): calendar-outline — already in Ionic icon set, not used by adjacent items.
-  { label: 'Team Meetings', route: '/team-meetings', requiresFlag: 'is_admin', devStatus: 'not-started' },
+  { label: 'Team Meetings', route: '/team-meetings', requiresFlag: 'is_admin', devStatus: 'pilot' },
   { label: 'To Dos',                                         devStatus: 'not-started' },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
     children: [

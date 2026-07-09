@@ -54,7 +54,7 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
   const { data: dcsUsers, error: dcsErr } = await supabase
     .from('users')
     .select('id, display_name')
-    .eq('system_role', 'dcs')
+    .eq('is_dcs', true)
     .is('deleted_at', null)
     .order('display_name', { ascending: true });
   if (dcsErr) return { success: false, error: dcsErr.message };
