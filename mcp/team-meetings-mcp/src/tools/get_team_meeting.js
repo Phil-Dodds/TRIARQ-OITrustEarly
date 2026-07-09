@@ -88,7 +88,7 @@ async function get_team_meeting(params, caller_user_id) {
   if (initiativeIds.length) {
     const { data: cycles } = await supabase
       .from('delivery_cycles')
-      .select('delivery_cycle_id, delivery_cycle_name, lifecycle_stage')
+      .select('delivery_cycle_id, cycle_title, current_lifecycle_stage')
       .in('delivery_cycle_id', initiativeIds)
       .is('deleted_at', null);
 
@@ -107,8 +107,8 @@ async function get_team_meeting(params, caller_user_id) {
     (cycles || []).forEach(c => {
       initiativeMap[c.delivery_cycle_id] = {
         id:          c.delivery_cycle_id,
-        name:        c.delivery_cycle_name,
-        stage:       c.lifecycle_stage,
+        name:        c.cycle_title,
+        stage:       c.current_lifecycle_stage,
         gate_status: resolveGateStatus(milestonesByCycle[c.delivery_cycle_id] || [])
       };
     });

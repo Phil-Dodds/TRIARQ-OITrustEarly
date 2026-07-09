@@ -65,11 +65,11 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
   // Active initiatives assigned to these DCS users, scoped to accessible divisions.
   let cycleQuery = supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, delivery_cycle_name, lifecycle_stage, assigned_dcs_user_id, division_id')
+    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, assigned_dcs_user_id, division_id')
     .in('assigned_dcs_user_id', dcsIds)
-    .neq('lifecycle_stage', 'closed')
+    .neq('current_lifecycle_stage', 'closed')
     .is('deleted_at', null)
-    .order('delivery_cycle_name', { ascending: true });
+    .order('cycle_title', { ascending: true });
 
   if (accessible_division_ids !== null) {
     cycleQuery = cycleQuery.in('division_id', accessible_division_ids);
@@ -114,8 +114,8 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
     const list = cyclesByDcs[c.assigned_dcs_user_id] || [];
     list.push({
       id:                     c.delivery_cycle_id,
-      name:                   c.delivery_cycle_name,
-      stage:                  c.lifecycle_stage,
+      name:                   c.cycle_title,
+      stage:                  c.current_lifecycle_stage,
       gate_status:            resolveGateStatus(milestonesByCycle[c.delivery_cycle_id] || []),
       last_status_update_date: lastStatusDateByCycle[c.delivery_cycle_id] ?? null
     });
