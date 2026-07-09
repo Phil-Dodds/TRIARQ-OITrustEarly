@@ -76,32 +76,32 @@ export interface SectionConfig {
 export const SECTION_CONFIGS: readonly SectionConfig[] = [
   {
     section_key: 'hot-topics',
-    title:       'Hot topics / agenda topics',
-    sub_label:   'What the team wants to raise today',
+    title:       'Hot Topics / Agenda Topics',
+    sub_label:   'What the Team Wants to Raise Today',
     bar_color:   '#E96127'
   },
   {
     section_key: 'escalation',
-    title:       'Escalation to Phil, inform Phil, blockers and gates',
-    sub_label:   "Things that need Phil's attention, awareness, or a decision",
+    title:       'Escalation to Phil, Inform Phil, Blockers',
+    sub_label:   "Things That Need Phil's Attention, Awareness, or a Decision",
     bar_color:   '#F2A620'
   },
   {
     section_key: 'comms',
-    title:       'Phil communications / reminders',
-    sub_label:   'Items Phil wants the team to know',
+    title:       'Phil Communications / Reminders',
+    sub_label:   'Items Phil Wants the Team to Know',
     bar_color:   '#0071AF'
   },
   {
     section_key: 'initiatives-gates',
-    title:       'Initiatives and gates',
-    sub_label:   'Initiative status, gate dates, and planning discussion',
+    title:       'Initiatives and Gates',
+    sub_label:   'Initiative Status, Gate Dates, and Planning Discussion',
     bar_color:   '#534AB7'
   },
   {
     section_key: 'training',
-    title:       'Trainings / process / getting better',
-    sub_label:   'Process improvements, skill gaps, team development',
+    title:       'Trainings / Process / Getting Better',
+    sub_label:   'Process Improvements, Skill Gaps, Team Development',
     bar_color:   '#5A5A5A'
   }
 ] as const;

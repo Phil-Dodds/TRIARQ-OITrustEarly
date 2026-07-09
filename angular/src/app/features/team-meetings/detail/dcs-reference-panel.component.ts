@@ -100,7 +100,16 @@ function avatarColor(id: string): string {
               <div class="drp-dcs-name-row">
                 <span class="drp-dcs-name">{{ dcs.display_name }}</span>
                 <span class="drp-role-pill">DCS</span>
+                <span *ngIf="dcs.initiatives.length > 0" class="drp-count-badge">{{ dcs.initiatives.length }}</span>
               </div>
+              <!-- Add All button — skips initiatives already in meeting -->
+              <button *ngIf="dcs.initiatives.length > 0"
+                      class="drp-add-all-btn"
+                      type="button"
+                      [disabled]="isAddingAll(dcs.id)"
+                      (click)="addAllToMeeting(dcs, $event)">
+                {{ addAllLabel(dcs.id) }}
+              </button>
               <span class="drp-chevron">{{ isDcsExpanded(dcs.id) ? '▾' : '▸' }}</span>
             </div>
 
@@ -206,6 +215,21 @@ function avatarColor(id: string): string {
       border-radius: 999px; padding: 1px 7px;
       white-space: nowrap;
     }
+    .drp-count-badge {
+      background: #257099; color: #fff;
+      border-radius: 999px; padding: 0 6px;
+      font: 600 10px Roboto; line-height: 16px;
+      flex-shrink: 0;
+    }
+    .drp-add-all-btn {
+      background: none;
+      border: 1px solid var(--triarq-color-primary, #257099);
+      color: var(--triarq-color-primary, #257099);
+      border-radius: 5px; padding: 1px 8px;
+      font: 500 10px Roboto; cursor: pointer; white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .drp-add-all-btn:disabled { opacity: 0.6; cursor: default; }
     .drp-chevron { color: #757575; font-size: 11px; flex-shrink: 0; }
     .drp-initiatives { padding: 0 0 4px 54px; }
     .drp-no-initiatives { font: italic 12px Roboto, sans-serif; color: #9E9E9E; padding: 6px 12px; }
@@ -247,6 +271,7 @@ function avatarColor(id: string): string {
 })
 export class DcsReferencePanelComponent implements OnInit {
   @Input()  initiativesGatesSectionId!: string;
+  @Input()  existingInitiativeIds: Set<string> = new Set();
   @Output() bulletAdded = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string }>();
 
   dcsUsers:  DcsUserWithInitiatives[] = [];
@@ -254,9 +279,11 @@ export class DcsReferencePanelComponent implements OnInit {
   loadError  = '';
   collapsed  = false;
 
-  private expandedDcsIds = new Set<string>();
-  private addingIds      = new Set<string>();
-  private addedIds       = new Map<string, ReturnType<typeof setTimeout>>();
+  private expandedDcsIds  = new Set<string>();
+  private addingIds       = new Set<string>();
+  private addedIds        = new Map<string, ReturnType<typeof setTimeout>>();
+  private addingAllIds    = new Set<string>();
+  private addedAllIds     = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Expose helpers to template.
   readonly gateStatusColor  = gateStatusColor;
@@ -308,11 +335,42 @@ export class DcsReferencePanelComponent implements OnInit {
     this.cdr.markForCheck();
   }
 
-  isDcsExpanded(id: string): boolean { return this.expandedDcsIds.has(id); }
-  isAdding(id: string): boolean       { return this.addingIds.has(id); }
+  isDcsExpanded(id: string): boolean  { return this.expandedDcsIds.has(id); }
+  isAdding(id: string): boolean        { return this.addingIds.has(id); }
+  isAddingAll(dcsId: string): boolean  { return this.addingAllIds.has(dcsId); }
 
   addedLabel(initiativeId: string): string {
     return this.addedIds.has(initiativeId) ? 'Added ✓' : '+ Add';
+  }
+
+  addAllLabel(dcsId: string): string {
+    return this.addedAllIds.has(dcsId) ? 'All Added ✓' : '+ Add All';
+  }
+
+  addAllToMeeting(dcs: DcsUserWithInitiatives, event: Event): void {
+    event.stopPropagation();
+    if (!this.initiativesGatesSectionId || this.addingAllIds.has(dcs.id)) return;
+    const toAdd = dcs.initiatives.filter(i => !this.existingInitiativeIds.has(i.id));
+    if (!toAdd.length) return;
+
+    this.addingAllIds.add(dcs.id);
+    this.cdr.markForCheck();
+
+    toAdd.forEach(init => {
+      this.bulletAdded.emit({
+        section_id:      this.initiativesGatesSectionId,
+        initiative_id:   init.id,
+        initiative_name: init.name
+      });
+      // Mark individual add buttons added too.
+      const t = setTimeout(() => { this.addedIds.delete(init.id); this.cdr.markForCheck(); }, 2500);
+      this.addedIds.set(init.id, t);
+    });
+
+    this.addingAllIds.delete(dcs.id);
+    const at = setTimeout(() => { this.addedAllIds.delete(dcs.id); this.cdr.markForCheck(); }, 2500);
+    this.addedAllIds.set(dcs.id, at);
+    this.cdr.markForCheck();
   }
 
   addToMeeting(init: DcsInitiativeRef): void {

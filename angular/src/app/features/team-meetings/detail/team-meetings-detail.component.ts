@@ -222,6 +222,7 @@ interface InitiativeSearchResult {
         <div *ngIf="!isReadOnly" class="tmd-ref-col">
           <app-dcs-reference-panel
             [initiativesGatesSectionId]="initiativesGatesSectionId"
+            [existingInitiativeIds]="existingInitiativeIds"
             (bulletAdded)="onRefPanelAddBullet($event)">
           </app-dcs-reference-panel>
         </div>
@@ -427,6 +428,12 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
 
   get initiativesGatesSectionId(): string {
     return this.meeting?.sections.find(s => s.section_key === 'initiatives-gates')?.id ?? '';
+  }
+
+  // Initiative IDs already present in the initiatives-gates section — used by DCS panel for collision guard.
+  get existingInitiativeIds(): Set<string> {
+    const sec = this.meeting?.sections.find(s => s.section_key === 'initiatives-gates');
+    return new Set((sec?.bullets ?? []).map(b => b.initiative?.id).filter((id): id is string => !!id));
   }
 
   private meetingId = '';
