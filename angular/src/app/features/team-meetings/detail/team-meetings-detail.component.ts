@@ -66,8 +66,31 @@ interface InitiativeSearchResult {
         <div class="tmd-sections-col">
           <div class="tmd-meeting-title-row">
             <a routerLink="/team-meetings" class="tmd-back-link">← Team Meetings</a>
-            <h1 class="tmd-title">{{ meeting.title }}</h1>
+            <!-- Inline title edit (fix 3) — edit mode only -->
+            <div *ngIf="!editingTitle && !isReadOnly" class="tmd-title-display">
+              <h1 class="tmd-title">{{ meeting.title }}</h1>
+              <button class="tmd-edit-title-btn" type="button"
+                      title="Edit title"
+                      (click)="startEditTitle()">✎</button>
+            </div>
+            <h1 *ngIf="isReadOnly" class="tmd-title">{{ meeting.title }}</h1>
+            <div *ngIf="editingTitle" class="tmd-title-edit-row">
+              <input class="tmd-title-input"
+                     type="text"
+                     [(ngModel)]="titleDraft"
+                     (keydown.enter)="saveTitle()"
+                     (keydown.escape)="cancelEditTitle()"
+                     (blur)="saveTitle()"
+                     [attr.aria-label]="'Edit meeting title'">
+              <span *ngIf="savingTitle" class="tmd-title-saving">Saving…</span>
+            </div>
             <span class="tmd-meeting-date">{{ meeting.meeting_date | date:'EEEE, MMMM d, y' }}</span>
+            <!-- Carry-forward hint: link to previous meeting so user can pull bullets forward (fix 5) -->
+            <a *ngIf="!isReadOnly && previousMeetingId"
+               [routerLink]="['/team-meetings', previousMeetingId]"
+               class="tmd-prev-meeting-link">
+              ← Last meeting (carry bullets forward from there)
+            </a>
           </div>
 
           <!-- Sections -->
@@ -221,8 +244,8 @@ interface InitiativeSearchResult {
     </div>
   `,
   styles: [`
-    .tmd-loading { padding: 48px 32px; color: #757575; font: 14px Roboto, sans-serif; }
-    .tmd-full-error { display: flex; align-items: center; gap: 10px; padding: 24px 32px; color: #D32F2F; font: 14px Roboto, sans-serif; }
+    .tmd-loading { padding: 48px 32px; color: #757575; font: 14px Roboto; }
+    .tmd-full-error { display: flex; align-items: center; gap: 10px; padding: 24px 32px; color: #D32F2F; font: 14px Roboto; }
     .tmd-link-btn { background: none; border: none; color: var(--triarq-color-primary, #257099); cursor: pointer; text-decoration: underline; font-size: 14px; }
 
     .tmd-readonly-banner {
@@ -230,7 +253,7 @@ interface InitiativeSearchResult {
       border-bottom: 2px solid #F2A620;
       padding: 10px 24px;
       display: flex; align-items: center; justify-content: space-between;
-      font: 13px Roboto, sans-serif; color: #1A1A1A;
+      font: 13px Roboto; color: #1A1A1A;
     }
     .tmd-banner-link { color: var(--triarq-color-primary, #257099); text-decoration: none; font-weight: 500; }
 
@@ -247,11 +270,19 @@ interface InitiativeSearchResult {
     }
 
     .tmd-meeting-title-row { margin-bottom: 20px; }
-    .tmd-back-link { font: 13px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); text-decoration: none; display: block; margin-bottom: 8px; }
-    .tmd-title { font: 600 22px Roboto, sans-serif; color: #1A1A1A; margin: 0 0 4px; }
-    .tmd-meeting-date { font: italic 13px Roboto, sans-serif; color: #757575; }
+    .tmd-back-link { font: 13px Roboto; color: var(--triarq-color-primary, #257099); text-decoration: none; display: block; margin-bottom: 8px; }
+    .tmd-title { font: 600 22px Roboto; color: #1A1A1A; margin: 0 0 4px; }
+    .tmd-title-display { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .tmd-title-display .tmd-title { margin: 0; }
+    .tmd-edit-title-btn { background: none; border: none; color: #9E9E9E; cursor: pointer; font-size: 15px; padding: 0 2px; }
+    .tmd-edit-title-btn:hover,.tmd-prev-meeting-link:hover { color: #257099; }
+    .tmd-title-edit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .tmd-title-input { font: 600 22px Roboto; border: 1px solid #257099; border-radius: 5px; padding: 2px 8px; outline: none; width: 100%; box-sizing: border-box; }
+    .tmd-title-saving { font: 12px Roboto; color: #9E9E9E; white-space: nowrap; }
+    .tmd-meeting-date { font: italic 13px Roboto; color: #757575; }
+    .tmd-prev-meeting-link { display: block; margin-top: 6px; font: 12px Roboto; color: #9E9E9E; text-decoration: none; }
+    .tmd-prev-meeting-link:hover { text-decoration: underline; }
 
-    /* Section */
     .tmd-section { margin-bottom: 16px; border-radius: 10px; border: 1px solid #E8E8E8; overflow: hidden; }
     .tmd-section-header {
       display: flex; align-items: flex-start; justify-content: space-between;
@@ -263,14 +294,12 @@ interface InitiativeSearchResult {
     }
     .tmd-section-header:hover { background: #F5F5F5; }
     .tmd-section-header-text { display: flex; flex-direction: column; gap: 2px; }
-    .tmd-section-title { font: 600 14px Roboto, sans-serif; color: #1A1A1A; }
-    /* S-015 zone explanation */
-    .tmd-section-sublabel { font: italic 11px Roboto, sans-serif; color: #5A5A5A; }
+    .tmd-section-title { font: 600 14px Roboto; color: #1A1A1A; }
+    .tmd-section-sublabel { font: italic 11px Roboto; color: #5A5A5A; }
     .tmd-section-chevron { font-size: 12px; color: #757575; flex-shrink: 0; margin-top: 2px; }
 
     .tmd-section-body { padding: 12px 16px 8px; }
 
-    /* Bullets */
     .tmd-bullets { margin-bottom: 8px; }
     .tmd-bullet-row {
       display: flex; align-items: center; gap: 8px;
@@ -278,14 +307,13 @@ interface InitiativeSearchResult {
       border-bottom: 1px solid #F5F5F5;
     }
     .tmd-bullet-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-    /* S-021: initiative chip tappable */
     .tmd-initiative-chip {
-      font: 500 13px Roboto, sans-serif;
+      font: 500 13px Roboto;
       color: var(--triarq-color-primary, #257099);
       text-decoration: underline;
       cursor: pointer; flex: 1;
     }
-    .tmd-bullet-text { font: 13px Roboto, sans-serif; color: #1A1A1A; flex: 1; }
+    .tmd-bullet-text { font: 13px Roboto; color: #1A1A1A; flex: 1; }
     .tmd-remove-btn {
       background: none; border: none; color: #9E9E9E; cursor: pointer;
       font-size: 16px; padding: 0 4px; line-height: 1;
@@ -293,34 +321,31 @@ interface InitiativeSearchResult {
     }
     .tmd-remove-btn:hover { color: #D32F2F; }
     .tmd-remove-btn:disabled { opacity: 0.4; cursor: default; }
-    .tmd-no-bullets { font: italic 12px Roboto, sans-serif; color: #9E9E9E; padding: 4px 0 8px; }
+    .tmd-no-bullets { font: italic 12px Roboto; color: #9E9E9E; padding: 4px 0 8px; }
 
-    /* Carry-forward (read-only mode) */
     .tmd-carry-btn-wrap { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-    .tmd-carry-btn { background: none; border: none; font: 11px Roboto, sans-serif; color: #9E9E9E; cursor: pointer; white-space: nowrap; }
+    .tmd-carry-btn { background: none; border: none; font: 11px Roboto; color: #9E9E9E; cursor: pointer; white-space: nowrap; }
     .tmd-carry-btn:hover { color: var(--triarq-color-primary, #257099); }
-    .tmd-carry-confirm, .tmd-carry-prompt, .tmd-carried-label { font: 11px Roboto, sans-serif; color: #5A5A5A; display: flex; align-items: center; gap: 6px; }
-    .tmd-carry-confirm-btn { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 3px; padding: 2px 8px; font: 500 11px Roboto, sans-serif; cursor: pointer; }
+    .tmd-carry-confirm, .tmd-carry-prompt, .tmd-carried-label { font: 11px Roboto; color: #5A5A5A; display: flex; align-items: center; gap: 6px; }
+    .tmd-carry-confirm-btn { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 3px; padding: 2px 8px; font: 500 11px Roboto; cursor: pointer; }
     .tmd-carry-cancel-btn { background: none; border: none; color: #9E9E9E; cursor: pointer; font-size: 11px; }
     .tmd-carried-label { color: #4CAF50; }
 
-    /* Add bullet input */
     .tmd-add-bullet-row { display: flex; gap: 8px; margin-bottom: 8px; position: relative; }
     .tmd-add-input-wrap { flex: 1; position: relative; }
     .tmd-bullet-input {
       width: 100%; border: 1px solid #BDBDBD; border-radius: 5px;
-      padding: 6px 10px; font: 13px Roboto, sans-serif;
+      padding: 6px 10px; font: 13px Roboto;
       outline: none; box-sizing: border-box;
     }
     .tmd-bullet-input:focus { border-color: var(--triarq-color-primary, #257099); }
     .tmd-add-btn {
       background: var(--triarq-color-primary, #257099); color: #fff;
       border: none; border-radius: 5px; padding: 6px 14px;
-      font: 500 13px Roboto, sans-serif; cursor: pointer; white-space: nowrap;
+      font: 500 13px Roboto; cursor: pointer; white-space: nowrap;
     }
     .tmd-add-btn:disabled { opacity: 0.5; cursor: default; }
 
-    /* @ picker dropdown */
     .tmd-picker-dropdown {
       position: absolute; top: 100%; left: 0; right: 0;
       background: #fff; border: 1px solid #E0E0E0; border-radius: 5px;
@@ -332,21 +357,19 @@ interface InitiativeSearchResult {
       padding: 8px 12px; cursor: pointer;
     }
     .tmd-picker-item:hover { background: #F5F9FC; }
-    .tmd-picker-name { font: 13px Roboto, sans-serif; color: #1A1A1A; }
-    .tmd-picker-stage { font: 11px Roboto, sans-serif; color: #9E9E9E; text-transform: uppercase; }
+    .tmd-picker-name { font: 13px Roboto; color: #1A1A1A; }
+    .tmd-picker-stage { font: 11px Roboto; color: #9E9E9E; text-transform: uppercase; }
 
-    /* Notes */
     .tmd-notes-zone { margin-top: 8px; }
-    .tmd-notes-label { display: block; font: 600 10px Roboto, sans-serif; color: #9E9E9E; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .tmd-notes-label { display: block; font: 600 10px Roboto; color: #9E9E9E; letter-spacing: 0.06em; margin-bottom: 4px; }
     .tmd-notes-textarea {
       width: 100%; border: 1px solid #E0E0E0; border-radius: 5px;
-      padding: 8px 10px; font: 13px Roboto, sans-serif;
+      padding: 8px 10px; font: 13px Roboto;
       resize: vertical; outline: none; box-sizing: border-box;
     }
     .tmd-notes-textarea:focus { border-color: var(--triarq-color-primary, #257099); }
-    .tmd-notes-readonly { font: 13px Roboto, sans-serif; color: #1A1A1A; margin: 0; white-space: pre-wrap; }
+    .tmd-notes-readonly { font: 13px Roboto; color: #1A1A1A; margin: 0; white-space: pre-wrap; }
 
-    /* Initiative detail overlay — D-478 */
     .tmd-overlay-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.15); z-index: 200; }
     .tmd-initiative-overlay {
       position: fixed; top: 0; right: 0;
@@ -359,10 +382,10 @@ interface InitiativeSearchResult {
       display: flex; align-items: center; justify-content: space-between;
       padding: 16px 20px; border-bottom: 1px solid #E0E0E0;
     }
-    .tmd-overlay-title { font: 600 16px Roboto, sans-serif; }
+    .tmd-overlay-title { font: 600 16px Roboto; }
     .tmd-close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #757575; }
     .tmd-overlay-body { padding: 20px; }
-    .tmd-overlay-note { font: 14px Roboto, sans-serif; color: #5A5A5A; }
+    .tmd-overlay-note { font: 14px Roboto; color: #5A5A5A; }
     .tmd-link { color: var(--triarq-color-primary, #257099); }
   `]
 })
@@ -371,7 +394,13 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   loading    = false;
   loadError  = '';
   isReadOnly = false;
-  latestMeetingId: string | null = null;
+  latestMeetingId:    string | null = null;
+  previousMeetingId:  string | null = null;
+
+  // Inline title editing.
+  editingTitle = false;
+  titleDraft   = '';
+  savingTitle  = false;
 
   // Add-bullet state per section (keyed by section_id).
   addInputs:          Record<string, string>  = {};
@@ -448,14 +477,16 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   }
 
   private determineReadOnlyMode(): void {
-    // Read-only = not the most recent meeting. Load first 2 to compare dates.
-    this.svc.listMeetings(2).subscribe({
+    this.svc.listMeetings(3).subscribe({
       next: res => {
         if (!res.success || !res.data?.length) return;
         const meetings = res.data;
         this.latestMeetingId = meetings[0].id;
-        // Current meeting is read-only if it is not the most recent by meeting_date.
-        this.isReadOnly = meetings[0].id !== this.meetingId;
+        this.isReadOnly      = meetings[0].id !== this.meetingId;
+        // previousMeetingId: for the current meeting, show link to the one before it.
+        if (!this.isReadOnly && meetings.length > 1) {
+          this.previousMeetingId = meetings[1].id;
+        }
         this.cdr.markForCheck();
       }
     });
@@ -640,6 +671,44 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   cancelCarry(): void {
     this.carryingBulletId = null;
     this.carryTarget      = null;
+    this.cdr.markForCheck();
+  }
+
+  // ── Title editing (fix 3) ───────────────────────────────────────────────────
+  startEditTitle(): void {
+    if (!this.meeting) return;
+    this.titleDraft  = this.meeting.title;
+    this.editingTitle = true;
+    this.cdr.markForCheck();
+  }
+
+  saveTitle(): void {
+    if (!this.meeting || this.savingTitle) return;
+    const trimmed = this.titleDraft.trim();
+    if (!trimmed || trimmed === this.meeting.title) {
+      this.editingTitle = false;
+      this.cdr.markForCheck();
+      return;
+    }
+    this.savingTitle = true;
+    this.cdr.markForCheck();
+    this.svc.updateMeeting(this.meeting.id, trimmed).subscribe({
+      next: res => {
+        this.savingTitle  = false;
+        this.editingTitle = false;
+        if (res.success && this.meeting) this.meeting.title = trimmed;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.savingTitle  = false;
+        this.editingTitle = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  cancelEditTitle(): void {
+    this.editingTitle = false;
     this.cdr.markForCheck();
   }
 

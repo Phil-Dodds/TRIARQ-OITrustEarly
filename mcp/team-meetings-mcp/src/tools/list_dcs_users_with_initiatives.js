@@ -53,7 +53,7 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
   // All DCS users.
   const { data: dcsUsers, error: dcsErr } = await supabase
     .from('users')
-    .select('id, display_name, avatar_url')
+    .select('id, display_name')
     .eq('system_role', 'dcs')
     .is('deleted_at', null)
     .order('display_name', { ascending: true });
@@ -125,7 +125,7 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
   const result = dcsUsers.map(u => ({
     id:           u.id,
     display_name: u.display_name,
-    avatar_url:   u.avatar_url,
+    avatar_url:   null,
     initiatives:  cyclesByDcs[u.id] || []
   }));
 

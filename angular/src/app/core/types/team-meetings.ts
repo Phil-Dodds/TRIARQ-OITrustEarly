@@ -82,7 +82,7 @@ export const SECTION_CONFIGS: readonly SectionConfig[] = [
   },
   {
     section_key: 'escalation',
-    title:       'Escalation to Phil, inform Phil, blockers and gates planning',
+    title:       'Escalation to Phil, inform Phil, blockers and gates',
     sub_label:   "Things that need Phil's attention, awareness, or a decision",
     bar_color:   '#F2A620'
   },
