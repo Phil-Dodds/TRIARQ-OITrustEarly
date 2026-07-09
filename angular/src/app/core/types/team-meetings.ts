@@ -13,6 +13,7 @@ export interface TeamMeetingInitiativeRef {
 export interface TeamMeetingBullet {
   id:                     string;
   text:                   string;
+  bullet_note:            string | null;
   sort_order:             number;
   carried_from_bullet_id: string | null;
   initiative:             TeamMeetingInitiativeRef | null;

@@ -118,6 +118,7 @@ interface InitiativeSearchResult {
                     No items recorded.
                   </div>
                   <div *ngFor="let bullet of section.bullets" class="tmd-bullet-row">
+                    <div class="tmd-bullet-main-row">
                     <span class="tmd-bullet-dot" [style.background]="cfg.bar_color"></span>
                     <!-- Initiative chip (tappable per D-478/S-021) -->
                     <span *ngIf="bullet.initiative" class="tmd-initiative-chip"
@@ -165,6 +166,18 @@ interface InitiativeSearchResult {
                             (click)="removeBullet(section, bullet)">
                       ×
                     </button>
+                    </div><!-- /tmd-bullet-main-row -->
+                    <!-- Per-bullet note — ghost line in edit mode, plain text in read-only -->
+                    <textarea *ngIf="!isReadOnly"
+                              class="tmd-bullet-note"
+                              [placeholder]="'Add a note…'"
+                              [value]="bullet.bullet_note ?? ''"
+                              (blur)="onBulletNoteBlur(bullet, $event)"
+                              rows="1">
+                    </textarea>
+                    <p *ngIf="isReadOnly && bullet.bullet_note" class="tmd-bullet-note-readonly">
+                      {{ bullet.bullet_note }}
+                    </p>
                   </div>
                 </div>
 
@@ -249,19 +262,9 @@ interface InitiativeSearchResult {
     .tmd-full-error { display: flex; align-items: center; gap: 10px; padding: 24px 32px; color: #D32F2F; font: 14px Roboto; }
     .tmd-link-btn { background: none; border: none; color: var(--triarq-color-primary, #257099); cursor: pointer; text-decoration: underline; font-size: 14px; }
 
-    .tmd-readonly-banner {
-      background: #FFF8E1;
-      border-bottom: 2px solid #F2A620;
-      padding: 10px 24px;
-      display: flex; align-items: center; justify-content: space-between;
-      font: 13px Roboto; color: #1A1A1A;
-    }
-    .tmd-banner-link { color: var(--triarq-color-primary, #257099); text-decoration: none; font-weight: 500; }
-
-    .tmd-shell {
-      display: flex;
-      min-height: calc(100vh - 56px);
-    }
+    .tmd-readonly-banner { background:#FFF8E1; border-bottom:2px solid #F2A620; padding:10px 24px; display:flex; align-items:center; justify-content:space-between; font:13px Roboto; color:#1A1A1A; }
+    .tmd-banner-link { color:var(--triarq-color-primary,#257099); text-decoration:none; font-weight:500; }
+    .tmd-shell { display:flex; min-height:calc(100vh - 56px); }
     .tmd-sections-col { flex: 65; min-width: 0; padding: 24px 28px; }
     .tmd-ref-col { flex: 35; min-width: 280px; max-width: 380px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
 
@@ -285,14 +288,7 @@ interface InitiativeSearchResult {
     .tmd-prev-meeting-link:hover { text-decoration: underline; }
 
     .tmd-section { margin-bottom: 16px; border-radius: 10px; border: 1px solid #E8E8E8; overflow: hidden; }
-    .tmd-section-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      padding: 12px 16px;
-      background: #FAFAFA;
-      border-left: 4px solid;
-      cursor: pointer;
-      user-select: none;
-    }
+    .tmd-section-header { display:flex; align-items:flex-start; justify-content:space-between; padding:12px 16px; background:#FAFAFA; border-left:4px solid; cursor:pointer; user-select:none; }
     .tmd-section-header:hover { background: #F5F5F5; }
     .tmd-section-header-text { display: flex; flex-direction: column; gap: 2px; }
     .tmd-section-title { font: 600 14px Roboto; color: #1A1A1A; }
@@ -303,9 +299,15 @@ interface InitiativeSearchResult {
 
     .tmd-bullets { margin-bottom: 8px; }
     .tmd-bullet-row {
-      display: flex; align-items: center; gap: 8px;
+      display: flex; flex-direction: column;
       padding: 5px 0;
       border-bottom: 1px solid #F5F5F5;
+    }
+    .tmd-bullet-main-row { display:flex; align-items:center; gap:8px; }
+    .tmd-bullet-note { margin-left:14px; width:calc(100% - 14px); border:none; border-bottom:1px dashed transparent; background:transparent; resize:none; outline:none; font:italic 12px Roboto; color:#757575; padding:2px 0; transition:border-color .15s; }
+    .tmd-bullet-note:focus { border-bottom-color:#BDBDBD; color:#1A1A1A; }
+    .tmd-bullet-note::placeholder { color:#BDBDBD; }
+    .tmd-bullet-note-readonly { margin:2px 0 0 14px; font:italic 12px Roboto; color:#757575;
     }
     .tmd-bullet-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     .tmd-initiative-chip {
@@ -315,13 +317,9 @@ interface InitiativeSearchResult {
       cursor: pointer; flex: 1;
     }
     .tmd-bullet-text { font: 13px Roboto; color: #1A1A1A; flex: 1; }
-    .tmd-remove-btn {
-      background: none; border: none; color: #9E9E9E; cursor: pointer;
-      font-size: 16px; padding: 0 4px; line-height: 1;
-      flex-shrink: 0;
-    }
-    .tmd-remove-btn:hover { color: #D32F2F; }
-    .tmd-remove-btn:disabled { opacity: 0.4; cursor: default; }
+    .tmd-remove-btn { background:none; border:none; color:#9E9E9E; cursor:pointer; font-size:16px; padding:0 4px; line-height:1; flex-shrink:0; }
+    .tmd-remove-btn:hover { color:#D32F2F; }
+    .tmd-remove-btn:disabled { opacity:.4; cursor:default; }
     .tmd-no-bullets { font: italic 12px Roboto; color: #9E9E9E; padding: 4px 0 8px; }
 
     .tmd-carry-btn-wrap { margin-left: auto; display: flex; align-items: center; gap: 8px; }
@@ -340,35 +338,18 @@ interface InitiativeSearchResult {
       outline: none; box-sizing: border-box;
     }
     .tmd-bullet-input:focus { border-color: var(--triarq-color-primary, #257099); }
-    .tmd-add-btn {
-      background: var(--triarq-color-primary, #257099); color: #fff;
-      border: none; border-radius: 5px; padding: 6px 14px;
-      font: 500 13px Roboto; cursor: pointer; white-space: nowrap;
-    }
-    .tmd-add-btn:disabled { opacity: 0.5; cursor: default; }
-
-    .tmd-picker-dropdown {
-      position: absolute; top: 100%; left: 0; right: 0;
-      background: #fff; border: 1px solid #E0E0E0; border-radius: 5px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.1); z-index: 50;
-      max-height: 200px; overflow-y: auto;
-    }
-    .tmd-picker-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 8px 12px; cursor: pointer;
-    }
+    .tmd-add-btn { background:var(--triarq-color-primary,#257099); color:#fff; border:none; border-radius:5px; padding:6px 14px; font:500 13px Roboto; cursor:pointer; white-space:nowrap; }
+    .tmd-add-btn:disabled { opacity:.5; cursor:default; }
+    .tmd-picker-dropdown { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #E0E0E0; border-radius:5px; box-shadow:0 4px 16px rgba(0,0,0,.1); z-index:50; max-height:200px; overflow-y:auto; }
+    .tmd-picker-item { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; }
     .tmd-picker-item:hover { background: #F5F9FC; }
     .tmd-picker-name { font: 13px Roboto; color: #1A1A1A; }
     .tmd-picker-stage { font: 11px Roboto; color: #9E9E9E; text-transform: uppercase; }
 
     .tmd-notes-zone { margin-top: 8px; }
     .tmd-notes-label { display: block; font: 600 10px Roboto; color: #9E9E9E; letter-spacing: 0.06em; margin-bottom: 4px; }
-    .tmd-notes-textarea {
-      width: 100%; border: 1px solid #E0E0E0; border-radius: 5px;
-      padding: 8px 10px; font: 13px Roboto;
-      resize: vertical; outline: none; box-sizing: border-box;
-    }
-    .tmd-notes-textarea:focus { border-color: var(--triarq-color-primary, #257099); }
+    .tmd-notes-textarea { width:100%; border:1px solid #E0E0E0; border-radius:5px; padding:8px 10px; font:13px Roboto; resize:vertical; outline:none; box-sizing:border-box; }
+    .tmd-notes-textarea:focus { border-color:var(--triarq-color-primary,#257099); }
     .tmd-notes-readonly { font: 13px Roboto; color: #1A1A1A; margin: 0; white-space: pre-wrap; }
 
     .tmd-overlay-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.15); z-index: 200; }
@@ -579,9 +560,10 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
           section.bullets = [...section.bullets, {
             id:                     res.data.id,
             text:                   res.data.text,
+            bullet_note:            null,
             sort_order:             res.data.sort_order,
             carried_from_bullet_id: res.data.carried_from_bullet_id,
-            initiative:             null  // Refreshing on next load is acceptable; initiative already shown by name
+            initiative:             null
           }];
           this.addInputs[section.id] = '';
         }
@@ -620,6 +602,20 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
         if (res.success) {
           if (!section.notes) section.notes = { notes_text: text, updated_at: new Date().toISOString(), updated_by_display_name: null };
           else section.notes.notes_text = text;
+          this.cdr.markForCheck();
+        }
+      }
+    });
+  }
+
+  onBulletNoteBlur(bullet: TeamMeetingBullet, event: Event): void {
+    const text = (event.target as HTMLTextAreaElement).value;
+    const trimmed = text.trim();
+    if (trimmed === (bullet.bullet_note ?? '')) return; // no change
+    this.svc.updateBulletNote(bullet.id, trimmed).subscribe({
+      next: res => {
+        if (res.success) {
+          bullet.bullet_note = trimmed || null;
           this.cdr.markForCheck();
         }
       }

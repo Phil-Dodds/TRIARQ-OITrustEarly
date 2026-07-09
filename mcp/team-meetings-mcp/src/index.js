@@ -26,6 +26,7 @@ const { carry_forward_bullet }              = require('./tools/carry_forward_bul
 const { update_meeting_section_collapsed }  = require('./tools/update_meeting_section_collapsed');
 const { list_dcs_users_with_initiatives }   = require('./tools/list_dcs_users_with_initiatives');
 const { update_meeting }                    = require('./tools/update_meeting');
+const { update_bullet_note }               = require('./tools/update_bullet_note');
 
 const app  = express();
 const PORT = process.env.PORT || 3005;
@@ -40,7 +41,8 @@ const TOOLS = {
   carry_forward_bullet,
   update_meeting_section_collapsed,
   list_dcs_users_with_initiatives,
-  update_meeting
+  update_meeting,
+  update_bullet_note
 };
 
 app.use(cors());

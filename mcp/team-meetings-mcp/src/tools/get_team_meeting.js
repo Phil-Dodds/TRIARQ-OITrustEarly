@@ -59,7 +59,7 @@ async function get_team_meeting(params, caller_user_id) {
   // Fetch bullets.
   const { data: bullets, error: bulletErr } = await supabase
     .from('team_meeting_bullets')
-    .select('id, section_id, text, sort_order, carried_from_bullet_id, initiative_id')
+    .select('id, section_id, text, bullet_note, sort_order, carried_from_bullet_id, initiative_id')
     .in('section_id', sectionIds.length ? sectionIds : ['__none__'])
     .order('sort_order', { ascending: true });
   if (bulletErr) return { success: false, error: bulletErr.message };
@@ -131,6 +131,7 @@ async function get_team_meeting(params, caller_user_id) {
     list.push({
       id:                    b.id,
       text:                  b.text,
+      bullet_note:           b.bullet_note ?? null,
       sort_order:            b.sort_order,
       carried_from_bullet_id: b.carried_from_bullet_id,
       initiative:            b.initiative_id ? (initiativeMap[b.initiative_id] ?? null) : null

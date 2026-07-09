@@ -31,7 +31,7 @@ async function carry_forward_bullet(params, caller_user_id) {
   // Load source bullet.
   const { data: sourceBullet, error: bulletErr } = await supabase
     .from('team_meeting_bullets')
-    .select('id, text, initiative_id, section_id')
+    .select('id, text, bullet_note, initiative_id, section_id')
     .eq('id', source_bullet_id)
     .maybeSingle();
   if (bulletErr || !sourceBullet) {
@@ -75,9 +75,10 @@ async function carry_forward_bullet(params, caller_user_id) {
   const { data: newBullet, error: insertErr } = await supabase
     .from('team_meeting_bullets')
     .insert({
-      section_id:            targetSection.id,
-      text:                  sourceBullet.text,
-      initiative_id:         sourceBullet.initiative_id ?? null,
+      section_id:             targetSection.id,
+      text:                   sourceBullet.text,
+      bullet_note:            sourceBullet.bullet_note ?? null,
+      initiative_id:          sourceBullet.initiative_id ?? null,
       sort_order,
       carried_from_bullet_id: source_bullet_id
     })

@@ -70,4 +70,8 @@ export class TeamMeetingsService {
   updateMeeting(meeting_id: string, title: string): Observable<McpResponse<{ id: string; title: string; meeting_date: string; updated_at: string }>> {
     return this.mcp.call('team-meetings', 'update_meeting', { meeting_id, title });
   }
+
+  updateBulletNote(bullet_id: string, note_text: string): Observable<McpResponse<void>> {
+    return this.mcp.call('team-meetings', 'update_bullet_note', { bullet_id, note_text });
+  }
 }
