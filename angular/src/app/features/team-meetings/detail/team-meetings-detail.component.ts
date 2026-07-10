@@ -12,8 +12,9 @@ import { RouterModule, Router,
          ActivatedRoute }            from '@angular/router';
 import { FormsModule }               from '@angular/forms';
 import { IonicModule }               from '@ionic/angular';
-import { TeamMeetingsService }       from '../team-meetings.service';
-import { DcsReferencePanelComponent } from './dcs-reference-panel.component';
+import { TeamMeetingsService }           from '../team-meetings.service';
+import { DcsReferencePanelComponent }    from './dcs-reference-panel.component';
+import { DeliveryCycleDetailComponent }  from '../../delivery/detail/delivery-cycle-detail.component';
 import {
   TeamMeeting, TeamMeetingSection, TeamMeetingBullet,
   SECTION_CONFIGS, SectionKey
@@ -33,7 +34,7 @@ interface InitiativeSearchResult {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, RouterModule, FormsModule, IonicModule,
-    DcsReferencePanelComponent
+    DcsReferencePanelComponent, DeliveryCycleDetailComponent
   ],
   template: `
     <!-- Loading state -->
@@ -225,25 +226,21 @@ interface InitiativeSearchResult {
           <app-dcs-reference-panel
             [initiativesGatesSectionId]="initiativesGatesSectionId"
             [existingInitiativeIds]="existingInitiativeIds"
-            (bulletAdded)="onRefPanelAddBullet($event)">
+            (bulletAdded)="onRefPanelAddBullet($event)"
+            (initiativeSelected)="openInitiativeDetail($event)">
           </app-dcs-reference-panel>
         </div>
       </div>
     </ng-container>
 
-    <!-- Initiative detail panel overlay — D-478 read-only mode -->
+    <!-- Initiative detail panel overlay — D-478 / reuses app-delivery-cycle-detail panel mode -->
     <div *ngIf="showInitiativePanel" class="tmd-overlay-scrim" (click)="closeInitiativeDetail()"></div>
     <div *ngIf="showInitiativePanel" class="tmd-initiative-overlay">
-      <div class="tmd-overlay-header">
-        <span class="tmd-overlay-title">Initiative Detail</span>
-        <button class="tmd-close-btn" (click)="closeInitiativeDetail()" type="button">×</button>
-      </div>
-      <div class="tmd-overlay-body">
-        <p class="tmd-overlay-note">
-          Open the full Initiative detail via
-          <a [routerLink]="['/initiatives', selectedInitiativeId]" class="tmd-link">View Initiative →</a>
-        </p>
-      </div>
+      <app-delivery-cycle-detail
+        *ngIf="selectedInitiativeId"
+        [cycleId]="selectedInitiativeId"
+        (close)="closeInitiativeDetail()">
+      </app-delivery-cycle-detail>
     </div>
   `,
   styles: [`
@@ -344,20 +341,12 @@ interface InitiativeSearchResult {
     .tmd-overlay-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.15); z-index: 200; }
     .tmd-initiative-overlay {
       position: fixed; top: 0; right: 0;
-      width: 440px; height: 100vh;
+      width: min(860px, 100vw); height: 100vh;
       background: #fff; box-shadow: -4px 0 20px rgba(0,0,0,0.12);
-      z-index: 201; display: flex; flex-direction: column;
+      z-index: 201; overflow-y: auto;
       border-radius: 10px 0 0 10px;
     }
-    .tmd-overlay-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 20px; border-bottom: 1px solid #E0E0E0;
-    }
-    .tmd-overlay-title { font: 600 16px Roboto; }
     .tmd-close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #757575; }
-    .tmd-overlay-body { padding: 20px; }
-    .tmd-overlay-note { font: 14px Roboto; color: #5A5A5A; }
-    .tmd-link { color: var(--triarq-color-primary, #257099); }
   `]
 })
 export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {

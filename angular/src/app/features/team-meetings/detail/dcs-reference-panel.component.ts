@@ -125,7 +125,13 @@ function avatarColor(id: string): string {
                         [style.background]="gateStatusColor(init.gate_status)"
                         [title]="gateStatusLabel(init.gate_status)">
                   </span>
-                  <span class="drp-initiative-name">{{ init.name }}</span>
+                  <span class="drp-initiative-name drp-initiative-link"
+                        role="button"
+                        tabindex="0"
+                        (click)="initiativeSelected.emit(init.id); $event.stopPropagation()"
+                        (keydown.enter)="initiativeSelected.emit(init.id)">
+                    {{ init.name }}
+                  </span>
                 </div>
                 <div class="drp-initiative-meta">
                   <span class="drp-stage-badge">{{ init.stage }}</span>
@@ -245,6 +251,8 @@ function avatarColor(id: string): string {
       border-radius: 50%; flex-shrink: 0;
     }
     .drp-initiative-name { font: 13px Roboto, sans-serif; color: #1A1A1A; }
+    .drp-initiative-link { cursor: pointer; }
+    .drp-initiative-link:hover { color: var(--triarq-color-primary, #257099); text-decoration: underline; }
     .drp-initiative-meta { display: flex; align-items: center; gap: 8px; padding-left: 14px; }
     .drp-stage-badge {
       font: 500 10px Roboto, sans-serif;
@@ -272,7 +280,8 @@ function avatarColor(id: string): string {
 export class DcsReferencePanelComponent implements OnInit {
   @Input()  initiativesGatesSectionId!: string;
   @Input()  existingInitiativeIds: Set<string> = new Set();
-  @Output() bulletAdded = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string }>();
+  @Output() bulletAdded          = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string }>();
+  @Output() initiativeSelected   = new EventEmitter<string>();
 
   dcsUsers:  DcsUserWithInitiatives[] = [];
   loading    = false;
