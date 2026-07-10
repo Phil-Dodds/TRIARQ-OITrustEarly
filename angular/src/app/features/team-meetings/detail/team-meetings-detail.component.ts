@@ -166,6 +166,15 @@ interface InitiativeSearchResult {
                       ×
                     </button>
                     </div><!-- /tmd-bullet-main-row -->
+                    <!-- DCS name + next gate — initiatives-gates section only -->
+                    <div *ngIf="bullet.initiative && section.section_key === 'initiatives-gates' && (bullet.initiative.dcs_name || bullet.initiative.next_gate)"
+                         class="tmd-bullet-meta">
+                      <span *ngIf="bullet.initiative.dcs_name" class="tmd-bullet-dcs">{{ bullet.initiative.dcs_name }}</span>
+                      <span *ngIf="bullet.initiative.dcs_name && bullet.initiative.next_gate" class="tmd-bullet-meta-sep">·</span>
+                      <span *ngIf="bullet.initiative.next_gate" class="tmd-bullet-gate">
+                        {{ bullet.initiative.next_gate.label }}<ng-container *ngIf="bullet.initiative.next_gate.target_date"> &rarr; {{ bullet.initiative.next_gate.target_date | date:'MMM d' }}</ng-container>
+                      </span>
+                    </div>
                     <!-- Per-bullet note — ghost textarea, saves on blur -->
                     <textarea class="tmd-bullet-note"
                               [placeholder]="'Add a note…'"
@@ -290,6 +299,10 @@ interface InitiativeSearchResult {
       border-bottom: 1px solid #F5F5F5;
     }
     .tmd-bullet-main-row { display:flex; align-items:center; gap:8px; }
+    .tmd-bullet-meta { display:flex; align-items:center; gap:6px; margin-left:14px; margin-top:2px; flex-wrap:wrap; }
+    .tmd-bullet-dcs  { font:11px Roboto; color:#257099; }
+    .tmd-bullet-meta-sep { font:11px Roboto; color:#BDBDBD; }
+    .tmd-bullet-gate { font:11px Roboto; color:#757575; }
     .tmd-bullet-note { margin-left:14px; width:calc(100% - 14px); border:none; border-bottom:1px dashed transparent; background:transparent; resize:none; outline:none; font:italic 12px Roboto; color:#757575; padding:2px 0; transition:border-color .15s; }
     .tmd-bullet-note:focus { border-bottom-color:#BDBDBD; color:#1A1A1A; }
     .tmd-bullet-note::placeholder { color:#BDBDBD; }
@@ -548,7 +561,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
             sort_order:             res.data.sort_order,
             carried_from_bullet_id: res.data.carried_from_bullet_id,
             initiative:             initiativeId && initiativeName
-                                      ? { id: initiativeId, name: initiativeName, stage: '', gate_status: '' }
+                                      ? { id: initiativeId, name: initiativeName, stage: '', gate_status: '', dcs_name: null, next_gate: null }
                                       : null
           }];
           this.addInputs[section.id] = '';

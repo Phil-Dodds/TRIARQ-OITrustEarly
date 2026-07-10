@@ -3,11 +3,18 @@
 
 export type SectionKey = 'hot-topics' | 'escalation' | 'comms' | 'initiatives-gates' | 'training';
 
+export interface TeamMeetingNextGate {
+  label:       string;
+  target_date: string | null;
+}
+
 export interface TeamMeetingInitiativeRef {
   id:          string;
   name:        string;
   stage:       string;
   gate_status: string;
+  dcs_name:    string | null;
+  next_gate:   TeamMeetingNextGate | null;
 }
 
 export interface TeamMeetingBullet {

@@ -9,6 +9,9 @@ const { supabase } = require('../db');
 // D-419 walkback chain: find the furthest-in-progress gate milestone status.
 const WALKBACK_CHAIN = ['go_to_deploy', 'go_to_build', 'brief_review'];
 
+// Forward order for "next gate" computation.
+const GATE_FORWARD_ORDER = ['brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'];
+
 function resolveGateStatus(milestoneDates) {
   for (const gate of WALKBACK_CHAIN) {
     const m = (milestoneDates || []).find(x => x.gate_name === gate);
@@ -18,6 +21,17 @@ function resolveGateStatus(milestoneDates) {
     return m.date_status;
   }
   return 'not_started';
+}
+
+function resolveNextGate(milestoneDates) {
+  for (const gate of GATE_FORWARD_ORDER) {
+    const m = (milestoneDates || []).find(x => x.gate_name === gate);
+    if (!m) continue;
+    if (m.date_status === 'complete') continue;
+    if (m.date_status === 'skipped')  continue;
+    return { label: m.milestone_label, target_date: m.target_date ?? null };
+  }
+  return null;
 }
 
 /**
@@ -88,14 +102,26 @@ async function get_team_meeting(params, caller_user_id) {
   if (initiativeIds.length) {
     const { data: cycles } = await supabase
       .from('delivery_cycles')
-      .select('delivery_cycle_id, cycle_title, current_lifecycle_stage')
+      .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, assigned_dcs_user_id')
       .in('delivery_cycle_id', initiativeIds)
       .is('deleted_at', null);
 
-    // Milestone dates for D-419 walkback.
+    // Look up DCS display names.
+    const dcsUserIds = [...new Set((cycles || []).map(c => c.assigned_dcs_user_id).filter(Boolean))];
+    let dcsNameMap = {};
+    if (dcsUserIds.length) {
+      const { data: dcsUsers } = await supabase
+        .from('users')
+        .select('id, display_name')
+        .in('id', dcsUserIds)
+        .is('deleted_at', null);
+      (dcsUsers || []).forEach(u => { dcsNameMap[u.id] = u.display_name; });
+    }
+
+    // Milestone dates — D-419 walkback + next gate.
     const { data: milestones } = await supabase
       .from('cycle_milestone_dates')
-      .select('delivery_cycle_id, gate_name, date_status')
+      .select('delivery_cycle_id, gate_name, milestone_label, target_date, date_status')
       .in('delivery_cycle_id', initiativeIds)
       .is('deleted_at', null);
 
@@ -105,11 +131,14 @@ async function get_team_meeting(params, caller_user_id) {
     });
 
     (cycles || []).forEach(c => {
+      const mds = milestonesByCycle[c.delivery_cycle_id] || [];
       initiativeMap[c.delivery_cycle_id] = {
         id:          c.delivery_cycle_id,
         name:        c.cycle_title,
         stage:       c.current_lifecycle_stage,
-        gate_status: resolveGateStatus(milestonesByCycle[c.delivery_cycle_id] || [])
+        gate_status: resolveGateStatus(mds),
+        dcs_name:    c.assigned_dcs_user_id ? (dcsNameMap[c.assigned_dcs_user_id] ?? null) : null,
+        next_gate:   resolveNextGate(mds)
       };
     });
   }
