@@ -395,7 +395,7 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges {
   }
 
   addToMeeting(init: DcsInitiativeRef): void {
-    if (!this.initiativesGatesSectionId || this.addingIds.has(init.id)) return;
+    if (!this.initiativesGatesSectionId || this.addingIds.has(init.id) || this.isInitiativeAdded(init.id)) return;
     this.addingIds.add(init.id);
     this.cdr.markForCheck();
 

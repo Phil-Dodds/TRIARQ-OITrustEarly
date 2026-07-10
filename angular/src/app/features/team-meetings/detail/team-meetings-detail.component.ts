@@ -534,7 +534,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     this.submitBullet(section, text, undefined);
   }
 
-  private submitBullet(section: TeamMeetingSection, text: string, initiativeId?: string): void {
+  private submitBullet(section: TeamMeetingSection, text: string, initiativeId?: string, initiativeName?: string): void {
     this.addingBulletSectionId = section.id;
     this.cdr.markForCheck();
     this.svc.addBullet(section.id, text, initiativeId).subscribe({
@@ -547,7 +547,9 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
             bullet_note:            null,
             sort_order:             res.data.sort_order,
             carried_from_bullet_id: res.data.carried_from_bullet_id,
-            initiative:             null
+            initiative:             initiativeId && initiativeName
+                                      ? { id: initiativeId, name: initiativeName, stage: '', gate_status: '' }
+                                      : null
           }];
           this.addInputs[section.id] = '';
         }
@@ -708,7 +710,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
       section.collapsed = false;
       this.svc.updateSectionCollapsed(section.id, false).subscribe();
     }
-    this.submitBullet(section, event.initiative_name, event.initiative_id);
+    this.submitBullet(section, event.initiative_name, event.initiative_id, event.initiative_name);
   }
 
   // ── Initiative detail overlay (D-478) ───────────────────────────────────────
