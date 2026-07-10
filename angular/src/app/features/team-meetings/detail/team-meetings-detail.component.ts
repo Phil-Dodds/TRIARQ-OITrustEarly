@@ -406,9 +406,15 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.meetingId = this.route.snapshot.paramMap.get('meeting_id') ?? '';
-    this.loadMeeting();
-    this.determineLatestMeeting();
+    this.route.paramMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      this.meetingId       = params.get('meeting_id') ?? '';
+      this.meeting         = null;
+      this.addInputs       = {};
+      this.isLatestMeeting = true;
+      this.previousMeetingId = null;
+      this.loadMeeting();
+      this.determineLatestMeeting();
+    });
   }
 
   ngOnDestroy(): void {
