@@ -67,8 +67,12 @@ export class TeamMeetingsService {
     return this.mcp.call<DcsUserWithInitiatives[]>('team-meetings', 'list_dcs_users_with_initiatives', {});
   }
 
-  updateMeeting(meeting_id: string, title: string): Observable<McpResponse<{ id: string; title: string; meeting_date: string; updated_at: string }>> {
-    return this.mcp.call('team-meetings', 'update_meeting', { meeting_id, title });
+  updateMeeting(meeting_id: string, title: string, meeting_date?: string): Observable<McpResponse<{ id: string; title: string; meeting_date: string; updated_at: string }>> {
+    return this.mcp.call('team-meetings', 'update_meeting', {
+      meeting_id,
+      title,
+      ...(meeting_date ? { meeting_date } : {})
+    });
   }
 
   updateBulletNote(bullet_id: string, note_text: string): Observable<McpResponse<void>> {

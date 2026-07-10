@@ -81,14 +81,20 @@ function todayIso(): string {
              class="tm-row"
              role="button"
              tabindex="0"
-             (click)="confirmDeleteId !== m.id && openMeeting(m.id)"
-             (keydown.enter)="confirmDeleteId !== m.id && openMeeting(m.id)">
+             (click)="confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)"
+             (keydown.enter)="confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)">
           <span class="tm-col-title tm-meeting-name">{{ m.title }}</span>
           <span class="tm-col-date">{{ m.meeting_date | date:'MMM d, y' }}</span>
           <span class="tm-col-updated tm-muted">{{ m.updated_at | date:'MMM d, y' }}</span>
-          <!-- Inline delete — confirm before executing -->
-          <span (click)="$event.stopPropagation()">
+          <!-- Row actions — edit + delete -->
+          <span class="tm-row-actions" (click)="$event.stopPropagation()">
             <ng-container *ngIf="confirmDeleteId !== m.id">
+              <button class="tm-edit-btn"
+                      type="button"
+                      title="Edit meeting"
+                      (click)="openEditMeeting(m)">
+                ✎
+              </button>
               <button class="tm-delete-btn"
                       type="button"
                       [disabled]="deletingId === m.id"
@@ -107,11 +113,11 @@ function todayIso(): string {
       </div>
     </div>
 
-    <!-- New Meeting creation panel — S-016 (right panel), S-017 (modal scrim) -->
+    <!-- Meeting panel — New (S-016/S-017) or Edit mode -->
     <div *ngIf="showNewPanel" class="tm-scrim" (click)="closeNewPanel()"></div>
     <div *ngIf="showNewPanel" class="tm-panel">
       <div class="tm-panel-header">
-        <span class="tm-panel-title">New Meeting</span>
+        <span class="tm-panel-title">{{ editingMeeting ? 'Edit Meeting' : 'New Meeting' }}</span>
         <button class="tm-close-btn" (click)="closeNewPanel()" type="button" aria-label="Close">×</button>
       </div>
 
@@ -140,7 +146,7 @@ function todayIso(): string {
           <button class="tm-btn-primary"
                   type="submit"
                   [disabled]="saving || newMeetingForm.invalid">
-            {{ saving ? 'Creating…' : 'Create Meeting' }}
+            {{ saving ? (editingMeeting ? 'Saving…' : 'Creating…') : (editingMeeting ? 'Save Changes' : 'Create Meeting') }}
           </button>
         </div>
       </form>
@@ -190,7 +196,7 @@ function todayIso(): string {
     }
     .tm-list-header, .tm-row {
       display: grid;
-      grid-template-columns: 1fr 140px 140px 40px;
+      grid-template-columns: 1fr 140px 140px 72px;
       gap: 8px;
       padding: 10px 12px;
       align-items: center;
@@ -211,6 +217,9 @@ function todayIso(): string {
     .tm-row:hover { background: #F5F9FC; }
     .tm-meeting-name { font: 500 14px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); }
     .tm-muted { color: #757575; font-size: 13px; }
+    .tm-row-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+    .tm-edit-btn { background: none; border: none; color: #BDBDBD; cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 3px; transition: color 0.1s; }
+    .tm-edit-btn:hover { color: var(--triarq-color-primary, #257099); }
     .tm-delete-btn { background: none; border: none; color: #BDBDBD; cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 3px; transition: color 0.1s; }
     .tm-delete-btn:hover { color: #D32F2F; }
     .tm-delete-confirm { display: flex; align-items: center; gap: 6px; font: 12px Roboto, sans-serif; color: #D32F2F; white-space: nowrap; }
@@ -287,8 +296,9 @@ export class TeamMeetingsListComponent implements OnInit {
   showNewPanel    = false;
   saving          = false;
   saveError       = '';
-  confirmDeleteId: string | null = null;
-  deletingId:      string | null = null;
+  confirmDeleteId: string | null           = null;
+  deletingId:      string | null           = null;
+  editingMeeting:  TeamMeetingListItem | null = null;
 
   newMeetingForm!: FormGroup;
 
@@ -346,7 +356,18 @@ export class TeamMeetingsListComponent implements OnInit {
 
   closeNewPanel(): void {
     if (this.saving) return;
-    this.showNewPanel = false;
+    this.showNewPanel   = false;
+    this.editingMeeting = null;
+  }
+
+  openEditMeeting(m: TeamMeetingListItem): void {
+    this.editingMeeting = m;
+    this.saveError      = '';
+    this.newMeetingForm = this.fb.group({
+      title:        [m.title, Validators.required],
+      meeting_date: [m.meeting_date, Validators.required]
+    });
+    this.showNewPanel = true;
   }
 
   deleteMeeting(m: TeamMeetingListItem): void {
@@ -372,6 +393,33 @@ export class TeamMeetingsListComponent implements OnInit {
     this.saving    = true;
     this.saveError = '';
     this.cdr.markForCheck();
+
+    if (this.editingMeeting) {
+      const targetId = this.editingMeeting.id;
+      this.svc.updateMeeting(targetId, title, meeting_date).subscribe({
+        next: res => {
+          this.saving = false;
+          if (res.success && res.data) {
+            this.meetings = this.meetings.map(m =>
+              m.id === targetId
+                ? { ...m, title: res.data!.title, meeting_date: res.data!.meeting_date, updated_at: res.data!.updated_at }
+                : m
+            );
+            this.showNewPanel   = false;
+            this.editingMeeting = null;
+          } else {
+            this.saveError = res.error ?? 'Failed to save changes.';
+          }
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          this.saving    = false;
+          this.saveError = err?.error ?? 'Unable to save changes. Check your connection.';
+          this.cdr.markForCheck();
+        }
+      });
+      return;
+    }
 
     this.svc.createMeeting(title, meeting_date).subscribe({
       next: res => {
