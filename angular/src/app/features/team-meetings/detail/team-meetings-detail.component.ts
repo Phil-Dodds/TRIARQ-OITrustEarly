@@ -2,7 +2,7 @@
 // Meeting prep/run screen (D-490 Steps 4, 6, 7).
 // Route: /team-meetings/:meeting_id
 // Two-column layout (≥1024px): 65% sections + 35% DCS reference panel.
-// Read-only mode: any meeting that is not the most recent (determined by meeting_date).
+// All meetings fully editable. isLatestMeeting controls carry-forward visibility and past-meeting banner.
 
 import {
   Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef
@@ -46,34 +46,33 @@ interface InitiativeSearchResult {
     </div>
 
     <ng-container *ngIf="meeting && !loading">
-      <!-- Read-only banner (Step 7) -->
-      <div *ngIf="isReadOnly" class="tmd-readonly-banner">
-        <span>{{ meeting.title }} — {{ meeting.meeting_date | date:'MMMM d, y' }} · Read only</span>
+      <!-- Past-meeting banner (shown when not the most recently created meeting) -->
+      <div *ngIf="!isLatestMeeting" class="tmd-readonly-banner">
+        <span>Past meeting — {{ meeting.meeting_date | date:'MMMM d, y' }}</span>
         <a *ngIf="latestMeetingId"
            [routerLink]="['/team-meetings', latestMeetingId]"
            class="tmd-banner-link">
-          → Prep this week's meeting
+          → Latest meeting
         </a>
         <a *ngIf="!latestMeetingId"
            routerLink="/team-meetings"
            class="tmd-banner-link">
-          → Create this week's meeting
+          → All meetings
         </a>
       </div>
 
-      <div class="tmd-shell" [class.tmd-wide]="!isReadOnly">
+      <div class="tmd-shell tmd-wide">
         <!-- Left column: sections (65%) -->
         <div class="tmd-sections-col">
           <div class="tmd-meeting-title-row">
             <a routerLink="/team-meetings" class="tmd-back-link">← Team Meetings</a>
-            <!-- Inline title edit (fix 3) — edit mode only -->
-            <div *ngIf="!editingTitle && !isReadOnly" class="tmd-title-display">
+            <!-- Inline title edit -->
+            <div *ngIf="!editingTitle" class="tmd-title-display">
               <h1 class="tmd-title">{{ meeting.title }}</h1>
               <button class="tmd-edit-title-btn" type="button"
                       title="Edit title"
                       (click)="startEditTitle()">✎</button>
             </div>
-            <h1 *ngIf="isReadOnly" class="tmd-title">{{ meeting.title }}</h1>
             <div *ngIf="editingTitle" class="tmd-title-edit-row">
               <input class="tmd-title-input"
                      type="text"
@@ -85,8 +84,8 @@ interface InitiativeSearchResult {
               <span *ngIf="savingTitle" class="tmd-title-saving">Saving…</span>
             </div>
             <span class="tmd-meeting-date">{{ meeting.meeting_date | date:'EEEE, MMMM d, y' }}</span>
-            <!-- Carry-forward hint: link to previous meeting so user can pull bullets forward (fix 5) -->
-            <a *ngIf="!isReadOnly && previousMeetingId"
+            <!-- Carry-forward hint: on the latest meeting, link to the prior one to pull bullets forward -->
+            <a *ngIf="isLatestMeeting && previousMeetingId"
                [routerLink]="['/team-meetings', previousMeetingId]"
                class="tmd-prev-meeting-link">
               ← Last meeting (carry bullets forward from there)
@@ -114,7 +113,7 @@ interface InitiativeSearchResult {
               <div *ngIf="!section.collapsed" class="tmd-section-body">
                 <!-- Bullet list -->
                 <div class="tmd-bullets">
-                  <div *ngIf="section.bullets.length === 0 && isReadOnly" class="tmd-no-bullets">
+                  <div *ngIf="section.bullets.length === 0" class="tmd-no-bullets">
                     No items recorded.
                   </div>
                   <div *ngFor="let bullet of section.bullets" class="tmd-bullet-row">
@@ -131,8 +130,8 @@ interface InitiativeSearchResult {
                     <!-- Plain text bullet -->
                     <span *ngIf="!bullet.initiative" class="tmd-bullet-text">{{ bullet.text }}</span>
 
-                    <!-- Carry-forward tap target (read-only mode, Step 7) -->
-                    <span *ngIf="isReadOnly" class="tmd-carry-btn-wrap">
+                    <!-- Carry-forward tap target — available on any past meeting -->
+                    <span *ngIf="!isLatestMeeting" class="tmd-carry-btn-wrap">
                       <ng-container *ngIf="!carryingBulletId || carryingBulletId !== bullet.id">
                         <button class="tmd-carry-btn"
                                 type="button"
@@ -157,9 +156,8 @@ interface InitiativeSearchResult {
                       </span>
                     </span>
 
-                    <!-- Remove button (prep/run mode only) -->
-                    <button *ngIf="!isReadOnly"
-                            class="tmd-remove-btn"
+                    <!-- Remove button -->
+                    <button class="tmd-remove-btn"
                             type="button"
                             [disabled]="removingBulletId === bullet.id"
                             [attr.aria-label]="'Remove: ' + bullet.text"
@@ -167,22 +165,18 @@ interface InitiativeSearchResult {
                       ×
                     </button>
                     </div><!-- /tmd-bullet-main-row -->
-                    <!-- Per-bullet note — ghost line in edit mode, plain text in read-only -->
-                    <textarea *ngIf="!isReadOnly"
-                              class="tmd-bullet-note"
+                    <!-- Per-bullet note — ghost textarea, saves on blur -->
+                    <textarea class="tmd-bullet-note"
                               [placeholder]="'Add a note…'"
                               [value]="bullet.bullet_note ?? ''"
                               (blur)="onBulletNoteBlur(bullet, $event)"
                               rows="1">
                     </textarea>
-                    <p *ngIf="isReadOnly && bullet.bullet_note" class="tmd-bullet-note-readonly">
-                      {{ bullet.bullet_note }}
-                    </p>
                   </div>
                 </div>
 
-                <!-- Add-bullet input (prep/run mode) -->
-                <div *ngIf="!isReadOnly" class="tmd-add-bullet-row">
+                <!-- Add-bullet input -->
+                <div class="tmd-add-bullet-row">
                   <div class="tmd-add-input-wrap">
                     <input class="tmd-bullet-input"
                            type="text"
@@ -211,28 +205,23 @@ interface InitiativeSearchResult {
                   </button>
                 </div>
 
-                <!-- Notes textarea (prep/run mode) / plain text (read-only) -->
+                <!-- Notes textarea -->
                 <div class="tmd-notes-zone">
-                  <!-- S-015 zone explanation -->
                   <label class="tmd-notes-label">NOTES / COMMENTS</label>
-                  <textarea *ngIf="!isReadOnly"
-                            class="tmd-notes-textarea"
+                  <textarea class="tmd-notes-textarea"
                             placeholder="Capture discussion, decisions, or follow-ups here…"
                             [value]="getNotes(section)"
                             (blur)="onNotesBlur(section, $event)"
                             rows="3">
                   </textarea>
-                  <p *ngIf="isReadOnly && section.notes?.notes_text" class="tmd-notes-readonly">
-                    {{ section.notes?.notes_text }}
-                  </p>
                 </div>
               </div><!-- /section-body -->
             </ng-container>
           </div><!-- /section -->
         </div><!-- /sections-col -->
 
-        <!-- Right column: DCS reference panel (Step 5) — hidden in read-only mode (Step 7) -->
-        <div *ngIf="!isReadOnly" class="tmd-ref-col">
+        <!-- Right column: DCS reference panel -->
+        <div class="tmd-ref-col">
           <app-dcs-reference-panel
             [initiativesGatesSectionId]="initiativesGatesSectionId"
             [existingInitiativeIds]="existingInitiativeIds"
@@ -375,7 +364,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   meeting:   TeamMeeting | null = null;
   loading    = false;
   loadError  = '';
-  isReadOnly = false;
+  isLatestMeeting     = true;
   latestMeetingId:    string | null = null;
   previousMeetingId:  string | null = null;
 
@@ -430,7 +419,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.meetingId = this.route.snapshot.paramMap.get('meeting_id') ?? '';
     this.loadMeeting();
-    this.determineReadOnlyMode();
+    this.determineLatestMeeting();
   }
 
   ngOnDestroy(): void {
@@ -464,15 +453,15 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  private determineReadOnlyMode(): void {
+  private determineLatestMeeting(): void {
     this.svc.listMeetings(3).subscribe({
       next: res => {
         if (!res.success || !res.data?.length) return;
-        const meetings = res.data;
-        this.latestMeetingId = meetings[0].id;
-        this.isReadOnly      = meetings[0].id !== this.meetingId;
-        // previousMeetingId: for the current meeting, show link to the one before it.
-        if (!this.isReadOnly && meetings.length > 1) {
+        const meetings = res.data; // sorted by created_at DESC
+        this.latestMeetingId  = meetings[0].id;
+        this.isLatestMeeting  = meetings[0].id === this.meetingId;
+        // On the latest meeting: show link to the previous one so user can carry bullets forward.
+        if (this.isLatestMeeting && meetings.length > 1) {
           this.previousMeetingId = meetings[1].id;
         }
         this.cdr.markForCheck();
