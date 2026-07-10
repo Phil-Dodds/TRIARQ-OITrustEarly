@@ -118,33 +118,34 @@ function avatarColor(id: string): string {
               <div *ngIf="dcs.initiatives.length === 0" class="drp-no-initiatives">
                 No active initiatives
               </div>
-              <div *ngFor="let init of dcs.initiatives" class="drp-initiative-row">
-                <div class="drp-initiative-main">
-                  <!-- D-419 gate status dot -->
-                  <span class="drp-status-dot"
-                        [style.background]="gateStatusColor(init.gate_status)"
-                        [title]="gateStatusLabel(init.gate_status)">
-                  </span>
-                  <span class="drp-initiative-name drp-initiative-link"
-                        role="button"
-                        tabindex="0"
-                        (click)="initiativeSelected.emit(init.id); $event.stopPropagation()"
-                        (keydown.enter)="initiativeSelected.emit(init.id)">
-                    {{ init.name }}
-                  </span>
-                </div>
-                <div class="drp-initiative-meta">
-                  <span class="drp-stage-badge">{{ init.stage }}</span>
-                  <span *ngIf="init.last_status_update_date" class="drp-last-update">
-                    {{ init.last_status_update_date | date:'MMM d' }}
-                  </span>
-                </div>
-                <button class="drp-add-btn"
-                        type="button"
-                        [disabled]="isAdding(init.id)"
-                        (click)="addToMeeting(init)">
-                  {{ addedLabel(init.id) }}
-                </button>
+              <div *ngFor="let init of dcs.initiatives"
+                   class="drp-initiative-row"
+                   [class.drp-initiative-checked]="isInitiativeAdded(init.id)"
+                   (click)="!isInitiativeAdded(init.id) && addToMeeting(init); $event.stopPropagation()"
+                   [attr.role]="isInitiativeAdded(init.id) ? null : 'button'"
+                   [attr.tabindex]="isInitiativeAdded(init.id) ? null : 0"
+                   (keydown.enter)="!isInitiativeAdded(init.id) && addToMeeting(init)">
+                <!-- Checkbox -->
+                <span class="drp-checkbox"
+                      [class.drp-checkbox-checked]="isInitiativeAdded(init.id)"
+                      [title]="isInitiativeAdded(init.id) ? 'In meeting' : 'Add to meeting'">
+                  <span *ngIf="isInitiativeAdded(init.id)" class="drp-checkmark">✓</span>
+                </span>
+                <!-- D-419 status dot -->
+                <span class="drp-status-dot"
+                      [style.background]="gateStatusColor(init.gate_status)"
+                      [title]="gateStatusLabel(init.gate_status)">
+                </span>
+                <!-- Name (tappable for detail) -->
+                <span class="drp-initiative-name drp-initiative-link"
+                      role="button"
+                      tabindex="0"
+                      (click)="initiativeSelected.emit(init.id); $event.stopPropagation()"
+                      (keydown.enter)="initiativeSelected.emit(init.id)">
+                  {{ init.name }}
+                </span>
+                <!-- Stage badge -->
+                <span class="drp-stage-badge">{{ init.stage }}</span>
               </div>
             </div>
           </div>
@@ -240,40 +241,35 @@ function avatarColor(id: string): string {
     .drp-initiatives { padding: 0 0 4px 54px; }
     .drp-no-initiatives { font: italic 12px Roboto, sans-serif; color: #9E9E9E; padding: 6px 12px; }
     .drp-initiative-row {
-      padding: 6px 12px 6px 0;
-      display: flex; flex-direction: column; gap: 3px;
+      padding: 5px 12px 5px 8px;
+      display: flex; flex-direction: row; align-items: center; gap: 6px;
       border-bottom: 1px solid #F5F5F5;
+      cursor: pointer; transition: background 0.1s;
     }
-    .drp-initiative-main { display: flex; align-items: center; gap: 6px; }
+    .drp-initiative-row:hover:not(.drp-initiative-checked) { background: #F0F7FB; }
+    .drp-initiative-checked { cursor: default; opacity: 0.7; }
+    .drp-checkbox {
+      width: 15px; height: 15px; flex-shrink: 0;
+      border: 1.5px solid #BDBDBD; border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      background: #fff; transition: border-color 0.1s, background 0.1s;
+    }
+    .drp-checkbox-checked {
+      background: var(--triarq-color-primary, #257099);
+      border-color: var(--triarq-color-primary, #257099);
+    }
+    .drp-checkmark { font-size: 10px; color: #fff; line-height: 1; }
     /* D-419 status dot */
-    .drp-status-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%; flex-shrink: 0;
-    }
-    .drp-initiative-name { font: 13px Roboto, sans-serif; color: #1A1A1A; }
+    .drp-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .drp-initiative-name { font: 13px Roboto, sans-serif; color: #1A1A1A; flex: 1; min-width: 0; }
     .drp-initiative-link { cursor: pointer; }
     .drp-initiative-link:hover { color: var(--triarq-color-primary, #257099); text-decoration: underline; }
-    .drp-initiative-meta { display: flex; align-items: center; gap: 8px; padding-left: 14px; }
     .drp-stage-badge {
-      font: 500 10px Roboto, sans-serif;
+      font: 500 10px Roboto, sans-serif; flex-shrink: 0;
       background: #F5F5F5; color: #5A5A5A;
       border-radius: 999px; padding: 1px 7px;
       text-transform: uppercase; letter-spacing: 0.03em;
     }
-    .drp-last-update { font: italic 11px Roboto, sans-serif; color: #9E9E9E; }
-    .drp-add-btn {
-      align-self: flex-end;
-      background: none;
-      border: 1px solid var(--triarq-color-primary, #257099);
-      color: var(--triarq-color-primary, #257099);
-      border-radius: 5px;
-      padding: 2px 10px;
-      font: 500 11px Roboto, sans-serif;
-      cursor: pointer;
-      white-space: nowrap;
-      margin-top: 2px;
-    }
-    .drp-add-btn:disabled { opacity: 0.6; cursor: default; }
     .drp-link-btn { background: none; border: none; color: var(--triarq-color-primary, #257099); cursor: pointer; text-decoration: underline; font-size: 12px; }
   `]
 })
@@ -347,6 +343,10 @@ export class DcsReferencePanelComponent implements OnInit {
   isDcsExpanded(id: string): boolean  { return this.expandedDcsIds.has(id); }
   isAdding(id: string): boolean        { return this.addingIds.has(id); }
   isAddingAll(dcsId: string): boolean  { return this.addingAllIds.has(dcsId); }
+
+  isInitiativeAdded(id: string): boolean {
+    return this.existingInitiativeIds.has(id) || this.addedIds.has(id);
+  }
 
   addedLabel(initiativeId: string): string {
     return this.addedIds.has(initiativeId) ? 'Added ✓' : '+ Add';
