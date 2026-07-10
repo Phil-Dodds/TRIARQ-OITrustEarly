@@ -74,18 +74,35 @@ function todayIso(): string {
           <span class="tm-col-title">Meeting Title</span>
           <span class="tm-col-date">Meeting Date</span>
           <span class="tm-col-updated">Last Updated</span>
+          <span></span>
         </div>
         <!-- D-308 / S-005: full-row tap navigates to meeting prep/run screen -->
         <div *ngFor="let m of meetings"
              class="tm-row"
              role="button"
              tabindex="0"
-             (click)="openMeeting(m.id)"
-             (keydown.enter)="openMeeting(m.id)"
-             (keydown.space)="openMeeting(m.id)">
+             (click)="confirmDeleteId !== m.id && openMeeting(m.id)"
+             (keydown.enter)="confirmDeleteId !== m.id && openMeeting(m.id)">
           <span class="tm-col-title tm-meeting-name">{{ m.title }}</span>
           <span class="tm-col-date">{{ m.meeting_date | date:'MMM d, y' }}</span>
           <span class="tm-col-updated tm-muted">{{ m.updated_at | date:'MMM d, y' }}</span>
+          <!-- Inline delete — confirm before executing -->
+          <span (click)="$event.stopPropagation()">
+            <ng-container *ngIf="confirmDeleteId !== m.id">
+              <button class="tm-delete-btn"
+                      type="button"
+                      [disabled]="deletingId === m.id"
+                      title="Delete meeting"
+                      (click)="confirmDeleteId = m.id">
+                🗑
+              </button>
+            </ng-container>
+            <span *ngIf="confirmDeleteId === m.id" class="tm-delete-confirm">
+              Delete?
+              <button class="tm-delete-confirm-btn" type="button" (click)="deleteMeeting(m)">Yes</button>
+              <button class="tm-delete-cancel-btn" type="button" (click)="confirmDeleteId = null">Cancel</button>
+            </span>
+          </span>
         </div>
       </div>
     </div>
@@ -173,7 +190,7 @@ function todayIso(): string {
     }
     .tm-list-header, .tm-row {
       display: grid;
-      grid-template-columns: 1fr 140px 140px;
+      grid-template-columns: 1fr 140px 140px 40px;
       gap: 8px;
       padding: 10px 12px;
       align-items: center;
@@ -194,6 +211,11 @@ function todayIso(): string {
     .tm-row:hover { background: #F5F9FC; }
     .tm-meeting-name { font: 500 14px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); }
     .tm-muted { color: #757575; font-size: 13px; }
+    .tm-delete-btn { background: none; border: none; color: #BDBDBD; cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 3px; transition: color 0.1s; }
+    .tm-delete-btn:hover { color: #D32F2F; }
+    .tm-delete-confirm { display: flex; align-items: center; gap: 6px; font: 12px Roboto, sans-serif; color: #D32F2F; white-space: nowrap; }
+    .tm-delete-confirm-btn { background: #D32F2F; color: #fff; border: none; border-radius: 3px; padding: 2px 8px; font: 500 11px Roboto, sans-serif; cursor: pointer; }
+    .tm-delete-cancel-btn { background: none; border: none; color: #757575; cursor: pointer; font-size: 11px; }
     .tm-skeleton-row {
       height: 44px;
       background: linear-gradient(90deg, #F0F0F0 25%, #E8E8E8 50%, #F0F0F0 75%);
@@ -262,9 +284,11 @@ export class TeamMeetingsListComponent implements OnInit {
   loading   = false;
   loadError = '';
 
-  showNewPanel = false;
-  saving       = false;
-  saveError    = '';
+  showNewPanel    = false;
+  saving          = false;
+  saveError       = '';
+  confirmDeleteId: string | null = null;
+  deletingId:      string | null = null;
 
   newMeetingForm!: FormGroup;
 
@@ -323,6 +347,22 @@ export class TeamMeetingsListComponent implements OnInit {
   closeNewPanel(): void {
     if (this.saving) return;
     this.showNewPanel = false;
+  }
+
+  deleteMeeting(m: TeamMeetingListItem): void {
+    this.deletingId      = m.id;
+    this.confirmDeleteId = null;
+    this.cdr.markForCheck();
+    this.svc.deleteMeeting(m.id).subscribe({
+      next: res => {
+        this.deletingId = null;
+        if (res.success) {
+          this.meetings = this.meetings.filter(x => x.id !== m.id);
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.deletingId = null; this.cdr.markForCheck(); }
+    });
   }
 
   saveNewMeeting(): void {

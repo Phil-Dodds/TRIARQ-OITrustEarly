@@ -74,4 +74,8 @@ export class TeamMeetingsService {
   updateBulletNote(bullet_id: string, note_text: string): Observable<McpResponse<void>> {
     return this.mcp.call('team-meetings', 'update_bullet_note', { bullet_id, note_text });
   }
+
+  deleteMeeting(meeting_id: string): Observable<McpResponse<void>> {
+    return this.mcp.call('team-meetings', 'delete_team_meeting', { meeting_id });
+  }
 }

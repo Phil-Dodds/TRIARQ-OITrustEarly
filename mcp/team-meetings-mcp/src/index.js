@@ -27,6 +27,7 @@ const { update_meeting_section_collapsed }  = require('./tools/update_meeting_se
 const { list_dcs_users_with_initiatives }   = require('./tools/list_dcs_users_with_initiatives');
 const { update_meeting }                    = require('./tools/update_meeting');
 const { update_bullet_note }               = require('./tools/update_bullet_note');
+const { delete_team_meeting }              = require('./tools/delete_team_meeting');
 
 const app  = express();
 const PORT = process.env.PORT || 3005;
@@ -42,7 +43,8 @@ const TOOLS = {
   update_meeting_section_collapsed,
   list_dcs_users_with_initiatives,
   update_meeting,
-  update_bullet_note
+  update_bullet_note,
+  delete_team_meeting
 };
 
 app.use(cors());

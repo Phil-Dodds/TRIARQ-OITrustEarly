@@ -28,6 +28,7 @@ async function list_team_meetings(params, caller_user_id) {
   const { data, error } = await supabase
     .from('team_meetings')
     .select('id, title, meeting_date, created_at, updated_at')
+    .is('deleted_at', null)
     .order('meeting_date', { ascending: false })
     .range(offset, offset + limit - 1);
 
