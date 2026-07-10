@@ -5,7 +5,8 @@
 // D-419: gate_status dot color from walkback result (on_track/at_risk/off_track/complete/not_started).
 
 import {
-  Component, OnInit, Input, Output, EventEmitter,
+  Component, OnInit, OnChanges, SimpleChanges,
+  Input, Output, EventEmitter,
   ChangeDetectionStrategy, ChangeDetectorRef
 } from '@angular/core';
 import { CommonModule }          from '@angular/common';
@@ -273,7 +274,7 @@ function avatarColor(id: string): string {
     .drp-link-btn { background: none; border: none; color: var(--triarq-color-primary, #257099); cursor: pointer; text-decoration: underline; font-size: 12px; }
   `]
 })
-export class DcsReferencePanelComponent implements OnInit {
+export class DcsReferencePanelComponent implements OnInit, OnChanges {
   @Input()  initiativesGatesSectionId!: string;
   @Input()  existingInitiativeIds: Set<string> = new Set();
   @Output() bulletAdded          = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string }>();
@@ -302,6 +303,17 @@ export class DcsReferencePanelComponent implements OnInit {
   ) {}
 
   ngOnInit(): void { this.load(); }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['existingInitiativeIds']) {
+      // Remove from optimistic addedIds any initiative no longer in the meeting.
+      // This fires when a bullet is removed via × so the checkbox unchecks.
+      for (const id of Array.from(this.addedIds.keys())) {
+        if (!this.existingInitiativeIds.has(id)) this.addedIds.delete(id);
+      }
+      this.cdr.markForCheck();
+    }
+  }
 
   load(): void {
     this.loading   = true;
