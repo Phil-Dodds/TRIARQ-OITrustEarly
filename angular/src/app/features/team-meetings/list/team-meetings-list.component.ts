@@ -139,20 +139,22 @@ function todayIso(): string {
 
       <form [formGroup]="newMeetingForm" (ngSubmit)="saveNewMeeting()" class="tm-panel-body">
         <div class="tm-field">
+          <label class="tm-label">Meeting Date</label>
+          <input class="tm-input"
+                 formControlName="meeting_date"
+                 type="date"
+                 (change)="onDateChanged()">
+        </div>
+
+        <div class="tm-field">
           <label class="tm-label">Meeting Title</label>
           <input class="tm-input"
                  formControlName="title"
                  type="text"
-                 placeholder="Meeting title">
+                 placeholder="Meeting title"
+                 (input)="titleEdited = true">
           <span *ngIf="newMeetingForm.get('title')?.invalid && newMeetingForm.get('title')?.touched"
                 class="tm-field-error">Title is required.</span>
-        </div>
-
-        <div class="tm-field">
-          <label class="tm-label">Meeting Date</label>
-          <input class="tm-input"
-                 formControlName="meeting_date"
-                 type="date">
         </div>
 
         <div *ngIf="saveError" class="tm-form-error">{{ saveError }}</div>
@@ -344,13 +346,29 @@ export class TeamMeetingsListComponent implements OnInit {
     this.loadMeetings();
   }
 
+  // Default meeting title = "<Series Name> — <Set Date>". Auto-updates when the
+  // date changes until the user types their own title.
+  titleEdited = false;
+
+  private defaultTitle(dateIso: string): string {
+    const d = new Date(dateIso + 'T00:00:00');
+    const series = this.trackName || 'Meeting';
+    return `${series} — ${formatMonday(d)}`;
+  }
+
   private initForm(): void {
-    const monday = getMondayOfCurrentWeek();
-    const prefix = this.trackName ? `${this.trackName} Prep` : 'Prep';
+    const date = todayIso();
+    this.titleEdited = false;
     this.newMeetingForm = this.fb.group({
-      title:        [`${prefix} — Week of ${formatMonday(monday)}`, Validators.required],
-      meeting_date: [todayIso(), Validators.required]
+      meeting_date: [date, Validators.required],
+      title:        [this.defaultTitle(date), Validators.required]
     });
+  }
+
+  onDateChanged(): void {
+    if (this.titleEdited || this.editingMeeting) return;
+    const date = this.newMeetingForm.get('meeting_date')?.value as string;
+    if (date) this.newMeetingForm.get('title')?.setValue(this.defaultTitle(date));
   }
 
   loadMeetings(): void {
