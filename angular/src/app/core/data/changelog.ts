@@ -36,19 +36,34 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     contractLabel: 'Contract 33 — Team Meetings',
     items: [
       {
-        audience:    'Admin',
-        surface:     'Team Meetings list',
-        description: 'New "Team Meetings" sidebar item (Admin only). Lists all Product Ops prep meetings sorted by date. Create a new meeting with a pre-filled title for the current week.'
+        audience:    'All',
+        surface:     'Team Meetings',
+        description: 'A new home for recurring team meetings. Team Meetings helps you plan a meeting agenda and take notes as you go — organized into sections you choose, with bullets, per-item notes, and a discussion notes area under each section. Open it from the sidebar.'
       },
       {
-        audience:    'Admin',
-        surface:     'Meeting prep / run screen',
-        description: 'Two-column meeting workspace: five color-coded sections (Hot Topics, Escalation, Comms, Initiatives & Gates, Training) with bullet entry, @ initiative picker, and auto-saving notes. DCS Initiative Reference Panel on the right — add initiatives directly to the Initiatives & Gates section.'
+        audience:    'All',
+        surface:     'Meeting series',
+        description: 'Anyone can create a meeting series — a named sequence of related meetings (like a weekly team check-in) with its own participants and agenda sections. Make a series private and invite people directly (paste names straight from Outlook), or make it public so anyone in the company can find and join it under "Search Public Meetings to Join."'
       },
       {
-        audience:    'Admin',
-        surface:     'Prior meeting read-only view',
-        description: 'Prior meetings open in read-only mode with a "→ This week" carry-forward action on each bullet. Carry forward preserves the lineage FK — never a text copy.'
+        audience:    'All',
+        surface:     'Collaborative notes',
+        description: 'Meeting participants see and update the same meeting together. Add bullets and notes during the meeting and everyone’s screen stays in sync — great for a shared agenda on the conference room screen while people contribute from their own laptops.'
+      },
+      {
+        audience:    'All',
+        surface:     'Carry forward',
+        description: 'Unfinished items don’t get lost. Open last meeting and carry any bullet forward to this week’s meeting with one click — the item keeps its history across meetings.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Reference panel',
+        description: 'While planning, browse initiatives by DCS, DOL, or EPO and check them straight into the agenda. Each agenda item shows the assigned person and the next gate with its target date, and taps through to the full initiative detail.'
+      },
+      {
+        audience:    'All',
+        surface:     'Share link',
+        description: 'Every series has a share link you can paste into an Outlook invite — clicking it takes participants straight to the latest meeting in the series.'
       }
     ]
   },
