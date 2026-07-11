@@ -1,8 +1,11 @@
 // team-meetings-detail.component.ts — Pathways OI Trust
-// Meeting prep/run screen (D-490 Steps 4, 6, 7).
+// Meeting prep/run screen (D-490 Steps 4, 6, 7 + Tracks Phase A+B).
 // Route: /team-meetings/:meeting_id
-// Two-column layout (≥1024px): 65% sections + 35% DCS reference panel.
-// All meetings fully editable. isLatestMeeting controls carry-forward visibility and past-meeting banner.
+// Two-column layout (≥1024px): 65% sections + 35% reference panel.
+// All meetings fully editable by track members. isLatestMeeting controls
+// carry-forward visibility and past-meeting banner (scoped to the track).
+// Live collaboration: 10s poll via meeting_changed_since; full refetch only on
+// change; merge preserves focused textareas so the screen doesn't rewrite.
 
 import {
   Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef
@@ -13,14 +16,17 @@ import { RouterModule, Router,
 import { FormsModule }               from '@angular/forms';
 import { IonicModule }               from '@ionic/angular';
 import { TeamMeetingsService }           from '../team-meetings.service';
+import { AuthService }                   from '../../../core/services/auth.service';
 import { DcsReferencePanelComponent }    from './dcs-reference-panel.component';
 import { DeliveryCycleDetailComponent }  from '../../delivery/detail/delivery-cycle-detail.component';
+import { TrackSettingsComponent }        from '../tracks/track-settings.component';
 import {
-  TeamMeeting, TeamMeetingSection, TeamMeetingBullet,
-  SECTION_CONFIGS, SectionKey
+  TeamMeeting, TeamMeetingSection, TeamMeetingBullet
 } from '../../../core/types/team-meetings';
-import { Subject } from 'rxjs';
-import { debounceTime, takeUntil } from 'rxjs/operators';
+import { Subject, interval } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
+
+const POLL_INTERVAL_MS = 10000;
 
 interface InitiativeSearchResult {
   id:    string;
@@ -34,7 +40,7 @@ interface InitiativeSearchResult {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, RouterModule, FormsModule, IonicModule,
-    DcsReferencePanelComponent, DeliveryCycleDetailComponent
+    DcsReferencePanelComponent, DeliveryCycleDetailComponent, TrackSettingsComponent
   ],
   template: `
     <!-- Loading state -->
@@ -66,7 +72,14 @@ interface InitiativeSearchResult {
         <!-- Left column: sections (65%) -->
         <div class="tmd-sections-col">
           <div class="tmd-meeting-title-row">
-            <a routerLink="/team-meetings" class="tmd-back-link">← Team Meetings</a>
+            <div class="tmd-back-row">
+              <a [routerLink]="meeting.track ? ['/team-meetings/track', meeting.track.track_id] : ['/team-meetings']"
+                 class="tmd-back-link">← {{ meeting.track?.track_name || 'Team Meetings' }}</a>
+              <button *ngIf="meeting.track?.is_leader"
+                      class="tmd-series-btn" type="button"
+                      title="Series settings — sections, members, invites"
+                      (click)="showSettings = true">⚙ Series</button>
+            </div>
             <!-- Inline title edit -->
             <div *ngIf="!editingTitle" class="tmd-title-display">
               <h1 class="tmd-title">{{ meeting.title }}</h1>
@@ -93,20 +106,20 @@ interface InitiativeSearchResult {
             </a>
           </div>
 
-          <!-- Sections -->
+          <!-- Sections — snapshot title/color from the series template at creation -->
           <div *ngFor="let section of meeting.sections" class="tmd-section">
-            <ng-container *ngIf="getSectionConfig(section.section_key) as cfg">
+            <ng-container>
               <!-- Section header (D-308 collapse pattern) -->
               <div class="tmd-section-header"
                    role="button"
                    tabindex="0"
                    (click)="toggleSection(section)"
                    (keydown.enter)="toggleSection(section)"
-                   [style.border-left-color]="cfg.bar_color">
+                   [style.border-left-color]="section.bar_color">
                 <div class="tmd-section-header-text">
-                  <span class="tmd-section-title">{{ cfg.title }}</span>
+                  <span class="tmd-section-title">{{ section.title }}</span>
                   <!-- S-015 zone explanation -->
-                  <span class="tmd-section-sublabel">{{ cfg.sub_label }}</span>
+                  <span *ngIf="section.sub_label" class="tmd-section-sublabel">{{ section.sub_label }}</span>
                 </div>
                 <span class="tmd-section-chevron">{{ section.collapsed ? '▸' : '▾' }}</span>
               </div>
@@ -119,7 +132,8 @@ interface InitiativeSearchResult {
                   </div>
                   <div *ngFor="let bullet of section.bullets" class="tmd-bullet-row">
                     <div class="tmd-bullet-main-row">
-                    <span class="tmd-bullet-dot" [style.background]="cfg.bar_color"></span>
+                    <span class="tmd-bullet-dot" [style.background]="section.bar_color"
+                          [title]="bullet.created_by_display_name ? 'Added by ' + bullet.created_by_display_name : ''"></span>
                     <!-- Initiative chip (tappable per D-478/S-021) -->
                     <span *ngIf="bullet.initiative" class="tmd-initiative-chip"
                           role="button" tabindex="0"
@@ -158,7 +172,7 @@ interface InitiativeSearchResult {
                       </span>
                       <span *ngIf="carryingBulletId === bullet.id && !carryTarget && !carryingSaving" class="tmd-carry-prompt">
                         No current meeting found —
-                        <a routerLink="/team-meetings" class="tmd-link">+ New Meeting</a>
+                        <a [routerLink]="meeting.track ? ['/team-meetings/track', meeting.track.track_id] : ['/team-meetings']" class="tmd-link">+ New Meeting</a>
                       </span>
                       <span *ngIf="carriedBulletIds.has(bullet.id)" class="tmd-carried-label">
                         Carried to {{ carriageTargetTitle }}
@@ -178,7 +192,8 @@ interface InitiativeSearchResult {
                     <textarea class="tmd-bullet-note"
                               [placeholder]="'Add a note…'"
                               [value]="bullet.bullet_note ?? ''"
-                              (blur)="onBulletNoteBlur(bullet, $event)"
+                              (focus)="focusedBulletNoteId = bullet.id"
+                              (blur)="focusedBulletNoteId = null; onBulletNoteBlur(bullet, $event)"
                               rows="1">
                     </textarea>
                   </div>
@@ -220,7 +235,8 @@ interface InitiativeSearchResult {
                   <textarea class="tmd-notes-textarea"
                             placeholder="Capture discussion, decisions, or follow-ups here…"
                             [value]="getNotes(section)"
-                            (blur)="onNotesBlur(section, $event)"
+                            (focus)="focusedNotesSectionId = section.id"
+                            (blur)="focusedNotesSectionId = null; onNotesBlur(section, $event)"
                             rows="3">
                   </textarea>
                 </div>
@@ -229,17 +245,28 @@ interface InitiativeSearchResult {
           </div><!-- /section -->
         </div><!-- /sections-col -->
 
-        <!-- Right column: DCS reference panel -->
+        <!-- Right column: reference panel (person type set per series) -->
         <div class="tmd-ref-col">
           <app-dcs-reference-panel
             [initiativesGatesSectionId]="initiativesGatesSectionId"
             [existingInitiativeIds]="existingInitiativeIds"
+            [personType]="meeting.track?.ref_panel_person_type ?? 'dcs'"
             (bulletAdded)="onRefPanelAddBullet($event)"
             (initiativeSelected)="openInitiativeDetail($event)">
           </app-dcs-reference-panel>
         </div>
       </div>
     </ng-container>
+
+    <!-- Series settings panel — leaders: sections (applies to this meeting too), invites, members -->
+    <app-track-settings *ngIf="showSettings && meeting?.track"
+                        [trackId]="meeting!.track!.track_id"
+                        [meetingId]="meeting!.id"
+                        [currentUserId]="currentUserId"
+                        (close)="onSettingsClosed()"
+                        (changed)="loadMeeting()"
+                        (deleted)="onTrackDeleted()">
+    </app-track-settings>
 
     <!-- Initiative detail panel overlay — D-478 / reuses app-delivery-cycle-detail panel mode -->
     <div *ngIf="showInitiativePanel" class="tmd-overlay-scrim" (click)="closeInitiativeDetail()"></div>
@@ -268,7 +295,10 @@ interface InitiativeSearchResult {
     }
 
     .tmd-meeting-title-row { margin-bottom: 20px; }
-    .tmd-back-link { font: 13px Roboto; color: var(--triarq-color-primary, #257099); text-decoration: none; display: block; margin-bottom: 8px; }
+    .tmd-back-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .tmd-back-link { font: 13px Roboto; color: var(--triarq-color-primary, #257099); text-decoration: none; }
+    .tmd-series-btn { background: none; border: 1px solid #BDBDBD; border-radius: 5px; color: #5A5A5A; font: 500 12px Roboto; padding: 4px 10px; cursor: pointer; }
+    .tmd-series-btn:hover { border-color: var(--triarq-color-primary, #257099); color: var(--triarq-color-primary, #257099); }
     .tmd-title { font: 600 22px Roboto; color: #1A1A1A; margin: 0 0 4px; }
     .tmd-title-display { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
     .tmd-title-display .tmd-title { margin: 0; }
@@ -397,6 +427,14 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   showInitiativePanel = false;
   selectedInitiativeId: string | null = null;
 
+  // Series settings panel (leaders).
+  showSettings  = false;
+  currentUserId = '';
+
+  // Live-collab merge guards — the focused textarea is never rewritten by a poll refresh.
+  focusedNotesSectionId: string | null = null;
+  focusedBulletNoteId:   string | null = null;
+
   get initiativesGatesSectionId(): string {
     return this.meeting?.sections.find(s => s.section_key === 'initiatives-gates')?.id ?? '';
   }
@@ -409,24 +447,31 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
 
   private meetingId = '';
   private destroy$  = new Subject<void>();
+  private lastContentStamp: string | null = null;
+  private pollInFlight = false;
 
   constructor(
     private readonly svc:   TeamMeetingsService,
+    private readonly auth:  AuthService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     private readonly cdr:   ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
+    this.currentUserId = this.auth.getCurrentUser()?.id ?? '';
     this.route.paramMap.pipe(takeUntil(this.destroy$)).subscribe(params => {
       this.meetingId       = params.get('meeting_id') ?? '';
       this.meeting         = null;
       this.addInputs       = {};
       this.isLatestMeeting = true;
       this.previousMeetingId = null;
+      this.lastContentStamp  = null;
       this.loadMeeting();
-      this.determineLatestMeeting();
     });
+
+    // Live-collab poll: cheap timestamp check every 10s; full refetch only on change.
+    interval(POLL_INTERVAL_MS).pipe(takeUntil(this.destroy$)).subscribe(() => this.pollForChanges());
   }
 
   ngOnDestroy(): void {
@@ -442,10 +487,12 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
       next: res => {
         if (res.success) {
           this.meeting = res.data ?? null;
+          this.lastContentStamp = res.data?.content_updated_at ?? null;
           // Init add inputs per section.
           (res.data?.sections ?? []).forEach(s => {
             if (!(s.id in this.addInputs)) this.addInputs[s.id] = '';
           });
+          this.determineLatestMeeting();
         } else {
           this.loadError = res.error ?? 'Failed to load meeting.';
         }
@@ -460,8 +507,73 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ── Polling sync ─────────────────────────────────────────────────────────────
+  private pollForChanges(): void {
+    if (!this.meeting || this.pollInFlight || this.loading) return;
+    this.pollInFlight = true;
+    this.svc.meetingChangedSince(this.meetingId, this.lastContentStamp).subscribe({
+      next: res => {
+        this.pollInFlight = false;
+        if (res.success && res.data?.changed) {
+          this.refetchAndMerge();
+        }
+      },
+      error: () => { this.pollInFlight = false; }
+    });
+  }
+
+  private refetchAndMerge(): void {
+    this.svc.getMeeting(this.meetingId).subscribe({
+      next: res => {
+        if (!res.success || !res.data || !this.meeting) return;
+        const incoming = res.data;
+        this.lastContentStamp = incoming.content_updated_at;
+
+        // Title/date — skip if user editing the title.
+        if (!this.editingTitle) {
+          this.meeting.title        = incoming.title;
+          this.meeting.meeting_date = incoming.meeting_date;
+        }
+        this.meeting.track = incoming.track;
+
+        // Merge sections in place: only the changed pieces re-render.
+        const currentById = new Map(this.meeting.sections.map(s => [s.id, s]));
+        const merged: TeamMeetingSection[] = incoming.sections.map(inc => {
+          const cur = currentById.get(inc.id);
+          if (!cur) {
+            // New section (leader added mid-meeting on another screen).
+            if (!(inc.id in this.addInputs)) this.addInputs[inc.id] = '';
+            return inc;
+          }
+          cur.title      = inc.title;
+          cur.sub_label  = inc.sub_label;
+          cur.bar_color  = inc.bar_color;
+          cur.sort_order = inc.sort_order;
+          cur.collapsed  = inc.collapsed;
+          // Bullets: preserve object identity for the bullet whose note is being edited.
+          cur.bullets = inc.bullets.map(ib => {
+            if (ib.id === this.focusedBulletNoteId) {
+              const existing = cur.bullets.find(b => b.id === ib.id);
+              return existing ?? ib;
+            }
+            return ib;
+          });
+          // Notes: never rewrite the textarea the user is typing in.
+          if (cur.id !== this.focusedNotesSectionId) {
+            cur.notes = inc.notes;
+          }
+          return cur;
+        });
+        this.meeting.sections = merged;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
   private determineLatestMeeting(): void {
-    this.svc.listMeetings(3).subscribe({
+    const trackId = this.meeting?.track?.track_id;
+    if (!trackId) return;
+    this.svc.listMeetings(trackId, 3).subscribe({
       next: res => {
         if (!res.success || !res.data?.length) return;
         const meetings = res.data; // sorted by created_at DESC
@@ -474,10 +586,6 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       }
     });
-  }
-
-  getSectionConfig(key: SectionKey) {
-    return SECTION_CONFIGS.find(c => c.section_key === key) ?? null;
   }
 
   getNotes(section: TeamMeetingSection): string {
@@ -559,6 +667,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
             bullet_note:            null,
             sort_order:             res.data.sort_order,
             carried_from_bullet_id: res.data.carried_from_bullet_id,
+            created_by_display_name: null,
             initiative:             initiativeId && initiativeName
                                       ? { id: initiativeId, name: initiativeName, stage: '', gate_status: '', dcs_name: null, next_gate: null }
                                       : null
@@ -592,15 +701,39 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ── Notes auto-save ─────────────────────────────────────────────────────────
+  // ── Notes auto-save (optimistic concurrency — reload-or-overwrite on conflict) ─
   onNotesBlur(section: TeamMeetingSection, event: Event): void {
-    const text = (event.target as HTMLTextAreaElement).value;
-    this.svc.updateNotes(section.id, text).subscribe({
+    const el   = event.target as HTMLTextAreaElement;
+    const text = el.value;
+    if (text === (section.notes?.notes_text ?? '')) return; // no change
+    this.saveNotes(section, text, false);
+  }
+
+  private saveNotes(section: TeamMeetingSection, text: string, force: boolean): void {
+    this.svc.updateNotes(section.id, text, section.notes?.updated_at, force).subscribe({
       next: res => {
-        if (res.success) {
-          if (!section.notes) section.notes = { notes_text: text, updated_at: new Date().toISOString(), updated_by_display_name: null };
-          else section.notes.notes_text = text;
+        if (res.success && res.data) {
+          section.notes = {
+            notes_text:              text,
+            updated_at:              (res.data as { updated_at?: string }).updated_at ?? new Date().toISOString(),
+            updated_by_display_name: null
+          };
           this.cdr.markForCheck();
+        } else if ((res as { conflict?: boolean }).conflict) {
+          const serverText = (res.data as unknown as { server_notes_text?: string })?.server_notes_text ?? '';
+          const overwrite = window.confirm(
+            `${res.error}\n\nOK = keep YOUR version (overwrites theirs).\nCancel = load THEIR version (your edit is discarded).`
+          );
+          if (overwrite) {
+            this.saveNotes(section, text, true);
+          } else {
+            section.notes = {
+              notes_text:              serverText,
+              updated_at:              (res.data as unknown as { server_updated_at?: string })?.server_updated_at ?? new Date().toISOString(),
+              updated_by_display_name: (res.data as unknown as { editor?: string })?.editor ?? null
+            };
+            this.cdr.markForCheck();
+          }
         }
       }
     });
@@ -626,7 +759,8 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     this.carryTarget      = null;
     this.cdr.markForCheck();
 
-    this.svc.listMeetings(5).subscribe({
+    const trackId = this.meeting?.track?.track_id ?? '';
+    this.svc.listMeetings(trackId, 5).subscribe({
       next: res => {
         if (!res.success || !res.data) return;
         // Find most recent meeting that is not the one being viewed.
@@ -736,5 +870,18 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     this.showInitiativePanel  = false;
     this.selectedInitiativeId = null;
     this.cdr.markForCheck();
+  }
+
+  // ── Series settings panel ────────────────────────────────────────────────────
+  onSettingsClosed(): void {
+    this.showSettings = false;
+    // Sections may have been added/removed against this meeting — refresh.
+    this.refetchAndMerge();
+    this.cdr.markForCheck();
+  }
+
+  onTrackDeleted(): void {
+    this.showSettings = false;
+    this.router.navigate(['/team-meetings']);
   }
 }

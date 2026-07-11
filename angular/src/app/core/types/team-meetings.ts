@@ -1,7 +1,9 @@
 // team-meetings.ts — Pathways OI Trust
-// TypeScript types for Team Meetings feature (D-490).
+// TypeScript types for Team Meetings feature (D-490 + Tracks Phase A+B).
 
-export type SectionKey = 'hot-topics' | 'escalation' | 'comms' | 'initiatives-gates' | 'training';
+export type SectionKey = string;   // catalog keys ('hot-topics', …) or 'custom-<uuid>'
+
+export type RefPanelPersonType = 'dcs' | 'dol' | 'epo';
 
 export interface TeamMeetingNextGate {
   label:       string;
@@ -13,17 +15,18 @@ export interface TeamMeetingInitiativeRef {
   name:        string;
   stage:       string;
   gate_status: string;
-  dcs_name:    string | null;
+  dcs_name:    string | null;   // assigned person of the track's ref_panel_person_type
   next_gate:   TeamMeetingNextGate | null;
 }
 
 export interface TeamMeetingBullet {
-  id:                     string;
-  text:                   string;
-  bullet_note:            string | null;
-  sort_order:             number;
-  carried_from_bullet_id: string | null;
-  initiative:             TeamMeetingInitiativeRef | null;
+  id:                      string;
+  text:                    string;
+  bullet_note:             string | null;
+  sort_order:              number;
+  carried_from_bullet_id:  string | null;
+  created_by_display_name: string | null;
+  initiative:              TeamMeetingInitiativeRef | null;
 }
 
 export interface TeamMeetingNotes {
@@ -37,17 +40,29 @@ export interface TeamMeetingSection {
   section_key: SectionKey;
   sort_order:  number;
   collapsed:   boolean;
+  title:       string;
+  sub_label:   string;
+  bar_color:   string;
   bullets:     TeamMeetingBullet[];
   notes:       TeamMeetingNotes | null;
 }
 
+export interface TeamMeetingTrackContext {
+  track_id:              string;
+  track_name:            string;
+  ref_panel_person_type: RefPanelPersonType;
+  is_leader:             boolean;
+}
+
 export interface TeamMeeting {
-  id:           string;
-  title:        string;
-  meeting_date: string;
-  created_at:   string;
-  updated_at:   string;
-  sections:     TeamMeetingSection[];
+  id:                 string;
+  title:              string;
+  meeting_date:       string;
+  created_at:         string;
+  updated_at:         string;
+  content_updated_at: string;
+  track:              TeamMeetingTrackContext | null;
+  sections:           TeamMeetingSection[];
 }
 
 export interface TeamMeetingListItem {
@@ -57,6 +72,75 @@ export interface TeamMeetingListItem {
   created_at:   string;
   updated_at:   string;
 }
+
+// ── Tracks ─────────────────────────────────────────────────────────────────────
+
+export interface TrackListItem {
+  track_id:              string;
+  track_name:            string;
+  is_public:             boolean;
+  ref_panel_person_type: RefPanelPersonType;
+  is_member:             boolean;
+  is_leader:             boolean;
+  member_count:          number;
+  latest_meeting:        { id: string; title: string; meeting_date: string } | null;
+  deleted_at:            string | null;
+}
+
+export interface TrackMember {
+  user_id:      string;
+  display_name: string;
+  email:        string;
+  is_leader:    boolean;
+}
+
+export interface TrackSection {
+  id:          string;
+  catalog_id:  string | null;
+  section_key: string;
+  title:       string;
+  sub_label:   string;
+  bar_color:   string;
+  sort_order:  number;
+}
+
+export interface TrackDetail {
+  track_id:              string;
+  track_name:            string;
+  is_public:             boolean;
+  ref_panel_person_type: RefPanelPersonType;
+  deleted_at:            string | null;
+  is_leader:             boolean;
+  is_member:             boolean;
+  members:               TrackMember[];
+  sections:              TrackSection[];
+  latest_meeting:        { id: string; title: string; meeting_date: string } | null;
+}
+
+export interface PublicTrackListItem {
+  track_id:       string;
+  track_name:     string;
+  leaders:        string[];
+  latest_meeting: { title: string; meeting_date: string } | null;
+  is_member:      boolean;
+}
+
+export interface CatalogSection {
+  id:          string;
+  section_key: string;
+  title:       string;
+  sub_label:   string;
+  bar_color:   string;
+  sort_order:  number;
+}
+
+export interface InviteReport {
+  added:     { email: string; display_name: string }[];
+  already:   { email: string; display_name: string }[];
+  not_found: string[];
+}
+
+// ── Reference panel ────────────────────────────────────────────────────────────
 
 export interface DcsInitiativeRef {
   id:                      string;
@@ -73,48 +157,15 @@ export interface DcsUserWithInitiatives {
   initiatives:  DcsInitiativeRef[];
 }
 
-// Section UI config (colors, titles, sub-labels) — declared as named constants per Rule 4.
-export interface SectionConfig {
-  section_key: SectionKey;
-  title:       string;
-  sub_label:   string;
-  bar_color:   string;
-}
-
-export const SECTION_CONFIGS: readonly SectionConfig[] = [
-  {
-    section_key: 'hot-topics',
-    title:       'Hot Topics / Agenda Topics',
-    sub_label:   'What the Team Wants to Raise Today',
-    bar_color:   '#E96127'
-  },
-  {
-    section_key: 'escalation',
-    title:       'Escalation to Phil, Inform Phil, Blockers',
-    sub_label:   "Things That Need Phil's Attention, Awareness, or a Decision",
-    bar_color:   '#F2A620'
-  },
-  {
-    section_key: 'comms',
-    title:       'Phil Communications / Reminders',
-    sub_label:   'Items Phil Wants the Team to Know',
-    bar_color:   '#0071AF'
-  },
-  {
-    section_key: 'initiatives-gates',
-    title:       'Initiatives and Gates',
-    sub_label:   'Initiative Status, Gate Dates, and Planning Discussion',
-    bar_color:   '#534AB7'
-  },
-  {
-    section_key: 'training',
-    title:       'Trainings / Process / Getting Better',
-    sub_label:   'Process Improvements, Skill Gaps, Team Development',
-    bar_color:   '#5A5A5A'
-  }
-] as const;
+export const PERSON_TYPE_LABELS: Record<RefPanelPersonType, string> = {
+  dcs: 'DCS',
+  dol: 'DOL',
+  epo: 'EPO'
+};
 
 // Screen key constants — never constructed from runtime variables (Rule 4).
 export const TEAM_MEETINGS_SCREEN_KEYS = {
-  LIST: 'team-meetings.list'
+  LIST:   'team-meetings.list',
+  TRACKS: 'team-meetings.tracks',
+  PUBLIC: 'team-meetings.public'
 } as const;

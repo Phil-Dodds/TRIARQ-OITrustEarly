@@ -1,10 +1,11 @@
 // update_bullet_note.js
-// Pathways OI Trust — team-meetings-mcp / D-490
-// Saves or clears the per-bullet note. Called on textarea blur in the detail view.
+// Pathways OI Trust — team-meetings-mcp / D-490 + Tracks Phase B
+// Saves or clears the per-bullet note. Called on textarea blur. Any track member.
 
 'use strict';
 
 const { supabase } = require('../db');
+const { assertSectionAccess, bumpMeeting } = require('../track_access');
 
 /**
  * @param {{ bullet_id: string, note_text: string }} params
@@ -14,24 +15,23 @@ async function update_bullet_note(params, caller_user_id) {
   const { bullet_id, note_text } = params;
   if (!bullet_id) return { success: false, error: 'bullet_id is required.' };
 
-  // Admin check.
-  const { data: caller, error: callerErr } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', caller_user_id)
-    .is('deleted_at', null)
+  const { data: bullet } = await supabase
+    .from('team_meeting_bullets')
+    .select('id, section_id')
+    .eq('id', bullet_id)
     .maybeSingle();
-  if (callerErr || !caller?.is_admin) {
-    return { success: false, error: 'Team Meetings is restricted to Admin users.' };
-  }
+  if (!bullet) return { success: false, error: 'Bullet not found.' };
+
+  const access = await assertSectionAccess(bullet.section_id, caller_user_id);
+  if (access.error) return { success: false, error: access.error };
 
   const { error: updateErr } = await supabase
     .from('team_meeting_bullets')
     .update({ bullet_note: note_text?.trim() || null })
     .eq('id', bullet_id);
-
   if (updateErr) return { success: false, error: updateErr.message };
 
+  await bumpMeeting(access.meeting.id);
   return { success: true };
 }
 

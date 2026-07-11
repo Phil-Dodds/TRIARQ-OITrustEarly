@@ -28,6 +28,7 @@ const { list_dcs_users_with_initiatives }   = require('./tools/list_dcs_users_wi
 const { update_meeting }                    = require('./tools/update_meeting');
 const { update_bullet_note }               = require('./tools/update_bullet_note');
 const { delete_team_meeting }              = require('./tools/delete_team_meeting');
+const tracks                               = require('./tools/tracks');
 
 const app  = express();
 const PORT = process.env.PORT || 3005;
@@ -44,7 +45,28 @@ const TOOLS = {
   list_dcs_users_with_initiatives,
   update_meeting,
   update_bullet_note,
-  delete_team_meeting
+  delete_team_meeting,
+  // Tracks Phase A+B
+  list_my_tracks:          tracks.list_my_tracks,
+  create_track:            tracks.create_track,
+  get_track:               tracks.get_track,
+  update_track:            tracks.update_track,
+  delete_track:            tracks.delete_track,
+  purge_track:             tracks.purge_track,
+  restore_track:           tracks.restore_track,
+  add_track_members:       tracks.add_track_members,
+  remove_track_member:     tracks.remove_track_member,
+  set_track_leader:        tracks.set_track_leader,
+  list_public_tracks:      tracks.list_public_tracks,
+  join_public_track:       tracks.join_public_track,
+  add_track_section:       tracks.add_track_section,
+  remove_track_section:    tracks.remove_track_section,
+  reorder_track_sections:  tracks.reorder_track_sections,
+  list_section_catalog:    tracks.list_section_catalog,
+  save_catalog_section:    tracks.save_catalog_section,
+  delete_catalog_section:  tracks.delete_catalog_section,
+  get_latest_meeting:      tracks.get_latest_meeting,
+  meeting_changed_since:   tracks.meeting_changed_since
 };
 
 app.use(cors());

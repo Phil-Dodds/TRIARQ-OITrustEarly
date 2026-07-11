@@ -1,12 +1,14 @@
 // carry_forward_bullet.js
-// Pathways OI Trust — team-meetings-mcp / D-490
-// Carries a bullet from a prior meeting to the current meeting, preserving lineage
-// via carried_from_bullet_id FK. Never copies text without the FK — that breaks
-// the carry-forward relationship (D-490 Step 6 critical note).
+// Pathways OI Trust — team-meetings-mcp / D-490 + Tracks Phase B
+// Carries a bullet from a prior meeting to a target meeting IN THE SAME TRACK,
+// preserving lineage via carried_from_bullet_id FK. Never copies text without
+// the FK — that breaks the carry-forward relationship (D-490 Step 6).
+// Any track member.
 
 'use strict';
 
 const { supabase } = require('../db');
+const { assertSectionAccess, assertMeetingAccess, bumpMeeting } = require('../track_access');
 
 /**
  * @param {{ source_bullet_id: string, target_meeting_id: string }} params
@@ -16,17 +18,6 @@ async function carry_forward_bullet(params, caller_user_id) {
   const { source_bullet_id, target_meeting_id } = params;
   if (!source_bullet_id)  return { success: false, error: 'source_bullet_id is required.' };
   if (!target_meeting_id) return { success: false, error: 'target_meeting_id is required.' };
-
-  // Admin check.
-  const { data: caller, error: callerErr } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', caller_user_id)
-    .is('deleted_at', null)
-    .maybeSingle();
-  if (callerErr || !caller?.is_admin) {
-    return { success: false, error: 'Team Meetings is restricted to Admin users.' };
-  }
 
   // Load source bullet.
   const { data: sourceBullet, error: bulletErr } = await supabase
@@ -38,14 +29,15 @@ async function carry_forward_bullet(params, caller_user_id) {
     return { success: false, error: 'Source bullet not found.' };
   }
 
-  // Resolve source section's section_key.
-  const { data: sourceSection, error: sourceSectionErr } = await supabase
-    .from('team_meeting_sections')
-    .select('section_key')
-    .eq('id', sourceBullet.section_id)
-    .maybeSingle();
-  if (sourceSectionErr || !sourceSection) {
-    return { success: false, error: 'Source section not found.' };
+  // Access via source section (resolves meeting + track membership).
+  const sourceAccess = await assertSectionAccess(sourceBullet.section_id, caller_user_id);
+  if (sourceAccess.error) return { success: false, error: sourceAccess.error };
+
+  // Access to target meeting + same-track guard.
+  const targetAccess = await assertMeetingAccess(target_meeting_id, caller_user_id);
+  if (targetAccess.error) return { success: false, error: targetAccess.error };
+  if (sourceAccess.meeting.track_id !== targetAccess.meeting.track_id) {
+    return { success: false, error: 'Bullets can only be carried forward within the same meeting series.' };
   }
 
   // Find matching section in target meeting.
@@ -53,12 +45,13 @@ async function carry_forward_bullet(params, caller_user_id) {
     .from('team_meeting_sections')
     .select('id')
     .eq('meeting_id', target_meeting_id)
-    .eq('section_key', sourceSection.section_key)
+    .eq('section_key', sourceAccess.section.section_key)
+    .is('deleted_at', null)
     .maybeSingle();
   if (targetSectionErr || !targetSection) {
     return {
       success: false,
-      error: `Target meeting does not have a matching section for '${sourceSection.section_key}'.`
+      error: `Target meeting does not have a matching section for '${sourceAccess.section.section_key}'.`
     };
   }
 
@@ -80,20 +73,21 @@ async function carry_forward_bullet(params, caller_user_id) {
       bullet_note:            sourceBullet.bullet_note ?? null,
       initiative_id:          sourceBullet.initiative_id ?? null,
       sort_order,
-      carried_from_bullet_id: source_bullet_id
+      carried_from_bullet_id: source_bullet_id,
+      created_by:             caller_user_id
     })
     .select()
     .single();
-
   if (insertErr) {
     return { success: false, error: `Failed to carry forward bullet: ${insertErr.message}` };
   }
 
-  // Verify the FK was set — a null FK here means something went wrong (D-490 Step 6).
+  // Verify the FK was set (D-490 Step 6).
   if (!newBullet.carried_from_bullet_id) {
     return { success: false, error: 'Carry-forward failed: carried_from_bullet_id was not set on the new bullet.' };
   }
 
+  await bumpMeeting(target_meeting_id);
   return { success: true, data: { bullet: newBullet, target_meeting_id } };
 }
 

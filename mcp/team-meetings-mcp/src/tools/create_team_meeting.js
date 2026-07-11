@@ -1,51 +1,57 @@
 // create_team_meeting.js
-// Pathways OI Trust — team-meetings-mcp / D-490
-// Creates a new meeting record and inserts all five sections in fixed order.
+// Pathways OI Trust — team-meetings-mcp / D-490 + Tracks Phase A
+// Creates a meeting inside a track. Any active track member can create (not admin-only).
+// Sections snapshot from the track's section template at creation time.
 
 'use strict';
 
 const { supabase } = require('../db');
-
-// Fixed section order per D-490 spec Step 2.
-const SECTIONS = [
-  { sort_order: 1, section_key: 'hot-topics'        },
-  { sort_order: 2, section_key: 'escalation'        },
-  { sort_order: 3, section_key: 'comms'             },
-  { sort_order: 4, section_key: 'initiatives-gates' },
-  { sort_order: 5, section_key: 'training'          },
-];
+const { assertTrackAccess } = require('../track_access');
 
 /**
- * @param {{ title: string, meeting_date: string }} params
+ * @param {{ title: string, meeting_date: string, track_id: string }} params
  * @param {string} caller_user_id
  */
 async function create_team_meeting(params, caller_user_id) {
-  const { title, meeting_date } = params;
+  const { title, meeting_date, track_id } = params;
 
-  if (!title?.trim())    return { success: false, error: 'title is required.' };
-  if (!meeting_date)     return { success: false, error: 'meeting_date is required.' };
+  if (!title?.trim()) return { success: false, error: 'title is required.' };
+  if (!meeting_date)  return { success: false, error: 'meeting_date is required.' };
+  if (!track_id)      return { success: false, error: 'track_id is required.' };
 
-  // Admin check (D-490: admin-only tool).
-  const { data: caller, error: callerErr } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', caller_user_id)
+  const access = await assertTrackAccess(track_id, caller_user_id);
+  if (access.error) return { success: false, error: access.error };
+  if (access.track.deleted_at) return { success: false, error: 'This series has been deleted.' };
+
+  // Snapshot section template.
+  const { data: templateSections, error: tplErr } = await supabase
+    .from('team_meeting_track_sections')
+    .select('section_key, title, sub_label, bar_color, sort_order')
+    .eq('track_id', track_id)
     .is('deleted_at', null)
-    .maybeSingle();
-  if (callerErr || !caller?.is_admin) {
-    return { success: false, error: 'Team Meetings is restricted to Admin users.' };
+    .order('sort_order', { ascending: true });
+  if (tplErr) return { success: false, error: tplErr.message };
+  if (!templateSections?.length) {
+    return { success: false, error: 'This series has no sections configured. A series leader must add at least one section before meetings can be created.' };
   }
 
   const { data: meeting, error: meetingErr } = await supabase
     .from('team_meetings')
-    .insert({ title: title.trim(), meeting_date, created_by: caller_user_id })
+    .insert({ title: title.trim(), meeting_date, track_id, created_by: caller_user_id })
     .select()
     .single();
   if (meetingErr) {
     return { success: false, error: `Failed to create meeting: ${meetingErr.message}` };
   }
 
-  const sectionRows = SECTIONS.map(s => ({ ...s, meeting_id: meeting.id }));
+  const sectionRows = templateSections.map(s => ({
+    meeting_id:  meeting.id,
+    section_key: s.section_key,
+    title:       s.title,
+    sub_label:   s.sub_label,
+    bar_color:   s.bar_color,
+    sort_order:  s.sort_order
+  }));
   const { data: sections, error: sectionErr } = await supabase
     .from('team_meeting_sections')
     .insert(sectionRows)

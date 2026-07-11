@@ -80,7 +80,7 @@ function avatarColor(id: string): string {
 
         <!-- Empty -->
         <div *ngIf="!loading && !loadError && dcsUsers.length === 0" class="drp-empty">
-          No DCS users found.
+          No {{ personTypeLabel }} users found.
         </div>
 
         <!-- DCS user rows — D-415/S-034 compact person row -->
@@ -100,7 +100,7 @@ function avatarColor(id: string): string {
               <!-- S-034: name + role pill on same horizontal line -->
               <div class="drp-dcs-name-row">
                 <span class="drp-dcs-name">{{ dcs.display_name }}</span>
-                <span class="drp-role-pill">DCS</span>
+                <span class="drp-role-pill">{{ personTypeLabel }}</span>
                 <span *ngIf="dcs.initiatives.length > 0" class="drp-count-badge">{{ dcs.initiatives.length }}</span>
               </div>
               <!-- Add All button — skips initiatives already in meeting -->
@@ -277,8 +277,12 @@ function avatarColor(id: string): string {
 export class DcsReferencePanelComponent implements OnInit, OnChanges {
   @Input()  initiativesGatesSectionId!: string;
   @Input()  existingInitiativeIds: Set<string> = new Set();
+  // Tracks Phase B: series-level person type — groups the panel by DCS, DOL, or EPO.
+  @Input()  personType: 'dcs' | 'dol' | 'epo' = 'dcs';
   @Output() bulletAdded          = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string }>();
   @Output() initiativeSelected   = new EventEmitter<string>();
+
+  get personTypeLabel(): string { return this.personType.toUpperCase(); }
 
   dcsUsers:  DcsUserWithInitiatives[] = [];
   loading    = false;
@@ -305,6 +309,9 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges {
   ngOnInit(): void { this.load(); }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (changes['personType'] && !changes['personType'].firstChange) {
+      this.load();
+    }
     if (changes['existingInitiativeIds']) {
       // Remove from optimistic addedIds any initiative no longer in the meeting.
       // This fires when a bullet is removed via × so the checkbox unchecks.
@@ -319,7 +326,7 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges {
     this.loading   = true;
     this.loadError = '';
     this.cdr.markForCheck();
-    this.svc.listDcsUsersWithInitiatives().subscribe({
+    this.svc.listDcsUsersWithInitiatives(this.personType).subscribe({
       next: res => {
         if (res.success) {
           this.dcsUsers = res.data ?? [];

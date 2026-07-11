@@ -86,6 +86,14 @@ const ADMIN_CARDS: AdminCard[] = [
     route:       'api-keys',
     icon:        '◆',
     philOnly:    true
+  },
+  // Tracks Phase A: ninth admin card — shared Team Meeting section list.
+  {
+    title:       'Meeting Sections',
+    description: 'Shared section list for Team Meeting series. Series leaders pick sections from this list when configuring a series. Removing a section here does not change series already using it.',
+    who:         'Phil and Admin',
+    route:       'meeting-sections',
+    icon:        '▤'
   }
 ];
 

@@ -1,17 +1,20 @@
 // team-meetings-list.component.ts — Pathways OI Trust
-// Team Meetings list screen (D-490 Step 3).
-// Route: /team-meetings — Admin-only.
+// Meetings list within a series (D-490 Step 3 + Tracks Phase A).
+// Route: /team-meetings/track/:track_id — series members + admins.
 // Row tap → navigate to /team-meetings/:id (full-screen prep/run; CC-002 deviation from S-018).
 // "+ New Meeting" → right panel (S-016 create panel, S-017 modal scrim).
+// Gear → series settings panel (members, leaders, sections, share URL).
 
 import {
   Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef
 } from '@angular/core';
 import { CommonModule }          from '@angular/common';
-import { RouterModule, Router }  from '@angular/router';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { IonicModule }           from '@ionic/angular';
 import { TeamMeetingsService }   from '../team-meetings.service';
+import { AuthService }           from '../../../core/services/auth.service';
+import { TrackSettingsComponent } from '../tracks/track-settings.component';
 import { TeamMeetingListItem }   from '../../../core/types/team-meetings';
 
 function getMondayOfCurrentWeek(): Date {
@@ -37,18 +40,22 @@ function todayIso(): string {
   selector:        'app-team-meetings-list',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, IonicModule],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, IonicModule, TrackSettingsComponent],
   template: `
     <!-- S-001: visible context on every surface -->
     <div class="tm-shell">
       <div class="tm-header">
         <div>
-          <h1 class="tm-title">Team Meetings</h1>
-          <p class="tm-subtitle">Product Ops meeting prep and run notes — Admin only.</p>
+          <a routerLink="/team-meetings" class="tm-back">← Team Meetings</a>
+          <h1 class="tm-title">{{ trackName || 'Meetings' }}</h1>
+          <p class="tm-subtitle">Meeting prep and run notes for this series.</p>
         </div>
-        <button class="tm-btn-primary" (click)="openNewMeeting()" type="button">
-          + New Meeting
-        </button>
+        <div class="tm-header-actions">
+          <button class="tm-gear-btn" (click)="showSettings = true" type="button" title="Series settings">⚙</button>
+          <button class="tm-btn-primary" (click)="openNewMeeting()" type="button">
+            + New Meeting
+          </button>
+        </div>
       </div>
 
       <!-- Loading state — S-028 Context B skeleton rows -->
@@ -113,6 +120,15 @@ function todayIso(): string {
       </div>
     </div>
 
+    <!-- Series settings panel -->
+    <app-track-settings *ngIf="showSettings"
+                        [trackId]="trackId"
+                        [currentUserId]="currentUserId"
+                        (close)="showSettings = false"
+                        (changed)="loadMeetings()"
+                        (deleted)="onTrackDeleted()">
+    </app-track-settings>
+
     <!-- Meeting panel — New (S-016/S-017) or Edit mode -->
     <div *ngIf="showNewPanel" class="tm-scrim" (click)="closeNewPanel()"></div>
     <div *ngIf="showNewPanel" class="tm-panel">
@@ -163,6 +179,10 @@ function todayIso(): string {
       justify-content: space-between;
       margin-bottom: 24px;
     }
+    .tm-back { font: 13px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); text-decoration: none; }
+    .tm-header-actions { display: flex; align-items: center; gap: 10px; }
+    .tm-gear-btn { background: none; border: 1px solid #BDBDBD; border-radius: 5px; color: #5A5A5A; font-size: 16px; padding: 6px 10px; cursor: pointer; }
+    .tm-gear-btn:hover { border-color: var(--triarq-color-primary, #257099); color: var(--triarq-color-primary, #257099); }
     .tm-title {
       font: 600 22px/1.2 Roboto, sans-serif;
       color: var(--triarq-text-primary, #1A1A1A);
@@ -293,6 +313,12 @@ export class TeamMeetingsListComponent implements OnInit {
   loading   = false;
   loadError = '';
 
+  trackId       = '';
+  trackName     = '';
+  isLeader      = false;
+  showSettings  = false;
+  currentUserId = '';
+
   showNewPanel    = false;
   saving          = false;
   saveError       = '';
@@ -304,20 +330,25 @@ export class TeamMeetingsListComponent implements OnInit {
 
   constructor(
     private readonly svc: TeamMeetingsService,
+    private readonly auth: AuthService,
     private readonly fb:  FormBuilder,
     private readonly router: Router,
+    private readonly route: ActivatedRoute,
     private readonly cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
+    this.trackId       = this.route.snapshot.paramMap.get('track_id') ?? '';
+    this.currentUserId = this.auth.getCurrentUser()?.id ?? '';
     this.initForm();
     this.loadMeetings();
   }
 
   private initForm(): void {
     const monday = getMondayOfCurrentWeek();
+    const prefix = this.trackName ? `${this.trackName} Prep` : 'Prep';
     this.newMeetingForm = this.fb.group({
-      title:        [`Product Ops Prep — Week of ${formatMonday(monday)}`, Validators.required],
+      title:        [`${prefix} — Week of ${formatMonday(monday)}`, Validators.required],
       meeting_date: [todayIso(), Validators.required]
     });
   }
@@ -326,10 +357,15 @@ export class TeamMeetingsListComponent implements OnInit {
     this.loading   = true;
     this.loadError = '';
     this.cdr.markForCheck();
-    this.svc.listMeetings().subscribe({
+    this.svc.listMeetings(this.trackId).subscribe({
       next: res => {
         if (res.success) {
           this.meetings = res.data ?? [];
+          const trackInfo = (res as unknown as { track?: { track_name: string; is_leader: boolean } }).track;
+          if (trackInfo) {
+            this.trackName = trackInfo.track_name;
+            this.isLeader  = trackInfo.is_leader;
+          }
         } else {
           this.loadError = res.error ?? 'Failed to load meetings.';
         }
@@ -342,6 +378,11 @@ export class TeamMeetingsListComponent implements OnInit {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  onTrackDeleted(): void {
+    this.showSettings = false;
+    this.router.navigate(['/team-meetings']);
   }
 
   openMeeting(id: string): void {
@@ -421,7 +462,7 @@ export class TeamMeetingsListComponent implements OnInit {
       return;
     }
 
-    this.svc.createMeeting(title, meeting_date).subscribe({
+    this.svc.createMeeting(this.trackId, title, meeting_date).subscribe({
       next: res => {
         this.saving = false;
         if (res.success && res.data) {

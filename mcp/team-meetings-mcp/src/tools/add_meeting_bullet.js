@@ -1,14 +1,14 @@
 // add_meeting_bullet.js
-// Pathways OI Trust — team-meetings-mcp / D-490
-// Adds a bullet to a meeting section.
+// Pathways OI Trust — team-meetings-mcp / D-490 + Tracks Phase B
+// Adds a bullet to a meeting section. Any track member. Records created_by attribution.
 //
 // CRITICAL: initiative_id must be set when called from the @ picker or reference
-// panel "+ Add". Never set initiative_id from free-text input (D-490 spec Step 2).
-// carry_forward_bullet sets carried_from_bullet_id via this tool's logic path.
+// panel checkbox. Never set initiative_id from free-text input (D-490 spec Step 2).
 
 'use strict';
 
 const { supabase } = require('../db');
+const { assertSectionAccess, bumpMeeting } = require('../track_access');
 
 /**
  * @param {{ section_id: string, text: string, initiative_id?: string, carried_from_bullet_id?: string }} params
@@ -20,26 +20,8 @@ async function add_meeting_bullet(params, caller_user_id) {
   if (!section_id) return { success: false, error: 'section_id is required.' };
   if (!text?.trim()) return { success: false, error: 'text is required.' };
 
-  // Admin check.
-  const { data: caller, error: callerErr } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', caller_user_id)
-    .is('deleted_at', null)
-    .maybeSingle();
-  if (callerErr || !caller?.is_admin) {
-    return { success: false, error: 'Team Meetings is restricted to Admin users.' };
-  }
-
-  // Verify section exists.
-  const { data: section, error: sectionErr } = await supabase
-    .from('team_meeting_sections')
-    .select('id')
-    .eq('id', section_id)
-    .maybeSingle();
-  if (sectionErr || !section) {
-    return { success: false, error: 'Section not found.' };
-  }
+  const access = await assertSectionAccess(section_id, caller_user_id);
+  if (access.error) return { success: false, error: access.error };
 
   // Compute next sort_order.
   const { data: maxRow } = await supabase
@@ -53,10 +35,11 @@ async function add_meeting_bullet(params, caller_user_id) {
 
   const newBullet = {
     section_id,
-    text:                  text.trim(),
+    text:                   text.trim(),
     sort_order,
-    initiative_id:         initiative_id         ?? null,
-    carried_from_bullet_id: carried_from_bullet_id ?? null
+    initiative_id:          initiative_id          ?? null,
+    carried_from_bullet_id: carried_from_bullet_id ?? null,
+    created_by:             caller_user_id
   };
 
   const { data: bullet, error: bulletErr } = await supabase
@@ -66,6 +49,7 @@ async function add_meeting_bullet(params, caller_user_id) {
     .single();
   if (bulletErr) return { success: false, error: `Failed to add bullet: ${bulletErr.message}` };
 
+  await bumpMeeting(access.meeting.id);
   return { success: true, data: bullet };
 }
 

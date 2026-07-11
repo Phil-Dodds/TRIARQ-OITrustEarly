@@ -7,6 +7,7 @@ import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRe
 import { UserProfileService } from '../../../core/services/user-profile.service';
 import { AuthService }        from '../../../core/services/auth.service';
 import { DeliveryService }    from '../../../core/services/delivery.service';
+import { TeamMeetingsService } from '../../../features/team-meetings/team-meetings.service';
 import { Router }             from '@angular/router';
 import { User, PendingApprovalItem } from '../../../core/types/database';
 import { RoleFlag }           from '../../../core/constants/roles';
@@ -40,10 +41,10 @@ const NAV_ITEMS: NavItem[] = [
   // Contract 32 / D-485: Initiative Status Dashboard is now a card on this hub
   // (not a standalone nav item).
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'live'        },
-  // Contract 33 / D-490: Team Meetings — Admin-only meeting prep and run tool.
-  // Placed below Initiative Tracking per spec Step 8. Visibility: is_admin only.
-  // CC-005 (icon): calendar-outline — already in Ionic icon set, not used by adjacent items.
-  { label: 'Team Meetings', route: '/team-meetings', requiresFlag: 'is_admin', devStatus: 'pilot' },
+  // Contract 33 / D-490 + Tracks Phase A: Team Meetings — visible to ALL users.
+  // Users without a series can create one (if permitted) or join a public series.
+  // Badge = number of series the user participates in.
+  { label: 'Team Meetings', route: '/team-meetings', devStatus: 'pilot' },
   { label: 'To Dos',                                         devStatus: 'not-started' },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
     children: [
@@ -99,6 +100,10 @@ const NAV_ITEMS: NavItem[] = [
           <span *ngIf="item.route === '/actions' && actionBadge > 0"
                 class="oi-nav-badge"
                 [attr.aria-label]="actionBadge + ' pending actions'">{{ actionBadge }}</span>
+          <!-- Tracks Phase A: series-participation badge on Team Meetings. -->
+          <span *ngIf="item.route === '/team-meetings' && trackBadge > 0"
+                class="oi-nav-badge"
+                [attr.aria-label]="trackBadge + ' meeting series'">{{ trackBadge }}</span>
           <button *ngIf="item.children?.length"
                   type="button" class="oi-nav-chevron"
                   [attr.aria-label]="(isExpanded(item.label) ? 'Collapse ' : 'Expand ') + item.label"
@@ -211,6 +216,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
    *  reflects all three actionable My Actions tabs. Post-approval Consulted
    *  items (D-468) are excluded from the pending count. */
   actionBadge = 0;
+  /** Tracks Phase A: number of meeting series the user participates in. */
+  trackBadge  = 0;
   private pendingCount = 0;
   private dueCount = 0;
   private ackCount = 0;
@@ -221,6 +228,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     private readonly profileService: UserProfileService,
     private readonly auth:           AuthService,
     private readonly delivery:       DeliveryService,
+    private readonly teamMeetings:   TeamMeetingsService,
     private readonly router:         Router,
     private readonly cdr:            ChangeDetectorRef
   ) {}
@@ -237,6 +245,20 @@ export class SidebarComponent implements OnInit, OnDestroy {
       })
     );
     this.loadActionBadge();
+    this.loadTrackBadge();
+  }
+
+  /** Tracks Phase A: series-participation count for the Team Meetings badge. */
+  private loadTrackBadge(): void {
+    this.sub.add(
+      this.teamMeetings.listMyTracks().subscribe({
+        next: res => {
+          this.trackBadge = (res.success && res.data) ? res.data.filter(t => t.is_member).length : 0;
+          this.cdr.markForCheck();
+        },
+        error: () => { /* badge stays 0 — non-blocking */ }
+      })
+    );
   }
 
   /** Fetch the three actionable counts for the My Actions badge (D-472 + D-484). */

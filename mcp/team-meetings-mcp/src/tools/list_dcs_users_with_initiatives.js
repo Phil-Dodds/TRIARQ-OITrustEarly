@@ -1,14 +1,23 @@
 // list_dcs_users_with_initiatives.js
-// Pathways OI Trust — team-meetings-mcp / D-490
-// Returns all DCS users with their active initiatives scoped to caller's division access.
-// D-419: gate_status is the D-419 walkback result from cycle_milestone_dates.
-// D-389: system_role = 'dcs', assigned_dcs_user_id on delivery_cycles.
+// Pathways OI Trust — team-meetings-mcp / D-490 + Tracks Phase B
+// Returns users of the requested person type (dcs | dol | epo) with their active
+// initiatives, scoped to caller's division access. Any authenticated user —
+// this is the reference panel data source, gated by track membership at the
+// meeting level, not here.
+// D-419: gate_status is the walkback result from cycle_milestone_dates.
 
 'use strict';
 
 const { supabase } = require('../db');
+const { getCaller } = require('../track_access');
 
 const WALKBACK_CHAIN = ['go_to_deploy', 'go_to_build', 'brief_review'];
+
+const PERSON_TYPES = {
+  dcs: { flag: 'is_dcs', column: 'assigned_dcs_user_id' },
+  dol: { flag: 'is_dol', column: 'assigned_dol_user_id' },
+  epo: { flag: 'is_epo', column: 'assigned_epo_user_id' }
+};
 
 function resolveGateStatus(milestoneDates) {
   for (const gate of WALKBACK_CHAIN) {
@@ -22,20 +31,15 @@ function resolveGateStatus(milestoneDates) {
 }
 
 /**
- * @param {{}} params
+ * @param {{ person_type?: 'dcs'|'dol'|'epo' }} params
  * @param {string} caller_user_id
  */
 async function list_dcs_users_with_initiatives(params, caller_user_id) {
-  // Admin check.
-  const { data: caller, error: callerErr } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', caller_user_id)
-    .is('deleted_at', null)
-    .maybeSingle();
-  if (callerErr || !caller?.is_admin) {
-    return { success: false, error: 'Team Meetings is restricted to Admin users.' };
-  }
+  const personType = PERSON_TYPES[params.person_type || 'dcs'];
+  if (!personType) return { success: false, error: 'person_type must be dcs, dol, or epo.' };
+
+  const caller = await getCaller(caller_user_id);
+  if (!caller) return { success: false, error: 'User not found.' };
 
   // Division access for the caller — admins get all divisions.
   let accessible_division_ids = null; // null = all divisions (admin)
@@ -50,23 +54,23 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
     if (!accessible_division_ids.length) return { success: true, data: [] };
   }
 
-  // All DCS users.
-  const { data: dcsUsers, error: dcsErr } = await supabase
+  // All users of the requested person type.
+  const { data: typedUsers, error: usersErr } = await supabase
     .from('users')
     .select('id, display_name')
-    .eq('is_dcs', true)
+    .eq(personType.flag, true)
     .is('deleted_at', null)
     .order('display_name', { ascending: true });
-  if (dcsErr) return { success: false, error: dcsErr.message };
-  if (!dcsUsers?.length) return { success: true, data: [] };
+  if (usersErr) return { success: false, error: usersErr.message };
+  if (!typedUsers?.length) return { success: true, data: [] };
 
-  const dcsIds = dcsUsers.map(u => u.id);
+  const userIds = typedUsers.map(u => u.id);
 
-  // Active initiatives assigned to these DCS users, scoped to accessible divisions.
+  // Active initiatives assigned to these users, scoped to accessible divisions.
   let cycleQuery = supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, assigned_dcs_user_id, division_id')
-    .in('assigned_dcs_user_id', dcsIds)
+    .select(`delivery_cycle_id, cycle_title, current_lifecycle_stage, ${personType.column}, division_id`)
+    .in(personType.column, userIds)
     .neq('current_lifecycle_stage', 'closed')
     .is('deleted_at', null)
     .order('cycle_title', { ascending: true });
@@ -93,7 +97,7 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
     });
   }
 
-  // Last status update date per initiative (CC-006: joined from initiative_status_updates).
+  // Last status update date per initiative (CC-006).
   let lastStatusDateByCycle = {};
   if (cycleIds.length) {
     const { data: statusRows } = await supabase
@@ -108,25 +112,26 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
     });
   }
 
-  // Group initiatives by DCS user.
-  const cyclesByDcs = {};
+  // Group initiatives by assigned user.
+  const cyclesByUser = {};
   (cycles || []).forEach(c => {
-    const list = cyclesByDcs[c.assigned_dcs_user_id] || [];
+    const assignedId = c[personType.column];
+    const list = cyclesByUser[assignedId] || [];
     list.push({
-      id:                     c.delivery_cycle_id,
-      name:                   c.cycle_title,
-      stage:                  c.current_lifecycle_stage,
-      gate_status:            resolveGateStatus(milestonesByCycle[c.delivery_cycle_id] || []),
+      id:                      c.delivery_cycle_id,
+      name:                    c.cycle_title,
+      stage:                   c.current_lifecycle_stage,
+      gate_status:             resolveGateStatus(milestonesByCycle[c.delivery_cycle_id] || []),
       last_status_update_date: lastStatusDateByCycle[c.delivery_cycle_id] ?? null
     });
-    cyclesByDcs[c.assigned_dcs_user_id] = list;
+    cyclesByUser[assignedId] = list;
   });
 
-  const result = dcsUsers.map(u => ({
+  const result = typedUsers.map(u => ({
     id:           u.id,
     display_name: u.display_name,
     avatar_url:   null,
-    initiatives:  cyclesByDcs[u.id] || []
+    initiatives:  cyclesByUser[u.id] || []
   }));
 
   return { success: true, data: result };

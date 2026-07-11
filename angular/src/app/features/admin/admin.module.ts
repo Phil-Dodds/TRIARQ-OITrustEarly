@@ -26,7 +26,9 @@ import { IonicModule }  from '@ionic/angular';
       // Contract 29 (D-464): Gate Approvers admin screen (Phil-only).
       { path: 'gate-approvers', loadComponent: () => import('./gate-approvers/gate-approvers.component').then(c => c.GateApproversComponent) },
       // Contract 31 (D-475): API Keys admin screen (Phil-only).
-      { path: 'api-keys', loadComponent: () => import('./api-keys/api-keys.component').then(c => c.ApiKeysComponent) }
+      { path: 'api-keys', loadComponent: () => import('./api-keys/api-keys.component').then(c => c.ApiKeysComponent) },
+      // Tracks Phase A: shared Team Meeting section list.
+      { path: 'meeting-sections', loadComponent: () => import('./meeting-sections/meeting-sections.component').then(c => c.MeetingSectionsComponent) }
     ])
   ]
 })
