@@ -600,6 +600,50 @@ async function add_track_section(params, caller_user_id) {
   return { success: true, data: { track_section: trackSection, meeting_section: meetingSection } };
 }
 
+// update_track_section — leader. Edits title/sub_label on a series section.
+// If meeting_id supplied, the matching section in that meeting updates too
+// (snapshot model: other past meetings keep their original title).
+async function update_track_section(params, caller_user_id) {
+  const { track_id, track_section_id, title, sub_label, meeting_id } = params;
+  if (!track_id || !track_section_id) return { success: false, error: 'track_id and track_section_id are required.' };
+  if (title !== undefined && !title?.trim()) return { success: false, error: 'title cannot be empty.' };
+
+  const access = await assertTrackAccess(track_id, caller_user_id, { requireLeader: true });
+  if (access.error) return { success: false, error: access.error };
+
+  const { data: ts } = await supabase
+    .from('team_meeting_track_sections')
+    .select('id, section_key')
+    .eq('id', track_section_id)
+    .eq('track_id', track_id)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (!ts) return { success: false, error: 'Section not found in this series.' };
+
+  const patch = {};
+  if (title !== undefined)     patch.title     = title.trim();
+  if (sub_label !== undefined) patch.sub_label = (sub_label || '').trim();
+  if (!Object.keys(patch).length) return { success: false, error: 'Nothing to update.' };
+
+  const { error } = await supabase
+    .from('team_meeting_track_sections')
+    .update(patch)
+    .eq('id', ts.id);
+  if (error) return { success: false, error: error.message };
+
+  if (meeting_id) {
+    await supabase
+      .from('team_meeting_sections')
+      .update(patch)
+      .eq('meeting_id', meeting_id)
+      .eq('section_key', ts.section_key);
+    const { bumpMeeting } = require('../track_access');
+    await bumpMeeting(meeting_id);
+  }
+
+  return { success: true, data: { track_section_id, ...patch } };
+}
+
 // remove_track_section — leader. Soft-deletes template row (future meetings drop it).
 // If meeting_id supplied, also soft-deletes the matching section in that meeting.
 // Past meetings keep their snapshot.
@@ -788,6 +832,7 @@ module.exports = {
   list_public_tracks,
   join_public_track,
   add_track_section,
+  update_track_section,
   remove_track_section,
   reorder_track_sections,
   list_section_catalog,

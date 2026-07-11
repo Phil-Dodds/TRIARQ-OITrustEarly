@@ -162,6 +162,10 @@ export class TeamMeetingsService {
     return this.mcp.call('team-meetings', 'add_track_section', { track_id, ...opts });
   }
 
+  updateTrackSection(track_id: string, track_section_id: string, patch: { title?: string; sub_label?: string }, meeting_id?: string): Observable<McpResponse<unknown>> {
+    return this.mcp.call('team-meetings', 'update_track_section', { track_id, track_section_id, ...patch, ...(meeting_id ? { meeting_id } : {}) });
+  }
+
   removeTrackSection(track_id: string, track_section_id: string, meeting_id?: string): Observable<McpResponse<unknown>> {
     return this.mcp.call('team-meetings', 'remove_track_section', { track_id, track_section_id, ...(meeting_id ? { meeting_id } : {}) });
   }

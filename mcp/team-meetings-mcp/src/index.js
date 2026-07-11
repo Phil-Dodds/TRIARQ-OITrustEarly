@@ -60,6 +60,7 @@ const TOOLS = {
   list_public_tracks:      tracks.list_public_tracks,
   join_public_track:       tracks.join_public_track,
   add_track_section:       tracks.add_track_section,
+  update_track_section:    tracks.update_track_section,
   remove_track_section:    tracks.remove_track_section,
   reorder_track_sections:  tracks.reorder_track_sections,
   list_section_catalog:    tracks.list_section_catalog,

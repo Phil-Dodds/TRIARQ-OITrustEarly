@@ -67,6 +67,17 @@ function avatarColor(id: string): string {
       </div>
 
       <div *ngIf="!collapsed" class="drp-body">
+        <!-- Person type selector — anyone can switch live; leader's choice persists to the series -->
+        <div class="drp-type-row" role="radiogroup" aria-label="Reference panel people type">
+          <button *ngFor="let pt of personTypeOptions"
+                  type="button"
+                  class="drp-type-pill"
+                  [class.drp-type-pill-active]="personType === pt"
+                  (click)="selectPersonType(pt)">
+            {{ pt.toUpperCase() }}
+          </button>
+        </div>
+
         <!-- Loading skeleton — S-028 Context B -->
         <ng-container *ngIf="loading">
           <div *ngFor="let i of [1,2,3]" class="drp-skeleton-row"></div>
@@ -260,6 +271,18 @@ function avatarColor(id: string): string {
       border-color: var(--triarq-color-primary, #257099);
     }
     .drp-checkmark { font-size: 10px; color: #fff; line-height: 1; }
+    /* Person type pills */
+    .drp-type-row { display: flex; gap: 6px; padding: 8px 12px 4px; }
+    .drp-type-pill {
+      background: #fff; border: 1px solid #BDBDBD; border-radius: 999px;
+      color: #5A5A5A; padding: 2px 12px; font: 500 11px Roboto, sans-serif;
+      cursor: pointer; transition: all 0.1s;
+    }
+    .drp-type-pill-active {
+      background: var(--triarq-color-primary, #257099);
+      border-color: var(--triarq-color-primary, #257099);
+      color: #fff;
+    }
     /* D-419 status dot */
     .drp-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .drp-initiative-name { font: 13px Roboto, sans-serif; color: #1A1A1A; flex: 1; min-width: 0; }
@@ -277,12 +300,24 @@ function avatarColor(id: string): string {
 export class DcsReferencePanelComponent implements OnInit, OnChanges {
   @Input()  initiativesGatesSectionId!: string;
   @Input()  existingInitiativeIds: Set<string> = new Set();
-  // Tracks Phase B: series-level person type — groups the panel by DCS, DOL, or EPO.
+  // Tracks Phase B: person type — groups the panel by DCS, DOL, or EPO.
+  // Seeded from the series' remembered choice; any participant may switch live.
   @Input()  personType: 'dcs' | 'dol' | 'epo' = 'dcs';
   @Output() bulletAdded          = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string }>();
   @Output() initiativeSelected   = new EventEmitter<string>();
+  // Fires when a user switches the type — parent persists to the series if leader.
+  @Output() personTypeChanged    = new EventEmitter<'dcs' | 'dol' | 'epo'>();
+
+  readonly personTypeOptions: ('dcs' | 'dol' | 'epo')[] = ['dcs', 'dol', 'epo'];
 
   get personTypeLabel(): string { return this.personType.toUpperCase(); }
+
+  selectPersonType(pt: 'dcs' | 'dol' | 'epo'): void {
+    if (pt === this.personType) return;
+    this.personType = pt;
+    this.load();
+    this.personTypeChanged.emit(pt);
+  }
 
   dcsUsers:  DcsUserWithInitiatives[] = [];
   loading    = false;

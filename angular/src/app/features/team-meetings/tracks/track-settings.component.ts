@@ -12,7 +12,7 @@ import { CommonModule }        from '@angular/common';
 import { FormsModule }         from '@angular/forms';
 import { TeamMeetingsService } from '../team-meetings.service';
 import {
-  TrackDetail, CatalogSection, InviteReport, RefPanelPersonType, PERSON_TYPE_LABELS
+  TrackDetail, CatalogSection, InviteReport
 } from '../../../core/types/team-meetings';
 
 @Component({
@@ -62,21 +62,6 @@ import {
           </label>
         </div>
 
-        <!-- Reference panel person type -->
-        <div class="ts-block">
-          <label class="ts-label">Initiative Reference Panel — People Type</label>
-          <p class="ts-hint">Groups the reference panel (Initiatives and Gates) by this role. Remembered for all meetings in this series.</p>
-          <div class="ts-radio-row">
-            <label *ngFor="let pt of personTypes" class="ts-radio">
-              <input type="radio" name="ptype" [value]="pt"
-                     [checked]="track.ref_panel_person_type === pt"
-                     [disabled]="!track.is_leader"
-                     (change)="setPersonType(pt)">
-              {{ personTypeLabels[pt] }}
-            </label>
-          </div>
-        </div>
-
         <!-- Members -->
         <div class="ts-block">
           <label class="ts-label">Members ({{ track.members.length }})</label>
@@ -122,15 +107,33 @@ import {
           <p class="ts-hint">Applied to new meetings in this series, in this order. Existing meetings are unchanged.</p>
           <div *ngFor="let s of track.sections; let i = index" class="ts-section-row">
             <span class="ts-section-bar" [style.background]="s.bar_color"></span>
-            <span class="ts-section-title">{{ s.title }}</span>
-            <span *ngIf="track.is_leader" class="ts-section-actions">
-              <button class="ts-icon-btn" type="button" [disabled]="i === 0" title="Move up"
-                      (click)="move(i, -1)">↑</button>
-              <button class="ts-icon-btn" type="button" [disabled]="i === track.sections.length - 1" title="Move down"
-                      (click)="move(i, 1)">↓</button>
-              <button class="ts-icon-btn ts-danger" type="button" title="Remove from series"
-                      (click)="removeSection(s.id)">×</button>
-            </span>
+            <ng-container *ngIf="editingSectionId !== s.id">
+              <span class="ts-section-text">
+                <span class="ts-section-title">{{ s.title }}</span>
+                <span *ngIf="s.sub_label" class="ts-section-sub">{{ s.sub_label }}</span>
+              </span>
+              <span *ngIf="track.is_leader" class="ts-section-actions">
+                <button class="ts-icon-btn" type="button" title="Edit title and description"
+                        (click)="startEditSection(s)">✎</button>
+                <button class="ts-icon-btn" type="button" [disabled]="i === 0" title="Move up"
+                        (click)="move(i, -1)">↑</button>
+                <button class="ts-icon-btn" type="button" [disabled]="i === track.sections.length - 1" title="Move down"
+                        (click)="move(i, 1)">↓</button>
+                <button class="ts-icon-btn ts-danger" type="button" title="Remove from series"
+                        (click)="removeSection(s.id)">×</button>
+              </span>
+            </ng-container>
+            <ng-container *ngIf="editingSectionId === s.id">
+              <span class="ts-section-edit">
+                <input class="ts-input" [(ngModel)]="sectionTitleDraft" placeholder="Section title">
+                <input class="ts-input" [(ngModel)]="sectionSubDraft" placeholder="Description (optional)">
+              </span>
+              <span class="ts-section-actions">
+                <button class="ts-mini-primary" type="button" [disabled]="!sectionTitleDraft.trim()"
+                        (click)="saveSectionEdit(s)">Save</button>
+                <button class="ts-mini-btn" type="button" (click)="editingSectionId = null">Cancel</button>
+              </span>
+            </ng-container>
           </div>
 
           <div *ngIf="track.is_leader" class="ts-add-section">
@@ -198,7 +201,10 @@ import {
     .ts-invite-notfound { color: #D32F2F; }
     .ts-section-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #F5F5F5; }
     .ts-section-bar { width: 4px; height: 18px; border-radius: 2px; flex-shrink: 0; }
-    .ts-section-title { font: 13px Roboto, sans-serif; flex: 1; }
+    .ts-section-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .ts-section-title { font: 13px Roboto, sans-serif; }
+    .ts-section-sub { font: italic 11px Roboto, sans-serif; color: #757575; }
+    .ts-section-edit { display: flex; flex-direction: column; gap: 4px; flex: 1; }
     .ts-section-actions { display: flex; gap: 2px; }
     .ts-icon-btn { background: none; border: none; color: #757575; cursor: pointer; font-size: 14px; padding: 2px 5px; }
     .ts-icon-btn:disabled { opacity: 0.3; cursor: default; }
@@ -233,8 +239,10 @@ export class TrackSettingsComponent implements OnInit {
   customTitle       = '';
   confirmDelete     = false;
 
-  readonly personTypes: RefPanelPersonType[] = ['dcs', 'dol', 'epo'];
-  readonly personTypeLabels = PERSON_TYPE_LABELS;
+  // Per-section title/description editing (leaders).
+  editingSectionId: string | null = null;
+  sectionTitleDraft = '';
+  sectionSubDraft   = '';
 
   constructor(
     private readonly svc: TeamMeetingsService,
@@ -319,15 +327,26 @@ export class TrackSettingsComponent implements OnInit {
     });
   }
 
-  setPersonType(pt: RefPanelPersonType): void {
-    if (!this.track || this.track.ref_panel_person_type === pt) return;
-    this.svc.updateTrack(this.trackId, { ref_panel_person_type: pt }).subscribe({
+  startEditSection(s: { id: string; title: string; sub_label: string }): void {
+    this.editingSectionId  = s.id;
+    this.sectionTitleDraft = s.title;
+    this.sectionSubDraft   = s.sub_label;
+    this.cdr.markForCheck();
+  }
+
+  saveSectionEdit(s: { id: string }): void {
+    const title = this.sectionTitleDraft.trim();
+    if (!title) return;
+    this.svc.updateTrackSection(this.trackId, s.id, { title, sub_label: this.sectionSubDraft }, this.meetingId).subscribe({
       next: res => {
-        if (res.success && this.track) {
-          this.track.ref_panel_person_type = pt;
+        if (res.success) {
+          this.editingSectionId = null;
+          this.load();
           this.changed.emit();
+        } else {
+          this.loadError = res.error ?? 'Failed to save section.';
+          this.cdr.markForCheck();
         }
-        this.cdr.markForCheck();
       }
     });
   }

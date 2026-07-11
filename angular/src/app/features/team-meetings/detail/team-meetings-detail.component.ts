@@ -252,7 +252,8 @@ interface InitiativeSearchResult {
             [existingInitiativeIds]="existingInitiativeIds"
             [personType]="meeting.track?.ref_panel_person_type ?? 'dcs'"
             (bulletAdded)="onRefPanelAddBullet($event)"
-            (initiativeSelected)="openInitiativeDetail($event)">
+            (initiativeSelected)="openInitiativeDetail($event)"
+            (personTypeChanged)="onPersonTypeChanged($event)">
           </app-dcs-reference-panel>
         </div>
       </div>
@@ -870,6 +871,17 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     this.showInitiativePanel  = false;
     this.selectedInitiativeId = null;
     this.cdr.markForCheck();
+  }
+
+  // ── Reference panel person type ──────────────────────────────────────────────
+  // Anyone switches live (local only). A leader's choice persists to the series
+  // so it carries forward to the next meeting. Default: dcs.
+  onPersonTypeChanged(pt: 'dcs' | 'dol' | 'epo'): void {
+    const track = this.meeting?.track;
+    if (!track?.is_leader || track.ref_panel_person_type === pt) return;
+    this.svc.updateTrack(track.track_id, { ref_panel_person_type: pt }).subscribe({
+      next: res => { if (res.success && this.meeting?.track) this.meeting.track.ref_panel_person_type = pt; }
+    });
   }
 
   // ── Series settings panel ────────────────────────────────────────────────────
