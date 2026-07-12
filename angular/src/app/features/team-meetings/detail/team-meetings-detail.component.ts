@@ -254,6 +254,7 @@ interface InitiativeSearchResult {
             [initiativesGatesSectionId]="initiativesGatesSectionId"
             [existingInitiativeIds]="existingInitiativeIds"
             [personType]="meeting.track?.ref_panel_person_type ?? 'dcs'"
+            [trackId]="meeting.track?.track_id ?? ''"
             (bulletAdded)="onRefPanelAddBullet($event)"
             (initiativeSelected)="openInitiativeDetail($event)"
             (personTypeChanged)="onPersonTypeChanged($event)">

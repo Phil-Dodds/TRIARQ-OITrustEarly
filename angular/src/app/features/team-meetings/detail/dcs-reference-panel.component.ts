@@ -1,26 +1,40 @@
 // dcs-reference-panel.component.ts — Pathways OI Trust
-// DCS Initiative Reference Panel (D-490 Step 5).
-// Right-column panel showing DCS users and their active initiatives.
-// D-415/S-034: avatar 32px, name + role pill on same horizontal line.
-// D-419: gate_status dot color from walkback result (on_track/at_risk/off_track/complete/not_started).
+// Initiative Reference Panel (D-490 Step 5 + Tracks participant-aware redesign,
+// session 2026-07-11).
+//
+// Two modes:
+//   Participants-only (default ON): meeting participants (leaders + members)
+//     with initiatives merged across all three roles (DCS/DOL/EPO).
+//   Toggle OFF: participants stay pinned on top; DCS/DOL/EPO pills appear and
+//     the chosen type's non-participant people append below a divider.
+//
+// Per-user memory (Option A, ScreenStateService): toggle, pill, and per-person
+// expand/collapse are remembered per track and default the next meeting.
+// Defaults when nothing saved: toggle ON, series person type, leaders collapsed,
+// non-leader participants expanded, others collapsed.
+//
+// D-415/S-034 person row. D-419 gate-status dot colors.
 
 import {
-  Component, OnInit, OnChanges, SimpleChanges,
+  Component, OnInit, OnChanges, OnDestroy, SimpleChanges,
   Input, Output, EventEmitter,
   ChangeDetectionStrategy, ChangeDetectorRef
 } from '@angular/core';
 import { CommonModule }          from '@angular/common';
 import { TeamMeetingsService }   from '../team-meetings.service';
-import { DcsUserWithInitiatives, DcsInitiativeRef } from '../../../core/types/team-meetings';
+import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
+import {
+  DcsInitiativeRef, RefPanelPerson, RefPanelPersonType, RefPanelTrackState
+} from '../../../core/types/team-meetings';
 
 // D-419 gate status → dot color mapping (reusing existing color semantics).
 function gateStatusColor(status: string): string {
   switch (status) {
-    case 'on_track':  return '#4CAF50'; // green
-    case 'at_risk':   return '#F2A620'; // sunray amber
-    case 'off_track': return '#D32F2F'; // red
-    case 'complete':  return '#257099'; // primary blue
-    default:          return '#BDBDBD'; // grey — not_started or unknown
+    case 'on_track':  return '#4CAF50';
+    case 'at_risk':   return '#F2A620';
+    case 'off_track': return '#D32F2F';
+    case 'complete':  return '#257099';
+    default:          return '#BDBDBD';
   }
 }
 
@@ -48,6 +62,8 @@ function avatarColor(id: string): string {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 
+const SAVE_DEBOUNCE_MS = 800;
+
 @Component({
   selector:        'app-dcs-reference-panel',
   standalone:      true,
@@ -67,8 +83,16 @@ function avatarColor(id: string): string {
       </div>
 
       <div *ngIf="!collapsed" class="drp-body">
-        <!-- Person type selector — anyone can switch live; leader's choice persists to the series -->
-        <div class="drp-type-row" role="radiogroup" aria-label="Reference panel people type">
+        <!-- Participants-only toggle (remembered per user per series) -->
+        <label class="drp-toggle-row">
+          <input type="checkbox"
+                 [checked]="participantsOnly"
+                 (change)="toggleParticipantsOnly()">
+          Show only initiatives for meeting participants
+        </label>
+
+        <!-- Person type pills — only when browsing beyond participants -->
+        <div *ngIf="!participantsOnly" class="drp-type-row" role="radiogroup" aria-label="Additional people type">
           <button *ngFor="let pt of personTypeOptions"
                   type="button"
                   class="drp-type-pill"
@@ -89,83 +113,95 @@ function avatarColor(id: string): string {
           <button class="drp-link-btn" (click)="load()" type="button">Retry</button>
         </div>
 
-        <!-- Empty -->
-        <div *ngIf="!loading && !loadError && dcsUsers.length === 0" class="drp-empty">
-          No {{ personTypeLabel }} users found.
-        </div>
-
-        <!-- DCS user rows — D-415/S-034 compact person row -->
         <ng-container *ngIf="!loading && !loadError">
-          <div *ngFor="let dcs of dcsUsers" class="drp-dcs-block">
-            <div class="drp-dcs-row"
-                 role="button"
-                 tabindex="0"
-                 (click)="toggleDcs(dcs.id)"
-                 (keydown.enter)="toggleDcs(dcs.id)">
-              <!-- S-034: avatar 32px -->
-              <div class="drp-avatar"
-                   [style.background]="dcs.avatar_url ? 'transparent' : avatarColor(dcs.id)">
-                <img *ngIf="dcs.avatar_url" [src]="dcs.avatar_url" class="drp-avatar-img" [alt]="dcs.display_name">
-                <span *ngIf="!dcs.avatar_url">{{ initials(dcs.display_name) }}</span>
-              </div>
-              <!-- S-034: name + role pill on same horizontal line -->
-              <div class="drp-dcs-name-row">
-                <span class="drp-dcs-name">{{ dcs.display_name }}</span>
-                <span class="drp-role-pill">{{ personTypeLabel }}</span>
-                <span *ngIf="dcs.initiatives.length > 0" class="drp-count-badge">{{ dcs.initiatives.length }}</span>
-              </div>
-              <!-- Add All button — skips initiatives already in meeting.
-                   Disabled (not hidden) when every initiative is already added. -->
-              <button *ngIf="dcs.initiatives.length > 0"
-                      class="drp-add-all-btn"
-                      type="button"
-                      [disabled]="isAddingAll(dcs.id) || allAdded(dcs)"
-                      [title]="allAdded(dcs) ? 'All initiatives already in this meeting' : ''"
-                      (click)="addAllToMeeting(dcs, $event)">
-                {{ allAdded(dcs) ? 'All Added ✓' : addAllLabel(dcs.id) }}
-              </button>
-              <span class="drp-chevron">{{ isDcsExpanded(dcs.id) ? '▾' : '▸' }}</span>
-            </div>
-
-            <!-- Initiative list (expanded) -->
-            <div *ngIf="isDcsExpanded(dcs.id)" class="drp-initiatives">
-              <div *ngIf="dcs.initiatives.length === 0" class="drp-no-initiatives">
-                No active initiatives
-              </div>
-              <div *ngFor="let init of dcs.initiatives"
-                   class="drp-initiative-row"
-                   [class.drp-initiative-checked]="isInitiativeAdded(init.id)"
-                   (click)="!isInitiativeAdded(init.id) && addToMeeting(init); $event.stopPropagation()"
-                   [attr.role]="isInitiativeAdded(init.id) ? null : 'button'"
-                   [attr.tabindex]="isInitiativeAdded(init.id) ? null : 0"
-                   (keydown.enter)="!isInitiativeAdded(init.id) && addToMeeting(init)">
-                <!-- Checkbox -->
-                <span class="drp-checkbox"
-                      [class.drp-checkbox-checked]="isInitiativeAdded(init.id)"
-                      [title]="isInitiativeAdded(init.id) ? 'In meeting' : 'Add to meeting'">
-                  <span *ngIf="isInitiativeAdded(init.id)" class="drp-checkmark">✓</span>
-                </span>
-                <!-- D-419 status dot -->
-                <span class="drp-status-dot"
-                      [style.background]="gateStatusColor(init.gate_status)"
-                      [title]="gateStatusLabel(init.gate_status)">
-                </span>
-                <!-- Name (tappable for detail) -->
-                <span class="drp-initiative-name drp-initiative-link"
-                      role="button"
-                      tabindex="0"
-                      (click)="initiativeSelected.emit(init.id); $event.stopPropagation()"
-                      (keydown.enter)="initiativeSelected.emit(init.id)">
-                  {{ init.name }}
-                </span>
-                <!-- Stage badge -->
-                <span class="drp-stage-badge">{{ init.stage }}</span>
-              </div>
-            </div>
+          <!-- Participants -->
+          <div *ngIf="participants.length === 0" class="drp-empty">
+            No participants in this series yet.
           </div>
+          <ng-container *ngFor="let person of participants">
+            <ng-container *ngTemplateOutlet="personBlock; context: { person: person, isParticipant: true }"></ng-container>
+          </ng-container>
+
+          <!-- Others (toggle OFF) -->
+          <ng-container *ngIf="!participantsOnly">
+            <div class="drp-divider">Others — {{ personTypeLabel }}</div>
+            <div *ngIf="others.length === 0" class="drp-empty">
+              No additional {{ personTypeLabel }} users found.
+            </div>
+            <ng-container *ngFor="let person of others">
+              <ng-container *ngTemplateOutlet="personBlock; context: { person: person, isParticipant: false }"></ng-container>
+            </ng-container>
+          </ng-container>
         </ng-container>
       </div>
     </div>
+
+    <!-- Shared person row + initiative list -->
+    <ng-template #personBlock let-person="person" let-isParticipant="isParticipant">
+      <div class="drp-dcs-block">
+        <div class="drp-dcs-row"
+             role="button"
+             tabindex="0"
+             (click)="togglePerson(person.id)"
+             (keydown.enter)="togglePerson(person.id)">
+          <!-- S-034: avatar 32px -->
+          <div class="drp-avatar"
+               [style.background]="person.avatar_url ? 'transparent' : avatarColor(person.id)">
+            <img *ngIf="person.avatar_url" [src]="person.avatar_url" class="drp-avatar-img" [alt]="person.display_name">
+            <span *ngIf="!person.avatar_url">{{ initials(person.display_name) }}</span>
+          </div>
+          <!-- S-034: name + pills on same horizontal line -->
+          <div class="drp-dcs-name-row">
+            <span class="drp-dcs-name">{{ person.display_name }}</span>
+            <span *ngIf="person.is_leader" class="drp-role-pill drp-leader-pill">Leader</span>
+            <span *ngIf="!isParticipant" class="drp-role-pill">{{ personTypeLabel }}</span>
+            <span *ngIf="person.initiatives.length > 0" class="drp-count-badge">{{ person.initiatives.length }}</span>
+          </div>
+          <!-- Add All — disabled (not hidden) when every initiative is already added -->
+          <button *ngIf="person.initiatives.length > 0"
+                  class="drp-add-all-btn"
+                  type="button"
+                  [disabled]="isAddingAll(person.id) || allAdded(person)"
+                  [title]="allAdded(person) ? 'All initiatives already in this meeting' : ''"
+                  (click)="addAllToMeeting(person, $event)">
+            {{ allAdded(person) ? 'All Added ✓' : addAllLabel(person.id) }}
+          </button>
+          <span class="drp-chevron">{{ isPersonExpanded(person.id) ? '▾' : '▸' }}</span>
+        </div>
+
+        <!-- Initiative list (expanded) -->
+        <div *ngIf="isPersonExpanded(person.id)" class="drp-initiatives">
+          <div *ngIf="person.initiatives.length === 0" class="drp-no-initiatives">
+            No active initiatives
+          </div>
+          <div *ngFor="let init of person.initiatives"
+               class="drp-initiative-row"
+               [class.drp-initiative-checked]="isInitiativeAdded(init.id)"
+               (click)="!isInitiativeAdded(init.id) && addToMeeting(init); $event.stopPropagation()"
+               [attr.role]="isInitiativeAdded(init.id) ? null : 'button'"
+               [attr.tabindex]="isInitiativeAdded(init.id) ? null : 0"
+               (keydown.enter)="!isInitiativeAdded(init.id) && addToMeeting(init)">
+            <span class="drp-checkbox"
+                  [class.drp-checkbox-checked]="isInitiativeAdded(init.id)"
+                  [title]="isInitiativeAdded(init.id) ? 'In meeting' : 'Add to meeting'">
+              <span *ngIf="isInitiativeAdded(init.id)" class="drp-checkmark">✓</span>
+            </span>
+            <span class="drp-status-dot"
+                  [style.background]="gateStatusColor(init.gate_status)"
+                  [title]="gateStatusLabel(init.gate_status)">
+            </span>
+            <span class="drp-initiative-name drp-initiative-link"
+                  role="button"
+                  tabindex="0"
+                  (click)="initiativeSelected.emit(init.id); $event.stopPropagation()"
+                  (keydown.enter)="initiativeSelected.emit(init.id)">
+              {{ init.name }}
+            </span>
+            <span class="drp-stage-badge">{{ init.stage }}</span>
+          </div>
+        </div>
+      </div>
+    </ng-template>
   `,
   styles: [`
     .drp-panel {
@@ -195,6 +231,21 @@ function avatarColor(id: string): string {
       font-size: 14px; color: #757575; padding: 2px 6px;
     }
     .drp-body { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .drp-toggle-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px 4px;
+      font: 12px Roboto, sans-serif; color: #5A5A5A;
+      cursor: pointer; user-select: none;
+    }
+    .drp-divider {
+      margin: 10px 12px 2px;
+      padding-top: 8px;
+      border-top: 1px solid #E0E0E0;
+      font: 600 10px Roboto, sans-serif;
+      color: #9E9E9E;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
     .drp-skeleton-row {
       height: 48px; margin: 4px 12px;
       background: linear-gradient(90deg, #EEEEEE 25%, #E5E5E5 50%, #EEEEEE 75%);
@@ -204,17 +255,15 @@ function avatarColor(id: string): string {
     }
     @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
     .drp-error, .drp-empty {
-      padding: 16px; font-size: 13px; color: #757575;
+      padding: 12px 16px; font-size: 13px; color: #757575;
     }
     .drp-dcs-block { border-bottom: 1px solid #F0F0F0; }
-    /* D-415/S-034: compact person row */
     .drp-dcs-row {
       display: flex; align-items: center; gap: 10px;
       padding: 8px 12px; cursor: pointer;
       transition: background 0.1s;
     }
     .drp-dcs-row:hover { background: #F0F5F8; }
-    /* S-034: avatar 32px */
     .drp-avatar {
       width: 32px; height: 32px;
       border-radius: 50%;
@@ -225,7 +274,6 @@ function avatarColor(id: string): string {
       overflow: hidden;
     }
     .drp-avatar-img { width: 100%; height: 100%; object-fit: cover; }
-    /* S-034: name + role pill on same line */
     .drp-dcs-name-row {
       display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;
     }
@@ -236,6 +284,7 @@ function avatarColor(id: string): string {
       border-radius: 999px; padding: 1px 7px;
       white-space: nowrap;
     }
+    .drp-leader-pill { background: #257099; color: #fff; }
     .drp-count-badge {
       background: #257099; color: #fff;
       border-radius: 999px; padding: 0 6px;
@@ -273,8 +322,7 @@ function avatarColor(id: string): string {
       border-color: var(--triarq-color-primary, #257099);
     }
     .drp-checkmark { font-size: 10px; color: #fff; line-height: 1; }
-    /* Person type pills */
-    .drp-type-row { display: flex; gap: 6px; padding: 8px 12px 4px; }
+    .drp-type-row { display: flex; gap: 6px; padding: 4px 12px; }
     .drp-type-pill {
       background: #fff; border: 1px solid #BDBDBD; border-radius: 999px;
       color: #5A5A5A; padding: 2px 12px; font: 500 11px Roboto, sans-serif;
@@ -285,7 +333,6 @@ function avatarColor(id: string): string {
       border-color: var(--triarq-color-primary, #257099);
       color: #fff;
     }
-    /* D-419 status dot */
     .drp-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .drp-initiative-name { font: 13px Roboto, sans-serif; color: #1A1A1A; flex: 1; min-width: 0; }
     .drp-initiative-link { cursor: pointer; }
@@ -299,59 +346,71 @@ function avatarColor(id: string): string {
     .drp-link-btn { background: none; border: none; color: var(--triarq-color-primary, #257099); cursor: pointer; text-decoration: underline; font-size: 12px; }
   `]
 })
-export class DcsReferencePanelComponent implements OnInit, OnChanges {
+export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy {
   @Input()  initiativesGatesSectionId!: string;
   @Input()  existingInitiativeIds: Set<string> = new Set();
-  // Tracks Phase B: person type — groups the panel by DCS, DOL, or EPO.
-  // Seeded from the series' remembered choice; any participant may switch live.
-  @Input()  personType: 'dcs' | 'dol' | 'epo' = 'dcs';
-  @Output() bulletAdded          = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string }>();
-  @Output() initiativeSelected   = new EventEmitter<string>();
+  // Series default person type (leader-persisted). A per-user saved choice overrides it.
+  @Input()  personType: RefPanelPersonType = 'dcs';
+  // Track scope for the participant-aware listing + per-user view memory.
+  @Input()  trackId = '';
+  @Output() bulletAdded        = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string }>();
+  @Output() initiativeSelected = new EventEmitter<string>();
   // Fires when a user switches the type — parent persists to the series if leader.
-  @Output() personTypeChanged    = new EventEmitter<'dcs' | 'dol' | 'epo'>();
+  @Output() personTypeChanged  = new EventEmitter<RefPanelPersonType>();
 
-  readonly personTypeOptions: ('dcs' | 'dol' | 'epo')[] = ['dcs', 'dol', 'epo'];
+  readonly personTypeOptions: RefPanelPersonType[] = ['dcs', 'dol', 'epo'];
 
-  get personTypeLabel(): string { return this.personType.toUpperCase(); }
-
-  selectPersonType(pt: 'dcs' | 'dol' | 'epo'): void {
-    if (pt === this.personType) return;
-    this.personType = pt;
-    this.load();
-    this.personTypeChanged.emit(pt);
-  }
-
-  dcsUsers:  DcsUserWithInitiatives[] = [];
+  participants: RefPanelPerson[] = [];
+  others:       RefPanelPerson[] = [];
+  participantsOnly = true;
   loading    = false;
   loadError  = '';
   collapsed  = false;
 
-  private expandedDcsIds  = new Set<string>();
-  private addingIds       = new Set<string>();
-  private addedIds        = new Map<string, ReturnType<typeof setTimeout>>();
-  private addingAllIds    = new Set<string>();
-  private addedAllIds     = new Map<string, ReturnType<typeof setTimeout>>();
+  // Per-person expand/collapse. Loaded from saved state; defaults applied on load:
+  // leaders collapsed, non-leader participants expanded, others collapsed.
+  private expandedById: Record<string, boolean> = {};
+  // True once the user (or their saved state) chose a type — series-default changes stop applying.
+  private userChoseType = false;
+
+  private addingIds    = new Set<string>();
+  private addedIds     = new Map<string, ReturnType<typeof setTimeout>>();
+  private addingAllIds = new Set<string>();
+  private addedAllIds  = new Map<string, ReturnType<typeof setTimeout>>();
+
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  // Full saved byTrack map — read-modify-write so other tracks' state survives.
+  private savedByTrack: Record<string, RefPanelTrackState> = {};
 
   // Expose helpers to template.
-  readonly gateStatusColor  = gateStatusColor;
-  readonly gateStatusLabel  = gateStatusLabel;
-  readonly initials         = initials;
-  readonly avatarColor      = avatarColor;
+  readonly gateStatusColor = gateStatusColor;
+  readonly gateStatusLabel = gateStatusLabel;
+  readonly initials        = initials;
+  readonly avatarColor     = avatarColor;
+
+  get personTypeLabel(): string { return this.personType.toUpperCase(); }
 
   constructor(
-    private readonly svc: TeamMeetingsService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly svc:         TeamMeetingsService,
+    private readonly screenState: ScreenStateService,
+    private readonly cdr:         ChangeDetectorRef
   ) {}
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    this.restoreState().then(() => this.load());
+  }
+
+  ngOnDestroy(): void {
+    if (this.saveTimer) { clearTimeout(this.saveTimer); this.flushState(); }
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['personType'] && !changes['personType'].firstChange) {
+    if (changes['personType'] && !changes['personType'].firstChange && !this.userChoseType) {
+      // Series default changed elsewhere and this user has no override — follow it.
       this.load();
     }
     if (changes['existingInitiativeIds']) {
-      // Remove from optimistic addedIds any initiative no longer in the meeting.
-      // This fires when a bullet is removed via × so the checkbox unchecks.
+      // Unchecks checkboxes when a bullet is removed via ×.
       for (const id of Array.from(this.addedIds.keys())) {
         if (!this.existingInitiativeIds.has(id)) this.addedIds.delete(id);
       }
@@ -359,30 +418,90 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges {
     }
   }
 
+  // ── Per-user view memory (Option A) ─────────────────────────────────────────
+  private async restoreState(): Promise<void> {
+    if (!this.trackId) return;
+    const saved = await this.screenState.restore(SCREEN_KEYS.TEAM_MEETINGS_REF_PANEL);
+    const byTrack = (saved?.filter_state?.['byTrack'] ?? {}) as Record<string, RefPanelTrackState>;
+    this.savedByTrack = byTrack;
+    const s = byTrack[this.trackId];
+    if (!s) return;
+    if (s.participants_only !== undefined) this.participantsOnly = !!s.participants_only;
+    if (s.person_type) {
+      this.personType    = s.person_type;
+      this.userChoseType = true;
+    }
+    if (s.expanded) this.expandedById = { ...s.expanded };
+    this.cdr.markForCheck();
+  }
+
+  private queueSave(): void {
+    if (!this.trackId) return;
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.flushState(), SAVE_DEBOUNCE_MS);
+  }
+
+  private flushState(): void {
+    this.saveTimer = null;
+    if (!this.trackId) return;
+    this.savedByTrack[this.trackId] = {
+      participants_only: this.participantsOnly,
+      ...(this.userChoseType ? { person_type: this.personType } : {}),
+      expanded: this.expandedById
+    };
+    this.screenState.save(SCREEN_KEYS.TEAM_MEETINGS_REF_PANEL, { byTrack: this.savedByTrack });
+  }
+
+  // ── Data ────────────────────────────────────────────────────────────────────
   load(): void {
+    if (!this.trackId) return;
     this.loading   = true;
     this.loadError = '';
     this.cdr.markForCheck();
-    this.svc.listDcsUsersWithInitiatives(this.personType).subscribe({
+    this.svc.listTrackInitiativeReference(this.trackId, this.personType).subscribe({
       next: res => {
-        if (res.success) {
-          this.dcsUsers = res.data ?? [];
-          // Auto-expand first DCS if only one.
-          if (this.dcsUsers.length === 1) {
-            this.expandedDcsIds.add(this.dcsUsers[0].id);
-          }
+        if (res.success && res.data) {
+          this.participants = res.data.participants ?? [];
+          this.others       = res.data.others ?? [];
+          this.applyDefaultExpansion();
         } else {
-          this.loadError = res.error ?? 'Failed to load DCS data.';
+          this.loadError = res.error ?? 'Failed to load initiative reference.';
         }
         this.loading = false;
         this.cdr.markForCheck();
       },
       error: err => {
-        this.loadError = err?.error ?? 'Unable to load DCS data.';
+        this.loadError = err?.error ?? 'Unable to load initiative reference.';
         this.loading   = false;
         this.cdr.markForCheck();
       }
     });
+  }
+
+  /** Defaults for people with no saved state: leaders collapsed, participants expanded, others collapsed. */
+  private applyDefaultExpansion(): void {
+    for (const p of this.participants) {
+      if (!(p.id in this.expandedById)) this.expandedById[p.id] = !p.is_leader;
+    }
+    for (const o of this.others) {
+      if (!(o.id in this.expandedById)) this.expandedById[o.id] = false;
+    }
+  }
+
+  // ── View state ──────────────────────────────────────────────────────────────
+  toggleParticipantsOnly(): void {
+    this.participantsOnly = !this.participantsOnly;
+    this.cdr.markForCheck();
+    this.queueSave();
+  }
+
+  selectPersonType(pt: RefPanelPersonType): void {
+    if (pt === this.personType) return;
+    this.personType    = pt;
+    this.userChoseType = true;
+    this.load();
+    this.queueSave();
+    this.personTypeChanged.emit(pt);
   }
 
   toggleCollapsed(): void {
@@ -390,39 +509,35 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges {
     this.cdr.markForCheck();
   }
 
-  toggleDcs(id: string): void {
-    if (this.expandedDcsIds.has(id)) this.expandedDcsIds.delete(id);
-    else                              this.expandedDcsIds.add(id);
+  togglePerson(id: string): void {
+    this.expandedById[id] = !this.expandedById[id];
     this.cdr.markForCheck();
+    this.queueSave();
   }
 
-  isDcsExpanded(id: string): boolean  { return this.expandedDcsIds.has(id); }
-  isAdding(id: string): boolean        { return this.addingIds.has(id); }
-  isAddingAll(dcsId: string): boolean  { return this.addingAllIds.has(dcsId); }
+  isPersonExpanded(id: string): boolean { return !!this.expandedById[id]; }
+  isAddingAll(id: string): boolean      { return this.addingAllIds.has(id); }
 
   isInitiativeAdded(id: string): boolean {
     return this.existingInitiativeIds.has(id) || this.addedIds.has(id);
   }
 
-  allAdded(dcs: DcsUserWithInitiatives): boolean {
-    return dcs.initiatives.length > 0 && dcs.initiatives.every(i => this.isInitiativeAdded(i.id));
+  allAdded(person: RefPanelPerson): boolean {
+    return person.initiatives.length > 0 && person.initiatives.every(i => this.isInitiativeAdded(i.id));
   }
 
-  addedLabel(initiativeId: string): string {
-    return this.addedIds.has(initiativeId) ? 'Added ✓' : '+ Add';
+  addAllLabel(personId: string): string {
+    return this.addedAllIds.has(personId) ? 'All Added ✓' : '+ Add All';
   }
 
-  addAllLabel(dcsId: string): string {
-    return this.addedAllIds.has(dcsId) ? 'All Added ✓' : '+ Add All';
-  }
-
-  addAllToMeeting(dcs: DcsUserWithInitiatives, event: Event): void {
+  // ── Add to meeting ──────────────────────────────────────────────────────────
+  addAllToMeeting(person: RefPanelPerson, event: Event): void {
     event.stopPropagation();
-    if (!this.initiativesGatesSectionId || this.addingAllIds.has(dcs.id)) return;
-    const toAdd = dcs.initiatives.filter(i => !this.existingInitiativeIds.has(i.id));
+    if (!this.initiativesGatesSectionId || this.addingAllIds.has(person.id)) return;
+    const toAdd = person.initiatives.filter(i => !this.isInitiativeAdded(i.id));
     if (!toAdd.length) return;
 
-    this.addingAllIds.add(dcs.id);
+    this.addingAllIds.add(person.id);
     this.cdr.markForCheck();
 
     toAdd.forEach(init => {
@@ -431,14 +546,13 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges {
         initiative_id:   init.id,
         initiative_name: init.name
       });
-      // Mark individual add buttons added too.
       const t = setTimeout(() => { this.addedIds.delete(init.id); this.cdr.markForCheck(); }, 2500);
       this.addedIds.set(init.id, t);
     });
 
-    this.addingAllIds.delete(dcs.id);
-    const at = setTimeout(() => { this.addedAllIds.delete(dcs.id); this.cdr.markForCheck(); }, 2500);
-    this.addedAllIds.set(dcs.id, at);
+    this.addingAllIds.delete(person.id);
+    const at = setTimeout(() => { this.addedAllIds.delete(person.id); this.cdr.markForCheck(); }, 2500);
+    this.addedAllIds.set(person.id, at);
     this.cdr.markForCheck();
   }
 
@@ -453,7 +567,6 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges {
       initiative_name: init.name
     });
 
-    // Optimistic feedback — parent confirms success; revert timer for UI label.
     const timer = setTimeout(() => {
       this.addedIds.delete(init.id);
       this.cdr.markForCheck();

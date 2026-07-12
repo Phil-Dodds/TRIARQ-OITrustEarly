@@ -71,6 +71,9 @@ export const SCREEN_KEYS = {
   MY_INITIATIVE_STATUS_DUE:             'my-initiative-status.due',
   MY_INITIATIVE_STATUS_ACKNOWLEDGMENTS: 'my-initiative-status.acknowledgments',
   INITIATIVE_STATUS_DASHBOARD:          'initiative-status-dashboard',
+  // Tracks (session 2026-07-11): per-user Initiative Reference panel view state.
+  // filter_state.byTrack = { [track_id]: { participants_only, person_type, expanded } }.
+  TEAM_MEETINGS_REF_PANEL:              'team-meetings.ref-panel',
 } as const;
 
 export type ScreenKey = typeof SCREEN_KEYS[keyof typeof SCREEN_KEYS];

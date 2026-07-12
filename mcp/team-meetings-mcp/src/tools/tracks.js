@@ -782,6 +782,171 @@ async function delete_catalog_section(params, caller_user_id) {
   return { success: true, data: { id } };
 }
 
+// ── list_track_initiative_reference ────────────────────────────────────────────
+// Reference panel data, participant-aware (session 2026-07-11 design).
+// participants: active track members (leaders + members), each with initiatives
+//   merged across ALL THREE assignment roles (DCS + DOL + EPO), deduped.
+// others: all users with the requested person-type flag who are NOT participants,
+//   with initiatives from that role's column only.
+// Division scoping matches list_dcs_users_with_initiatives (admins see all).
+const REF_WALKBACK_CHAIN = ['go_to_deploy', 'go_to_build', 'brief_review'];
+const REF_PERSON_TYPES = {
+  dcs: { flag: 'is_dcs', column: 'assigned_dcs_user_id' },
+  dol: { flag: 'is_dol', column: 'assigned_dol_user_id' },
+  epo: { flag: 'is_epo', column: 'assigned_epo_user_id' }
+};
+const REF_ALL_COLUMNS = ['assigned_dcs_user_id', 'assigned_dol_user_id', 'assigned_epo_user_id'];
+
+function refResolveGateStatus(milestoneDates) {
+  for (const gate of REF_WALKBACK_CHAIN) {
+    const m = (milestoneDates || []).find(x => x.gate_name === gate);
+    if (!m || !m.date_status) continue;
+    if (m.date_status === 'not_started') continue;
+    if (m.date_status === 'skipped')     continue;
+    return m.date_status;
+  }
+  return 'not_started';
+}
+
+async function list_track_initiative_reference(params, caller_user_id) {
+  const { track_id } = params;
+  if (!track_id) return { success: false, error: 'track_id is required.' };
+  const personType = REF_PERSON_TYPES[params.person_type || 'dcs'];
+  if (!personType) return { success: false, error: 'person_type must be dcs, dol, or epo.' };
+
+  const access = await assertTrackAccess(track_id, caller_user_id);
+  if (access.error) return { success: false, error: access.error };
+  const caller = access.caller;
+
+  // Division scope (admins = all divisions).
+  let accessible_division_ids = null;
+  if (!caller.is_admin) {
+    const { data: dm } = await supabase
+      .from('division_memberships')
+      .select('division_id')
+      .eq('user_id', caller_user_id)
+      .is('revoked_at', null)
+      .is('deleted_at', null);
+    accessible_division_ids = (dm || []).map(m => m.division_id);
+  }
+
+  // Participants: active track members + user rows.
+  const { data: memberRows, error: memErr } = await supabase
+    .from('team_meeting_track_members')
+    .select('user_id, is_leader')
+    .eq('track_id', track_id)
+    .is('deleted_at', null);
+  if (memErr) return { success: false, error: memErr.message };
+
+  const memberIds = (memberRows || []).map(m => m.user_id);
+  const leaderById = {};
+  (memberRows || []).forEach(m => { leaderById[m.user_id] = m.is_leader; });
+
+  let memberUsers = [];
+  if (memberIds.length) {
+    const { data } = await supabase
+      .from('users')
+      .select('id, display_name')
+      .in('id', memberIds)
+      .is('deleted_at', null)
+      .order('display_name', { ascending: true });
+    memberUsers = data || [];
+  }
+
+  // Others: person-type-flagged users not in the track.
+  const { data: typedUsers, error: typedErr } = await supabase
+    .from('users')
+    .select('id, display_name')
+    .eq(personType.flag, true)
+    .is('deleted_at', null)
+    .order('display_name', { ascending: true });
+  if (typedErr) return { success: false, error: typedErr.message };
+  const otherUsers = (typedUsers || []).filter(u => !memberIds.includes(u.id));
+  const otherIds = otherUsers.map(u => u.id);
+
+  // Cycles for participants (any role column) — one OR query.
+  let participantCycles = [];
+  if (memberIds.length) {
+    const idList = memberIds.join(',');
+    let q = supabase
+      .from('delivery_cycles')
+      .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, assigned_dcs_user_id, assigned_dol_user_id, assigned_epo_user_id, division_id')
+      .or(REF_ALL_COLUMNS.map(c => `${c}.in.(${idList})`).join(','))
+      .neq('current_lifecycle_stage', 'closed')
+      .is('deleted_at', null)
+      .order('cycle_title', { ascending: true });
+    if (accessible_division_ids !== null) q = q.in('division_id', accessible_division_ids);
+    const { data, error } = await q;
+    if (error) return { success: false, error: error.message };
+    participantCycles = data || [];
+  }
+
+  // Cycles for others (person-type column only).
+  let otherCycles = [];
+  if (otherIds.length) {
+    let q = supabase
+      .from('delivery_cycles')
+      .select(`delivery_cycle_id, cycle_title, current_lifecycle_stage, ${personType.column}, division_id`)
+      .in(personType.column, otherIds)
+      .neq('current_lifecycle_stage', 'closed')
+      .is('deleted_at', null)
+      .order('cycle_title', { ascending: true });
+    if (accessible_division_ids !== null) q = q.in('division_id', accessible_division_ids);
+    const { data, error } = await q;
+    if (error) return { success: false, error: error.message };
+    otherCycles = data || [];
+  }
+
+  // Enrichment: milestones + last status date across all cycles.
+  const allCycleIds = [...new Set([...participantCycles, ...otherCycles].map(c => c.delivery_cycle_id))];
+  let milestonesByCycle = {}, lastStatusDateByCycle = {};
+  if (allCycleIds.length) {
+    const { data: milestones } = await supabase
+      .from('cycle_milestone_dates')
+      .select('delivery_cycle_id, gate_name, date_status')
+      .in('delivery_cycle_id', allCycleIds)
+      .is('deleted_at', null);
+    (milestones || []).forEach(m => {
+      (milestonesByCycle[m.delivery_cycle_id] = milestonesByCycle[m.delivery_cycle_id] || []).push(m);
+    });
+    const { data: statusRows } = await supabase
+      .from('initiative_status_updates')
+      .select('delivery_cycle_id, created_at')
+      .in('delivery_cycle_id', allCycleIds)
+      .order('created_at', { ascending: false });
+    (statusRows || []).forEach(s => {
+      if (!lastStatusDateByCycle[s.delivery_cycle_id]) lastStatusDateByCycle[s.delivery_cycle_id] = s.created_at;
+    });
+  }
+
+  const toRef = c => ({
+    id:                      c.delivery_cycle_id,
+    name:                    c.cycle_title,
+    stage:                   c.current_lifecycle_stage,
+    gate_status:             refResolveGateStatus(milestonesByCycle[c.delivery_cycle_id] || []),
+    last_status_update_date: lastStatusDateByCycle[c.delivery_cycle_id] ?? null
+  });
+
+  const participants = memberUsers.map(u => {
+    const seen = new Set();
+    const initiatives = participantCycles
+      .filter(c => REF_ALL_COLUMNS.some(col => c[col] === u.id))
+      .filter(c => { if (seen.has(c.delivery_cycle_id)) return false; seen.add(c.delivery_cycle_id); return true; })
+      .map(toRef);
+    return { id: u.id, display_name: u.display_name, is_leader: !!leaderById[u.id], avatar_url: null, initiatives };
+  });
+
+  const others = otherUsers.map(u => ({
+    id: u.id,
+    display_name: u.display_name,
+    is_leader: false,
+    avatar_url: null,
+    initiatives: otherCycles.filter(c => c[personType.column] === u.id).map(toRef)
+  }));
+
+  return { success: true, data: { participants, others } };
+}
+
 // ── get_latest_meeting — series URL entry point ────────────────────────────────
 async function get_latest_meeting(params, caller_user_id) {
   const { track_id } = params;
@@ -839,5 +1004,6 @@ module.exports = {
   save_catalog_section,
   delete_catalog_section,
   get_latest_meeting,
-  meeting_changed_since
+  meeting_changed_since,
+  list_track_initiative_reference
 };

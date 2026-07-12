@@ -158,6 +158,27 @@ export interface DcsUserWithInitiatives {
   initiatives:  DcsInitiativeRef[];
 }
 
+// Participant-aware reference panel payload (session 2026-07-11 design).
+export interface RefPanelPerson {
+  id:           string;
+  display_name: string;
+  is_leader:    boolean;
+  avatar_url:   string | null;
+  initiatives:  DcsInitiativeRef[];
+}
+
+export interface TrackInitiativeReference {
+  participants: RefPanelPerson[];
+  others:       RefPanelPerson[];
+}
+
+// Per-user, per-track remembered reference panel view state (Option A).
+export interface RefPanelTrackState {
+  participants_only?: boolean;
+  person_type?:       RefPanelPersonType;
+  expanded?:          Record<string, boolean>;
+}
+
 export const PERSON_TYPE_LABELS: Record<RefPanelPersonType, string> = {
   dcs: 'DCS',
   dol: 'DOL',

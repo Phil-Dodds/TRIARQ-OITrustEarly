@@ -13,6 +13,7 @@ import {
   TeamMeetingNotes,
   DcsUserWithInitiatives,
   TrackListItem,
+  TrackInitiativeReference,
   TrackDetail,
   TrackSection,
   PublicTrackListItem,
@@ -78,6 +79,10 @@ export class TeamMeetingsService {
 
   listDcsUsersWithInitiatives(person_type: RefPanelPersonType = 'dcs'): Observable<McpResponse<DcsUserWithInitiatives[]>> {
     return this.mcp.call<DcsUserWithInitiatives[]>('team-meetings', 'list_dcs_users_with_initiatives', { person_type });
+  }
+
+  listTrackInitiativeReference(track_id: string, person_type: RefPanelPersonType): Observable<McpResponse<TrackInitiativeReference>> {
+    return this.mcp.call<TrackInitiativeReference>('team-meetings', 'list_track_initiative_reference', { track_id, person_type });
   }
 
   updateMeeting(meeting_id: string, title: string, meeting_date?: string): Observable<McpResponse<{ id: string; title: string; meeting_date: string; updated_at: string }>> {
