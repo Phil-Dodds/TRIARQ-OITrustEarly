@@ -52,6 +52,7 @@ export interface TeamMeetingTrackContext {
   track_name:            string;
   ref_panel_person_type: RefPanelPersonType;
   is_leader:             boolean;
+  member_count:          number;
 }
 
 export interface TeamMeeting {

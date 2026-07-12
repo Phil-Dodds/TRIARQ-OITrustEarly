@@ -132,8 +132,11 @@ interface InitiativeSearchResult {
                   </div>
                   <div *ngFor="let bullet of section.bullets" class="tmd-bullet-row">
                     <div class="tmd-bullet-main-row">
-                    <span class="tmd-bullet-dot" [style.background]="section.bar_color"
-                          [title]="bullet.created_by_display_name ? 'Added by ' + bullet.created_by_display_name : ''"></span>
+                    <span class="tmd-bullet-dot" [style.background]="section.bar_color"></span>
+                    <!-- Contributor initials — Phase D attribution. Hidden on single-member series. -->
+                    <span *ngIf="bullet.created_by_display_name && (meeting.track?.member_count ?? 0) > 1"
+                          class="tmd-bullet-author"
+                          [title]="'Added by ' + bullet.created_by_display_name">{{ initials(bullet.created_by_display_name) }}</span>
                     <!-- Initiative chip (tappable per D-478/S-021) -->
                     <span *ngIf="bullet.initiative" class="tmd-initiative-chip"
                           role="button" tabindex="0"
@@ -339,6 +342,13 @@ interface InitiativeSearchResult {
     .tmd-bullet-note-readonly { margin:2px 0 0 14px; font:italic 12px Roboto; color:#757575;
     }
     .tmd-bullet-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .tmd-bullet-author {
+      flex-shrink: 0;
+      background: #F0F0F0; color: #757575;
+      border-radius: 999px; padding: 1px 6px;
+      font: 500 9px Roboto; letter-spacing: 0.04em;
+      cursor: default;
+    }
     .tmd-initiative-chip {
       font: 500 13px Roboto;
       color: var(--triarq-color-primary, #257099);
@@ -591,6 +601,10 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
 
   getNotes(section: TeamMeetingSection): string {
     return section.notes?.notes_text ?? '';
+  }
+
+  initials(name: string): string {
+    return name.split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join('');
   }
 
   // ── Section collapse ────────────────────────────────────────────────────────

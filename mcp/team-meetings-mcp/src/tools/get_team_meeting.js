@@ -56,8 +56,9 @@ async function get_team_meeting(params, caller_user_id) {
   if (access.error) return { success: false, error: access.error };
   const { meeting, membership, caller } = access;
 
-  // Track context.
+  // Track context (member_count drives contributor-initials visibility in the UI).
   let track = null;
+  let memberCount = 0;
   if (meeting.track_id) {
     const { data: t } = await supabase
       .from('team_meeting_tracks')
@@ -65,6 +66,12 @@ async function get_team_meeting(params, caller_user_id) {
       .eq('track_id', meeting.track_id)
       .maybeSingle();
     track = t || null;
+    const { count } = await supabase
+      .from('team_meeting_track_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('track_id', meeting.track_id)
+      .is('deleted_at', null);
+    memberCount = count ?? 0;
   }
   const personType = track?.ref_panel_person_type || 'dcs';
   const assignedColumn = PERSON_TYPE_COLUMN[personType];
@@ -206,7 +213,8 @@ async function get_team_meeting(params, caller_user_id) {
         track_id:              track.track_id,
         track_name:            track.track_name,
         ref_panel_person_type: track.ref_panel_person_type,
-        is_leader:             !!membership?.is_leader || caller.is_admin
+        is_leader:             !!membership?.is_leader || caller.is_admin,
+        member_count:          memberCount
       } : null,
       sections: enrichedSections
     }
