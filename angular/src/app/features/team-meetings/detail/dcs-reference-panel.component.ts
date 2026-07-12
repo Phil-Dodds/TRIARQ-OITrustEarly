@@ -114,13 +114,15 @@ function avatarColor(id: string): string {
                 <span class="drp-role-pill">{{ personTypeLabel }}</span>
                 <span *ngIf="dcs.initiatives.length > 0" class="drp-count-badge">{{ dcs.initiatives.length }}</span>
               </div>
-              <!-- Add All button — skips initiatives already in meeting -->
+              <!-- Add All button — skips initiatives already in meeting.
+                   Disabled (not hidden) when every initiative is already added. -->
               <button *ngIf="dcs.initiatives.length > 0"
                       class="drp-add-all-btn"
                       type="button"
-                      [disabled]="isAddingAll(dcs.id)"
+                      [disabled]="isAddingAll(dcs.id) || allAdded(dcs)"
+                      [title]="allAdded(dcs) ? 'All initiatives already in this meeting' : ''"
                       (click)="addAllToMeeting(dcs, $event)">
-                {{ addAllLabel(dcs.id) }}
+                {{ allAdded(dcs) ? 'All Added ✓' : addAllLabel(dcs.id) }}
               </button>
               <span class="drp-chevron">{{ isDcsExpanded(dcs.id) ? '▾' : '▸' }}</span>
             </div>
@@ -400,6 +402,10 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges {
 
   isInitiativeAdded(id: string): boolean {
     return this.existingInitiativeIds.has(id) || this.addedIds.has(id);
+  }
+
+  allAdded(dcs: DcsUserWithInitiatives): boolean {
+    return dcs.initiatives.length > 0 && dcs.initiatives.every(i => this.isInitiativeAdded(i.id));
   }
 
   addedLabel(initiativeId: string): string {
