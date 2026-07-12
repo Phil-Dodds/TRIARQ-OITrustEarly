@@ -530,10 +530,17 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     return this.meeting?.sections.find(s => s.section_key === 'initiatives-gates')?.id ?? '';
   }
 
-  // Initiative IDs already present in the initiatives-gates section — used by DCS panel for collision guard.
+  // Initiative IDs already present ANYWHERE in the meeting — presenter routing
+  // means initiatives can live in any section, and the panel checkbox reflects
+  // "in this meeting", not "in one particular section".
   get existingInitiativeIds(): Set<string> {
-    const sec = this.meeting?.sections.find(s => s.section_key === 'initiatives-gates');
-    return new Set((sec?.bullets ?? []).map(b => b.initiative?.id).filter((id): id is string => !!id));
+    const ids = new Set<string>();
+    for (const s of this.meeting?.sections ?? []) {
+      for (const b of s.bullets) {
+        if (b.initiative?.id) ids.add(b.initiative.id);
+      }
+    }
+    return ids;
   }
 
   private meetingId = '';

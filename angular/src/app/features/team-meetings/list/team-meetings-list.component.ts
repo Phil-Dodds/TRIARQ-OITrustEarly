@@ -448,6 +448,9 @@ export class TeamMeetingsListComponent implements OnInit {
         this.deletingId = null;
         if (res.success) {
           this.meetings = this.meetings.filter(x => x.id !== m.id);
+          // Refresh the cadence-suggested date — it was computed before this
+          // deletion and would otherwise anchor on the deleted meeting.
+          this.loadMeetings();
         }
         this.cdr.markForCheck();
       },
