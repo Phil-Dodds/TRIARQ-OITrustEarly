@@ -26,7 +26,7 @@ async function create_team_meeting(params, caller_user_id) {
   // Snapshot section template.
   const { data: templateSections, error: tplErr } = await supabase
     .from('team_meeting_track_sections')
-    .select('section_key, title, sub_label, bar_color, sort_order')
+    .select('section_key, title, sub_label, bar_color, sort_order, presenter_user_id')
     .eq('track_id', track_id)
     .is('deleted_at', null)
     .order('sort_order', { ascending: true });
@@ -45,12 +45,13 @@ async function create_team_meeting(params, caller_user_id) {
   }
 
   const sectionRows = templateSections.map(s => ({
-    meeting_id:  meeting.id,
-    section_key: s.section_key,
-    title:       s.title,
-    sub_label:   s.sub_label,
-    bar_color:   s.bar_color,
-    sort_order:  s.sort_order
+    meeting_id:        meeting.id,
+    section_key:       s.section_key,
+    title:             s.title,
+    sub_label:         s.sub_label,
+    bar_color:         s.bar_color,
+    sort_order:        s.sort_order,
+    presenter_user_id: s.presenter_user_id ?? null
   }));
   const { data: sections, error: sectionErr } = await supabase
     .from('team_meeting_sections')

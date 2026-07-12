@@ -68,7 +68,11 @@ const TOOLS = {
   delete_catalog_section:  tracks.delete_catalog_section,
   get_latest_meeting:      tracks.get_latest_meeting,
   meeting_changed_since:   tracks.meeting_changed_since,
-  list_track_initiative_reference: tracks.list_track_initiative_reference
+  list_track_initiative_reference: tracks.list_track_initiative_reference,
+  set_presenter_section:      tracks.set_presenter_section,
+  add_presenter_sections_all: tracks.add_presenter_sections_all,
+  move_bullet:                tracks.move_bullet,
+  pull_from_last_meeting:     tracks.pull_from_last_meeting
 };
 
 app.use(cors());

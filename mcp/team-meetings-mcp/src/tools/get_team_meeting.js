@@ -78,7 +78,7 @@ async function get_team_meeting(params, caller_user_id) {
 
   const { data: sections, error: sectionErr } = await supabase
     .from('team_meeting_sections')
-    .select('id, section_key, sort_order, collapsed, title, sub_label, bar_color')
+    .select('id, section_key, sort_order, collapsed, title, sub_label, bar_color, presenter_user_id')
     .eq('meeting_id', meeting_id)
     .is('deleted_at', null)
     .order('sort_order', { ascending: true });
@@ -189,15 +189,16 @@ async function get_team_meeting(params, caller_user_id) {
   });
 
   const enrichedSections = (sections || []).map(s => ({
-    id:          s.id,
-    section_key: s.section_key,
-    sort_order:  s.sort_order,
-    collapsed:   s.collapsed,
-    title:       s.title,
-    sub_label:   s.sub_label,
-    bar_color:   s.bar_color,
-    bullets:     bulletsBySection[s.id] || [],
-    notes:       notesMap[s.id] ?? null
+    id:                s.id,
+    section_key:       s.section_key,
+    sort_order:        s.sort_order,
+    collapsed:         s.collapsed,
+    title:             s.title,
+    sub_label:         s.sub_label,
+    bar_color:         s.bar_color,
+    presenter_user_id: s.presenter_user_id ?? null,
+    bullets:           bulletsBySection[s.id] || [],
+    notes:             notesMap[s.id] ?? null
   }));
 
   return {

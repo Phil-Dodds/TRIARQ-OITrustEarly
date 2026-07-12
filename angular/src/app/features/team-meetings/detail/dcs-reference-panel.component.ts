@@ -177,10 +177,10 @@ const SAVE_DEBOUNCE_MS = 800;
           <div *ngFor="let init of person.initiatives"
                class="drp-initiative-row"
                [class.drp-initiative-checked]="isInitiativeAdded(init.id)"
-               (click)="!isInitiativeAdded(init.id) && addToMeeting(init); $event.stopPropagation()"
+               (click)="!isInitiativeAdded(init.id) && addToMeeting(init, person); $event.stopPropagation()"
                [attr.role]="isInitiativeAdded(init.id) ? null : 'button'"
                [attr.tabindex]="isInitiativeAdded(init.id) ? null : 0"
-               (keydown.enter)="!isInitiativeAdded(init.id) && addToMeeting(init)">
+               (keydown.enter)="!isInitiativeAdded(init.id) && addToMeeting(init, person)">
             <span class="drp-checkbox"
                   [class.drp-checkbox-checked]="isInitiativeAdded(init.id)"
                   [title]="isInitiativeAdded(init.id) ? 'In meeting' : 'Add to meeting'">
@@ -353,7 +353,9 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy 
   @Input()  personType: RefPanelPersonType = 'dcs';
   // Track scope for the participant-aware listing + per-user view memory.
   @Input()  trackId = '';
-  @Output() bulletAdded        = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string }>();
+  // person_id = whose row the initiative was added under — parent routes to that
+  // participant's presenter section when one exists (session 2026-07-12 design).
+  @Output() bulletAdded        = new EventEmitter<{ section_id: string; initiative_id: string; initiative_name: string; person_id: string }>();
   @Output() initiativeSelected = new EventEmitter<string>();
   // Fires when a user switches the type — parent persists to the series if leader.
   @Output() personTypeChanged  = new EventEmitter<RefPanelPersonType>();
@@ -533,7 +535,7 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy 
   // ── Add to meeting ──────────────────────────────────────────────────────────
   addAllToMeeting(person: RefPanelPerson, event: Event): void {
     event.stopPropagation();
-    if (!this.initiativesGatesSectionId || this.addingAllIds.has(person.id)) return;
+    if (this.addingAllIds.has(person.id)) return;
     const toAdd = person.initiatives.filter(i => !this.isInitiativeAdded(i.id));
     if (!toAdd.length) return;
 
@@ -544,7 +546,8 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy 
       this.bulletAdded.emit({
         section_id:      this.initiativesGatesSectionId,
         initiative_id:   init.id,
-        initiative_name: init.name
+        initiative_name: init.name,
+        person_id:       person.id
       });
       const t = setTimeout(() => { this.addedIds.delete(init.id); this.cdr.markForCheck(); }, 2500);
       this.addedIds.set(init.id, t);
@@ -556,15 +559,16 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy 
     this.cdr.markForCheck();
   }
 
-  addToMeeting(init: DcsInitiativeRef): void {
-    if (!this.initiativesGatesSectionId || this.addingIds.has(init.id) || this.isInitiativeAdded(init.id)) return;
+  addToMeeting(init: DcsInitiativeRef, person: RefPanelPerson): void {
+    if (this.addingIds.has(init.id) || this.isInitiativeAdded(init.id)) return;
     this.addingIds.add(init.id);
     this.cdr.markForCheck();
 
     this.bulletAdded.emit({
       section_id:      this.initiativesGatesSectionId,
       initiative_id:   init.id,
-      initiative_name: init.name
+      initiative_name: init.name,
+      person_id:       person.id
     });
 
     const timer = setTimeout(() => {

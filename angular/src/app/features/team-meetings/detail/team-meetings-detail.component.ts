@@ -98,16 +98,26 @@ interface InitiativeSearchResult {
               <span *ngIf="savingTitle" class="tmd-title-saving">Saving…</span>
             </div>
             <span class="tmd-meeting-date">{{ meeting.meeting_date | date:'EEEE, MMMM d, y' }}</span>
-            <!-- Carry-forward hint: on the latest meeting, link to the prior one to pull bullets forward -->
-            <a *ngIf="isLatestMeeting && previousMeetingId"
-               [routerLink]="['/team-meetings', previousMeetingId]"
-               class="tmd-prev-meeting-link">
-              ← Last meeting (carry bullets forward from there)
-            </a>
+            <!-- Pull from last meeting — master (all sections), dedupes automatically -->
+            <div *ngIf="previousMeetingId" class="tmd-pull-row">
+              <button class="tmd-pull-btn" type="button" [disabled]="pulling" (click)="pullAll()">
+                {{ pulling ? 'Pulling…' : '⟲ Pull from last meeting' }}
+              </button>
+              <span *ngIf="pullResult" class="tmd-pull-result">{{ pullResult }}</span>
+              <a [routerLink]="['/team-meetings', previousMeetingId]" class="tmd-prev-meeting-link">
+                ← Open last meeting
+              </a>
+            </div>
           </div>
 
-          <!-- Sections — snapshot title/color from the series template at creation -->
-          <div *ngFor="let section of meeting.sections" class="tmd-section">
+          <!-- Sections — snapshot title/color from the series template at creation.
+               Drop targets for bullet drag & drop. -->
+          <div *ngFor="let section of meeting.sections"
+               class="tmd-section"
+               [class.tmd-section-dragover]="dragOverSectionId === section.id"
+               (dragover)="onSectionDragOver($event, section)"
+               (dragleave)="dragOverSectionId === section.id && (dragOverSectionId = null)"
+               (drop)="onSectionDrop($event, section)">
             <ng-container>
               <!-- Section header (D-308 collapse pattern) -->
               <div class="tmd-section-header"
@@ -121,7 +131,16 @@ interface InitiativeSearchResult {
                   <!-- S-015 zone explanation -->
                   <span *ngIf="section.sub_label" class="tmd-section-sublabel">{{ section.sub_label }}</span>
                 </div>
-                <span class="tmd-section-chevron">{{ section.collapsed ? '▸' : '▾' }}</span>
+                <span class="tmd-section-header-actions">
+                  <!-- Subtle per-section pull -->
+                  <button *ngIf="previousMeetingId"
+                          class="tmd-section-pull-btn"
+                          type="button"
+                          title="Pull this section's bullets from the last meeting"
+                          [disabled]="pullingSectionId === section.id"
+                          (click)="pullSection(section, $event)">⟲</button>
+                  <span class="tmd-section-chevron">{{ section.collapsed ? '▸' : '▾' }}</span>
+                </span>
               </div>
 
               <div *ngIf="!section.collapsed" class="tmd-section-body">
@@ -130,8 +149,14 @@ interface InitiativeSearchResult {
                   <div *ngIf="section.bullets.length === 0" class="tmd-no-bullets">
                     No items recorded.
                   </div>
-                  <div *ngFor="let bullet of section.bullets" class="tmd-bullet-row">
-                    <div class="tmd-bullet-main-row">
+                  <div *ngFor="let bullet of section.bullets"
+                       class="tmd-bullet-row"
+                       [class.tmd-bullet-dragging]="draggingBulletId === bullet.id">
+                    <!-- Drag handle = the main row only, so note textareas keep normal text selection -->
+                    <div class="tmd-bullet-main-row"
+                         draggable="true"
+                         (dragstart)="onBulletDragStart($event, section, bullet)"
+                         (dragend)="onBulletDragEnd()">
                     <span class="tmd-bullet-dot" [style.background]="section.bar_color"></span>
                     <!-- Contributor initials — Phase D attribution. Hidden on single-member series. -->
                     <span *ngIf="bullet.created_by_display_name && (meeting.track?.member_count ?? 0) > 1"
@@ -191,11 +216,13 @@ interface InitiativeSearchResult {
                       ×
                     </button>
                     </div><!-- /tmd-bullet-main-row -->
-                    <!-- Per-bullet note — ghost textarea, saves on blur -->
+                    <!-- Per-bullet note — inviting tint when empty, white when focused/filled, autogrows -->
                     <textarea class="tmd-bullet-note"
+                              [class.tmd-note-filled]="!!bullet.bullet_note"
                               [placeholder]="'Add a note…'"
                               [value]="bullet.bullet_note ?? ''"
                               (focus)="focusedBulletNoteId = bullet.id"
+                              (input)="autoGrow($event)"
                               (blur)="focusedBulletNoteId = null; onBulletNoteBlur(bullet, $event)"
                               rows="1">
                     </textarea>
@@ -262,6 +289,19 @@ interface InitiativeSearchResult {
         </div>
       </div>
     </ng-container>
+
+    <!-- Section chooser — initiative add with no presenter section and no Initiatives & Gates -->
+    <div *ngIf="showSectionChooser" class="tmd-overlay-scrim" (click)="cancelSectionChooser()"></div>
+    <div *ngIf="showSectionChooser && meeting" class="tmd-chooser">
+      <div class="tmd-chooser-title">Which section should {{ pendingAdds.length === 1 ? 'this initiative' : 'these ' + pendingAdds.length + ' initiatives' }} go to?</div>
+      <div class="tmd-chooser-hint">No presenter section matches this person and this meeting has no Initiatives and Gates section.</div>
+      <button *ngFor="let s of meeting.sections"
+              class="tmd-chooser-option" type="button"
+              (click)="chooseSectionForPending(s)">
+        <span class="tmd-chooser-bar" [style.background]="s.bar_color"></span>{{ s.title }}
+      </button>
+      <button class="tmd-chooser-cancel" type="button" (click)="cancelSectionChooser()">Cancel</button>
+    </div>
 
     <!-- Series settings panel — leaders: sections (applies to this meeting too), invites, members -->
     <app-track-settings *ngIf="showSettings && meeting?.track"
@@ -337,9 +377,19 @@ interface InitiativeSearchResult {
     .tmd-bullet-dcs  { font:11px Roboto; color:#257099; }
     .tmd-bullet-meta-sep { font:11px Roboto; color:#BDBDBD; }
     .tmd-bullet-gate { font:11px Roboto; color:#757575; }
-    .tmd-bullet-note { margin-left:14px; width:calc(100% - 14px); border:none; border-bottom:1px dashed transparent; background:transparent; resize:none; outline:none; font:italic 12px Roboto; color:#757575; padding:2px 0; transition:border-color .15s; }
-    .tmd-bullet-note:focus { border-bottom-color:#BDBDBD; color:#1A1A1A; }
-    .tmd-bullet-note::placeholder { color:#BDBDBD; }
+    /* Bullet note — inviting tint when empty, white + bordered when focused/filled, autogrows */
+    .tmd-bullet-note {
+      margin:3px 0 2px 14px; width:calc(100% - 14px); box-sizing:border-box;
+      border:1px solid #E3EBF0; border-radius:5px;
+      background:#F4F7F9; resize:none; outline:none; overflow:hidden;
+      font:italic 12px/1.5 Roboto; color:#757575; padding:4px 8px;
+      transition:background .15s, border-color .15s;
+    }
+    .tmd-bullet-note:focus, .tmd-bullet-note.tmd-note-filled {
+      background:#fff; border-color:#E0E0E0; color:#1A1A1A;
+    }
+    .tmd-bullet-note:focus { border-color:var(--triarq-color-primary, #257099); }
+    .tmd-bullet-note::placeholder { color:#9FB4C0; }
     .tmd-bullet-note-readonly { margin:2px 0 0 14px; font:italic 12px Roboto; color:#757575;
     }
     .tmd-bullet-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
@@ -392,6 +442,35 @@ interface InitiativeSearchResult {
     .tmd-notes-textarea:focus { border-color:var(--triarq-color-primary,#257099); }
     .tmd-notes-readonly { font: 13px Roboto; color: #1A1A1A; margin: 0; white-space: pre-wrap; }
 
+    /* Pull from last meeting */
+    .tmd-pull-row { display:flex; align-items:center; gap:12px; margin-top:6px; flex-wrap:wrap; }
+    .tmd-pull-btn { background:none; border:1px solid var(--triarq-color-primary,#257099); color:var(--triarq-color-primary,#257099); border-radius:5px; padding:3px 12px; font:500 12px Roboto; cursor:pointer; }
+    .tmd-pull-btn:disabled { opacity:.6; cursor:default; }
+    .tmd-pull-result { font:italic 12px Roboto; color:#4CAF50; }
+    .tmd-section-header-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    .tmd-section-pull-btn { background:none; border:none; color:#BDBDBD; cursor:pointer; font-size:14px; padding:0 2px; line-height:1; }
+    .tmd-section-pull-btn:hover { color:var(--triarq-color-primary,#257099); }
+    /* Drag & drop */
+    .tmd-bullet-main-row[draggable="true"] { cursor:grab; }
+    .tmd-bullet-dragging { opacity:.4; }
+    .tmd-section-dragover { outline:2px dashed var(--triarq-color-primary,#257099); outline-offset:-2px; }
+    /* Section chooser popover */
+    .tmd-chooser {
+      position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      background:#fff; border-radius:10px; box-shadow:0 8px 32px rgba(0,0,0,.18);
+      z-index:210; padding:18px 20px; width:min(420px, 92vw);
+      display:flex; flex-direction:column; gap:6px;
+    }
+    .tmd-chooser-title { font:600 14px Roboto; color:#1A1A1A; }
+    .tmd-chooser-hint { font:italic 11px/1.4 Roboto; color:#757575; margin-bottom:6px; }
+    .tmd-chooser-option {
+      display:flex; align-items:center; gap:10px;
+      background:none; border:1px solid #E0E0E0; border-radius:5px;
+      padding:8px 12px; font:13px Roboto; color:#1A1A1A; cursor:pointer; text-align:left;
+    }
+    .tmd-chooser-option:hover { border-color:var(--triarq-color-primary,#257099); background:#F0F7FB; }
+    .tmd-chooser-bar { width:4px; height:16px; border-radius:2px; flex-shrink:0; }
+    .tmd-chooser-cancel { background:none; border:none; color:#757575; font:12px Roboto; cursor:pointer; margin-top:4px; align-self:flex-end; }
     .tmd-overlay-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.15); z-index: 200; }
     .tmd-initiative-overlay {
       position: fixed; top: 0; right: 0;
@@ -863,16 +942,152 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  // ── Reference panel → add bullet ────────────────────────────────────────────
-  onRefPanelAddBullet(event: { section_id: string; initiative_id: string; initiative_name: string }): void {
-    const section = this.meeting?.sections.find(s => s.id === event.section_id);
-    if (!section) return;
-    // Auto-expand initiatives-gates section if collapsed.
+  // ── Reference panel → add bullet (presenter-section routing, 2026-07-12) ─────
+  // Route by the person whose row was clicked: their presenter section →
+  // else Initiatives and Gates → else ask which section (popover).
+  onRefPanelAddBullet(event: { section_id: string; initiative_id: string; initiative_name: string; person_id: string }): void {
+    if (!this.meeting) return;
+    const target =
+      this.meeting.sections.find(s => s.presenter_user_id === event.person_id) ??
+      this.meeting.sections.find(s => s.section_key === 'initiatives-gates');
+
+    if (!target) {
+      // No obvious home — queue and ask. Add All queues several; one answer places all.
+      this.pendingAdds.push({ initiative_id: event.initiative_id, initiative_name: event.initiative_name });
+      this.showSectionChooser = true;
+      this.cdr.markForCheck();
+      return;
+    }
+    this.addToSection(target, event.initiative_id, event.initiative_name);
+  }
+
+  private addToSection(section: TeamMeetingSection, initiativeId: string, initiativeName: string): void {
     if (section.collapsed) {
       section.collapsed = false;
       this.svc.updateSectionCollapsed(section.id, false).subscribe();
     }
-    this.submitBullet(section, event.initiative_name, event.initiative_id, event.initiative_name);
+    this.submitBullet(section, initiativeName, initiativeId, initiativeName);
+  }
+
+  // Section chooser popover state.
+  pendingAdds: { initiative_id: string; initiative_name: string }[] = [];
+  showSectionChooser = false;
+
+  chooseSectionForPending(section: TeamMeetingSection): void {
+    const pending = [...this.pendingAdds];
+    this.pendingAdds = [];
+    this.showSectionChooser = false;
+    pending.forEach(p => this.addToSection(section, p.initiative_id, p.initiative_name));
+    this.cdr.markForCheck();
+  }
+
+  cancelSectionChooser(): void {
+    this.pendingAdds = [];
+    this.showSectionChooser = false;
+    this.cdr.markForCheck();
+  }
+
+  // ── Drag & drop bullets between sections (desktop, HTML5) ────────────────────
+  draggingBulletId: string | null = null;
+  private dragSourceSectionId: string | null = null;
+  dragOverSectionId: string | null = null;
+
+  onBulletDragStart(event: DragEvent, section: TeamMeetingSection, bullet: TeamMeetingBullet): void {
+    this.draggingBulletId    = bullet.id;
+    this.dragSourceSectionId = section.id;
+    event.dataTransfer?.setData('text/plain', bullet.id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  onBulletDragEnd(): void {
+    this.draggingBulletId    = null;
+    this.dragSourceSectionId = null;
+    this.dragOverSectionId   = null;
+    this.cdr.markForCheck();
+  }
+
+  onSectionDragOver(event: DragEvent, section: TeamMeetingSection): void {
+    if (!this.draggingBulletId || section.id === this.dragSourceSectionId) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    if (this.dragOverSectionId !== section.id) {
+      this.dragOverSectionId = section.id;
+      this.cdr.markForCheck();
+    }
+  }
+
+  onSectionDrop(event: DragEvent, target: TeamMeetingSection): void {
+    event.preventDefault();
+    const bulletId = this.draggingBulletId;
+    const sourceId = this.dragSourceSectionId;
+    this.onBulletDragEnd();
+    if (!bulletId || !sourceId || sourceId === target.id || !this.meeting) return;
+
+    const source = this.meeting.sections.find(s => s.id === sourceId);
+    const bullet = source?.bullets.find(b => b.id === bulletId);
+    if (!source || !bullet) return;
+
+    // Optimistic move; server confirms (poll corrects on failure).
+    source.bullets  = source.bullets.filter(b => b.id !== bulletId);
+    target.bullets  = [...target.bullets, bullet];
+    if (target.collapsed) {
+      target.collapsed = false;
+      this.svc.updateSectionCollapsed(target.id, false).subscribe();
+    }
+    this.cdr.markForCheck();
+    this.svc.moveBullet(bulletId, target.id).subscribe({
+      next: res => { if (!res.success) this.refetchAndMerge(); },
+      error: () => this.refetchAndMerge()
+    });
+  }
+
+  // ── Pull from last meeting ────────────────────────────────────────────────────
+  pulling = false;
+  pullingSectionId: string | null = null;
+  pullResult = '';
+
+  pullAll(): void {
+    if (!this.meeting || this.pulling) return;
+    this.pulling    = true;
+    this.pullResult = '';
+    this.cdr.markForCheck();
+    this.svc.pullFromLastMeeting(this.meeting.id).subscribe({
+      next: res => {
+        this.pulling = false;
+        if (res.success && res.data) {
+          this.pullResult = res.data.no_previous
+            ? 'No earlier meeting in this series.'
+            : `Pulled ${res.data.pulled} item${res.data.pulled === 1 ? '' : 's'}${res.data.skipped ? ` · ${res.data.skipped} skipped as duplicates` : ''}.`;
+          if (res.data.pulled) this.refetchAndMerge();
+        } else {
+          this.pullResult = res.error ?? 'Pull failed.';
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.pulling = false; this.pullResult = 'Pull failed.'; this.cdr.markForCheck(); }
+    });
+  }
+
+  pullSection(section: TeamMeetingSection, event: Event): void {
+    event.stopPropagation();
+    if (!this.meeting || this.pullingSectionId) return;
+    this.pullingSectionId = section.id;
+    this.cdr.markForCheck();
+    this.svc.pullFromLastMeeting(this.meeting.id, section.id).subscribe({
+      next: res => {
+        this.pullingSectionId = null;
+        if (res.success && res.data?.pulled) this.refetchAndMerge();
+        this.cdr.markForCheck();
+      },
+      error: () => { this.pullingSectionId = null; this.cdr.markForCheck(); }
+    });
+  }
+
+  // ── Bullet note autogrow ──────────────────────────────────────────────────────
+  autoGrow(event: Event): void {
+    const el = event.target as HTMLTextAreaElement;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
   }
 
   // ── Initiative detail overlay (D-478) ───────────────────────────────────────

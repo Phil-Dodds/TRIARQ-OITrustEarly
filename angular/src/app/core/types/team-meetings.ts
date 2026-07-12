@@ -36,15 +36,16 @@ export interface TeamMeetingNotes {
 }
 
 export interface TeamMeetingSection {
-  id:          string;
-  section_key: SectionKey;
-  sort_order:  number;
-  collapsed:   boolean;
-  title:       string;
-  sub_label:   string;
-  bar_color:   string;
-  bullets:     TeamMeetingBullet[];
-  notes:       TeamMeetingNotes | null;
+  id:                string;
+  section_key:       SectionKey;
+  sort_order:        number;
+  collapsed:         boolean;
+  title:             string;
+  sub_label:         string;
+  bar_color:         string;
+  presenter_user_id: string | null;
+  bullets:           TeamMeetingBullet[];
+  notes:             TeamMeetingNotes | null;
 }
 
 export interface TeamMeetingTrackContext {
@@ -96,13 +97,14 @@ export interface TrackMember {
 }
 
 export interface TrackSection {
-  id:          string;
-  catalog_id:  string | null;
-  section_key: string;
-  title:       string;
-  sub_label:   string;
-  bar_color:   string;
-  sort_order:  number;
+  id:                string;
+  catalog_id:        string | null;
+  section_key:       string;
+  title:             string;
+  sub_label:         string;
+  bar_color:         string;
+  sort_order:        number;
+  presenter_user_id: string | null;
 }
 
 // Meeting series cadence — suggestion only, never enforced (D-205).

@@ -143,6 +143,19 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
             Public — anyone can find and join this series
           </label>
         </div>
+
+        <!-- Invite at creation — same Outlook format as series settings -->
+        <div class="tk-field">
+          <label class="tk-label">Invite Members (optional)</label>
+          <textarea class="tk-input" rows="2" formControlName="invites"
+                    placeholder="cbickford@triarqhealth.com; Julie Lundberg <jlundberg@triarqhealth.com>"></textarea>
+        </div>
+
+        <p class="tk-create-hint">
+          After creating, series setup opens automatically — participants, presenter
+          sections, meeting cadence, and the share link all live there (⚙ on the series page anytime).
+        </p>
+
         <div *ngIf="saveError" class="tk-form-error">{{ saveError }}</div>
         <div class="tk-panel-actions">
           <button class="tk-btn-ghost" (click)="closeNewPanel()" type="button">Cancel</button>
@@ -210,6 +223,7 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
     .tk-template-selected { border-color: var(--triarq-color-primary, #257099); background: #F0F7FB; }
     .tk-template-label { font: 600 13px Roboto, sans-serif; color: #1A1A1A; }
     .tk-template-desc { font: 11px/1.4 Roboto, sans-serif; color: #757575; }
+    .tk-create-hint { font: italic 11px/1.5 Roboto, sans-serif; color: #757575; margin: 0; }
   `]
 })
 export class TracksListComponent implements OnInit {
@@ -245,7 +259,8 @@ export class TracksListComponent implements OnInit {
     this.isAdmin   = !!this.profile.getCurrentProfile()?.is_admin;
     this.newForm = this.fb.group({
       track_name: ['', Validators.required],
-      is_public:  [false]
+      is_public:  [false],
+      invites:    ['']
     });
     this.load();
   }
@@ -283,7 +298,7 @@ export class TracksListComponent implements OnInit {
   }
 
   openNewPanel(): void {
-    this.newForm.reset({ track_name: '', is_public: false });
+    this.newForm.reset({ track_name: '', is_public: false, invites: '' });
     this.selectedTemplateKey = 'team';
     this.saveError    = '';
     this.showNewPanel = true;
@@ -296,18 +311,28 @@ export class TracksListComponent implements OnInit {
 
   createTrack(): void {
     if (this.newForm.invalid || this.saving) return;
-    const { track_name, is_public } = this.newForm.value as { track_name: string; is_public: boolean };
+    const { track_name, is_public, invites } = this.newForm.value as { track_name: string; is_public: boolean; invites: string };
     this.saving    = true;
     this.saveError = '';
     this.cdr.markForCheck();
     const template = this.templates.find(t => t.key === this.selectedTemplateKey);
     this.svc.createTrack(track_name, !!is_public, template?.sections, template?.suggested_cadence).subscribe({
       next: res => {
-        this.saving = false;
         if (res.success && res.data) {
-          this.showNewPanel = false;
-          this.router.navigate(['/team-meetings/track', res.data.track_id]);
+          const trackId = res.data.track_id;
+          const finish = () => {
+            this.saving       = false;
+            this.showNewPanel = false;
+            // Land on the series with setup open — participants/sections/cadence right there.
+            this.router.navigate(['/team-meetings/track', trackId], { queryParams: { setup: 1 } });
+          };
+          if (invites?.trim()) {
+            this.svc.addTrackMembers(trackId, invites).subscribe({ next: finish, error: finish });
+          } else {
+            finish();
+          }
         } else {
+          this.saving    = false;
           this.saveError = res.error ?? 'Failed to create series.';
           this.cdr.markForCheck();
         }

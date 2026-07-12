@@ -96,9 +96,21 @@ import {
         <!-- Members -->
         <div class="ts-block">
           <label class="ts-label">Members ({{ track.members.length }})</label>
+          <p *ngIf="track.is_leader" class="ts-hint">Presenter section = a section in the meeting for that person's action items, escalations, blockers, and accomplishments. Initiatives added from the reference panel land in the presenter's section automatically.</p>
+          <button *ngIf="track.is_leader" class="ts-mini-primary" type="button"
+                  [disabled]="addingAllPresenters"
+                  (click)="addPresenterSectionsForAll()">
+            {{ addingAllPresenters ? 'Adding…' : '+ Presenter sections for all participants' }}
+          </button>
           <div *ngFor="let m of track.members" class="ts-member-row">
             <span class="ts-member-name">{{ m.display_name }}</span>
             <span *ngIf="m.is_leader" class="ts-leader-chip">Leader</span>
+            <label *ngIf="track.is_leader" class="ts-presenter-toggle" title="Presenter section in meetings">
+              <input type="checkbox"
+                     [checked]="hasPresenterSection(m.user_id)"
+                     (change)="togglePresenterSection(m.user_id, $event)">
+              Presenter
+            </label>
             <span class="ts-member-actions">
               <button *ngIf="track.is_leader" class="ts-mini-btn" type="button"
                       (click)="toggleLeader(m.user_id, !m.is_leader)">
@@ -227,6 +239,7 @@ import {
     .ts-member-name { font: 13px Roboto, sans-serif; color: #1A1A1A; flex: 1; }
     .ts-leader-chip { background: #E3F0F7; color: #257099; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
     .ts-member-actions { display: flex; gap: 6px; }
+    .ts-presenter-toggle { display: flex; align-items: center; gap: 4px; font: 11px Roboto, sans-serif; color: #5A5A5A; cursor: pointer; white-space: nowrap; }
     .ts-invite { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
     .ts-invite-report { font: 12px Roboto, sans-serif; color: #2E7D32; display: flex; flex-direction: column; gap: 2px; }
     .ts-invite-notfound { color: #D32F2F; }
@@ -367,6 +380,38 @@ export class TrackSettingsComponent implements OnInit {
         if (res.success && this.track) this.track.is_public = next;
         this.cdr.markForCheck();
       }
+    });
+  }
+
+  // ── Presenter sections ───────────────────────────────────────────────────────
+  addingAllPresenters = false;
+
+  hasPresenterSection(userId: string): boolean {
+    return !!this.track?.sections.some(s => s.presenter_user_id === userId);
+  }
+
+  togglePresenterSection(userId: string, event: Event): void {
+    const enabled = (event.target as HTMLInputElement).checked;
+    this.svc.setPresenterSection(this.trackId, userId, enabled, this.meetingId).subscribe({
+      next: res => {
+        if (res.success) { this.load(); this.changed.emit(); }
+        else { this.loadError = res.error ?? 'Failed to update presenter section.'; this.cdr.markForCheck(); }
+      }
+    });
+  }
+
+  addPresenterSectionsForAll(): void {
+    if (this.addingAllPresenters) return;
+    this.addingAllPresenters = true;
+    this.cdr.markForCheck();
+    this.svc.addPresenterSectionsAll(this.trackId, this.meetingId).subscribe({
+      next: res => {
+        this.addingAllPresenters = false;
+        if (res.success) { this.load(); this.changed.emit(); }
+        else { this.loadError = res.error ?? 'Failed to add presenter sections.'; }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.addingAllPresenters = false; this.cdr.markForCheck(); }
     });
   }
 

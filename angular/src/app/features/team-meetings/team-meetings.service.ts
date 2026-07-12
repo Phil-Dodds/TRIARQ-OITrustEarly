@@ -190,6 +190,22 @@ export class TeamMeetingsService {
     return this.mcp.call('team-meetings', 'reorder_track_sections', { track_id, ordered_ids });
   }
 
+  setPresenterSection(track_id: string, user_id: string, enabled: boolean, meeting_id?: string): Observable<McpResponse<unknown>> {
+    return this.mcp.call('team-meetings', 'set_presenter_section', { track_id, user_id, enabled, ...(meeting_id ? { meeting_id } : {}) });
+  }
+
+  addPresenterSectionsAll(track_id: string, meeting_id?: string): Observable<McpResponse<{ created: number }>> {
+    return this.mcp.call('team-meetings', 'add_presenter_sections_all', { track_id, ...(meeting_id ? { meeting_id } : {}) });
+  }
+
+  moveBullet(bullet_id: string, target_section_id: string): Observable<McpResponse<unknown>> {
+    return this.mcp.call('team-meetings', 'move_bullet', { bullet_id, target_section_id });
+  }
+
+  pullFromLastMeeting(meeting_id: string, section_id?: string): Observable<McpResponse<{ pulled: number; skipped: number; no_previous?: boolean }>> {
+    return this.mcp.call('team-meetings', 'pull_from_last_meeting', { meeting_id, ...(section_id ? { section_id } : {}) });
+  }
+
   listSectionCatalog(): Observable<McpResponse<CatalogSection[]>> {
     return this.mcp.call<CatalogSection[]>('team-meetings', 'list_section_catalog', {});
   }

@@ -192,7 +192,7 @@ async function get_track(params, caller_user_id) {
 
   const { data: sections } = await supabase
     .from('team_meeting_track_sections')
-    .select('id, catalog_id, section_key, title, sub_label, bar_color, sort_order')
+    .select('id, catalog_id, section_key, title, sub_label, bar_color, sort_order, presenter_user_id')
     .eq('track_id', track_id)
     .is('deleted_at', null)
     .order('sort_order', { ascending: true });
@@ -834,6 +834,344 @@ async function delete_catalog_section(params, caller_user_id) {
   return { success: true, data: { id } };
 }
 
+// ── Presenter sections (session 2026-07-12) ────────────────────────────────────
+// One section per participant for their action items / escalations / blockers /
+// accomplishments. Stable section_key 'presenter-<user_id>' matches across
+// meetings (carry-forward + pull-from-last work automatically).
+
+const PRESENTER_SUB_LABEL = 'Action Items, Escalations, Blockers, Accomplishments';
+const PRESENTER_COLORS = [
+  '#257099','#534AB7','#E96127','#0071AF','#5A5A5A',
+  '#F2A620','#4CAF50','#D32F2F','#795548','#607D8B'
+];
+function presenterColor(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return PRESENTER_COLORS[h % PRESENTER_COLORS.length];
+}
+
+/** Internal: create/reactivate one presenter template section (+ optional live meeting snapshot). */
+async function upsertPresenterSection(track_id, user, meeting_id) {
+  const section_key = `presenter-${user.id}`;
+
+  const { data: existing } = await supabase
+    .from('team_meeting_track_sections')
+    .select('id, deleted_at')
+    .eq('track_id', track_id)
+    .eq('section_key', section_key)
+    .maybeSingle();
+
+  const { data: maxRow } = await supabase
+    .from('team_meeting_track_sections')
+    .select('sort_order')
+    .eq('track_id', track_id)
+    .is('deleted_at', null)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const sort_order = (maxRow?.sort_order ?? 0) + 1;
+
+  const fields = {
+    title:             user.display_name,
+    sub_label:         PRESENTER_SUB_LABEL,
+    bar_color:         presenterColor(user.id),
+    presenter_user_id: user.id
+  };
+
+  let row;
+  if (existing && !existing.deleted_at) {
+    row = existing; // already active — no-op
+  } else if (existing) {
+    const { data, error } = await supabase
+      .from('team_meeting_track_sections')
+      .update({ ...fields, deleted_at: null, sort_order })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) return { error: error.message };
+    row = data;
+  } else {
+    const { data, error } = await supabase
+      .from('team_meeting_track_sections')
+      .insert({ track_id, catalog_id: null, section_key, sort_order, ...fields })
+      .select()
+      .single();
+    if (error) return { error: error.message };
+    row = data;
+  }
+
+  // Optional live-meeting snapshot (reactivate if previously removed).
+  if (meeting_id) {
+    const { data: ms } = await supabase
+      .from('team_meeting_sections')
+      .select('id, deleted_at')
+      .eq('meeting_id', meeting_id)
+      .eq('section_key', section_key)
+      .maybeSingle();
+    const { data: maxMs } = await supabase
+      .from('team_meeting_sections')
+      .select('sort_order')
+      .eq('meeting_id', meeting_id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const msSort = (maxMs?.sort_order ?? 0) + 1;
+    if (ms && ms.deleted_at) {
+      await supabase.from('team_meeting_sections')
+        .update({ ...fields, deleted_at: null, sort_order: msSort })
+        .eq('id', ms.id);
+    } else if (!ms) {
+      await supabase.from('team_meeting_sections')
+        .insert({ meeting_id, section_key, sort_order: msSort, ...fields });
+    }
+    await require('../track_access').bumpMeeting(meeting_id);
+  }
+
+  return { row };
+}
+
+// set_presenter_section — leader. Per-member toggle.
+async function set_presenter_section(params, caller_user_id) {
+  const { track_id, user_id, enabled, meeting_id } = params;
+  if (!track_id || !user_id || enabled === undefined) {
+    return { success: false, error: 'track_id, user_id, and enabled are required.' };
+  }
+
+  const access = await assertTrackAccess(track_id, caller_user_id, { requireLeader: true });
+  if (access.error) return { success: false, error: access.error };
+
+  if (enabled) {
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, display_name')
+      .eq('id', user_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!user) return { success: false, error: 'User not found.' };
+    const result = await upsertPresenterSection(track_id, user, meeting_id);
+    if (result.error) return { success: false, error: result.error };
+    return { success: true, data: result.row };
+  }
+
+  // Disable: soft-delete template row (+ live meeting section).
+  const section_key = `presenter-${user_id}`;
+  const { error } = await supabase
+    .from('team_meeting_track_sections')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('track_id', track_id)
+    .eq('section_key', section_key)
+    .is('deleted_at', null);
+  if (error) return { success: false, error: error.message };
+  if (meeting_id) {
+    await supabase
+      .from('team_meeting_sections')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('meeting_id', meeting_id)
+      .eq('section_key', section_key);
+    await require('../track_access').bumpMeeting(meeting_id);
+  }
+  return { success: true, data: { track_id, user_id, enabled: false } };
+}
+
+// add_presenter_sections_all — leader. One per active member who lacks one.
+async function add_presenter_sections_all(params, caller_user_id) {
+  const { track_id, meeting_id } = params;
+  if (!track_id) return { success: false, error: 'track_id is required.' };
+
+  const access = await assertTrackAccess(track_id, caller_user_id, { requireLeader: true });
+  if (access.error) return { success: false, error: access.error };
+
+  const { data: members } = await supabase
+    .from('team_meeting_track_members')
+    .select('user_id')
+    .eq('track_id', track_id)
+    .is('deleted_at', null);
+  const memberIds = (members || []).map(m => m.user_id);
+  if (!memberIds.length) return { success: true, data: { created: 0 } };
+
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, display_name')
+    .in('id', memberIds)
+    .is('deleted_at', null)
+    .order('display_name', { ascending: true });
+
+  const { data: existing } = await supabase
+    .from('team_meeting_track_sections')
+    .select('presenter_user_id')
+    .eq('track_id', track_id)
+    .is('deleted_at', null)
+    .not('presenter_user_id', 'is', null);
+  const has = new Set((existing || []).map(s => s.presenter_user_id));
+
+  let created = 0;
+  for (const user of (users || [])) {
+    if (has.has(user.id)) continue;
+    const result = await upsertPresenterSection(track_id, user, meeting_id);
+    if (!result.error) created++;
+  }
+  return { success: true, data: { created } };
+}
+
+// ── move_bullet — drag & drop between sections of the same meeting ─────────────
+async function move_bullet(params, caller_user_id) {
+  const { bullet_id, target_section_id } = params;
+  if (!bullet_id || !target_section_id) {
+    return { success: false, error: 'bullet_id and target_section_id are required.' };
+  }
+
+  const { data: bullet } = await supabase
+    .from('team_meeting_bullets')
+    .select('id, section_id')
+    .eq('id', bullet_id)
+    .maybeSingle();
+  if (!bullet) return { success: false, error: 'Bullet not found.' };
+  if (bullet.section_id === target_section_id) return { success: true, data: { bullet_id } };
+
+  const { assertSectionAccess, bumpMeeting } = require('../track_access');
+  const sourceAccess = await assertSectionAccess(bullet.section_id, caller_user_id);
+  if (sourceAccess.error) return { success: false, error: sourceAccess.error };
+
+  // Target must be a section of the same meeting.
+  const { data: target } = await supabase
+    .from('team_meeting_sections')
+    .select('id, meeting_id')
+    .eq('id', target_section_id)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (!target || target.meeting_id !== sourceAccess.meeting.id) {
+    return { success: false, error: 'Bullets can only be moved between sections of the same meeting.' };
+  }
+
+  const { data: maxRow } = await supabase
+    .from('team_meeting_bullets')
+    .select('sort_order')
+    .eq('section_id', target_section_id)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from('team_meeting_bullets')
+    .update({ section_id: target_section_id, sort_order: (maxRow?.sort_order ?? 0) + 1 })
+    .eq('id', bullet_id);
+  if (error) return { success: false, error: error.message };
+
+  await bumpMeeting(sourceAccess.meeting.id);
+  return { success: true, data: { bullet_id, target_section_id } };
+}
+
+// ── pull_from_last_meeting — master (all sections) or one section ──────────────
+// Pulls bullets from the previous meeting in the series. Matching: presenter
+// sections by presenter_user_id, everything else by section_key. Dedupe — skip if:
+//   (a) source bullet already carried into this meeting (FK),
+//   (b) same initiative already present in the target section,
+//   (c) identical trimmed text already present (generic bullets).
+// Unmatched source sections are skipped silently. Notes travel with bullets.
+async function pull_from_last_meeting(params, caller_user_id) {
+  const { meeting_id, section_id } = params;
+  if (!meeting_id) return { success: false, error: 'meeting_id is required.' };
+
+  const { assertMeetingAccess, bumpMeeting } = require('../track_access');
+  const access = await assertMeetingAccess(meeting_id, caller_user_id);
+  if (access.error) return { success: false, error: access.error };
+  const meeting = access.meeting;
+
+  // Previous meeting = most recent other meeting in the track created before this one.
+  const { data: prev } = await supabase
+    .from('team_meetings')
+    .select('id')
+    .eq('track_id', meeting.track_id)
+    .is('deleted_at', null)
+    .neq('id', meeting_id)
+    .lt('created_at', meeting.created_at)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!prev) return { success: true, data: { pulled: 0, skipped: 0, no_previous: true } };
+
+  // Sections both sides.
+  const { data: targetSections } = await supabase
+    .from('team_meeting_sections')
+    .select('id, section_key, presenter_user_id')
+    .eq('meeting_id', meeting_id)
+    .is('deleted_at', null);
+  const { data: sourceSections } = await supabase
+    .from('team_meeting_sections')
+    .select('id, section_key, presenter_user_id')
+    .eq('meeting_id', prev.id)
+    .is('deleted_at', null);
+
+  // Build target list (all, or just the requested one).
+  const targets = (targetSections || []).filter(t => !section_id || t.id === section_id);
+  if (!targets.length) return { success: false, error: 'Section not found in this meeting.' };
+
+  // Match each target to its source section.
+  const pairs = [];
+  for (const t of targets) {
+    const src = (sourceSections || []).find(s =>
+      t.presenter_user_id ? s.presenter_user_id === t.presenter_user_id : s.section_key === t.section_key
+    );
+    if (src) pairs.push({ target: t, source: src });
+  }
+
+  let pulled = 0, skipped = 0;
+  for (const { target, source } of pairs) {
+    const { data: sourceBullets } = await supabase
+      .from('team_meeting_bullets')
+      .select('id, text, bullet_note, initiative_id, sort_order')
+      .eq('section_id', source.id)
+      .order('sort_order', { ascending: true });
+    if (!sourceBullets?.length) continue;
+
+    const { data: targetBullets } = await supabase
+      .from('team_meeting_bullets')
+      .select('id, text, initiative_id, carried_from_bullet_id')
+      .eq('section_id', target.id);
+    const carriedIds     = new Set((targetBullets || []).map(b => b.carried_from_bullet_id).filter(Boolean));
+    const initiativeIds  = new Set((targetBullets || []).map(b => b.initiative_id).filter(Boolean));
+    const texts          = new Set((targetBullets || []).map(b => (b.text || '').trim().toLowerCase()));
+
+    let nextSort = Math.max(0, ...(targetBullets || []).map(() => 0));
+    const { data: maxRow } = await supabase
+      .from('team_meeting_bullets')
+      .select('sort_order')
+      .eq('section_id', target.id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    nextSort = (maxRow?.sort_order ?? 0);
+
+    for (const sb of sourceBullets) {
+      const dupCarried    = carriedIds.has(sb.id);
+      const dupInitiative = sb.initiative_id && initiativeIds.has(sb.initiative_id);
+      const dupText       = !sb.initiative_id && texts.has((sb.text || '').trim().toLowerCase());
+      if (dupCarried || dupInitiative || dupText) { skipped++; continue; }
+
+      nextSort += 1;
+      const { error } = await supabase
+        .from('team_meeting_bullets')
+        .insert({
+          section_id:             target.id,
+          text:                   sb.text,
+          bullet_note:            sb.bullet_note ?? null,
+          initiative_id:          sb.initiative_id ?? null,
+          sort_order:             nextSort,
+          carried_from_bullet_id: sb.id,
+          created_by:             caller_user_id
+        });
+      if (!error) {
+        pulled++;
+        if (sb.initiative_id) initiativeIds.add(sb.initiative_id);
+        texts.add((sb.text || '').trim().toLowerCase());
+      }
+    }
+  }
+
+  if (pulled) await bumpMeeting(meeting_id);
+  return { success: true, data: { pulled, skipped } };
+}
+
 // ── list_track_initiative_reference ────────────────────────────────────────────
 // Reference panel data, participant-aware (session 2026-07-11 design).
 // participants: active track members (leaders + members), each with initiatives
@@ -1057,5 +1395,9 @@ module.exports = {
   delete_catalog_section,
   get_latest_meeting,
   meeting_changed_since,
-  list_track_initiative_reference
+  list_track_initiative_reference,
+  set_presenter_section,
+  add_presenter_sections_all,
+  move_bullet,
+  pull_from_last_meeting
 };

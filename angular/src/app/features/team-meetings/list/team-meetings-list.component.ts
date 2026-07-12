@@ -342,6 +342,11 @@ export class TeamMeetingsListComponent implements OnInit {
   ngOnInit(): void {
     this.trackId       = this.route.snapshot.paramMap.get('track_id') ?? '';
     this.currentUserId = this.auth.getCurrentUser()?.id ?? '';
+    // Fresh-series flow: ?setup=1 lands with the settings panel already open.
+    if (this.route.snapshot.queryParamMap.get('setup')) {
+      this.showSettings = true;
+      this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    }
     this.initForm();
     this.loadMeetings();
   }
