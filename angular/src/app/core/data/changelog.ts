@@ -32,6 +32,47 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-12',
+    contractLabel: 'Contract 33 follow-on — Team Meetings enhancements',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Meeting types',
+        description: 'Creating a series now starts from a meeting type. Team Meeting sets up the classic agenda (starting with collecting topics from the room so nothing gets missed). Manager / Employee 1:1 sets up a Grove-style one-on-one — the employee owns the agenda, plus sections for early warning signs, coaching, career development, written follow-ups, and a closing "One More Thing…". Or start Blank and build your own.'
+      },
+      {
+        audience:    'All',
+        surface:     'Presenter sections',
+        description: 'Give each participant their own section for action items, escalations, blockers, and accomplishments — one click adds a section for every participant, or toggle them per person. When you add an initiative from the reference panel, it lands in that presenter’s section automatically.'
+      },
+      {
+        audience:    'All',
+        surface:     'Pull from last meeting',
+        description: 'One button pulls everything from the last meeting into this one — bullets, notes, all sections at once (or use the small ⟲ on a single section). Items already carried over are skipped automatically, so pulling twice never duplicates.'
+      },
+      {
+        audience:    'All',
+        surface:     'Drag and drop',
+        description: 'Drag any bullet from one section to another — grab the item, drop it where the conversation says it belongs.'
+      },
+      {
+        audience:    'All',
+        surface:     'Meeting cadence',
+        description: 'Set a rhythm for the series — weekly, bi-weekly, tri-weekly, or monthly on a chosen day (or a simple every-N-days). New meetings suggest the right date automatically and the title fills itself in; you can always pick a different date.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Reference panel',
+        description: 'The panel now focuses on the people in your meeting: participants appear with all their initiatives across every role. Untick "Show only initiatives for meeting participants" to browse everyone by DCS, DOL, or EPO. Your view choices — filter, people type, expanded rows — are remembered for your next meeting in the series.'
+      },
+      {
+        audience:    'All',
+        surface:     'Quality touches',
+        description: 'Bullet note boxes now invite you in with a light tint when empty, turn white as you type, and grow with your text. New series open straight into setup with invites available at creation. Who added each bullet shows as small initials in multi-person meetings.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-07',
     contractLabel: 'Contract 33 — Team Meetings',
     items: [
