@@ -10,6 +10,7 @@ const {
   TRACK_CREATOR_EMAIL, getCaller, getMembership, getTrack,
   assertTrackAccess, parseEmails
 } = require('../track_access');
+const { suggestNextMeetingDate, validateCadence } = require('../cadence');
 
 // ── list_my_tracks ─────────────────────────────────────────────────────────────
 // Tracks where caller is an active member. Admin + include_all=true → every
@@ -87,10 +88,19 @@ async function list_my_tracks(params, caller_user_id) {
 }
 
 // ── create_track ───────────────────────────────────────────────────────────────
-// Restricted to TRACK_CREATOR_EMAIL. Seeds all catalog sections as starting template.
+// Restricted to TRACK_CREATOR_EMAIL.
+// sections (optional, from a meeting template): [{ section_key?, title, sub_label?, bar_color? }].
+//   - section_key matching a catalog row links it (catalog_id + key; provided
+//     title/sub_label override catalog values when given).
+//   - no section_key (or no catalog match) → custom section.
+//   - omitted entirely → seeds all active catalog sections (Blank behavior).
+// meeting_cadence (optional): validated cadence object (template suggestion).
 async function create_track(params, caller_user_id) {
-  const { track_name, is_public } = params;
+  const { track_name, is_public, sections, meeting_cadence } = params;
   if (!track_name?.trim()) return { success: false, error: 'track_name is required.' };
+
+  const cadErr = validateCadence(meeting_cadence ?? null);
+  if (cadErr) return { success: false, error: cadErr };
 
   const caller = await getCaller(caller_user_id);
   if (!caller) return { success: false, error: 'User not found.' };
@@ -100,7 +110,12 @@ async function create_track(params, caller_user_id) {
 
   const { data: track, error: tErr } = await supabase
     .from('team_meeting_tracks')
-    .insert({ track_name: track_name.trim(), is_public: !!is_public, created_by: caller_user_id })
+    .insert({
+      track_name: track_name.trim(),
+      is_public: !!is_public,
+      created_by: caller_user_id,
+      ...(meeting_cadence ? { meeting_cadence } : {})
+    })
     .select()
     .single();
   if (tErr) return { success: false, error: `Failed to create series: ${tErr.message}` };
@@ -110,19 +125,41 @@ async function create_track(params, caller_user_id) {
     .insert({ track_id: track.track_id, user_id: caller_user_id, is_leader: true });
   if (mErr) return { success: false, error: `Series created but membership failed: ${mErr.message}` };
 
-  // Seed template with all active catalog sections — leader trims in setup.
   const { data: catalog } = await supabase
     .from('team_meeting_section_catalog')
     .select('id, section_key, title, sub_label, bar_color, sort_order')
     .is('deleted_at', null)
     .order('sort_order', { ascending: true });
-  if (catalog?.length) {
-    await supabase.from('team_meeting_track_sections').insert(
-      catalog.map(c => ({
-        track_id: track.track_id, catalog_id: c.id, section_key: c.section_key,
-        title: c.title, sub_label: c.sub_label, bar_color: c.bar_color, sort_order: c.sort_order
-      }))
-    );
+
+  let rows;
+  if (Array.isArray(sections) && sections.length) {
+    const { randomUUID } = require('crypto');
+    const catalogByKey = {};
+    (catalog || []).forEach(c => { catalogByKey[c.section_key] = c; });
+    rows = sections
+      .filter(s => s?.title?.trim() || catalogByKey[s?.section_key])
+      .map((s, i) => {
+        const cat = s.section_key ? catalogByKey[s.section_key] : null;
+        return {
+          track_id:    track.track_id,
+          catalog_id:  cat?.id ?? null,
+          section_key: cat?.section_key ?? `custom-${randomUUID()}`,
+          title:       (s.title?.trim()) || cat.title,
+          sub_label:   s.sub_label !== undefined ? (s.sub_label || '').trim() : (cat?.sub_label ?? ''),
+          bar_color:   s.bar_color || cat?.bar_color || '#5A5A5A',
+          sort_order:  i + 1
+        };
+      });
+  } else {
+    // Blank / default: seed all active catalog sections — leader trims in setup.
+    rows = (catalog || []).map(c => ({
+      track_id: track.track_id, catalog_id: c.id, section_key: c.section_key,
+      title: c.title, sub_label: c.sub_label, bar_color: c.bar_color, sort_order: c.sort_order
+    }));
+  }
+  if (rows.length) {
+    const { error: sErr } = await supabase.from('team_meeting_track_sections').insert(rows);
+    if (sErr) return { success: false, error: `Series created but sections failed: ${sErr.message}` };
   }
 
   return { success: true, data: track };
@@ -169,6 +206,14 @@ async function get_track(params, caller_user_id) {
     .limit(1)
     .maybeSingle();
 
+  // Cadence lives on the track row; getTrack() helper doesn't select it — fetch here.
+  const { data: cadRow } = await supabase
+    .from('team_meeting_tracks')
+    .select('meeting_cadence')
+    .eq('track_id', track_id)
+    .maybeSingle();
+  const meeting_cadence = cadRow?.meeting_cadence ?? null;
+
   return {
     success: true,
     data: {
@@ -176,6 +221,8 @@ async function get_track(params, caller_user_id) {
       track_name:            track.track_name,
       is_public:             track.is_public,
       ref_panel_person_type: track.ref_panel_person_type,
+      meeting_cadence,
+      suggested_next_meeting_date: suggestNextMeetingDate(meeting_cadence, latest?.meeting_date ?? null),
       deleted_at:            track.deleted_at,
       is_leader:             !!membership?.is_leader || caller.is_admin,
       is_member:             !!membership,
@@ -196,7 +243,7 @@ async function get_track(params, caller_user_id) {
 // ── update_track ───────────────────────────────────────────────────────────────
 // Leader only. track_name / is_public / ref_panel_person_type.
 async function update_track(params, caller_user_id) {
-  const { track_id, track_name, is_public, ref_panel_person_type } = params;
+  const { track_id, track_name, is_public, ref_panel_person_type, meeting_cadence } = params;
   if (!track_id) return { success: false, error: 'track_id is required.' };
 
   const access = await assertTrackAccess(track_id, caller_user_id, { requireLeader: true });
@@ -213,6 +260,11 @@ async function update_track(params, caller_user_id) {
       return { success: false, error: 'ref_panel_person_type must be dcs, dol, or epo.' };
     }
     patch.ref_panel_person_type = ref_panel_person_type;
+  }
+  if (meeting_cadence !== undefined) {
+    const cadErr = validateCadence(meeting_cadence);
+    if (cadErr) return { success: false, error: cadErr };
+    patch.meeting_cadence = meeting_cadence;   // null clears the cadence
   }
   if (!Object.keys(patch).length) return { success: false, error: 'Nothing to update.' };
 

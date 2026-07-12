@@ -356,8 +356,12 @@ export class TeamMeetingsListComponent implements OnInit {
     return `${series} — ${formatMonday(d)}`;
   }
 
+  // Cadence-suggested date for the next meeting (from list_team_meetings track
+  // info). Suggestion only — user can pick any date (D-205 nudge philosophy).
+  suggestedDate = '';
+
   private initForm(): void {
-    const date = todayIso();
+    const date = this.suggestedDate || todayIso();
     this.titleEdited = false;
     this.newMeetingForm = this.fb.group({
       meeting_date: [date, Validators.required],
@@ -379,10 +383,11 @@ export class TeamMeetingsListComponent implements OnInit {
       next: res => {
         if (res.success) {
           this.meetings = res.data ?? [];
-          const trackInfo = (res as unknown as { track?: { track_name: string; is_leader: boolean } }).track;
+          const trackInfo = (res as unknown as { track?: { track_name: string; is_leader: boolean; suggested_next_meeting_date?: string } }).track;
           if (trackInfo) {
-            this.trackName = trackInfo.track_name;
-            this.isLeader  = trackInfo.is_leader;
+            this.trackName     = trackInfo.track_name;
+            this.isLeader      = trackInfo.is_leader;
+            this.suggestedDate = trackInfo.suggested_next_meeting_date ?? '';
           }
         } else {
           this.loadError = res.error ?? 'Failed to load meetings.';

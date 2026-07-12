@@ -13,6 +13,7 @@ import { TeamMeetingsService }  from '../team-meetings.service';
 import { AuthService }          from '../../../core/services/auth.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { TrackListItem }        from '../../../core/types/team-meetings';
+import { MEETING_TEMPLATES }    from './meeting-templates';
 
 // Business rule (session 2026-07-11): series creation restricted to Phil for now.
 const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
@@ -119,6 +120,23 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
           <span *ngIf="newForm.get('track_name')?.invalid && newForm.get('track_name')?.touched"
                 class="tk-field-error">Series name is required.</span>
         </div>
+
+        <!-- Meeting type — pre-loads sections + suggested cadence; everything editable after -->
+        <div class="tk-field">
+          <label class="tk-label">Meeting Type</label>
+          <div *ngFor="let t of templates"
+               class="tk-template-card"
+               [class.tk-template-selected]="selectedTemplateKey === t.key"
+               role="radio"
+               [attr.aria-checked]="selectedTemplateKey === t.key"
+               tabindex="0"
+               (click)="selectedTemplateKey = t.key"
+               (keydown.enter)="selectedTemplateKey = t.key">
+            <span class="tk-template-label">{{ t.label }}</span>
+            <span class="tk-template-desc">{{ t.description }}</span>
+          </div>
+        </div>
+
         <div class="tk-field">
           <label class="tk-label-inline">
             <input type="checkbox" formControlName="is_public">
@@ -182,6 +200,16 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
     .tk-field-error { font-size: 12px; color: #D32F2F; }
     .tk-form-error { padding: 8px 12px; background: #FFF3F3; border-left: 3px solid #D32F2F; font-size: 13px; color: #1A1A1A; border-radius: 4px; }
     .tk-panel-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; }
+    .tk-template-card {
+      display: flex; flex-direction: column; gap: 2px;
+      border: 1px solid #E0E0E0; border-radius: 10px;
+      padding: 10px 12px; margin-bottom: 8px;
+      cursor: pointer; transition: border-color 0.1s, background 0.1s;
+    }
+    .tk-template-card:hover { border-color: var(--triarq-color-primary, #257099); }
+    .tk-template-selected { border-color: var(--triarq-color-primary, #257099); background: #F0F7FB; }
+    .tk-template-label { font: 600 13px Roboto, sans-serif; color: #1A1A1A; }
+    .tk-template-desc { font: 11px/1.4 Roboto, sans-serif; color: #757575; }
   `]
 })
 export class TracksListComponent implements OnInit {
@@ -196,6 +224,9 @@ export class TracksListComponent implements OnInit {
   saving       = false;
   saveError    = '';
   confirmPurgeId: string | null = null;
+
+  readonly templates = MEETING_TEMPLATES;
+  selectedTemplateKey: 'team' | 'one-on-one' | 'blank' = 'team';
 
   newForm!: FormGroup;
 
@@ -253,6 +284,7 @@ export class TracksListComponent implements OnInit {
 
   openNewPanel(): void {
     this.newForm.reset({ track_name: '', is_public: false });
+    this.selectedTemplateKey = 'team';
     this.saveError    = '';
     this.showNewPanel = true;
   }
@@ -268,7 +300,8 @@ export class TracksListComponent implements OnInit {
     this.saving    = true;
     this.saveError = '';
     this.cdr.markForCheck();
-    this.svc.createTrack(track_name, !!is_public).subscribe({
+    const template = this.templates.find(t => t.key === this.selectedTemplateKey);
+    this.svc.createTrack(track_name, !!is_public, template?.sections, template?.suggested_cadence).subscribe({
       next: res => {
         this.saving = false;
         if (res.success && res.data) {

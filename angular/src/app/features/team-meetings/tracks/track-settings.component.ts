@@ -12,7 +12,7 @@ import { CommonModule }        from '@angular/common';
 import { FormsModule }         from '@angular/forms';
 import { TeamMeetingsService } from '../team-meetings.service';
 import {
-  TrackDetail, CatalogSection, InviteReport
+  TrackDetail, CatalogSection, InviteReport, MeetingCadence
 } from '../../../core/types/team-meetings';
 
 @Component({
@@ -60,6 +60,37 @@ import {
                    (change)="toggleVisibility()">
             Public — anyone can find and join this series
           </label>
+        </div>
+
+        <!-- Meeting cadence — drives the default date on "+ New Meeting" (suggestion only) -->
+        <div class="ts-block">
+          <label class="ts-label">Meeting Cadence</label>
+          <p class="ts-hint">Suggests the date for the next meeting. You can always pick a different date.</p>
+          <div class="ts-cadence-row">
+            <select class="ts-select" [ngModel]="cadenceChoice" (ngModelChange)="onCadenceChoice($event)"
+                    [disabled]="!track.is_leader">
+              <option value="">None — default to today</option>
+              <option value="interval-1">Every day</option>
+              <option value="interval-7">Every 7 days</option>
+              <option value="interval-14">Every 14 days</option>
+              <option value="weekly">Weekly on…</option>
+              <option value="biweekly">Bi-weekly on…</option>
+              <option value="triweekly">Tri-weekly on…</option>
+              <option value="monthly">Monthly on…</option>
+            </select>
+            <select *ngIf="cadenceNeedsDow" class="ts-select" [ngModel]="cadenceDow" (ngModelChange)="onCadenceDow($event)"
+                    [disabled]="!track.is_leader">
+              <option *ngFor="let d of weekdays; let i = index" [value]="i">{{ d }}</option>
+            </select>
+            <select *ngIf="cadenceChoice === 'monthly'" class="ts-select" [ngModel]="cadenceOccurrence" (ngModelChange)="onCadenceOccurrence($event)"
+                    [disabled]="!track.is_leader">
+              <option value="1">1st</option>
+              <option value="2">2nd</option>
+              <option value="3">3rd</option>
+              <option value="4">4th</option>
+              <option value="last">Last</option>
+            </select>
+          </div>
         </div>
 
         <!-- Members -->
@@ -210,6 +241,7 @@ import {
     .ts-icon-btn:disabled { opacity: 0.3; cursor: default; }
     .ts-icon-btn.ts-danger { color: #D32F2F; }
     .ts-add-section { display: flex; gap: 8px; margin-top: 6px; }
+    .ts-cadence-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .ts-danger-zone { border-top: 1px solid #F0F0F0; padding-top: 14px; }
     .ts-confirm { display: flex; align-items: center; gap: 8px; font: 12px Roboto, sans-serif; color: #D32F2F; flex-wrap: wrap; }
     .ts-confirm-btn { background: #D32F2F; color: #fff; border: none; border-radius: 3px; padding: 3px 10px; font: 500 11px Roboto, sans-serif; cursor: pointer; }
@@ -243,6 +275,16 @@ export class TrackSettingsComponent implements OnInit {
   editingSectionId: string | null = null;
   sectionTitleDraft = '';
   sectionSubDraft   = '';
+
+  // Meeting cadence controls.
+  readonly weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  cadenceChoice     = '';       // '' | 'interval-1' | 'interval-7' | 'interval-14' | 'weekly' | 'biweekly' | 'triweekly' | 'monthly'
+  cadenceDow        = 1;
+  cadenceOccurrence: '1' | '2' | '3' | '4' | 'last' = '1';
+
+  get cadenceNeedsDow(): boolean {
+    return ['weekly', 'biweekly', 'triweekly', 'monthly'].includes(this.cadenceChoice);
+  }
 
   constructor(
     private readonly svc: TeamMeetingsService,
@@ -280,6 +322,7 @@ export class TrackSettingsComponent implements OnInit {
         if (res.success && res.data) {
           this.track    = res.data;
           this.editName = res.data.track_name;
+          this.seedCadenceControls(res.data.meeting_cadence);
         } else {
           this.loadError = res.error ?? 'Failed to load series settings.';
         }
@@ -326,6 +369,45 @@ export class TrackSettingsComponent implements OnInit {
       }
     });
   }
+
+  // ── Meeting cadence ──────────────────────────────────────────────────────────
+  private seedCadenceControls(cadence: MeetingCadence | null): void {
+    if (!cadence) { this.cadenceChoice = ''; return; }
+    if (cadence.type === 'interval') {
+      this.cadenceChoice = `interval-${cadence.interval_days}`;
+    } else {
+      this.cadenceChoice = cadence.type;
+      this.cadenceDow    = cadence.day_of_week ?? 1;
+      if (cadence.type === 'monthly') this.cadenceOccurrence = cadence.month_occurrence ?? '1';
+    }
+  }
+
+  private buildCadence(): MeetingCadence | null {
+    if (!this.cadenceChoice) return null;
+    if (this.cadenceChoice.startsWith('interval-')) {
+      return { type: 'interval', interval_days: parseInt(this.cadenceChoice.split('-')[1], 10) as 1 | 7 | 14 };
+    }
+    const base: MeetingCadence = {
+      type: this.cadenceChoice as MeetingCadence['type'],
+      day_of_week: Number(this.cadenceDow)
+    };
+    if (base.type === 'monthly') base.month_occurrence = this.cadenceOccurrence;
+    return base;
+  }
+
+  private saveCadence(): void {
+    this.svc.updateTrack(this.trackId, { meeting_cadence: this.buildCadence() }).subscribe({
+      next: res => {
+        if (res.success) this.changed.emit();
+        else { this.loadError = res.error ?? 'Failed to save cadence.'; }
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  onCadenceChoice(v: string): void      { this.cadenceChoice = v; this.saveCadence(); }
+  onCadenceDow(v: string | number): void { this.cadenceDow = Number(v); this.saveCadence(); }
+  onCadenceOccurrence(v: '1' | '2' | '3' | '4' | 'last'): void { this.cadenceOccurrence = v; this.saveCadence(); }
 
   startEditSection(s: { id: string; title: string; sub_label: string }): void {
     this.editingSectionId  = s.id;

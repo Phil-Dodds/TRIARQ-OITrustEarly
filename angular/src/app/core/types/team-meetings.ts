@@ -105,11 +105,31 @@ export interface TrackSection {
   sort_order:  number;
 }
 
+// Meeting series cadence — suggestion only, never enforced (D-205).
+export type CadenceType = 'interval' | 'weekly' | 'biweekly' | 'triweekly' | 'monthly';
+
+export interface MeetingCadence {
+  type:              CadenceType;
+  interval_days?:    1 | 7 | 14;
+  day_of_week?:      number;                          // 0=Sun … 6=Sat
+  month_occurrence?: '1' | '2' | '3' | '4' | 'last';
+}
+
+// Section spec used by meeting templates → create_track.
+export interface TemplateSectionSpec {
+  section_key?: string;   // catalog key to link; omit for custom
+  title:        string;
+  sub_label?:   string;
+  bar_color?:   string;
+}
+
 export interface TrackDetail {
   track_id:              string;
   track_name:            string;
   is_public:             boolean;
   ref_panel_person_type: RefPanelPersonType;
+  meeting_cadence:       MeetingCadence | null;
+  suggested_next_meeting_date: string;
   deleted_at:            string | null;
   is_leader:             boolean;
   is_member:             boolean;

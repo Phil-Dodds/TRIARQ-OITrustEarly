@@ -6,6 +6,7 @@
 
 const { supabase } = require('../db');
 const { assertTrackAccess } = require('../track_access');
+const { suggestNextMeetingDate } = require('../cadence');
 
 /**
  * @param {{ track_id: string, limit?: number, offset?: number }} params
@@ -30,13 +31,31 @@ async function list_team_meetings(params, caller_user_id) {
     .range(offset, offset + limit - 1);
 
   if (error) return { success: false, error: error.message };
+
+  // Cadence-driven default date for the "+ New Meeting" panel.
+  const { data: cadRow } = await supabase
+    .from('team_meeting_tracks')
+    .select('meeting_cadence')
+    .eq('track_id', track_id)
+    .maybeSingle();
+  // Latest by meeting_date (cadence anchors on the calendar, not created_at).
+  const { data: latestByDate } = await supabase
+    .from('team_meetings')
+    .select('meeting_date')
+    .eq('track_id', track_id)
+    .is('deleted_at', null)
+    .order('meeting_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   return {
     success: true,
     data: data || [],
     track: {
       track_id:   access.track.track_id,
       track_name: access.track.track_name,
-      is_leader:  !!access.membership?.is_leader || access.caller.is_admin
+      is_leader:  !!access.membership?.is_leader || access.caller.is_admin,
+      suggested_next_meeting_date: suggestNextMeetingDate(cadRow?.meeting_cadence ?? null, latestByDate?.meeting_date ?? null)
     }
   };
 }

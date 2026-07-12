@@ -14,6 +14,8 @@ import {
   DcsUserWithInitiatives,
   TrackListItem,
   TrackInitiativeReference,
+  TemplateSectionSpec,
+  MeetingCadence,
   TrackDetail,
   TrackSection,
   PublicTrackListItem,
@@ -113,15 +115,24 @@ export class TeamMeetingsService {
     return this.mcp.call<TrackListItem[]>('team-meetings', 'list_my_tracks', { include_all });
   }
 
-  createTrack(track_name: string, is_public: boolean): Observable<McpResponse<{ track_id: string }>> {
-    return this.mcp.call('team-meetings', 'create_track', { track_name, is_public });
+  createTrack(
+    track_name: string,
+    is_public: boolean,
+    sections?: TemplateSectionSpec[],
+    meeting_cadence?: MeetingCadence
+  ): Observable<McpResponse<{ track_id: string }>> {
+    return this.mcp.call('team-meetings', 'create_track', {
+      track_name, is_public,
+      ...(sections ? { sections } : {}),
+      ...(meeting_cadence ? { meeting_cadence } : {})
+    });
   }
 
   getTrack(track_id: string): Observable<McpResponse<TrackDetail>> {
     return this.mcp.call<TrackDetail>('team-meetings', 'get_track', { track_id });
   }
 
-  updateTrack(track_id: string, patch: { track_name?: string; is_public?: boolean; ref_panel_person_type?: RefPanelPersonType }): Observable<McpResponse<unknown>> {
+  updateTrack(track_id: string, patch: { track_name?: string; is_public?: boolean; ref_panel_person_type?: RefPanelPersonType; meeting_cadence?: MeetingCadence | null }): Observable<McpResponse<unknown>> {
     return this.mcp.call('team-meetings', 'update_track', { track_id, ...patch });
   }
 
