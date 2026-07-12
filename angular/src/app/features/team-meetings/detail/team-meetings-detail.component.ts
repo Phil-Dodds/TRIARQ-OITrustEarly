@@ -173,8 +173,8 @@ interface InitiativeSearchResult {
                     <!-- Plain text bullet -->
                     <span *ngIf="!bullet.initiative" class="tmd-bullet-text">{{ bullet.text }}</span>
 
-                    <!-- DCS name + next gate — right-aligned, initiatives-gates only -->
-                    <span *ngIf="bullet.initiative && section.section_key === 'initiatives-gates' && (bullet.initiative.dcs_name || bullet.initiative.next_gate)"
+                    <!-- Assigned person + next gate — right-aligned, any section with an initiative bullet -->
+                    <span *ngIf="bullet.initiative && (bullet.initiative.dcs_name || bullet.initiative.next_gate)"
                           class="tmd-bullet-meta">
                       <span *ngIf="bullet.initiative.dcs_name" class="tmd-bullet-dcs">{{ bullet.initiative.dcs_name }}</span>
                       <span *ngIf="bullet.initiative.dcs_name && bullet.initiative.next_gate" class="tmd-bullet-meta-sep">·</span>

@@ -375,8 +375,11 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy 
   // True once the user (or their saved state) chose a type — series-default changes stop applying.
   private userChoseType = false;
 
-  private addingIds    = new Set<string>();
-  private addedIds     = new Map<string, ReturnType<typeof setTimeout>>();
+  // Optimistic "in meeting" marks. An entry persists until the server-confirmed
+  // set shows a present→absent transition for that id (bullet removed via ×).
+  // NO revert timers — a slow server must never uncheck a box the user just
+  // checked (that invites double-clicks and duplicate rows).
+  private addedIds     = new Set<string>();
   private addingAllIds = new Set<string>();
   private addedAllIds  = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -412,9 +415,15 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy 
       this.load();
     }
     if (changes['existingInitiativeIds']) {
-      // Unchecks checkboxes when a bullet is removed via ×.
-      for (const id of Array.from(this.addedIds.keys())) {
-        if (!this.existingInitiativeIds.has(id)) this.addedIds.delete(id);
+      // Uncheck ONLY on a confirmed present→absent transition (bullet removed
+      // via ×). A fresh optimistic add is absent from BOTH sets while the
+      // server round-trips — deleting it then would uncheck the box mid-save.
+      const prev = changes['existingInitiativeIds'].previousValue as Set<string> | undefined;
+      const curr = this.existingInitiativeIds;
+      if (prev) {
+        for (const id of Array.from(this.addedIds)) {
+          if (prev.has(id) && !curr.has(id)) this.addedIds.delete(id);
+        }
       }
       this.cdr.markForCheck();
     }
@@ -543,14 +552,13 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy 
     this.cdr.markForCheck();
 
     toAdd.forEach(init => {
+      this.addedIds.add(init.id);   // checked immediately, persists until confirmed removal
       this.bulletAdded.emit({
         section_id:      this.initiativesGatesSectionId,
         initiative_id:   init.id,
         initiative_name: init.name,
         person_id:       person.id
       });
-      const t = setTimeout(() => { this.addedIds.delete(init.id); this.cdr.markForCheck(); }, 2500);
-      this.addedIds.set(init.id, t);
     });
 
     this.addingAllIds.delete(person.id);
@@ -560,8 +568,10 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy 
   }
 
   addToMeeting(init: DcsInitiativeRef, person: RefPanelPerson): void {
-    if (this.addingIds.has(init.id) || this.isInitiativeAdded(init.id)) return;
-    this.addingIds.add(init.id);
+    if (this.isInitiativeAdded(init.id)) return;
+    // Check the box synchronously — the guard above makes double-clicks no-ops
+    // even while the server is slow.
+    this.addedIds.add(init.id);
     this.cdr.markForCheck();
 
     this.bulletAdded.emit({
@@ -570,14 +580,5 @@ export class DcsReferencePanelComponent implements OnInit, OnChanges, OnDestroy 
       initiative_name: init.name,
       person_id:       person.id
     });
-
-    const timer = setTimeout(() => {
-      this.addedIds.delete(init.id);
-      this.cdr.markForCheck();
-    }, 1500);
-
-    this.addingIds.delete(init.id);
-    this.addedIds.set(init.id, timer);
-    this.cdr.markForCheck();
   }
 }

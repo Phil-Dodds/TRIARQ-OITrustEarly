@@ -108,16 +108,19 @@ import {
             <label *ngIf="track.is_leader" class="ts-presenter-toggle" title="Presenter section in meetings">
               <input type="checkbox"
                      [checked]="hasPresenterSection(m.user_id)"
+                     [disabled]="presenterBusy.has(m.user_id)"
                      (change)="togglePresenterSection(m.user_id, $event)">
-              Presenter
+              {{ presenterBusy.has(m.user_id) ? 'Saving…' : 'Presenter' }}
             </label>
             <span class="ts-member-actions">
               <button *ngIf="track.is_leader" class="ts-mini-btn" type="button"
+                      [disabled]="memberBusy.has(m.user_id)"
                       (click)="toggleLeader(m.user_id, !m.is_leader)">
-                {{ m.is_leader ? 'Remove leader' : 'Make leader' }}
+                {{ memberBusy.has(m.user_id) ? 'Saving…' : (m.is_leader ? 'Remove leader' : 'Make leader') }}
               </button>
               <button *ngIf="track.is_leader || m.user_id === currentUserId"
                       class="ts-mini-btn ts-danger" type="button"
+                      [disabled]="memberBusy.has(m.user_id)"
                       (click)="removeMember(m.user_id)">
                 {{ m.user_id === currentUserId ? 'Leave' : 'Remove' }}
               </button>
@@ -163,6 +166,7 @@ import {
                 <button class="ts-icon-btn" type="button" [disabled]="i === track.sections.length - 1" title="Move down"
                         (click)="move(i, 1)">↓</button>
                 <button class="ts-icon-btn ts-danger" type="button" title="Remove from series"
+                        [disabled]="sectionBusy"
                         (click)="removeSection(s.id)">×</button>
               </span>
             </ng-container>
@@ -184,13 +188,13 @@ import {
               <option value="">Add from shared list…</option>
               <option *ngFor="let c of availableCatalog" [value]="c.id">{{ c.title }}</option>
             </select>
-            <button class="ts-mini-primary" type="button" [disabled]="!selectedCatalogId"
-                    (click)="addCatalogSection()">Add</button>
+            <button class="ts-mini-primary" type="button" [disabled]="!selectedCatalogId || sectionBusy"
+                    (click)="addCatalogSection()">{{ sectionBusy ? 'Saving…' : 'Add' }}</button>
           </div>
           <div *ngIf="track.is_leader" class="ts-add-section">
             <input class="ts-input" type="text" [(ngModel)]="customTitle" placeholder="Or create a custom section title…">
-            <button class="ts-mini-primary" type="button" [disabled]="!customTitle.trim()"
-                    (click)="addCustomSection()">Create</button>
+            <button class="ts-mini-primary" type="button" [disabled]="!customTitle.trim() || sectionBusy"
+                    (click)="addCustomSection()">{{ sectionBusy ? 'Saving…' : 'Create' }}</button>
           </div>
         </div>
 
@@ -385,18 +389,29 @@ export class TrackSettingsComponent implements OnInit {
 
   // ── Presenter sections ───────────────────────────────────────────────────────
   addingAllPresenters = false;
+  // In-flight guards — a click disables the control until the server answers,
+  // so slow responses can't collect duplicate clicks.
+  presenterBusy = new Set<string>();
+  memberBusy    = new Set<string>();
+  sectionBusy   = false;
 
   hasPresenterSection(userId: string): boolean {
     return !!this.track?.sections.some(s => s.presenter_user_id === userId);
   }
 
   togglePresenterSection(userId: string, event: Event): void {
+    if (this.presenterBusy.has(userId)) return;
     const enabled = (event.target as HTMLInputElement).checked;
+    this.presenterBusy.add(userId);
+    this.cdr.markForCheck();
     this.svc.setPresenterSection(this.trackId, userId, enabled, this.meetingId).subscribe({
       next: res => {
+        this.presenterBusy.delete(userId);
         if (res.success) { this.load(); this.changed.emit(); }
-        else { this.loadError = res.error ?? 'Failed to update presenter section.'; this.cdr.markForCheck(); }
-      }
+        else { this.loadError = res.error ?? 'Failed to update presenter section.'; }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.presenterBusy.delete(userId); this.cdr.markForCheck(); }
     });
   }
 
@@ -500,19 +515,33 @@ export class TrackSettingsComponent implements OnInit {
   }
 
   removeMember(userId: string): void {
+    if (this.memberBusy.has(userId)) return;
+    this.memberBusy.add(userId);
+    this.cdr.markForCheck();
     this.svc.removeTrackMember(this.trackId, userId).subscribe({
       next: res => {
+        this.memberBusy.delete(userId);
         if (res.success) {
           if (userId === this.currentUserId) { this.deleted.emit(); return; }
           this.load();
         }
-      }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.memberBusy.delete(userId); this.cdr.markForCheck(); }
     });
   }
 
   toggleLeader(userId: string, isLeader: boolean): void {
+    if (this.memberBusy.has(userId)) return;
+    this.memberBusy.add(userId);
+    this.cdr.markForCheck();
     this.svc.setTrackLeader(this.trackId, userId, isLeader).subscribe({
-      next: res => { if (res.success) this.load(); }
+      next: res => {
+        this.memberBusy.delete(userId);
+        if (res.success) this.load();
+        this.cdr.markForCheck();
+      },
+      error: () => { this.memberBusy.delete(userId); this.cdr.markForCheck(); }
     });
   }
 
@@ -528,29 +557,47 @@ export class TrackSettingsComponent implements OnInit {
   }
 
   addCatalogSection(): void {
-    if (!this.selectedCatalogId) return;
+    if (!this.selectedCatalogId || this.sectionBusy) return;
+    this.sectionBusy = true;
+    this.cdr.markForCheck();
     this.svc.addTrackSection(this.trackId, { catalog_id: this.selectedCatalogId, ...(this.meetingId ? { meeting_id: this.meetingId } : {}) }).subscribe({
       next: res => {
+        this.sectionBusy = false;
         if (res.success) { this.selectedCatalogId = ''; this.load(); }
-        else { this.loadError = res.error ?? 'Failed to add section.'; this.cdr.markForCheck(); }
-      }
+        else { this.loadError = res.error ?? 'Failed to add section.'; }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.sectionBusy = false; this.cdr.markForCheck(); }
     });
   }
 
   addCustomSection(): void {
     const title = this.customTitle.trim();
-    if (!title) return;
+    if (!title || this.sectionBusy) return;
+    this.sectionBusy = true;
+    this.cdr.markForCheck();
     this.svc.addTrackSection(this.trackId, { title, ...(this.meetingId ? { meeting_id: this.meetingId } : {}) }).subscribe({
       next: res => {
+        this.sectionBusy = false;
         if (res.success) { this.customTitle = ''; this.load(); }
-        else { this.loadError = res.error ?? 'Failed to create section.'; this.cdr.markForCheck(); }
-      }
+        else { this.loadError = res.error ?? 'Failed to create section.'; }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.sectionBusy = false; this.cdr.markForCheck(); }
     });
   }
 
   removeSection(trackSectionId: string): void {
+    if (this.sectionBusy) return;
+    this.sectionBusy = true;
+    this.cdr.markForCheck();
     this.svc.removeTrackSection(this.trackId, trackSectionId, this.meetingId).subscribe({
-      next: res => { if (res.success) this.load(); }
+      next: res => {
+        this.sectionBusy = false;
+        if (res.success) this.load();
+        this.cdr.markForCheck();
+      },
+      error: () => { this.sectionBusy = false; this.cdr.markForCheck(); }
     });
   }
 
