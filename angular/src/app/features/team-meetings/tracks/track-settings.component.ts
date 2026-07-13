@@ -12,7 +12,7 @@ import { CommonModule }        from '@angular/common';
 import { FormsModule }         from '@angular/forms';
 import { TeamMeetingsService } from '../team-meetings.service';
 import {
-  TrackDetail, CatalogSection, InviteReport, MeetingCadence
+  TrackDetail, TrackSection, CatalogSection, InviteReport, MeetingCadence
 } from '../../../core/types/team-meetings';
 
 @Component({
@@ -150,8 +150,17 @@ import {
         <!-- Sections -->
         <div class="ts-block">
           <label class="ts-label">Sections</label>
-          <p class="ts-hint">Applied to new meetings in this series, in this order. Existing meetings are unchanged.</p>
-          <div *ngFor="let s of track.sections; let i = index" class="ts-section-row">
+          <p class="ts-hint">Applied to new meetings in this series, in this order — drag a section to reorder. Existing meetings are unchanged.</p>
+          <div *ngFor="let s of track.sections" class="ts-section-row"
+               [class.ts-section-dragging]="draggingSectionId === s.id"
+               [class.ts-section-dragover]="dragOverSectionId === s.id"
+               [draggable]="track.is_leader && editingSectionId !== s.id"
+               (dragstart)="onSectionDragStart($event, s)"
+               (dragend)="onSectionDragEnd()"
+               (dragover)="onSectionDragOver($event, s)"
+               (dragleave)="dragOverSectionId === s.id && (dragOverSectionId = null)"
+               (drop)="onSectionDrop($event, s)">
+            <span *ngIf="track.is_leader" class="ts-section-grip" aria-hidden="true" title="Drag to reorder">⋮⋮</span>
             <span class="ts-section-bar" [style.background]="s.bar_color"></span>
             <ng-container *ngIf="editingSectionId !== s.id">
               <span class="ts-section-text">
@@ -161,10 +170,6 @@ import {
               <span *ngIf="track.is_leader" class="ts-section-actions">
                 <button class="ts-icon-btn" type="button" title="Edit title and description"
                         (click)="startEditSection(s)">✎</button>
-                <button class="ts-icon-btn" type="button" [disabled]="i === 0" title="Move up"
-                        (click)="move(i, -1)">↑</button>
-                <button class="ts-icon-btn" type="button" [disabled]="i === track.sections.length - 1" title="Move down"
-                        (click)="move(i, 1)">↓</button>
                 <button class="ts-icon-btn ts-danger" type="button" title="Remove from series"
                         [disabled]="sectionBusy"
                         (click)="removeSection(s.id)">×</button>
@@ -248,6 +253,11 @@ import {
     .ts-invite-report { font: 12px Roboto, sans-serif; color: #2E7D32; display: flex; flex-direction: column; gap: 2px; }
     .ts-invite-notfound { color: #D32F2F; }
     .ts-section-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #F5F5F5; }
+    .ts-section-row[draggable="true"] { cursor: grab; }
+    .ts-section-grip { color: #C0C0C0; font-size: 11px; letter-spacing: -2px; flex-shrink: 0; }
+    .ts-section-row:hover .ts-section-grip { color: #9E9E9E; }
+    .ts-section-dragging { opacity: 0.45; }
+    .ts-section-dragover { outline: 2px dashed var(--triarq-color-primary, #257099); outline-offset: -2px; }
     .ts-section-bar { width: 4px; height: 18px; border-radius: 2px; flex-shrink: 0; }
     .ts-section-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
     .ts-section-title { font: 13px Roboto, sans-serif; }
@@ -545,15 +555,48 @@ export class TrackSettingsComponent implements OnInit {
     });
   }
 
-  move(index: number, dir: -1 | 1): void {
-    if (!this.track) return;
-    const arr = [...this.track.sections];
-    const target = index + dir;
-    if (target < 0 || target >= arr.length) return;
-    [arr[index], arr[target]] = [arr[target], arr[index]];
+  // ── Section reorder — drag & drop (replaced the ↑↓ arrows). Dropped section
+  // takes the target's position, matching the meeting-screen drag semantics. ──
+  draggingSectionId: string | null = null;
+  dragOverSectionId: string | null = null;
+
+  onSectionDragStart(event: DragEvent, s: TrackSection): void {
+    this.draggingSectionId = s.id;
+    event.dataTransfer?.setData('text/plain', s.id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  onSectionDragEnd(): void {
+    this.draggingSectionId = null;
+    this.dragOverSectionId = null;
+    this.cdr.markForCheck();
+  }
+
+  onSectionDragOver(event: DragEvent, s: TrackSection): void {
+    if (!this.draggingSectionId || s.id === this.draggingSectionId) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    if (this.dragOverSectionId !== s.id) {
+      this.dragOverSectionId = s.id;
+      this.cdr.markForCheck();
+    }
+  }
+
+  onSectionDrop(event: DragEvent, target: TrackSection): void {
+    event.preventDefault();
+    const draggedId = this.draggingSectionId;
+    this.onSectionDragEnd();
+    if (!draggedId || draggedId === target.id || !this.track) return;
+
+    const arr  = [...this.track.sections];
+    const from = arr.findIndex(x => x.id === draggedId);
+    const to   = arr.findIndex(x => x.id === target.id);
+    if (from < 0 || to < 0) return;
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
     this.track.sections = arr;
     this.cdr.markForCheck();
-    this.svc.reorderTrackSections(this.trackId, arr.map(s => s.id)).subscribe();
+    this.svc.reorderTrackSections(this.trackId, arr.map(x => x.id)).subscribe();
   }
 
   addCatalogSection(): void {
