@@ -32,6 +32,9 @@ interface HubCard {
   icon:        string;
   /** D-356: render the "Coming Soon" badge on cards whose view has not been built yet. */
   comingSoon?: boolean;
+  /** Workstream-organized views — hidden behind the "More views" link until
+   *  workstreams are actually in effect (Phil, 2026-07-13). */
+  secondary?:  boolean;
   /** Optional id; required for cards that surface an async headline (D-396 / spec §4). */
   id?:         'all-initiatives' | 'epo-summary' | 'epo-schedule' | 'epo-deploy'
             |  'workstream-summary' | 'gate-schedule' | 'deploy-schedule'
@@ -73,6 +76,16 @@ const HUB_CARDS: HubCard[] = [
                  'and a Needs Review column (overdue, escalation, gate-date slip, or At Risk). ' +
                  'Filter by Division and toggle Needs Review to triage for a meeting.'
   },
+  // D-527 follow-on: Initiative Guide (concept guide / OI Library seed) — top
+  // row placement per Phil 2026-07-13.
+  {
+    title:       'How Initiative Tracking Works',
+    route:       '/initiatives/guide',
+    icon:        'ℹ',
+    description: 'A short guide to the concepts behind these views: what an Initiative is, what ' +
+                 'each of the five gates means, how target and actual dates behave, statuses vs ' +
+                 'approvals, and how status updates and acknowledgments flow.'
+  },
   {
     id:          'epo-summary',
     title:       'EPO WIP Summary',
@@ -101,10 +114,13 @@ const HUB_CARDS: HubCard[] = [
                  'quarter, and other active Initiatives. Use this to track each ' +
                  'EPO’s commitment against target dates.'
   },
+  // Workstream-organized views — secondary (behind "More views") until
+  // workstreams are in effect.
   {
     title:       'Workstream Summary',
     route:       '/initiatives/workstreams',
     icon:        '⟳',
+    secondary:   true,
     description: 'WIP throughput per Workstream across Pre-Build, Build, and Post-Build ' +
                  'stages. WIP limits live per EPO — see the EPO WIP Summary view for ' +
                  'over-limit alerts. Click the Workstream name to see the matching Initiatives.'
@@ -113,6 +129,7 @@ const HUB_CARDS: HubCard[] = [
     title:       'Gate Schedule',
     route:       '/initiatives/gates',
     icon:        '▷',
+    secondary:   true,
     description: 'Gates coming up in the next 7 days and gates with overdue target dates. ' +
                  'Use this to prioritize approval actions and identify stalled Initiatives. ' +
                  'Click an Initiative row to open it.'
@@ -121,6 +138,7 @@ const HUB_CARDS: HubCard[] = [
     title:       'Deploy Gate by Quarter',
     route:       '/initiatives/deploy-schedule',
     icon:        '◫',
+    secondary:   true,
     description: 'Go to Deploy gates grouped by quarter. See which Initiatives are scheduled ' +
                  'to reach production each quarter and track commitment against target dates. ' +
                  'Use this for release planning and capacity conversations.'
@@ -142,15 +160,6 @@ const HUB_CARDS: HubCard[] = [
     icon:        '✓',
     description: 'Gates approved in the last 4 weeks, across all initiatives in your divisions.'
   },
-  // D-527 follow-on: card 10 — Initiative Guide (concept guide / OI Library seed).
-  {
-    title:       'How Initiative Tracking Works',
-    route:       '/initiatives/guide',
-    icon:        'ℹ',
-    description: 'A short guide to the concepts behind these views: what an Initiative is, what ' +
-                 'each of the five gates means, how target and actual dates behave, statuses vs ' +
-                 'approvals, and how status updates and acknowledgments flow.'
-  }
 ];
 
 @Component({
@@ -172,9 +181,9 @@ const HUB_CARDS: HubCard[] = [
         </p>
       </div>
 
-      <!-- 2-column card grid -->
+      <!-- 3-column card grid — workstream-organized views live behind "More views" -->
       <div class="dh-grid">
-        <a *ngFor="let card of cards"
+        <a *ngFor="let card of primaryCards"
            [routerLink]="card.route"
            class="dh-card"
            (mouseenter)="onCardEnter($event)"
@@ -209,11 +218,31 @@ const HUB_CARDS: HubCard[] = [
           <div class="dh-open-link">Open view →</div>
         </a>
       </div>
+
+      <!-- Workstream-organized views — collapsed by default; workstreams are
+           not in effect yet (Phil 2026-07-13). -->
+      <div class="dh-more-row">
+        <a class="dh-more-link" (click)="showMore = !showMore">
+          {{ showMore ? 'Hide workstream views' : 'More views (workstream-organized) →' }}
+        </a>
+      </div>
+      <div *ngIf="showMore" class="dh-grid">
+        <a *ngFor="let card of secondaryCards"
+           [routerLink]="card.route"
+           class="dh-card"
+           (mouseenter)="onCardEnter($event)"
+           (mouseleave)="onCardLeave($event)">
+          <div class="dh-icon">{{ card.icon }}</div>
+          <div class="dh-card-title">{{ card.title }}</div>
+          <div class="dh-card-description">{{ card.description }}</div>
+          <div class="dh-open-link">Open view →</div>
+        </a>
+      </div>
     </div>
   `,
   styles: [`
     .dh-shell {
-      max-width: 880px;
+      max-width: 1180px;
       margin: var(--triarq-space-2xl) auto;
       padding: 0 var(--triarq-space-md);
     }
@@ -234,9 +263,11 @@ const HUB_CARDS: HubCard[] = [
        hold the grid within ~600px tall. */
     .dh-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: var(--triarq-space-md);
     }
+    .dh-more-row { margin: var(--triarq-space-md) 0; }
+    .dh-more-link { font-size: 12px; color: var(--triarq-color-primary); cursor: pointer; font-weight: 500; }
 
     .dh-card {
       position: relative;
@@ -304,6 +335,10 @@ const HUB_CARDS: HubCard[] = [
 })
 export class DeliveryHubComponent implements OnInit {
   readonly cards = HUB_CARDS;
+  readonly primaryCards   = HUB_CARDS.filter(c => !c.secondary);
+  readonly secondaryCards = HUB_CARDS.filter(c => c.secondary);
+  /** Workstream views collapsed by default — transient, not persisted. */
+  showMore = false;
 
   /**
    * Async headlines per card id. Loading state is shared — single
