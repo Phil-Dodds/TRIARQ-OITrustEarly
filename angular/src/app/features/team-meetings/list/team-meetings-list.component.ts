@@ -87,13 +87,15 @@ function todayIso(): string {
         <div *ngFor="let m of meetings"
              class="tm-row"
              [class.tm-row-deleting]="deletingId === m.id"
+             [class.tm-row-unread]="m.unread"
              role="button"
              tabindex="0"
              (click)="confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)"
              (keydown.enter)="confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)">
           <span class="tm-col-title tm-meeting-name">{{ m.title }}</span>
           <span class="tm-col-date">{{ m.meeting_date | date:'MMM d, y' }}</span>
-          <span class="tm-col-updated tm-muted">{{ m.updated_at | date:'MMM d, y' }}</span>
+          <!-- content_updated_at = anything changed by anyone; bold when unseen by you -->
+          <span class="tm-col-updated tm-muted">{{ m.content_updated_at | date:'MMM d, y' }}</span>
           <!-- Row actions — edit + delete -->
           <span class="tm-row-actions" (click)="$event.stopPropagation()">
             <ng-container *ngIf="confirmDeleteId !== m.id">
@@ -239,6 +241,9 @@ function todayIso(): string {
     }
     .tm-row:hover { background: #F5F9FC; }
     .tm-row-deleting { opacity: 0.4; pointer-events: none; }
+    /* Unread = meeting changed since your last view (or never viewed) */
+    .tm-row-unread .tm-meeting-name { font-weight: 700; }
+    .tm-row-unread .tm-col-date, .tm-row-unread .tm-col-updated { font-weight: 700; color: #1A1A1A; }
     .tm-meeting-name { font: 500 14px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); }
     .tm-muted { color: #757575; font-size: 13px; }
     .tm-row-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }

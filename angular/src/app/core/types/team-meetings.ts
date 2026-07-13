@@ -70,11 +70,15 @@ export interface TeamMeeting {
 }
 
 export interface TeamMeetingListItem {
-  id:           string;
-  title:        string;
-  meeting_date: string;
-  created_at:   string;
-  updated_at:   string;
+  id:                 string;
+  title:              string;
+  meeting_date:       string;
+  created_at:         string;
+  updated_at:         string;
+  /** True "anything changed by anyone" stamp — bumped by every content mutation. */
+  content_updated_at: string;
+  /** Caller never viewed this meeting, or it changed since their last view. */
+  unread:             boolean;
 }
 
 // ── Tracks ─────────────────────────────────────────────────────────────────────

@@ -24,13 +24,34 @@ async function list_team_meetings(params, caller_user_id) {
 
   const { data, error } = await supabase
     .from('team_meetings')
-    .select('id, title, meeting_date, created_at, updated_at')
+    .select('id, title, meeting_date, created_at, updated_at, content_updated_at')
     .eq('track_id', track_id)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (error) return { success: false, error: error.message };
+
+  // Unread flag per meeting: caller never viewed it, or content changed since
+  // their last view (same semantics as the series list).
+  const meetingIds = (data || []).map(m => m.id);
+  let viewByMeeting = {};
+  if (meetingIds.length) {
+    const { data: views } = await supabase
+      .from('team_meeting_views')
+      .select('meeting_id, viewed_at')
+      .eq('user_id', caller_user_id)
+      .in('meeting_id', meetingIds);
+    (views || []).forEach(v => { viewByMeeting[v.meeting_id] = v.viewed_at; });
+  }
+  const enriched = (data || []).map(m => {
+    const viewedAt = viewByMeeting[m.id];
+    return {
+      ...m,
+      unread: !viewedAt ||
+        new Date(m.content_updated_at).getTime() > new Date(viewedAt).getTime()
+    };
+  });
 
   // Cadence-driven default date for the "+ New Meeting" panel.
   const { data: cadRow } = await supabase
@@ -50,7 +71,7 @@ async function list_team_meetings(params, caller_user_id) {
 
   return {
     success: true,
-    data: data || [],
+    data: enriched,
     track: {
       track_id:   access.track.track_id,
       track_name: access.track.track_name,

@@ -112,7 +112,7 @@ interface InitiativeSearchResult {
 
           <!-- Sections — snapshot title/color from the series template at creation.
                Drop targets for bullet drag & drop. -->
-          <div *ngFor="let section of meeting.sections"
+          <div *ngFor="let section of meeting.sections; trackBy: trackById"
                class="tmd-section"
                [class.tmd-section-dragover]="dragOverSectionId === section.id"
                (dragover)="onSectionDragOver($event, section)"
@@ -150,7 +150,7 @@ interface InitiativeSearchResult {
                   <div *ngIf="section.bullets.length === 0" class="tmd-no-bullets">
                     No items recorded.
                   </div>
-                  <div *ngFor="let bullet of section.bullets"
+                  <div *ngFor="let bullet of section.bullets; trackBy: trackById"
                        class="tmd-bullet-row"
                        [class.tmd-bullet-dragging]="draggingBulletId === bullet.id"
                        [class.tmd-bullet-pending]="bullet.pending"
@@ -715,6 +715,10 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   initials(name: string): string {
     return name.split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join('');
   }
+
+  // trackBy for sections + bullets: DOM nodes are reused across poll merges —
+  // only changed bindings repaint (Processing Feedback / live-collab review).
+  trackById(_i: number, item: { id: string }): string { return item.id; }
 
   // ── Section collapse ────────────────────────────────────────────────────────
   toggleSection(section: TeamMeetingSection): void {
