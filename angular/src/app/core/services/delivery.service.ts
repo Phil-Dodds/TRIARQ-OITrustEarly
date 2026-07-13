@@ -133,6 +133,15 @@ export class DeliveryService {
     return this.mcp.call<InitiativeStatusDashboardRow[]>('delivery', 'get_initiative_status_dashboard', params as Record<string, unknown>);
   }
 
+  /** Contract 36 (D-512): dashboard polling change signal — boolean only. */
+  statusDashboardChangedSince(since: string | null, division_ids?: string[]):
+    Observable<McpResponse<{ changed: boolean; checked_at: string }>> {
+    return this.mcp.call('delivery', 'status_dashboard_changed_since', {
+      ...(since ? { since } : {}),
+      ...(division_ids?.length ? { division_ids } : {})
+    });
+  }
+
   /** On-demand overdue refresh (D-482). */
   triggerStatusRefresh(): Observable<McpResponse<StatusRefreshResult>> {
     return this.mcp.call<StatusRefreshResult>('delivery', 'trigger_status_refresh', {});

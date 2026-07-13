@@ -1,11 +1,14 @@
-// initiative-status-update-panel.component.ts — Contract 32 (WS2)
-// Right panel for Initiative Status (D-478). Two modes:
-//   edit  — trio member authors an update (Save/Cancel in header, D-348 Tier 1).
-//   read  — read-only view + acknowledgment + Needs Review + View Initiative link.
+// initiative-status-update-panel.component.ts — Contract 32 (WS2),
+// reworked Contract 36 (D-506/D-507/D-512/D-513/D-514).
+// Right panel for Initiative Status (D-478). Modes:
+//   edit — ANY user with visibility authors an update (D-506); may supersede
+//          the latest update when the edit window is open (D-507).
+//   read — read-only view + D-513 acknowledgment chips + Prev/Next meeting
+//          navigation (D-512) + Update Status / Edit actions from the panel.
 //
-// S-017: edit is modal (scrim); read is non-modal (no scrim). D-178 skeleton on
-// read load. D-346 Context A on Save/Acknowledge. D-200 Pattern 3 inline errors.
-// D-477: confidence fields use the shared MilestoneStatusSelectorComponent.
+// Full-rewrite note (D-252): Contract 36 deltas touched ~70% of the file —
+// recorded as a CC-decision; behaviors preserved: S-017 modality, D-178
+// skeleton, D-346 busy states, D-200 inline errors, D-477 confidence selector.
 
 import {
   Component,
@@ -14,7 +17,9 @@ import {
   Input,
   Output,
   EventEmitter,
-  OnInit
+  OnInit,
+  OnChanges,
+  SimpleChanges
 } from '@angular/core';
 import { CommonModule }       from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
@@ -28,7 +33,12 @@ import {
   StatusConfidence
 } from '../../../core/types/initiative-status';
 
-const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+// D-514: cadence display names — 'weekly cycle' / 'tri-weekly cycle' / 'monthly cycle'.
+const CADENCE_PHRASE: Record<string, string> = {
+  weekly:    'Weekly Cycle',
+  triweekly: 'Tri-weekly Cycle',
+  monthly:   'Monthly Cycle'
+};
 
 @Component({
   selector: 'app-initiative-status-update-panel',
@@ -37,22 +47,27 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
   imports: [CommonModule, ReactiveFormsModule, IonicModule, MilestoneStatusSelectorComponent],
   template: `
     <!-- S-017: edit is modal (scrim covers list); read is non-modal. -->
-    <div *ngIf="mode === 'edit'" class="oi-scrim oi-scrim-detail" (click)="onCancel()"></div>
+    <div *ngIf="activeMode === 'edit'" class="oi-scrim oi-scrim-detail" (click)="onCancel()"></div>
 
     <div class="oi-side-panel oi-side-detail" role="dialog" aria-modal="true"
-         [attr.aria-label]="mode === 'edit' ? 'Initiative Status Update' : 'Initiative Status'">
+         [attr.aria-label]="activeMode === 'edit' ? 'Initiative Status Update' : 'Initiative Status'">
 
       <!-- ── Header (D-348 Tier 1: Save/Cancel here in edit mode) ── -->
       <div class="oi-side-head">
         <div style="display:flex;flex-direction:column;gap:2px;">
-          <strong>{{ mode === 'edit' ? 'Initiative Status Update' : 'Initiative Status' }}</strong>
+          <strong>{{ activeMode === 'edit' ? (editingUpdateId ? 'Edit Status Update' : 'Initiative Status Update') : 'Initiative Status' }}</strong>
           <span style="font-size:12px;color:var(--triarq-color-text-secondary);">{{ initiativeName }}</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <ng-container *ngIf="mode === 'edit'">
+          <!-- D-512: Prev/Next walk the dashboard grid in its in-effect filter + sort. -->
+          <ng-container *ngIf="activeMode === 'read' && (hasPrev || hasNext)">
+            <button class="oi-btn-secondary isp-nav" [disabled]="!hasPrev" (click)="prev.emit()">‹ Prev</button>
+            <button class="oi-btn-secondary isp-nav" [disabled]="!hasNext" (click)="next.emit()">Next ›</button>
+          </ng-container>
+          <ng-container *ngIf="activeMode === 'edit'">
             <button class="oi-btn-secondary" (click)="onCancel()" [disabled]="saving">Cancel</button>
             <button class="oi-btn-primary" (click)="save()" [disabled]="saving">
-              {{ saving ? 'Saving…' : 'Save Status Update' }}
+              {{ saving ? 'Saving…' : (editingUpdateId ? 'Save Edit' : 'Save Status Update') }}
             </button>
           </ng-container>
           <button class="oi-close-btn" (click)="onCancel()" aria-label="Close">✕</button>
@@ -62,13 +77,16 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
       <div class="oi-side-body">
 
         <!-- ============ EDIT MODE ============ -->
-        <form *ngIf="mode === 'edit'" [formGroup]="form">
+        <form *ngIf="activeMode === 'edit'" [formGroup]="form">
+          <div *ngIf="editingUpdateId" class="isp-edit-note">
+            Editing the latest update — the original save time still governs due dates.
+          </div>
           <div class="oi-field-row" style="flex-direction:column;align-items:stretch;gap:4px;">
-            <label class="oi-field-label">Accomplished Last Cycle</label>
+            <label class="oi-field-label">{{ accomplishedLabel }}</label>
             <textarea class="oi-input" rows="3" formControlName="accomplished_last_cycle"></textarea>
           </div>
           <div class="oi-field-row" style="flex-direction:column;align-items:stretch;gap:4px;">
-            <label class="oi-field-label">Plan for Next Cycle</label>
+            <label class="oi-field-label">{{ planLabel }}</label>
             <textarea class="oi-input" rows="3" formControlName="plan_next_cycle"></textarea>
           </div>
           <div class="oi-field-row" style="flex-direction:column;align-items:stretch;gap:4px;">
@@ -106,7 +124,7 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
         </form>
 
         <!-- ============ READ MODE ============ -->
-        <ng-container *ngIf="mode === 'read'">
+        <ng-container *ngIf="activeMode === 'read'">
           <!-- D-178 Tier 1 skeleton -->
           <div *ngIf="loading" style="display:flex;flex-direction:column;gap:8px;">
             <ion-skeleton-text animated style="width:55%;height:14px;"></ion-skeleton-text>
@@ -116,16 +134,23 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
 
           <ng-container *ngIf="!loading">
             <div *ngIf="!latest?.latest" class="oi-zone-explain">No status updates recorded.</div>
+            <!-- D-512 act-from-panel: Update Status available with or without a prior update. -->
+            <div *ngIf="!latest?.latest" style="margin-top:12px;">
+              <button class="oi-btn-primary" (click)="startNewUpdate()">Update Status</button>
+            </div>
 
             <ng-container *ngIf="latest?.latest as u">
-              <div class="isp-subhead">Updated by {{ latest!.saved_by_name || 'Unknown' }} · {{ formatDateTime(u.saved_at) }}</div>
+              <div class="isp-subhead">
+                Updated by {{ latest!.saved_by_name || 'Unknown' }} · {{ ageLabel }}
+                <span *ngIf="latest!.chain?.is_edited" class="isp-edited">(edited)</span>
+              </div>
 
               <div class="oi-field-row" style="flex-direction:column;align-items:stretch;">
-                <span class="oi-field-label">Accomplished Last Cycle</span>
+                <span class="oi-field-label">{{ accomplishedLabel }}</span>
                 <span>{{ u.accomplished_last_cycle || '—' }}</span>
               </div>
               <div class="oi-field-row" style="flex-direction:column;align-items:stretch;">
-                <span class="oi-field-label">Plan for Next Cycle</span>
+                <span class="oi-field-label">{{ planLabel }}</span>
                 <span>{{ u.plan_next_cycle || '—' }}</span>
               </div>
               <div class="oi-field-row" style="flex-direction:column;align-items:stretch;">
@@ -145,18 +170,30 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
                 <span>{{ confidenceLabel(u.close_confidence) }}</span>
               </div>
 
-              <!-- Acknowledged by -->
-              <div class="oi-zone" style="margin-top:12px;">
-                <div class="oi-zone-title">Acknowledged by</div>
-                <div *ngIf="latest!.acknowledgments.length === 0" class="oi-zone-explain">
-                  No acknowledgments required.
-                </div>
-                <div *ngFor="let a of latest!.acknowledgments" class="isp-ack-row">
-                  <span [class.isp-ack-done]="a.acknowledged">{{ a.acknowledged ? '✓' : '○' }}</span>
-                  <span>{{ a.display_name }}</span>
-                  <span style="color:var(--triarq-color-text-secondary);font-size:12px;">
-                    {{ a.acknowledged ? formatDateTime(a.acknowledged_at) : 'Pending' }}
-                  </span>
+              <!-- D-513: Acknowledgment chips — non-trio-authored updates only. -->
+              <div class="oi-zone" style="margin-top:12px;" *ngIf="latest!.is_trio_author === false && latest!.acknowledgments.length">
+                <div class="oi-zone-title">Acknowledgments</div>
+                <div class="isp-chip-row">
+                  <ng-container *ngFor="let a of latest!.acknowledgments">
+                    <!-- Own pending chip = one-click Acknowledge -->
+                    <button *ngIf="isMe(a.user_id) && !a.acknowledged"
+                            class="isp-chip isp-chip-action"
+                            [disabled]="acking"
+                            [title]="a.display_name"
+                            (click)="acknowledge(u.id)">
+                      {{ acking ? 'Acknowledging…' : 'Acknowledge' }}
+                    </button>
+                    <span *ngIf="!isMe(a.user_id) || a.acknowledged"
+                          class="isp-chip"
+                          [class.isp-chip-done]="a.acknowledged"
+                          [class.isp-chip-pending]="!a.acknowledged"
+                          [title]="chipTitle(a)">
+                      {{ initials(a.display_name) }}<ng-container *ngIf="a.acknowledged"> ✓</ng-container>
+                    </span>
+                    <span *ngIf="!a.acknowledged && a.acknowledged_earlier" class="isp-earlier">
+                      acknowledged an earlier version
+                    </span>
+                  </ng-container>
                 </div>
               </div>
 
@@ -168,20 +205,16 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
                 </div>
               </div>
 
+              <!-- D-512 act-from-panel: Update Status (any user) + Edit (window rules) -->
+              <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="oi-btn-primary" (click)="startNewUpdate()">Update Status</button>
+                <button *ngIf="canEdit" class="oi-btn-secondary" (click)="startEditLatest()">Edit</button>
+              </div>
+
               <!-- View Initiative link (D-478, S-006/S-007) -->
               <div style="margin-top:12px;">
                 <a role="button" tabindex="0" class="isp-link"
                    (click)="viewInitiative.emit()" (keydown.enter)="viewInitiative.emit()">View Initiative</a>
-              </div>
-
-              <!-- Acknowledge button (D-346 Context A) -->
-              <div style="margin-top:12px;" *ngIf="canAcknowledge">
-                <button class="oi-btn-primary" (click)="acknowledge(u.id)" [disabled]="acking">
-                  {{ acking ? 'Acknowledging…' : 'Acknowledge Update' }}
-                </button>
-              </div>
-              <div style="margin-top:12px;" *ngIf="ackDone" class="isp-ack-done">
-                ✓ Acknowledged {{ formatDateTime(ackDoneAt) }}
               </div>
 
               <div class="oi-err" *ngIf="error">{{ error }}</div>
@@ -196,10 +229,24 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
     :host { display:block; }
     .isp-helper { font-size:11px; color:var(--triarq-color-stone, #5A5A5A); }
     .isp-subhead { font-size:12px; color:var(--triarq-color-text-secondary); margin-bottom:10px; }
+    .isp-edited { font-style:italic; color:#9E9E9E; margin-left:4px; }
+    .isp-edit-note { font-size:11px; font-style:italic; color:#757575; background:#F4F7F9; border-radius:5px; padding:6px 10px; margin-bottom:10px; }
     .isp-toggle { display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
     .isp-escalation { color:var(--triarq-color-error, #E96127); font-weight:500; }
-    .isp-ack-row { display:flex; align-items:center; gap:8px; font-size:13px; padding:3px 0; }
-    .isp-ack-done { color:#22c55e; font-weight:500; }
+    .isp-nav { font-size:12px; padding:4px 10px; }
+    .isp-chip-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .isp-chip {
+      display:inline-flex; align-items:center; gap:3px;
+      border-radius:999px; padding:2px 10px; font-size:11px; font-weight:600;
+      border:1px solid transparent;
+    }
+    .isp-chip-done { background:#E8F5E9; color:#2E7D32; }
+    .isp-chip-pending { background:#F0F0F0; color:#9E9E9E; border-color:#E0E0E0; }
+    .isp-chip-action {
+      background:var(--triarq-color-primary,#257099); color:#fff; cursor:pointer; border:none;
+    }
+    .isp-chip-action:disabled { opacity:0.6; cursor:default; }
+    .isp-earlier { font-size:10px; font-style:italic; color:#757575; }
     .isp-pill {
       background:var(--triarq-color-error, #E96127); color:#fff;
       border-radius:var(--radius-pill, 999px); padding:2px 10px; font-size:11px;
@@ -207,25 +254,34 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
     .isp-link { color:var(--triarq-color-primary, #257099); cursor:pointer; font-size:13px; }
   `]
 })
-export class InitiativeStatusUpdatePanelComponent implements OnInit {
+export class InitiativeStatusUpdatePanelComponent implements OnInit, OnChanges {
   @Input() initiativeId!: string;
   @Input() initiativeName = '';
   @Input() mode: 'edit' | 'read' = 'edit';
   /** Edit-mode field visibility (D-479). Server recomputes the authoritative value on save. */
   @Input() pilotApplicable = false;
   @Input() closeApplicable = false;
-  /** When true (openers without the cycle stage handy), the panel fetches the
-   *  cycle and derives applicability itself rather than trusting the inputs. */
+  /** When true, the panel fetches the cycle and derives applicability itself. */
   @Input() deriveApplicability = false;
+  /** D-512: Prev/Next meeting navigation (dashboard supplies availability). */
+  @Input() hasPrev = false;
+  @Input() hasNext = false;
 
   // Internal applicability — seeded from inputs, optionally derived (D-479).
   pilotApp = false;
   closeApp = false;
 
+  // Contract 36: the panel can switch read → edit internally (act from panel).
+  activeMode: 'edit' | 'read' = 'edit';
+  /** D-507: set when editing (superseding) the latest update. */
+  editingUpdateId: string | null = null;
+
   @Output() saved          = new EventEmitter<void>();
   @Output() cancelled      = new EventEmitter<void>();
   @Output() viewInitiative = new EventEmitter<void>();
   @Output() acknowledged   = new EventEmitter<void>();
+  @Output() prev           = new EventEmitter<void>();
+  @Output() next           = new EventEmitter<void>();
 
   form: FormGroup;
   pilotConfidence: StatusConfidence | null = null;
@@ -234,8 +290,6 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit {
   loading = false;
   saving  = false;
   acking  = false;
-  ackDone = false;
-  ackDoneAt = '';
   error: string | null = null;
 
   latest: LatestInitiativeStatus | null = null;
@@ -255,11 +309,29 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this.mode === 'read') { this.load(); return; }
+    this.activeMode = this.mode;
+    if (this.activeMode === 'read') { this.load(); return; }
     // Edit mode: seed applicability from inputs, optionally derive from the cycle.
     this.pilotApp = this.pilotApplicable;
     this.closeApp = this.closeApplicable;
     if (this.deriveApplicability) { this.deriveFromCycle(); }
+    // D-514: cadence phrase needs the latest-status payload even in edit mode.
+    this.loadCadenceOnly();
+  }
+
+  /** D-512: Prev/Next changes initiativeId — reload in place. */
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['initiativeId'] && !changes['initiativeId'].firstChange) {
+      this.error = null;
+      this.editingUpdateId = null;
+      this.activeMode = this.mode;
+      if (this.activeMode === 'read') { this.load(); }
+    }
+  }
+
+  /** External refresh hook — the dashboard's poll refreshes an open panel (D-512). */
+  refresh(): void {
+    if (this.activeMode === 'read') { this.load(); }
   }
 
   private deriveFromCycle(): void {
@@ -295,16 +367,79 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit {
     });
   }
 
-  /** Acknowledge button visibility (D-483): current user is an unacknowledged
-   *  non-save trio member, within the 5-day window. */
-  get canAcknowledge(): boolean {
-    if (this.ackDone || !this.latest?.latest) { return false; }
-    const me = this.profileService.getCurrentProfile()?.id;
+  /** Edit-mode openers still need resolved_cadence for the D-514 labels. */
+  private loadCadenceOnly(): void {
+    this.delivery.getLatestInitiativeStatus(this.initiativeId).subscribe({
+      next: (res) => {
+        if (res.success && res.data) { this.latest = res.data; this.cdr.markForCheck(); }
+      },
+      error: () => {}
+    });
+  }
+
+  // ── D-514: cadence-named helper text ────────────────────────────────────────
+  get cadencePhrase(): string | null {
+    const c = this.latest?.resolved_cadence;
+    return c ? (CADENCE_PHRASE[c] ?? null) : null;
+  }
+  get accomplishedLabel(): string {
+    return this.cadencePhrase ? `Accomplished Last ${this.cadencePhrase}` : 'Accomplished Recently';
+  }
+  get planLabel(): string {
+    return this.cadencePhrase ? `Plan for Next ${this.cadencePhrase}` : 'Plan / Next Steps';
+  }
+
+  // ── D-507 age from chain root ───────────────────────────────────────────────
+  get ageLabel(): string {
+    const rootIso = this.latest?.chain?.root_saved_at ?? this.latest?.latest?.saved_at ?? null;
+    if (!rootIso) { return '—'; }
+    const dayMs = 24 * 60 * 60 * 1000;
+    const d = new Date(rootIso);
+    const days = Math.floor(Date.now() / dayMs) - Math.floor(d.getTime() / dayMs);
+    if (days <= 0) { return 'Today'; }
+    return days === 1 ? '1 day' : `${days} days`;
+  }
+
+  // ── D-512 act-from-panel ────────────────────────────────────────────────────
+  startNewUpdate(): void {
+    this.editingUpdateId = null;
+    this.form.reset({ accomplished_last_cycle: '', plan_next_cycle: '', blockers: '', escalation_needed: false });
+    this.pilotConfidence = null;
+    this.closeConfidence = null;
+    this.activeMode = 'edit';
+    this.deriveFromCycle();
+    this.cdr.markForCheck();
+  }
+
+  /** D-507: Edit offered when the window is open AND caller is author or trio.
+   *  The trio check is server-authoritative; the panel shows Edit when the
+   *  window is open and the caller is the author OR appears in the ack chip
+   *  roster (trio) — the server re-validates on save. */
+  get canEdit(): boolean {
+    if (!this.latest?.latest || !this.latest.chain?.edit_window_open) { return false; }
+    const me = this.profileService.getCurrentProfile();
     if (!me) { return false; }
-    const within5d = (Date.now() - new Date(this.latest.latest.saved_at).getTime()) <= FIVE_DAYS_MS;
-    if (!within5d) { return false; }
-    const entry = this.latest.acknowledgments.find(a => a.user_id === me);
-    return !!entry && !entry.acknowledged;
+    if (me.is_admin === true) { return true; }
+    if (this.latest.latest.saved_by === me.id) { return true; }
+    return this.latest.acknowledgments.some(a => a.user_id === me.id);
+  }
+
+  startEditLatest(): void {
+    const u = this.latest?.latest;
+    if (!u) { return; }
+    this.editingUpdateId = u.id;
+    this.form.reset({
+      accomplished_last_cycle: u.accomplished_last_cycle ?? '',
+      plan_next_cycle:         u.plan_next_cycle ?? '',
+      blockers:                u.blockers ?? '',
+      escalation_needed:       u.escalation_needed === true
+    });
+    this.pilotConfidence = u.pilot_confidence ?? null;
+    this.closeConfidence = u.close_confidence ?? null;
+    this.pilotApp = u.pilot_confidence_applicable;
+    this.closeApp = u.close_confidence_applicable;
+    this.activeMode = 'edit';
+    this.cdr.markForCheck();
   }
 
   save(): void {
@@ -318,11 +453,20 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit {
       blockers:                v.blockers || null,
       escalation_needed:       v.escalation_needed === true,
       pilot_confidence:        this.pilotApp ? this.pilotConfidence : null,
-      close_confidence:        this.closeApp ? this.closeConfidence : null
+      close_confidence:        this.closeApp ? this.closeConfidence : null,
+      ...(this.editingUpdateId ? { supersedes_update_id: this.editingUpdateId } : {})
     }).subscribe({
       next: (res) => {
         this.saving = false;
-        if (res.success) { this.saved.emit(); }
+        if (res.success) {
+          this.editingUpdateId = null;
+          if (this.mode === 'read') {
+            // Opened as a read panel — return to read view with fresh data.
+            this.activeMode = 'read';
+            this.load();
+          }
+          this.saved.emit();
+        }
         else { this.error = res.error || 'Could not save the status update.'; this.cdr.markForCheck(); }
       },
       error: (err) => {
@@ -333,6 +477,21 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit {
     });
   }
 
+  // ── D-513 chips ─────────────────────────────────────────────────────────────
+  isMe(userId: string): boolean {
+    return this.profileService.getCurrentProfile()?.id === userId;
+  }
+
+  initials(name: string): string {
+    return name.split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join('');
+  }
+
+  chipTitle(a: { display_name: string; acknowledged: boolean; acknowledged_at: string | null; acknowledged_earlier?: boolean }): string {
+    if (a.acknowledged) { return `${a.display_name} — acknowledged ${this.formatDateTime(a.acknowledged_at)}`; }
+    if (a.acknowledged_earlier) { return `${a.display_name} — acknowledged an earlier version`; }
+    return `${a.display_name} — not acknowledged`;
+  }
+
   acknowledge(statusUpdateId: string): void {
     this.error = null;
     this.acking = true;
@@ -340,9 +499,8 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit {
       next: (res) => {
         this.acking = false;
         if (res.success && res.data) {
-          this.ackDone = true;
-          this.ackDoneAt = res.data.acknowledged_at;
-          this.acknowledged.emit();
+          this.load();               // chips re-render from server truth
+          this.acknowledged.emit();  // drains the My Actions badge (D-512 live)
         } else {
           this.error = res.error || 'Could not record acknowledgment.';
         }
@@ -356,7 +514,17 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit {
     });
   }
 
-  onCancel(): void { this.cancelled.emit(); }
+  onCancel(): void {
+    // Internal edit started from read view → back to read, not close.
+    if (this.activeMode === 'edit' && this.mode === 'read') {
+      this.activeMode = 'read';
+      this.editingUpdateId = null;
+      this.load();
+      this.cdr.markForCheck();
+      return;
+    }
+    this.cancelled.emit();
+  }
 
   confidenceLabel(v: string | null): string {
     const map: Record<string, string> = {

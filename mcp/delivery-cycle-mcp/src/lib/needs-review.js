@@ -26,13 +26,22 @@ const AT_RISK_STATES = ['at_risk', 'behind'];
  * evaluated per D-486).
  */
 async function resolveCadenceIntervalDays(supabase, division_id) {
+  const cadence = await resolveCadenceName(supabase, division_id);
+  return cadence ? (CADENCE_INTERVAL_DAYS[cadence] ?? null) : null;
+}
+
+/**
+ * D-514: resolve the cadence NAME ('weekly' | 'triweekly' | 'monthly' | null)
+ * for a Division via the D-481 upward walk. Null = unconfigured (exempt) —
+ * consumers omit the cadence phrase entirely.
+ */
+async function resolveCadenceName(supabase, division_id) {
   if (!division_id) { return null; }
   const { data, error } = await supabase
     .rpc('resolve_division_status_config', { p_division_id: division_id });
   if (error) { return null; }
   const row = Array.isArray(data) ? data[0] : data;
-  if (!row || !row.cadence) { return null; }
-  return CADENCE_INTERVAL_DAYS[row.cadence] ?? null;
+  return row?.cadence ?? null;
 }
 
 /**
@@ -131,6 +140,7 @@ module.exports = {
   GATE_LABELS,
   CADENCE_INTERVAL_DAYS,
   resolveCadenceIntervalDays,
+  resolveCadenceName,
   computeSlippedGateLabels,
   computeNeedsReviewReasons
 };

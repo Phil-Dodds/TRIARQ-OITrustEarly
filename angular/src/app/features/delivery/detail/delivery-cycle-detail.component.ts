@@ -256,8 +256,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </button>
 
             <!-- Contract 32 (WS2) — D-348 Tier 2 record-level actions. -->
-            <button *ngIf="callerIsTrioMember"
-                    (click)="openStatusPanel()"
+            <!-- D-506 (Contract 36): any user with visibility may author. -->
+            <button (click)="openStatusPanel()"
                     style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
                            background:none;border:1px solid var(--triarq-color-primary);
                            border-radius:5px;padding:3px 8px;cursor:pointer;">
@@ -543,8 +543,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--triarq-space-sm);">
           <span style="font-weight:500;">Current Status</span>
-          <button *ngIf="callerIsTrioMember"
-                  (click)="openStatusPanel()"
+          <!-- D-506 (Contract 36): any user with visibility may author. -->
+          <button (click)="openStatusPanel()"
                   style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
                          background:none;border:1px solid var(--triarq-color-primary);
                          border-radius:5px;padding:3px 8px;cursor:pointer;">
@@ -585,6 +585,35 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </div>
             <div *ngIf="u.close_confidence_applicable" style="margin-bottom:6px;">
               <span style="font-weight:500;">Close Review Confidence:</span> {{ confidenceLabel(u.close_confidence) }}
+            </div>
+
+            <!-- D-513 (Contract 36): acknowledgment chips — non-trio-authored updates
+                 only (the only case generating invitations). One chip per trio
+                 member; own pending chip = one-click Acknowledge. -->
+            <div *ngIf="latestStatus!.is_trio_author === false && latestStatus!.acknowledgments.length"
+                 style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0;">
+              <span style="font-weight:500;font-size:12px;">Acknowledgments:</span>
+              <ng-container *ngFor="let a of latestStatus!.acknowledgments">
+                <button *ngIf="isCurrentUser(a.user_id) && !a.acknowledged"
+                        type="button"
+                        [disabled]="ackingStatus"
+                        (click)="acknowledgeCurrentStatus(u.id)"
+                        style="background:var(--triarq-color-primary,#257099);color:#fff;border:none;border-radius:999px;
+                               padding:2px 10px;font-size:11px;font-weight:600;cursor:pointer;"
+                        [title]="a.display_name">
+                  {{ ackingStatus ? 'Acknowledging…' : 'Acknowledge' }}
+                </button>
+                <span *ngIf="!isCurrentUser(a.user_id) || a.acknowledged"
+                      [style.background]="a.acknowledged ? '#E8F5E9' : '#F0F0F0'"
+                      [style.color]="a.acknowledged ? '#2E7D32' : '#9E9E9E'"
+                      style="border-radius:999px;padding:2px 10px;font-size:11px;font-weight:600;"
+                      [title]="a.acknowledged ? (a.display_name + ' — acknowledged ' + formatStatusDateTime(a.acknowledged_at!))
+                              : (a.acknowledged_earlier ? (a.display_name + ' — acknowledged an earlier version') : (a.display_name + ' — not acknowledged'))">
+                  {{ statusInitials(a.display_name) }}<ng-container *ngIf="a.acknowledged"> ✓</ng-container>
+                </span>
+                <span *ngIf="!a.acknowledged && a.acknowledged_earlier"
+                      style="font-size:10px;font-style:italic;color:#757575;">acknowledged an earlier version</span>
+              </ng-container>
             </div>
 
             <div *ngIf="latestStatus!.needs_review_reasons.length"
@@ -1861,6 +1890,30 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
         this.cdr.markForCheck();
       },
       error: () => { this.loadingStatus = false; this.cdr.markForCheck(); }
+    });
+  }
+
+  // ── D-513 (Contract 36): Current Status acknowledgment chips ──────────────
+  ackingStatus = false;
+
+  isCurrentUser(userId: string): boolean {
+    return this.profileService.getCurrentProfile()?.id === userId;
+  }
+
+  statusInitials(name: string): string {
+    return name.split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join('');
+  }
+
+  acknowledgeCurrentStatus(statusUpdateId: string): void {
+    if (this.ackingStatus || !this.cycle) { return; }
+    this.ackingStatus = true;
+    this.cdr.markForCheck();
+    this.delivery.acknowledgeStatusUpdate(statusUpdateId).subscribe({
+      next: () => {
+        this.ackingStatus = false;
+        this.loadLatestStatus(this.cycle!.delivery_cycle_id);   // chips from server truth
+      },
+      error: () => { this.ackingStatus = false; this.cdr.markForCheck(); }
     });
   }
 

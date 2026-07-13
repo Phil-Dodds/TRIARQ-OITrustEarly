@@ -20,7 +20,9 @@ Read decision-registry.md for content lookup only. Never claim or assign a D-num
 
 ### Local dev
 - Run dev server: `npm start` (ng serve)
-- Test: `ng test`
+- Test (Angular): `ng test`
+- Test (MCP servers): `node --test tests/*.test.js` — `node --test tests/` and
+  the packaged `npm test` FAIL on this setup (Contract 36 correction).
 
 ### Deploy build
 - ALWAYS use `npm run build` (or `npm run build:prod`) — the postbuild step writes
@@ -31,7 +33,10 @@ Read decision-registry.md for content lookup only. Never claim or assign a D-num
   stdout to confirm the postbuild ran.
 
 ### Deploy procedure
-- **MCP (Render):** `git push origin master` — Render auto-deploys on push.
+- **MCP (Render):** Render does NOT auto-deploy on push (Contract 36 correction
+  of the earlier v2.7 text). After any push that changes `mcp/<service>/src/`,
+  Phil manually redeploys that service in the Render dashboard — BOTH services
+  (delivery-cycle-mcp, team-meetings-mcp) require this.
 - **Angular (GitHub Pages):** does NOT auto-deploy from master. Deploy explicitly:
   1. `npm run build` (writes version.json)
   2. Copy `angular/dist/pathways-oi-trust/browser/` to a staging dir OUTSIDE the
@@ -381,7 +386,44 @@ maintenance mode off). Report the result explicitly:
 
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | June 2026 | v2.7*
+### Rule 35 — Optimistic UI Reversion
+
+Never revert an optimistic UI state on a timer. Revert only on a server-confirmed state transition.
+
+**Conformance test:** Does any component revert optimistic state via setTimeout or interval? No = pass.
+
+**Exceptions:** None.
+<!-- RATIONALE
+Why: CC-038 — timer-based reverts plus a slow (cold-start) server response visibly unchecked a checkbox mid-save and invited duplicate submissions.
+Considered: Shorter timers (rejected — same race, smaller window). Server-confirmed transitions only (adopted).
+Downsides: A failed request leaves optimistic state until the next poll/correction. Mitigated by poll correction and error surfacing.
+-->
+<!-- GOVERNING: D-493, CC-038 -->
+
+---
+
+### Rule 36 — Busy Guard on MCP-Calling Controls
+
+Every control that fires an MCP call disables itself with a Saving…/spinner state until the call resolves.
+
+**Conformance test:** Does every server-calling control have a disabled/busy state during the in-flight call? Yes = pass.
+
+**Exceptions:** None.
+<!-- RATIONALE
+Why: CC-038 audit found four unguarded controls; rapid clicks inserted duplicate rows.
+Considered: Debounce only (rejected — masks, does not prevent). Disable-until-resolve (adopted).
+Downsides: Slight UI chrome cost. Negligible.
+-->
+<!-- GOVERNING: D-493, CC-038 -->
+
+---
+
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | July 2026 | v2.8*
+
+**v2.8 (2026-07-12, Contract 36 §7)** — Rules 35/36 added (optimistic-UI
+reversion; busy guards). Corrections: Render manual redeploy for BOTH MCP
+services (auto-deploy text was wrong); MCP test invocation is
+`node --test tests/*.test.js`.
 
 **v2.7 (2026-06-11)** — Build and Test Commands section rewritten. `ng build`
 replaced with `npm run build` (postbuild writes `version.json` for S-033

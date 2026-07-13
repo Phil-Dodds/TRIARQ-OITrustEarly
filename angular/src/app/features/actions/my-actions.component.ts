@@ -38,34 +38,40 @@ type ActiveTab = 'open' | 'completed' | 'due' | 'ack';
         <p class="ma-subtitle">Gates awaiting your approval or review, initiative status updates due, and what you've completed.</p>
       </header>
 
+      <!-- D-515 (Contract 36, amends D-491): three tabs; Completed is a
+           secondary link inside Approve Initiative Gates, not a tab. -->
       <div class="ma-tabs" role="tablist">
         <button class="ma-tab" role="tab"
-                [class.ma-tab--active]="activeTab === 'open'"
-                [attr.aria-selected]="activeTab === 'open'"
+                [class.ma-tab--active]="activeTab === 'open' || activeTab === 'completed'"
+                [attr.aria-selected]="activeTab === 'open' || activeTab === 'completed'"
                 (click)="selectTab('open')">
           Approve Initiative Gates
           <span *ngIf="openCount > 0" class="ma-tab-badge">{{ openCount }}</span>
         </button>
         <button class="ma-tab" role="tab"
-                [class.ma-tab--active]="activeTab === 'completed'"
-                [attr.aria-selected]="activeTab === 'completed'"
-                (click)="selectTab('completed')">
-          Initiative Gate Approvals Completed
-        </button>
-        <button class="ma-tab" role="tab"
                 [class.ma-tab--active]="activeTab === 'due'"
                 [attr.aria-selected]="activeTab === 'due'"
                 (click)="selectTab('due')">
-          Updates Due
+          Update Initiative Statuses
           <span *ngIf="dueCount > 0" class="ma-tab-badge">{{ dueCount }}</span>
         </button>
         <button class="ma-tab" role="tab"
                 [class.ma-tab--active]="activeTab === 'ack'"
                 [attr.aria-selected]="activeTab === 'ack'"
                 (click)="selectTab('ack')">
-          Needs Acknowledgment
+          Acknowledge Initiative Status Updates
           <span *ngIf="ackCount > 0" class="ma-tab-badge">{{ ackCount }}</span>
         </button>
+      </div>
+
+      <!-- D-515: Completed reachable via a link in filter-row position. -->
+      <div *ngIf="activeTab === 'open'" class="ma-completed-linkrow">
+        <a class="ma-completed-link" role="button" tabindex="0"
+           (click)="selectTab('completed')" (keydown.enter)="selectTab('completed')">View completed →</a>
+      </div>
+      <div *ngIf="activeTab === 'completed'" class="ma-completed-linkrow">
+        <a class="ma-completed-link" role="button" tabindex="0"
+           (click)="selectTab('open')" (keydown.enter)="selectTab('open')">← Back to pending</a>
       </div>
 
       <app-actions-list *ngIf="activeTab === 'open'"
@@ -100,6 +106,9 @@ type ActiveTab = 'open' | 'completed' | 'due' | 'ack';
     .ma-tab-badge { background: var(--triarq-color-primary, #257099); color: #fff;
                     border-radius: var(--triarq-radius-pill, 999px); padding: 1px 8px;
                     font-size: 11px; font-weight: 700; }
+    /* D-515: Completed as a secondary link in filter-row position. */
+    .ma-completed-linkrow { margin: -6px 0 10px; }
+    .ma-completed-link { font-size: 12px; color: var(--triarq-color-primary, #257099); cursor: pointer; }
   `]
 })
 export class MyActionsComponent implements OnInit {

@@ -6,7 +6,7 @@
 'use strict';
 
 const { supabase } = require('../db');
-const { computeNeedsReviewReasons } = require('../lib/needs-review');
+const { computeNeedsReviewReasons, resolveCadenceName } = require('../lib/needs-review');
 const { isWithinRecentCalendarDays, resolveChainRoots } = require('../lib/status-chain');
 
 const TRIO_ROLES = [
@@ -149,6 +149,8 @@ async function get_latest_initiative_status(params, caller_user_id) {
       saved_by_name:  latest ? (nameById[latest.saved_by] || null) : null,
       is_trio_author: isTrioAuthor,   // D-506/D-513: chips render only when false
       chain,                          // D-507: { root_saved_at, is_edited, edit_window_open }
+      // D-514: cadence name for helper text ('weekly'|'triweekly'|'monthly'|null).
+      resolved_cadence: await resolveCadenceName(supabase, cycle.division_id),
       acknowledgments,
       needs_review_reasons
     }

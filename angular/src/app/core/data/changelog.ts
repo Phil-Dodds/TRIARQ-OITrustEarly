@@ -33,6 +33,38 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-12',
+    builtAt:       '23:30 UTC',
+    contractLabel: 'Contract 36 — Initiative Status & Date Management',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Gate dates',
+        description: 'Gate target and actual dates can now be cleared — pick Clear in the date field and Save. Clearing never changes the gate status; clearing the actual date on a Complete gate asks you to confirm first.'
+      },
+      {
+        audience:    'All',
+        surface:     'Status updates',
+        description: 'Anyone with visibility on an initiative can now save a status update — not just the assigned team. When someone outside the DCS/EPO/DOL team posts one, those three are invited to acknowledge it. The latest update can also be edited for up to 3 days (history keeps every version).'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Status Dashboard',
+        description: 'Rebuilt for running status meetings: Next Gate and Target Date columns, Team column, a merged Updated By (who + how long ago), person filters (EPO/DOL/DCS), two meeting sorts, and Prev/Next in the View Status panel to walk the room initiative by initiative. Changes anyone makes appear live within ~10 seconds.'
+      },
+      {
+        audience:    'All',
+        surface:     'View Status panel',
+        description: 'Act without leaving the panel — post an update, edit the latest one, or acknowledge with one click. Acknowledgment chips show at a glance who has and hasn\'t seen an externally-authored update.'
+      },
+      {
+        audience:    'All',
+        surface:     'My Actions',
+        description: 'Tabs renamed to say what you do: Approve Initiative Gates · Update Initiative Statuses · Acknowledge Initiative Status Updates. Completed approvals moved to a "View completed" link inside the first tab.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-12',
     contractLabel: 'Contract 33 follow-on — Team Meetings enhancements',
     items: [
       {
