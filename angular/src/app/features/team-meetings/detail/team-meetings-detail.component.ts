@@ -8,7 +8,7 @@
 // change; merge preserves focused textareas so the screen doesn't rewrite.
 
 import {
-  Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef
+  Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, ElementRef
 } from '@angular/core';
 import { CommonModule }              from '@angular/common';
 import { RouterModule, Router,
@@ -162,9 +162,10 @@ interface InitiativeSearchResult {
                        [class.tmd-bullet-dragging]="draggingBulletId === bullet.id"
                        [class.tmd-bullet-pending]="bullet.pending"
                        [class.tmd-bullet-removing]="removingBulletId === bullet.id">
-                    <!-- Drag handle = the main row only, so note textareas keep normal text selection -->
+                    <!-- Drag handle = the main row only, so note textareas keep normal text selection.
+                         Draggable off while editing — selecting text in the edit input must not start a drag. -->
                     <div class="tmd-bullet-main-row"
-                         draggable="true"
+                         [draggable]="editingBulletId !== bullet.id"
                          (dragstart)="onBulletDragStart($event, section, bullet)"
                          (dragend)="onBulletDragEnd()">
                     <span class="tmd-bullet-dot" [style.background]="section.bar_color"></span>
@@ -180,8 +181,19 @@ interface InitiativeSearchResult {
                           (keydown.enter)="openInitiativeDetail(bullet.initiative.id)">
                       {{ bullet.initiative.name }}
                     </span>
-                    <!-- Plain text bullet -->
-                    <span *ngIf="!bullet.initiative" class="tmd-bullet-text">{{ bullet.text }}</span>
+                    <!-- Plain text bullet — click ✎ to edit in place -->
+                    <span *ngIf="!bullet.initiative && editingBulletId !== bullet.id" class="tmd-bullet-text">{{ bullet.text }}</span>
+                    <input *ngIf="editingBulletId === bullet.id"
+                           class="tmd-bullet-edit-input"
+                           type="text"
+                           [value]="editingBulletDraft"
+                           [disabled]="editingBulletSaving"
+                           (input)="editingBulletDraft = $any($event.target).value"
+                           (keydown.enter)="commitBulletEdit(bullet)"
+                           (keydown.escape)="cancelBulletEdit()"
+                           (blur)="commitBulletEdit(bullet)"
+                           (click)="$event.stopPropagation()" />
+                    <span *ngIf="editingBulletId === bullet.id && editingBulletSaving" class="tmd-bullet-saving">Saving…</span>
 
                     <!-- Assigned person + next gate — right-aligned, any section with an initiative bullet -->
                     <span *ngIf="bullet.initiative && (bullet.initiative.dcs_name || bullet.initiative.next_gate)"
@@ -219,6 +231,13 @@ interface InitiativeSearchResult {
 
                     <!-- Pending indicator (in-flight add) -->
                     <span *ngIf="bullet.pending" class="tmd-bullet-saving">Saving…</span>
+                    <!-- Edit button — free-text bullets only (initiative bullets show the Initiative name) -->
+                    <button *ngIf="!bullet.pending && !bullet.initiative && editingBulletId !== bullet.id"
+                            class="tmd-edit-bullet-btn"
+                            type="button"
+                            title="Edit bullet"
+                            [attr.aria-label]="'Edit: ' + bullet.text"
+                            (click)="startBulletEdit(bullet, $event)">✎</button>
                     <!-- Remove button -->
                     <button *ngIf="!bullet.pending"
                             class="tmd-remove-btn"
@@ -283,6 +302,7 @@ interface InitiativeSearchResult {
                             placeholder="Capture discussion, decisions, or follow-ups here…"
                             [value]="getNotes(section)"
                             (focus)="focusedNotesSectionId = section.id"
+                            (input)="autoGrow($event)"
                             (blur)="focusedNotesSectionId = null; onNotesBlur(section, $event)"
                             rows="3">
                   </textarea>
@@ -428,6 +448,13 @@ interface InitiativeSearchResult {
       cursor: pointer; flex: 1;
     }
     .tmd-bullet-text { font: 600 13px Roboto; color: #1A1A1A; flex: 1; }
+    .tmd-edit-bullet-btn { background:none; border:none; color:#9E9E9E; cursor:pointer; font-size:13px; padding:0 4px; line-height:1; flex-shrink:0; }
+    .tmd-edit-bullet-btn:hover { color:var(--triarq-color-primary,#257099); }
+    .tmd-bullet-edit-input {
+      flex:1; font:600 13px Roboto; color:#1A1A1A;
+      border:1px solid var(--triarq-color-primary,#257099); border-radius:5px;
+      padding:2px 6px; outline:none; min-width:0;
+    }
     .tmd-remove-btn { background:none; border:none; color:#9E9E9E; cursor:pointer; font-size:16px; padding:0 4px; line-height:1; flex-shrink:0; }
     .tmd-remove-btn:hover { color:#D32F2F; }
     .tmd-remove-btn:disabled { opacity:.4; cursor:default; }
@@ -581,7 +608,8 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     private readonly auth:  AuthService,
     private readonly route: ActivatedRoute,
     private readonly router: Router,
-    private readonly cdr:   ChangeDetectorRef
+    private readonly cdr:   ChangeDetectorRef,
+    private readonly host:  ElementRef<HTMLElement>
   ) {}
 
   ngOnInit(): void {
@@ -624,6 +652,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
         }
         this.loading = false;
         this.cdr.markForCheck();
+        this.sizeAllNotes();
       },
       error: err => {
         this.loadError = err?.error ?? 'Unable to load meeting.';
@@ -678,12 +707,12 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
           cur.bar_color  = inc.bar_color;
           cur.sort_order = inc.sort_order;
           cur.collapsed  = inc.collapsed;
-          // Bullets: preserve object identity for the bullet whose note is being
-          // edited, and keep pending ghost rows (in-flight adds) at the end.
+          // Bullets: preserve object identity for the bullet whose note or text
+          // is being edited, and keep pending ghost rows (in-flight adds) at the end.
           const pendingRows = cur.bullets.filter(b => b.pending);
           cur.bullets = [
             ...inc.bullets.map(ib => {
-              if (ib.id === this.focusedBulletNoteId) {
+              if (ib.id === this.focusedBulletNoteId || ib.id === this.editingBulletId) {
                 const existing = cur.bullets.find(b => b.id === ib.id);
                 return existing ?? ib;
               }
@@ -699,6 +728,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
         });
         this.meeting.sections = merged;
         this.cdr.markForCheck();
+        this.sizeAllNotes();
       }
     });
   }
@@ -737,6 +767,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   toggleSection(section: TeamMeetingSection): void {
     section.collapsed = !section.collapsed;
     this.cdr.markForCheck();
+    if (!section.collapsed) { this.sizeAllNotes(); } // freshly rendered textareas
     this.svc.updateSectionCollapsed(section.id, section.collapsed).subscribe();
   }
 
@@ -1215,6 +1246,60 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     const el = event.target as HTMLTextAreaElement;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
+  }
+
+  /** Size every note textarea to its content. autoGrow only fires on typing —
+   *  notes loaded from the server (initial load, poll merges, section expand)
+   *  land pre-filled and would otherwise stay clipped at their rows height. */
+  private sizeAllNotes(): void {
+    setTimeout(() => {
+      const areas = this.host.nativeElement
+        .querySelectorAll<HTMLTextAreaElement>('textarea.tmd-bullet-note, textarea.tmd-notes-textarea');
+      areas.forEach(el => {
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+      });
+    });
+  }
+
+  // ── Edit a saved bullet (free-text only; initiative bullets show the name) ──
+  editingBulletId: string | null = null;
+  editingBulletDraft = '';
+  editingBulletSaving = false;
+
+  startBulletEdit(bullet: TeamMeetingBullet, event: Event): void {
+    event.stopPropagation();
+    this.editingBulletId    = bullet.id;
+    this.editingBulletDraft = bullet.text;
+    this.editingBulletSaving = false;
+    this.cdr.markForCheck();
+    setTimeout(() => {
+      this.host.nativeElement.querySelector<HTMLInputElement>('.tmd-bullet-edit-input')?.focus();
+    });
+  }
+
+  cancelBulletEdit(): void {
+    this.editingBulletId    = null;
+    this.editingBulletDraft = '';
+    this.editingBulletSaving = false;
+    this.cdr.markForCheck();
+  }
+
+  commitBulletEdit(bullet: TeamMeetingBullet): void {
+    if (this.editingBulletId !== bullet.id || this.editingBulletSaving) return;
+    const text = this.editingBulletDraft.trim();
+    if (!text || text === bullet.text) { this.cancelBulletEdit(); return; }
+
+    this.editingBulletSaving = true;
+    this.cdr.markForCheck();
+    this.svc.updateBulletText(bullet.id, text).subscribe({
+      next: res => {
+        if (res.success) { bullet.text = text; }
+        else { this.refetchAndMerge(); }
+        this.cancelBulletEdit();
+      },
+      error: () => { this.refetchAndMerge(); this.cancelBulletEdit(); }
+    });
   }
 
   // ── Initiative detail overlay (D-478) ───────────────────────────────────────

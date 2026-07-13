@@ -204,3 +204,19 @@ describe('move_section', () => {
     assert.equal(r.data.section_id, 'sec-1');
   });
 });
+
+describe('update_bullet_text', () => {
+  const { update_bullet_text } = require('../src/tools/update_bullet_text');
+
+  it('returns error when bullet_id is missing', async () => {
+    const r = await update_bullet_text({ text: 'hello' }, 'user-1');
+    assert.equal(r.success, false);
+    assert.ok(r.error.includes('bullet_id'));
+  });
+
+  it('returns error when text is missing or blank', async () => {
+    const r = await update_bullet_text({ bullet_id: 'b-1', text: '   ' }, 'user-1');
+    assert.equal(r.success, false);
+    assert.ok(r.error.includes('text'));
+  });
+});

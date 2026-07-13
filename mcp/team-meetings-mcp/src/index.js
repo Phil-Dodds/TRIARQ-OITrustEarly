@@ -29,6 +29,7 @@ const { update_meeting }                    = require('./tools/update_meeting');
 const { update_bullet_note }               = require('./tools/update_bullet_note');
 const { delete_team_meeting }              = require('./tools/delete_team_meeting');
 const { move_section }                     = require('./tools/move_section');
+const { update_bullet_text }               = require('./tools/update_bullet_text');
 const tracks                               = require('./tools/tracks');
 
 const app  = express();
@@ -74,7 +75,8 @@ const TOOLS = {
   add_presenter_sections_all: tracks.add_presenter_sections_all,
   move_bullet:                tracks.move_bullet,
   pull_from_last_meeting:     tracks.pull_from_last_meeting,
-  move_section
+  move_section,
+  update_bullet_text
 };
 
 app.use(cors());

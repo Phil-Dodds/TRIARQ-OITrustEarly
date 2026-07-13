@@ -207,6 +207,11 @@ export class TeamMeetingsService {
     return this.mcp.call('team-meetings', 'move_section', { section_id, target_section_id });
   }
 
+  /** Edit a saved free-text bullet (initiative bullets are rejected server-side). */
+  updateBulletText(bullet_id: string, text: string): Observable<McpResponse<{ bullet_id: string; text: string }>> {
+    return this.mcp.call('team-meetings', 'update_bullet_text', { bullet_id, text });
+  }
+
   pullFromLastMeeting(meeting_id: string, section_id?: string): Observable<McpResponse<{ pulled: number; skipped: number; no_previous?: boolean }>> {
     return this.mcp.call('team-meetings', 'pull_from_last_meeting', { meeting_id, ...(section_id ? { section_id } : {}) });
   }
