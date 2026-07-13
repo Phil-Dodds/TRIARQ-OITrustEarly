@@ -28,7 +28,9 @@ const GATE_NAME_DISPLAY = {
  * @param {object} params
  * @param {string} params.delivery_cycle_id
  * @param {string} params.gate_name
- * @param {string} params.target_date  — ISO date string YYYY-MM-DD
+ * @param {string|null} params.target_date — D-502 null contract:
+ *   ISO date string YYYY-MM-DD sets the date; explicit null CLEARS it (SQL NULL);
+ *   parameter omitted = no change (rejected — this tool exists to change the field).
  * @param {string} caller_user_id - from JWT (middleware); may be null on JWT failure
  */
 async function set_milestone_target_date(params, caller_user_id) {
@@ -40,13 +42,14 @@ async function set_milestone_target_date(params, caller_user_id) {
   if (!gate_name) {
     return { success: false, error: 'gate_name is required.' };
   }
-  if (!target_date) {
-    return { success: false, error: 'target_date is required (YYYY-MM-DD).' };
+  // D-501/D-502: explicit null clears. Omitted (undefined) is a caller error.
+  if (target_date === undefined) {
+    return { success: false, error: 'target_date is required — pass a YYYY-MM-DD date, or null to clear.' };
   }
 
-  // Basic date format validation
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(target_date)) {
-    return { success: false, error: 'target_date must be in YYYY-MM-DD format.' };
+  // Basic date format validation (skip when clearing)
+  if (target_date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(target_date)) {
+    return { success: false, error: 'target_date must be in YYYY-MM-DD format, or null to clear.' };
   }
 
   if (!VALID_GATES.includes(gate_name)) {
@@ -118,7 +121,11 @@ async function set_milestone_target_date(params, caller_user_id) {
     callerDisplayName = caller?.display_name ?? callerDisplayName;
   }
   const gateNameDisplay = GATE_NAME_DISPLAY[gate_name] ?? gate_name;
-  const eventDescription = `${callerDisplayName} set ${gateNameDisplay} target date to ${target_date}.`;
+  // D-501: a clear logs with new_target_date null — D-486 slip detection must
+  // treat null as not-a-slip.
+  const eventDescription = target_date === null
+    ? `${callerDisplayName} cleared the ${gateNameDisplay} target date.`
+    : `${callerDisplayName} set ${gateNameDisplay} target date to ${target_date}.`;
 
   await supabase
     .from('cycle_event_log')

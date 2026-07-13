@@ -841,8 +841,9 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                        class="oi-input"
                        style="width:100%;font-size:12px;padding:3px 6px;" />
                 <div style="display:flex;gap:4px;margin-top:4px;">
+                  <!-- D-501 (AC 5): Save enables on any difference incl. set→blank (clear). -->
                   <button (click)="saveMilestoneDate(m.gate_name)"
-                          [disabled]="savingMilestone"
+                          [disabled]="savingMilestone || milestoneTargetUnchanged(m.gate_name)"
                           style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
                                  color:#fff;border:none;border-radius:4px;cursor:pointer;">
                     {{ savingMilestone ? 'Saving…' : 'Save' }}
@@ -870,6 +871,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                       title="Click to set target date">
                   Set date
                 </span>
+                <!-- D-503: non-blocking retained-status note after a clear. -->
+                <div *ngIf="milestoneNote && milestoneNoteGate === m.gate_name"
+                     style="font-size:10px;font-style:italic;color:#757575;margin-top:2px;">
+                  {{ milestoneNote }}
+                </div>
               </ng-template>
             </div>
 
@@ -881,17 +887,23 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                        class="oi-input"
                        style="width:100%;font-size:12px;padding:3px 6px;" />
                 <div style="display:flex;gap:4px;margin-top:4px;">
+                  <!-- D-501 (AC 5) disabled-when-unchanged. D-503/D-183: first Save on a
+                       Complete-gate clear arms the inline confirm below. -->
                   <button (click)="saveActualDate(m.gate_name)"
-                          [disabled]="savingActualDate"
+                          [disabled]="savingActualDate || actualDateUnchanged(m.gate_name)"
                           style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
                                  color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                    {{ savingActualDate ? 'Saving…' : 'Save' }}
+                    {{ savingActualDate ? 'Saving…' : (confirmClearCompleteGate === m.gate_name ? 'Confirm Clear' : 'Save') }}
                   </button>
                   <button (click)="cancelActualDateEdit()"
                           style="font-size:11px;padding:2px 8px;background:none;
                                  border:1px solid #D0D0D0;border-radius:4px;cursor:pointer;color:#5A5A5A;">
                     Cancel
                   </button>
+                </div>
+                <div *ngIf="confirmClearCompleteGate === m.gate_name"
+                     style="font-size:11px;color:var(--triarq-color-sunray,#F2A620);margin-top:2px;">
+                  This gate is marked Complete. Clear the actual date anyway? Press Confirm Clear to proceed — status stays Complete.
                 </div>
                 <div *ngIf="actualDateError" style="font-size:11px;color:var(--triarq-color-error);margin-top:2px;">{{ actualDateError }}</div>
               </ng-container>
@@ -1610,6 +1622,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   editingMilestoneGate: GateName | null = null;
   savingMilestone       = false;
   milestoneError        = '';
+  // D-503: non-blocking retained-status note after a target-date clear.
+  milestoneNote         = '';
+  milestoneNoteGate: GateName | null = null;
+  // D-503/D-183: two-step inline confirm for clearing the actual date on a Complete gate.
+  confirmClearCompleteGate: GateName | null = null;
   milestoneDateControl  = new FormControl('');
 
   // Artifacts
@@ -2739,7 +2756,9 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   startMilestoneEdit(m: CycleMilestoneDate): void {
     this.editingMilestoneGate = m.gate_name;
     this.milestoneDateControl.setValue(m.target_date ?? '');
-    this.milestoneError = '';
+    this.milestoneError    = '';
+    this.milestoneNote     = '';
+    this.milestoneNoteGate = null;
     this.cdr.markForCheck();
   }
 
@@ -2749,20 +2768,37 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.cdr.markForCheck();
   }
 
+  /** D-501 (AC 5): Save enables only when the field differs from the stored
+   *  value — including set → blank (a clear). Blank → blank stays disabled. */
+  milestoneTargetUnchanged(gate: GateName): boolean {
+    const m = this.cycle?.milestone_dates?.find(x => x.gate_name === gate);
+    const newVal = this.milestoneDateControl.value || null;
+    return newVal === (m?.target_date ?? null);
+  }
+
   saveMilestoneDate(gate: GateName): void {
-    if (!this.cycle || !this.milestoneDateControl.value) { return; }
+    if (!this.cycle) { return; }
+    // D-501: blank persists as NULL — clear is a first-class save.
+    const newVal: string | null = this.milestoneDateControl.value || null;
+    const milestone = this.cycle.milestone_dates?.find(m => m.gate_name === gate);
+    if (newVal === (milestone?.target_date ?? null)) { return; }  // no-op guard (AC 5)
+
+    const isClear = newVal === null;
     this.savingMilestone = true;
     this.milestoneError  = '';
+    this.milestoneNote   = '';
     this.cdr.markForCheck();
 
-    // Capture pre-save status — if Behind, changing target date resets to Not Started (spec Item 1)
-    const preSaveIdx = this.cycle.milestone_dates?.findIndex(m => m.gate_name === gate) ?? -1;
-    const wasBehind  = preSaveIdx !== -1 && this.cycle.milestone_dates![preSaveIdx].date_status === 'behind';
+    // Capture pre-save status — if Behind, CHANGING the target date resets to
+    // Not Started (spec Item 1). A CLEAR never touches status (D-503).
+    const wasBehind = !isClear && milestone?.date_status === 'behind';
+    // D-503: tracked statuses get the retained-status note after a clear.
+    const trackedStatus = ['on_track', 'at_risk', 'behind'].includes(milestone?.date_status ?? '');
 
     this.delivery.setMilestoneTargetDate({
       delivery_cycle_id: this.cycle.delivery_cycle_id,
       gate_name:         gate,
-      target_date:       this.milestoneDateControl.value
+      target_date:       newVal
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
@@ -2776,6 +2812,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
             this.cycle!.milestone_dates[idx] = updated;
           }
           this.editingMilestoneGate = null;
+          // D-503: non-blocking inline note when clearing under a tracked status.
+          if (isClear && trackedStatus) {
+            this.milestoneNote     = 'Status retained; no target date to track against.';
+            this.milestoneNoteGate = gate;
+          }
         } else {
           this.milestoneError = res.error ?? 'Save failed.';
         }
@@ -3478,19 +3519,45 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   startActualDateEdit(gate: GateName): void {
     this.editingActualDateGate = gate;
-    this.actualDateControl.setValue('');
+    // D-501: seed with the stored value so the dirty check (AC 5) is truthful
+    // and Clear on the native picker registers as set → blank.
+    const m = this.cycle?.milestone_dates?.find(x => x.gate_name === gate);
+    this.actualDateControl.setValue(m?.actual_date ?? '');
     this.actualDateError = '';
+    this.confirmClearCompleteGate = null;
     this.cdr.markForCheck();
   }
 
   cancelActualDateEdit(): void {
     this.editingActualDateGate = null;
     this.actualDateError       = '';
+    this.confirmClearCompleteGate = null;
     this.cdr.markForCheck();
   }
 
+  /** D-501 (AC 5): unchanged (incl. blank/blank) → Save disabled. */
+  actualDateUnchanged(gate: GateName): boolean {
+    const m = this.cycle?.milestone_dates?.find(x => x.gate_name === gate);
+    const newVal = this.actualDateControl.value || null;
+    return newVal === (m?.actual_date ?? null);
+  }
+
   saveActualDate(gate: GateName): void {
-    if (!this.cycle || !this.actualDateControl.value) { return; }
+    if (!this.cycle) { return; }
+    const newVal: string | null = this.actualDateControl.value || null;
+    const milestone = this.cycle.milestone_dates?.find(m => m.gate_name === gate);
+    if (newVal === (milestone?.actual_date ?? null)) { return; }  // no-op guard (AC 5)
+
+    // D-503/D-183: clearing the actual date on a Complete gate takes a
+    // two-step inline confirm. First Save press arms it; Confirm proceeds.
+    const isClear = newVal === null;
+    if (isClear && milestone?.date_status === 'complete' && this.confirmClearCompleteGate !== gate) {
+      this.confirmClearCompleteGate = gate;
+      this.cdr.markForCheck();
+      return;
+    }
+    this.confirmClearCompleteGate = null;
+
     this.savingActualDate = true;
     this.actualDateError  = '';
     this.cdr.markForCheck();
@@ -3498,7 +3565,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.delivery.setMilestoneActualDate({
       delivery_cycle_id: this.cycle.delivery_cycle_id,
       gate_name:         gate,
-      actual_date:       this.actualDateControl.value
+      actual_date:       newVal
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {

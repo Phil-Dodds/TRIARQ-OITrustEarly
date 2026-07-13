@@ -373,18 +373,20 @@ export class DeliveryService {
 
   // ── Milestone date tools ───────────────────────────────────────────────────
 
+  // D-502 null contract: explicit null CLEARS the date; a YYYY-MM-DD string sets it.
   setMilestoneTargetDate(params: {
     delivery_cycle_id: string;
     gate_name:         GateName;
-    target_date:       string;
+    target_date:       string | null;
   }): Observable<McpResponse<CycleMilestoneDate>> {
     return this.mcp.call<CycleMilestoneDate>('delivery', 'set_milestone_target_date', params as Record<string, unknown>);
   }
 
+  // D-502 null contract: explicit null CLEARS the date (status untouched, D-503).
   setMilestoneActualDate(params: {
     delivery_cycle_id: string;
     gate_name:         GateName;
-    actual_date:       string;
+    actual_date:       string | null;
     override_reason?:  string;
   }): Observable<McpResponse<CycleMilestoneDate>> {
     return this.mcp.call<CycleMilestoneDate>('delivery', 'set_milestone_actual_date', params as Record<string, unknown>);

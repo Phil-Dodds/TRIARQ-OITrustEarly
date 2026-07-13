@@ -45,7 +45,11 @@ const GATE_NAME_DISPLAY = {
  * @param {object} params
  * @param {string} params.delivery_cycle_id
  * @param {string} params.gate_name
- * @param {string} params.actual_date         — ISO date string YYYY-MM-DD
+ * @param {string|null} params.actual_date    — D-502 null contract:
+ *   ISO date string YYYY-MM-DD records the date (and sets date_status='complete');
+ *   explicit null CLEARS the date — date_status is NOT changed (D-503: clearing a
+ *   date never auto-changes gate status, including Complete).
+ *   Parameter omitted = caller error (this tool exists to change the field).
  * @param {string} [params.override_reason]   — required when reverting an existing actual_date after prior date_status='complete'
  * @param {string} caller_user_id             — from JWT (middleware)
  */
@@ -58,11 +62,12 @@ async function set_milestone_actual_date(params, caller_user_id) {
   if (!gate_name) {
     return { success: false, error: 'gate_name is required.' };
   }
-  if (!actual_date) {
-    return { success: false, error: 'actual_date is required (YYYY-MM-DD).' };
+  // D-501/D-502: explicit null clears. Omitted (undefined) is a caller error.
+  if (actual_date === undefined) {
+    return { success: false, error: 'actual_date is required — pass a YYYY-MM-DD date, or null to clear.' };
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(actual_date)) {
-    return { success: false, error: 'actual_date must be in YYYY-MM-DD format.' };
+  if (actual_date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(actual_date)) {
+    return { success: false, error: 'actual_date must be in YYYY-MM-DD format, or null to clear.' };
   }
   if (!VALID_GATES.includes(gate_name)) {
     return {
@@ -126,11 +131,13 @@ async function set_milestone_actual_date(params, caller_user_id) {
   }
 
   const prior_actual_date = milestone.actual_date;
-  const isRevert   = prior_actual_date && milestone.date_status === 'complete';
+  const isClear    = actual_date === null;   // D-501/D-503
+  const isRevert   = !isClear && prior_actual_date && milestone.date_status === 'complete';
   // D-449 — backdate path: the milestone is currently in 'skipped' state and
   // the caller is recording the actual completion date. This is mutually
-  // exclusive with isRevert (a skipped row has no prior actual_date).
-  const isBackdate = milestone.date_status === 'skipped';
+  // exclusive with isRevert (a skipped row has no prior actual_date) and
+  // never applies to a clear.
+  const isBackdate = !isClear && milestone.date_status === 'skipped';
 
   // TODO: re-enable when UI surfaces override_reason input — Contract 16 known gap.
   // The detail panel has no override_reason field; without it, completed actual
@@ -145,11 +152,13 @@ async function set_milestone_actual_date(params, caller_user_id) {
   //   };
   // }
 
-  // ── Write actual_date + date_status='complete' (+ optional override) ──────
-  const update = {
-    actual_date,
-    date_status: 'complete'
-  };
+  // ── Write actual_date (+ optional override) ───────────────────────────────
+  // Set path: date_status='complete' (D-205 direct-call semantics, unchanged).
+  // Clear path (D-503): actual_date=NULL, date_status UNTOUCHED — clearing a
+  // date never auto-changes status; a Complete gate stays Complete.
+  const update = isClear
+    ? { actual_date: null }
+    : { actual_date, date_status: 'complete' };
   if (override_reason) {
     update.status_override_reason = override_reason;
   }
@@ -206,9 +215,11 @@ async function set_milestone_actual_date(params, caller_user_id) {
         }
       });
   } else {
-    const eventDescription = isRevert
-      ? `${callerDisplayName} changed ${gateNameDisplay} actual date from ${prior_actual_date} to ${actual_date}.`
-      : `${callerDisplayName} set ${gateNameDisplay} actual date to ${actual_date}.`;
+    const eventDescription = isClear
+      ? `${callerDisplayName} cleared the ${gateNameDisplay} actual date.`
+      : isRevert
+        ? `${callerDisplayName} changed ${gateNameDisplay} actual date from ${prior_actual_date} to ${actual_date}.`
+        : `${callerDisplayName} set ${gateNameDisplay} actual date to ${actual_date}.`;
 
     await supabase
       .from('cycle_event_log')

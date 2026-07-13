@@ -58,7 +58,8 @@ async function computeSlippedGateLabels(supabase, delivery_cycle_id, cadenceInte
     const m = ev.event_metadata || {};
     const oldD = m.old_target_date;
     const newD = m.new_target_date;
-    // slip = a later date than before (push-out). Null old (first set) is not a slip.
+    // slip = a later date than before (push-out). Null old (first set) is not a
+    // slip; null new (D-501 clear) is not a slip either — both excluded here.
     if (oldD && newD && new Date(newD) > new Date(oldD)) {
       labels.add(GATE_LABELS[m.gate_name] || m.gate_name);
     }
