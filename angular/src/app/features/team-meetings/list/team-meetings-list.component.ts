@@ -86,6 +86,7 @@ function todayIso(): string {
         <!-- D-308 / S-005: full-row tap navigates to meeting prep/run screen -->
         <div *ngFor="let m of meetings"
              class="tm-row"
+             [class.tm-row-deleting]="deletingId === m.id"
              role="button"
              tabindex="0"
              (click)="confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)"
@@ -107,7 +108,7 @@ function todayIso(): string {
                       [disabled]="deletingId === m.id"
                       title="Delete meeting"
                       (click)="confirmDeleteId = m.id">
-                🗑
+                {{ deletingId === m.id ? '…' : '🗑' }}
               </button>
             </ng-container>
             <span *ngIf="confirmDeleteId === m.id" class="tm-delete-confirm">
@@ -237,6 +238,7 @@ function todayIso(): string {
       border-radius: 4px;
     }
     .tm-row:hover { background: #F5F9FC; }
+    .tm-row-deleting { opacity: 0.4; pointer-events: none; }
     .tm-meeting-name { font: 500 14px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); }
     .tm-muted { color: #757575; font-size: 13px; }
     .tm-row-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }

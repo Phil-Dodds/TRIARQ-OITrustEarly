@@ -27,6 +27,8 @@ export interface TeamMeetingBullet {
   carried_from_bullet_id:  string | null;
   created_by_display_name: string | null;
   initiative:              TeamMeetingInitiativeRef | null;
+  /** Client-only: optimistic ghost row shown while the add round-trips. */
+  pending?:                boolean;
 }
 
 export interface TeamMeetingNotes {
@@ -84,8 +86,12 @@ export interface TrackListItem {
   ref_panel_person_type: RefPanelPersonType;
   is_member:             boolean;
   is_leader:             boolean;
+  /** First leader alphabetically — shown as a chip on non-leader rows. */
+  first_leader_name:     string | null;
   member_count:          number;
   latest_meeting:        { id: string; title: string; meeting_date: string } | null;
+  /** Caller has not viewed the latest meeting, or it changed since their last view. */
+  unread:                boolean;
   deleted_at:            string | null;
 }
 

@@ -13,6 +13,7 @@ import { Router, NavigationEnd }  from '@angular/router';
 import { AuthService }            from './core/services/auth.service';
 import { UserProfileService }     from './core/services/user-profile.service';
 import { VersionCheckService }    from './core/services/version-check.service';
+import { BusyService }            from './core/services/busy.service';
 import { filter, map }            from 'rxjs/operators';
 import { Observable }             from 'rxjs';
 
@@ -21,6 +22,11 @@ import { Observable }             from 'rxjs';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="oi-app-root">
+
+      <!-- Global activity bar — visible while any mutating MCP call is in
+           flight (Processing Feedback standard, 2026-07-12). Pairs with the
+           body.oi-busy progress cursor set by BusyService. -->
+      <div *ngIf="busy$ | async" class="oi-activity-bar" aria-hidden="true"></div>
 
       <!-- CC-20-09: deploy-update banner. Sticky top, full width. Sits
            above the sidebar+main shell so it is visible regardless of
@@ -77,17 +83,34 @@ import { Observable }             from 'rxjs';
       cursor: pointer;
     }
     .oi-update-btn:hover { background: #e6e6e6; }
+
+    /* Processing Feedback standard: 2px indeterminate activity bar, fixed at
+       the very top, shown only while a mutating server call is in flight. */
+    .oi-activity-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 2000;
+      background: linear-gradient(90deg, transparent 0%, var(--triarq-color-primary, #257099) 40%, #6EC1E4 60%, transparent 100%);
+      background-size: 50% 100%;
+      background-repeat: no-repeat;
+      animation: oi-activity-slide 1.1s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes oi-activity-slide {
+      0%   { background-position: -50% 0; }
+      100% { background-position: 150% 0; }
+    }
   `]
 })
 export class AppComponent implements OnInit {
   showSidebar$!:     Observable<boolean>;
   updateAvailable$!: Observable<boolean>;
+  busy$!:            Observable<boolean>;
 
   constructor(
     private readonly router:         Router,
     private readonly auth:           AuthService,
     private readonly profileService: UserProfileService,
-    private readonly versionCheck:   VersionCheckService
+    private readonly versionCheck:   VersionCheckService,
+    private readonly busy:           BusyService
   ) {}
 
   ngOnInit(): void {
@@ -103,6 +126,9 @@ export class AppComponent implements OnInit {
     // NavigationEnd. Banner appears when build_version differs.
     this.updateAvailable$ = this.versionCheck.updateAvailable$;
     this.versionCheck.init();
+
+    // Processing Feedback standard: activity bar mirrors BusyService.
+    this.busy$ = this.busy.busy$;
 
     // Load profile at app startup so sidebar role-filtering works on any
     // first-landing route, not just /home. HomeComponent also calls

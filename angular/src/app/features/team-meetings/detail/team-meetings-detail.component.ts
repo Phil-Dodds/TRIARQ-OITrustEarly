@@ -135,6 +135,7 @@ interface InitiativeSearchResult {
                   <!-- Subtle per-section pull -->
                   <button *ngIf="previousMeetingId"
                           class="tmd-section-pull-btn"
+                          [class.tmd-pull-spinning]="pullingSectionId === section.id"
                           type="button"
                           title="Pull this section's bullets from the last meeting"
                           [disabled]="pullingSectionId === section.id"
@@ -151,7 +152,9 @@ interface InitiativeSearchResult {
                   </div>
                   <div *ngFor="let bullet of section.bullets"
                        class="tmd-bullet-row"
-                       [class.tmd-bullet-dragging]="draggingBulletId === bullet.id">
+                       [class.tmd-bullet-dragging]="draggingBulletId === bullet.id"
+                       [class.tmd-bullet-pending]="bullet.pending"
+                       [class.tmd-bullet-removing]="removingBulletId === bullet.id">
                     <!-- Drag handle = the main row only, so note textareas keep normal text selection -->
                     <div class="tmd-bullet-main-row"
                          draggable="true"
@@ -207,13 +210,16 @@ interface InitiativeSearchResult {
                       </span>
                     </span>
 
+                    <!-- Pending indicator (in-flight add) -->
+                    <span *ngIf="bullet.pending" class="tmd-bullet-saving">Saving…</span>
                     <!-- Remove button -->
-                    <button class="tmd-remove-btn"
+                    <button *ngIf="!bullet.pending"
+                            class="tmd-remove-btn"
                             type="button"
                             [disabled]="removingBulletId === bullet.id"
                             [attr.aria-label]="'Remove: ' + bullet.text"
                             (click)="removeBullet(section, bullet)">
-                      ×
+                      {{ removingBulletId === bullet.id ? '…' : '×' }}
                     </button>
                     </div><!-- /tmd-bullet-main-row -->
                     <!-- Per-bullet note — inviting tint when empty, white when focused/filled, autogrows -->
@@ -261,7 +267,11 @@ interface InitiativeSearchResult {
 
                 <!-- Notes textarea -->
                 <div class="tmd-notes-zone">
-                  <label class="tmd-notes-label">NOTES / COMMENTS</label>
+                  <label class="tmd-notes-label">
+                    NOTES / COMMENTS
+                    <span *ngIf="savingNotesSectionId === section.id" class="tmd-save-flash">Saving…</span>
+                    <span *ngIf="savedNotesSectionId === section.id" class="tmd-save-flash tmd-save-done">Saved ✓</span>
+                  </label>
                   <textarea class="tmd-notes-textarea"
                             placeholder="Capture discussion, decisions, or follow-ups here…"
                             [value]="getNotes(section)"
@@ -438,6 +448,8 @@ interface InitiativeSearchResult {
 
     .tmd-notes-zone { margin-top: 8px; }
     .tmd-notes-label { display: block; font: 600 10px Roboto; color: #9E9E9E; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .tmd-save-flash { margin-left: 8px; font: italic 500 10px Roboto; color: #9E9E9E; text-transform: none; letter-spacing: 0; }
+    .tmd-save-done { color: #4CAF50; }
     .tmd-notes-textarea { width:100%; border:1px solid #E0E0E0; border-radius:5px; padding:8px 10px; font:13px Roboto; resize:vertical; outline:none; box-sizing:border-box; }
     .tmd-notes-textarea:focus { border-color:var(--triarq-color-primary,#257099); }
     .tmd-notes-readonly { font: 13px Roboto; color: #1A1A1A; margin: 0; white-space: pre-wrap; }
@@ -448,8 +460,13 @@ interface InitiativeSearchResult {
     .tmd-pull-btn:disabled { opacity:.6; cursor:default; }
     .tmd-pull-result { font:italic 12px Roboto; color:#4CAF50; }
     .tmd-section-header-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-    .tmd-section-pull-btn { background:none; border:none; color:#BDBDBD; cursor:pointer; font-size:14px; padding:0 2px; line-height:1; }
+    .tmd-section-pull-btn { background:none; border:none; color:#BDBDBD; cursor:pointer; font-size:14px; padding:0 2px; line-height:1; display:inline-block; }
     .tmd-section-pull-btn:hover { color:var(--triarq-color-primary,#257099); }
+    .tmd-pull-spinning { animation: tmd-spin 0.9s linear infinite; color:var(--triarq-color-primary,#257099); }
+    @keyframes tmd-spin { from { transform: rotate(0); } to { transform: rotate(-360deg); } }
+    .tmd-bullet-pending { opacity: 0.55; }
+    .tmd-bullet-saving { font: italic 11px Roboto; color: #9E9E9E; flex-shrink: 0; }
+    .tmd-bullet-removing { opacity: 0.4; }
     /* Drag & drop */
     .tmd-bullet-main-row[draggable="true"] { cursor:grab; }
     .tmd-bullet-dragging { opacity:.4; }
@@ -648,14 +665,19 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
           cur.bar_color  = inc.bar_color;
           cur.sort_order = inc.sort_order;
           cur.collapsed  = inc.collapsed;
-          // Bullets: preserve object identity for the bullet whose note is being edited.
-          cur.bullets = inc.bullets.map(ib => {
-            if (ib.id === this.focusedBulletNoteId) {
-              const existing = cur.bullets.find(b => b.id === ib.id);
-              return existing ?? ib;
-            }
-            return ib;
-          });
+          // Bullets: preserve object identity for the bullet whose note is being
+          // edited, and keep pending ghost rows (in-flight adds) at the end.
+          const pendingRows = cur.bullets.filter(b => b.pending);
+          cur.bullets = [
+            ...inc.bullets.map(ib => {
+              if (ib.id === this.focusedBulletNoteId) {
+                const existing = cur.bullets.find(b => b.id === ib.id);
+                return existing ?? ib;
+              }
+              return ib;
+            }),
+            ...pendingRows
+          ];
           // Notes: never rewrite the textarea the user is typing in.
           if (cur.id !== this.focusedNotesSectionId) {
             cur.notes = inc.notes;
@@ -757,29 +779,47 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   }
 
   private submitBullet(section: TeamMeetingSection, text: string, initiativeId?: string, initiativeName?: string): void {
+    // Processing Feedback standard: a pending ghost bullet appears instantly
+    // where the user is looking; the server row replaces it on confirm.
+    const pendingId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const ghost: TeamMeetingBullet = {
+      id:                      pendingId,
+      text,
+      bullet_note:             null,
+      sort_order:              Number.MAX_SAFE_INTEGER,
+      carried_from_bullet_id:  null,
+      created_by_display_name: null,
+      initiative:              initiativeId && initiativeName
+                                 ? { id: initiativeId, name: initiativeName, stage: '', gate_status: '', dcs_name: null, next_gate: null }
+                                 : null,
+      pending:                 true
+    };
+    section.bullets = [...section.bullets, ghost];
     this.addingBulletSectionId = section.id;
+    this.addInputs[section.id] = '';
     this.cdr.markForCheck();
+
     this.svc.addBullet(section.id, text, initiativeId).subscribe({
       next: res => {
         this.addingBulletSectionId = null;
         if (res.success && res.data) {
-          section.bullets = [...section.bullets, {
-            id:                     res.data.id,
-            text:                   res.data.text,
+          section.bullets = section.bullets.map(b => b.id === pendingId ? {
+            id:                     res.data!.id,
+            text:                   res.data!.text,
             bullet_note:            null,
-            sort_order:             res.data.sort_order,
-            carried_from_bullet_id: res.data.carried_from_bullet_id,
+            sort_order:             res.data!.sort_order,
+            carried_from_bullet_id: res.data!.carried_from_bullet_id,
             created_by_display_name: null,
-            initiative:             initiativeId && initiativeName
-                                      ? { id: initiativeId, name: initiativeName, stage: '', gate_status: '', dcs_name: null, next_gate: null }
-                                      : null
-          }];
-          this.addInputs[section.id] = '';
+            initiative:             ghost.initiative
+          } : b);
+        } else {
+          section.bullets = section.bullets.filter(b => b.id !== pendingId);
         }
         this.cdr.markForCheck();
       },
       error: () => {
         this.addingBulletSectionId = null;
+        section.bullets = section.bullets.filter(b => b.id !== pendingId);
         this.cdr.markForCheck();
       }
     });
@@ -811,9 +851,25 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     this.saveNotes(section, text, false);
   }
 
+  savingNotesSectionId: string | null = null;
+  savedNotesSectionId:  string | null = null;
+  private savedFlashTimer: ReturnType<typeof setTimeout> | null = null;
+
   private saveNotes(section: TeamMeetingSection, text: string, force: boolean): void {
+    this.savingNotesSectionId = section.id;
+    this.savedNotesSectionId  = null;
+    this.cdr.markForCheck();
     this.svc.updateNotes(section.id, text, section.notes?.updated_at, force).subscribe({
       next: res => {
+        this.savingNotesSectionId = null;
+        if (res.success) {
+          this.savedNotesSectionId = section.id;
+          if (this.savedFlashTimer) clearTimeout(this.savedFlashTimer);
+          this.savedFlashTimer = setTimeout(() => {
+            this.savedNotesSectionId = null;
+            this.cdr.markForCheck();
+          }, 1800);
+        }
         if (res.success && res.data) {
           section.notes = {
             notes_text:              text,
@@ -837,6 +893,10 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
             this.cdr.markForCheck();
           }
         }
+      },
+      error: () => {
+        this.savingNotesSectionId = null;
+        this.cdr.markForCheck();
       }
     });
   }
@@ -1000,6 +1060,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   dragOverSectionId: string | null = null;
 
   onBulletDragStart(event: DragEvent, section: TeamMeetingSection, bullet: TeamMeetingBullet): void {
+    if (bullet.pending) { event.preventDefault(); return; }
     this.draggingBulletId    = bullet.id;
     this.dragSourceSectionId = section.id;
     event.dataTransfer?.setData('text/plain', bullet.id);

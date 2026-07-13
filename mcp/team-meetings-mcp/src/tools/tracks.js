@@ -50,40 +50,84 @@ async function list_my_tracks(params, caller_user_id) {
 
   const ids = tracks.map(t => t.track_id);
 
-  // Member counts.
+  // Member counts + leader names (first leader alphabetically, for the
+  // which-series-is-this chip on non-leader rows).
   const { data: allMembers } = await supabase
     .from('team_meeting_track_members')
-    .select('track_id')
+    .select('track_id, user_id, is_leader')
     .in('track_id', ids)
     .is('deleted_at', null);
   const memberCount = {};
   (allMembers || []).forEach(m => { memberCount[m.track_id] = (memberCount[m.track_id] || 0) + 1; });
 
-  // Latest meeting per track.
+  const leaderIds = [...new Set((allMembers || []).filter(m => m.is_leader).map(m => m.user_id))];
+  let leaderNameById = {};
+  if (leaderIds.length) {
+    const { data: leaderUsers } = await supabase
+      .from('users').select('id, display_name').in('id', leaderIds);
+    (leaderUsers || []).forEach(u => { leaderNameById[u.id] = u.display_name; });
+  }
+  const firstLeaderByTrack = {};
+  for (const t of tracks) {
+    const names = (allMembers || [])
+      .filter(m => m.track_id === t.track_id && m.is_leader)
+      .map(m => leaderNameById[m.user_id])
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+    firstLeaderByTrack[t.track_id] = names[0] ?? null;
+  }
+
+  // Latest meeting per track — by meeting_date (calendar recency drives the
+  // list sort), created_at breaks ties. content_updated_at feeds the unread flag.
   const { data: meetings } = await supabase
     .from('team_meetings')
-    .select('id, track_id, title, meeting_date, created_at')
+    .select('id, track_id, title, meeting_date, created_at, content_updated_at')
     .in('track_id', ids)
     .is('deleted_at', null)
+    .order('meeting_date', { ascending: false })
     .order('created_at', { ascending: false });
   const latestByTrack = {};
   (meetings || []).forEach(m => { if (!latestByTrack[m.track_id]) latestByTrack[m.track_id] = m; });
 
+  // Unread: caller has never viewed the latest meeting, or it changed since
+  // their last view (unread-email semantics).
+  const latestIds = Object.values(latestByTrack).map(m => m.id);
+  let viewByMeeting = {};
+  if (latestIds.length) {
+    const { data: views } = await supabase
+      .from('team_meeting_views')
+      .select('meeting_id, viewed_at')
+      .eq('user_id', caller_user_id)
+      .in('meeting_id', latestIds);
+    (views || []).forEach(v => { viewByMeeting[v.meeting_id] = v.viewed_at; });
+  }
+
   return {
     success: true,
-    data: tracks.map(t => ({
-      track_id:              t.track_id,
-      track_name:            t.track_name,
-      is_public:             t.is_public,
-      ref_panel_person_type: t.ref_panel_person_type,
-      is_member:             !!membershipByTrack[t.track_id],
-      is_leader:             !!membershipByTrack[t.track_id]?.is_leader,
-      member_count:          memberCount[t.track_id] || 0,
-      latest_meeting:        latestByTrack[t.track_id]
-                               ? { id: latestByTrack[t.track_id].id, title: latestByTrack[t.track_id].title, meeting_date: latestByTrack[t.track_id].meeting_date }
-                               : null,
-      deleted_at:            t.deleted_at
-    }))
+    data: tracks.map(t => {
+      const latest = latestByTrack[t.track_id] ?? null;
+      let unread = false;
+      if (latest && membershipByTrack[t.track_id]) {
+        const viewedAt = viewByMeeting[latest.id];
+        unread = !viewedAt ||
+          new Date(latest.content_updated_at).getTime() > new Date(viewedAt).getTime();
+      }
+      return {
+        track_id:              t.track_id,
+        track_name:            t.track_name,
+        is_public:             t.is_public,
+        ref_panel_person_type: t.ref_panel_person_type,
+        is_member:             !!membershipByTrack[t.track_id],
+        is_leader:             !!membershipByTrack[t.track_id]?.is_leader,
+        first_leader_name:     firstLeaderByTrack[t.track_id],
+        member_count:          memberCount[t.track_id] || 0,
+        latest_meeting:        latest
+                                 ? { id: latest.id, title: latest.title, meeting_date: latest.meeting_date }
+                                 : null,
+        unread,
+        deleted_at:            t.deleted_at
+      };
+    })
   };
 }
 

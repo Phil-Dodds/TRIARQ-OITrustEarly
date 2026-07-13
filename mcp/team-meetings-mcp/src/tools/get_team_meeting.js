@@ -56,6 +56,17 @@ async function get_team_meeting(params, caller_user_id) {
   if (access.error) return { success: false, error: access.error };
   const { meeting, membership, caller } = access;
 
+  // Record the view (drives the "unread" bold on My Team Meetings). Fires on
+  // every load including the 10s poll refetch — an open meeting stays read.
+  // Fire-and-forget; view tracking must never block the meeting load.
+  supabase
+    .from('team_meeting_views')
+    .upsert(
+      { user_id: caller_user_id, meeting_id, viewed_at: new Date().toISOString() },
+      { onConflict: 'user_id,meeting_id' }
+    )
+    .then(() => {}, () => {});
+
   // Track context (member_count drives contributor-initials visibility in the UI).
   let track = null;
   let memberCount = 0;

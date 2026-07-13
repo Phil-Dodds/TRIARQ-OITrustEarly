@@ -27,8 +27,8 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
     <div class="tk-shell">
       <div class="tk-header">
         <div>
-          <h1 class="tk-title">Team Meetings</h1>
-          <p class="tk-subtitle">Your meeting series. Open a series to see its meetings.</p>
+          <h1 class="tk-title">My Team Meetings</h1>
+          <p class="tk-subtitle">Your meeting series, most recent first. Bold = the latest meeting has activity you haven't seen.</p>
         </div>
         <div class="tk-header-actions">
           <a class="tk-btn-ghost" routerLink="/team-meetings/public">Search Public Meetings to Join</a>
@@ -61,39 +61,40 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
         <a routerLink="/team-meetings/public" class="tk-link">Search public series to join</a><ng-container *ngIf="canCreate">, or create a new series</ng-container>.
       </div>
 
-      <!-- Series grid -->
+      <!-- Series grid — sorted by most recent meeting date; bold = unread latest meeting -->
       <div *ngIf="!loading && !loadError && tracks.length > 0" class="tk-list">
         <div class="tk-list-header">
           <span>Series</span>
           <span>Members</span>
           <span>Latest Meeting</span>
-          <span>Visibility</span>
           <span></span>
         </div>
         <div *ngFor="let t of tracks"
              class="tk-row"
              [class.tk-row-deleted]="t.deleted_at"
+             [class.tk-row-unread]="t.unread && !t.deleted_at"
              role="button" tabindex="0"
              (click)="!t.deleted_at && openTrack(t)"
              (keydown.enter)="!t.deleted_at && openTrack(t)">
           <span class="tk-track-name">
             {{ t.track_name }}
             <span *ngIf="t.is_leader" class="tk-leader-chip">Leader</span>
+            <span *ngIf="!t.is_leader && t.first_leader_name" class="tk-leadername-chip" [title]="'Series leader'">{{ t.first_leader_name }}</span>
+            <span *ngIf="t.is_public" class="tk-public-chip">Public</span>
             <span *ngIf="t.deleted_at" class="tk-deleted-chip">Deleted</span>
             <span *ngIf="isAdmin && !t.is_member" class="tk-nonmember-chip">Not a member</span>
           </span>
           <span class="tk-muted">{{ t.member_count }}</span>
-          <span class="tk-muted">
-            <ng-container *ngIf="t.latest_meeting">
-              {{ t.latest_meeting.title }} · {{ t.latest_meeting.meeting_date | date:'MMM d, y' }}
-            </ng-container>
+          <span class="tk-muted tk-latest-date">
+            <ng-container *ngIf="t.latest_meeting">{{ t.latest_meeting.meeting_date | date:'MMM d, y' }}</ng-container>
             <ng-container *ngIf="!t.latest_meeting">—</ng-container>
           </span>
-          <span class="tk-muted">{{ t.is_public ? 'Public' : 'Private' }}</span>
           <span class="tk-row-actions" (click)="$event.stopPropagation()">
             <ng-container *ngIf="isAdmin && t.deleted_at">
-              <button class="tk-mini-btn" type="button" (click)="restore(t)">Restore</button>
+              <button class="tk-mini-btn" type="button" [disabled]="adminBusyId === t.track_id"
+                      (click)="restore(t)">{{ adminBusyId === t.track_id ? '…' : 'Restore' }}</button>
               <button *ngIf="confirmPurgeId !== t.track_id" class="tk-mini-btn tk-danger" type="button"
+                      [disabled]="adminBusyId === t.track_id"
                       (click)="confirmPurgeId = t.track_id">Purge</button>
               <span *ngIf="confirmPurgeId === t.track_id" class="tk-confirm">
                 Permanently hide this series and all its meetings?
@@ -176,13 +177,18 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
     .tk-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
     .tk-btn-ghost { background: transparent; color: var(--triarq-color-primary, #257099); border: 1px solid var(--triarq-color-primary, #257099); border-radius: 5px; padding: 8px 16px; font: 500 14px Roboto, sans-serif; cursor: pointer; text-decoration: none; white-space: nowrap; }
     .tk-admin-toggle { display: flex; align-items: center; gap: 8px; font: 13px Roboto, sans-serif; color: #5A5A5A; margin-bottom: 12px; cursor: pointer; }
-    .tk-list-header, .tk-row { display: grid; grid-template-columns: 1fr 90px 280px 90px 220px; gap: 8px; padding: 10px 12px; align-items: center; }
+    .tk-list-header, .tk-row { display: grid; grid-template-columns: 1fr 90px 140px 220px; gap: 8px; padding: 10px 12px; align-items: center; }
     .tk-list-header { font: 600 12px Roboto, sans-serif; color: #757575; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #E0E0E0; }
     .tk-row { border-bottom: 1px solid #F5F5F5; cursor: pointer; transition: background 0.1s; border-radius: 4px; }
     .tk-row:hover { background: #F5F9FC; }
     .tk-row-deleted { opacity: 0.65; cursor: default; }
     .tk-track-name { font: 500 14px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .tk-leader-chip { background: #E3F0F7; color: #257099; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
+    .tk-leadername-chip { background: #F0F0F0; color: #5A5A5A; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
+    .tk-public-chip { background: #E8F5E9; color: #2E7D32; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
+    /* Unread = latest meeting never opened or changed since last view */
+    .tk-row-unread .tk-track-name, .tk-row-unread .tk-latest-date { font-weight: 700; color: #1A1A1A; }
+    .tk-row-unread .tk-track-name { color: var(--triarq-color-primary, #257099); }
     .tk-deleted-chip { background: #FDECEA; color: #D32F2F; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
     .tk-nonmember-chip { background: #F0F0F0; color: #757575; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
     .tk-muted { color: #757575; font: 13px Roboto, sans-serif; }
@@ -272,7 +278,14 @@ export class TracksListComponent implements OnInit {
     this.svc.listMyTracks(this.includeAll).subscribe({
       next: res => {
         if (res.success) {
-          this.tracks = res.data ?? [];
+          // Most recent meeting date first; series with no meetings sink to the
+          // bottom alphabetically.
+          this.tracks = (res.data ?? []).slice().sort((a, b) => {
+            const ad = a.latest_meeting?.meeting_date ?? '';
+            const bd = b.latest_meeting?.meeting_date ?? '';
+            if (ad !== bd) return bd.localeCompare(ad);
+            return a.track_name.localeCompare(b.track_name);
+          });
           if (this.tracks.some(t => !t.is_member)) this.isAdmin = true;
         } else {
           this.loadError = res.error ?? 'Failed to load meeting series.';
@@ -345,12 +358,26 @@ export class TracksListComponent implements OnInit {
     });
   }
 
+  adminBusyId: string | null = null;
+
   restore(t: TrackListItem): void {
-    this.svc.restoreTrack(t.track_id).subscribe({ next: () => this.load() });
+    if (this.adminBusyId) return;
+    this.adminBusyId = t.track_id;
+    this.cdr.markForCheck();
+    this.svc.restoreTrack(t.track_id).subscribe({
+      next: () => { this.adminBusyId = null; this.load(); },
+      error: () => { this.adminBusyId = null; this.cdr.markForCheck(); }
+    });
   }
 
   purge(t: TrackListItem): void {
+    if (this.adminBusyId) return;
     this.confirmPurgeId = null;
-    this.svc.purgeTrack(t.track_id).subscribe({ next: () => this.load() });
+    this.adminBusyId = t.track_id;
+    this.cdr.markForCheck();
+    this.svc.purgeTrack(t.track_id).subscribe({
+      next: () => { this.adminBusyId = null; this.load(); },
+      error: () => { this.adminBusyId = null; this.cdr.markForCheck(); }
+    });
   }
 }

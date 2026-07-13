@@ -733,3 +733,13 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
   font-size: 13px;
 }
 
+
+// ── Processing Feedback standard (2026-07-12) ─────────────────────────────────
+// BusyService adds .oi-busy to <body> while any mutating MCP call is in flight.
+// Every element shows the progress cursor — immediate, zero-per-component-work
+// acknowledgment that the system is working. Pairs with the app-root activity
+// bar. Read/poll calls never trigger this.
+body.oi-busy,
+body.oi-busy * {
+  cursor: progress !important;
+}

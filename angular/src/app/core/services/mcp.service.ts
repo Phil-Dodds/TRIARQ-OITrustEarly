@@ -6,8 +6,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, finalize } from 'rxjs/operators';
 import { AuthService } from './auth.service';
+import { BusyService, isReadTool } from './busy.service';
 import { McpResponse } from '../types/database';
 import { environment } from '../../../environments/environment';
 
@@ -15,7 +16,8 @@ import { environment } from '../../../environments/environment';
 export class McpService {
   constructor(
     private readonly http:  HttpClient,
-    private readonly auth:  AuthService
+    private readonly auth:  AuthService,
+    private readonly busy:  BusyService
   ) {}
 
   /**
@@ -43,9 +45,14 @@ export class McpService {
       'Authorization': `Bearer ${token}`
     });
 
+    // Global processing indicator — mutating calls only; reads/polls stay silent.
+    const mutating = !isReadTool(tool);
+    if (mutating) this.busy.begin();
+
     return this.http
       .post<McpResponse<T>>(`${baseUrl}/tools/${tool}`, params, { headers })
       .pipe(
+        finalize(() => { if (mutating) this.busy.end(); }),
         map(response => response),
         catchError((err: HttpErrorResponse) => {
           // 401 from MCP — pass through the server's actual error message so the user
