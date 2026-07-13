@@ -202,6 +202,11 @@ export class TeamMeetingsService {
     return this.mcp.call('team-meetings', 'move_bullet', { bullet_id, target_section_id });
   }
 
+  /** Section reorder within one meeting — dragged section takes the target's position. */
+  moveSection(section_id: string, target_section_id: string): Observable<McpResponse<unknown>> {
+    return this.mcp.call('team-meetings', 'move_section', { section_id, target_section_id });
+  }
+
   pullFromLastMeeting(meeting_id: string, section_id?: string): Observable<McpResponse<{ pulled: number; skipped: number; no_previous?: boolean }>> {
     return this.mcp.call('team-meetings', 'pull_from_last_meeting', { meeting_id, ...(section_id ? { section_id } : {}) });
   }

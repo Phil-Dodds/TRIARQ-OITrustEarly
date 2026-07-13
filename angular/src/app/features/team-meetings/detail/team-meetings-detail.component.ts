@@ -115,19 +115,26 @@ interface InitiativeSearchResult {
           <div *ngFor="let section of meeting.sections; trackBy: trackById"
                class="tmd-section"
                [class.tmd-section-dragover]="dragOverSectionId === section.id"
+               [class.tmd-section-dragging]="draggingSectionId === section.id"
                (dragover)="onSectionDragOver($event, section)"
                (dragleave)="dragOverSectionId === section.id && (dragOverSectionId = null)"
                (drop)="onSectionDrop($event, section)">
             <ng-container>
-              <!-- Section header (D-308 collapse pattern) -->
+              <!-- Section header (D-308 collapse pattern). Header doubles as the
+                   section drag handle — body stays non-draggable so note
+                   textareas keep normal text selection. -->
               <div class="tmd-section-header"
                    role="button"
                    tabindex="0"
+                   draggable="true"
+                   title="Drag to reorder sections"
+                   (dragstart)="onSectionHeaderDragStart($event, section)"
+                   (dragend)="onSectionDragEnd()"
                    (click)="toggleSection(section)"
                    (keydown.enter)="toggleSection(section)"
                    [style.border-left-color]="section.bar_color">
                 <div class="tmd-section-header-text">
-                  <span class="tmd-section-title">{{ section.title }}</span>
+                  <span class="tmd-section-title"><span class="tmd-section-grip" aria-hidden="true">⋮⋮</span>{{ section.title }}</span>
                   <!-- S-015 zone explanation -->
                   <span *ngIf="section.sub_label" class="tmd-section-sublabel">{{ section.sub_label }}</span>
                 </div>
@@ -373,6 +380,9 @@ interface InitiativeSearchResult {
     .tmd-section-title { font: 600 14px Roboto; color: #1A1A1A; }
     .tmd-section-sublabel { font: italic 11px Roboto; color: #5A5A5A; }
     .tmd-section-chevron { font-size: 12px; color: #757575; flex-shrink: 0; margin-top: 2px; }
+    .tmd-section-grip { color:#C0C0C0; font-size:11px; letter-spacing:-2px; margin-right:8px; cursor:grab; }
+    .tmd-section-header:hover .tmd-section-grip { color:#9E9E9E; }
+    .tmd-section-dragging { opacity:0.45; }
 
     .tmd-section-body { padding: 12px 16px 8px; }
 
@@ -410,13 +420,14 @@ interface InitiativeSearchResult {
       font: 500 9px Roboto; letter-spacing: 0.04em;
       cursor: default;
     }
+    /* Main bullet text bolded — anchors the eye on a dense screen; notes stay regular */
     .tmd-initiative-chip {
-      font: 500 13px Roboto;
+      font: 600 13px Roboto;
       color: var(--triarq-color-primary, #257099);
       text-decoration: underline;
       cursor: pointer; flex: 1;
     }
-    .tmd-bullet-text { font: 13px Roboto; color: #1A1A1A; flex: 1; }
+    .tmd-bullet-text { font: 600 13px Roboto; color: #1A1A1A; flex: 1; }
     .tmd-remove-btn { background:none; border:none; color:#9E9E9E; cursor:pointer; font-size:16px; padding:0 4px; line-height:1; flex-shrink:0; }
     .tmd-remove-btn:hover { color:#D32F2F; }
     .tmd-remove-btn:disabled { opacity:.4; cursor:default; }
@@ -625,6 +636,8 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   // ── Polling sync ─────────────────────────────────────────────────────────────
   private pollForChanges(): void {
     if (!this.meeting || this.pollInFlight || this.loading) return;
+    // Mid-drag DOM reorder would kill the drag — skip this tick, next one catches up.
+    if (this.draggingBulletId || this.draggingSectionId) return;
     this.pollInFlight = true;
     this.svc.meetingChangedSince(this.meetingId, this.lastContentStamp).subscribe({
       next: res => {
@@ -1078,8 +1091,27 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  // ── Section reorder drag (header = handle, meeting-local order) ──────────────
+  draggingSectionId: string | null = null;
+
+  onSectionHeaderDragStart(event: DragEvent, section: TeamMeetingSection): void {
+    this.draggingSectionId = section.id;
+    event.dataTransfer?.setData('text/plain', section.id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  onSectionDragEnd(): void {
+    this.draggingSectionId = null;
+    this.dragOverSectionId = null;
+    this.cdr.markForCheck();
+  }
+
   onSectionDragOver(event: DragEvent, section: TeamMeetingSection): void {
-    if (!this.draggingBulletId || section.id === this.dragSourceSectionId) return;
+    // One handler, two drag types: a bullet moving between sections, or a whole
+    // section reordering. Payload type = which dragging id is set.
+    const bulletDrag  = !!this.draggingBulletId  && section.id !== this.dragSourceSectionId;
+    const sectionDrag = !!this.draggingSectionId && section.id !== this.draggingSectionId;
+    if (!bulletDrag && !sectionDrag) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
     if (this.dragOverSectionId !== section.id) {
@@ -1090,6 +1122,7 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
 
   onSectionDrop(event: DragEvent, target: TeamMeetingSection): void {
     event.preventDefault();
+    if (this.draggingSectionId) { this.dropSectionReorder(target); return; }
     const bulletId = this.draggingBulletId;
     const sourceId = this.dragSourceSectionId;
     this.onBulletDragEnd();
@@ -1108,6 +1141,28 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     }
     this.cdr.markForCheck();
     this.svc.moveBullet(bulletId, target.id).subscribe({
+      next: res => { if (!res.success) this.refetchAndMerge(); },
+      error: () => this.refetchAndMerge()
+    });
+  }
+
+  /** Dropped section takes the target's position (down = after, up = before) —
+   *  same splice order the server applies, so optimistic state matches. */
+  private dropSectionReorder(target: TeamMeetingSection): void {
+    const draggedId = this.draggingSectionId;
+    this.onSectionDragEnd();
+    if (!draggedId || draggedId === target.id || !this.meeting) return;
+
+    const list = [...this.meeting.sections];
+    const from = list.findIndex(s => s.id === draggedId);
+    const to   = list.findIndex(s => s.id === target.id);
+    if (from < 0 || to < 0) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    this.meeting.sections = list;
+    this.cdr.markForCheck();
+
+    this.svc.moveSection(draggedId, target.id).subscribe({
       next: res => { if (!res.success) this.refetchAndMerge(); },
       error: () => this.refetchAndMerge()
     });

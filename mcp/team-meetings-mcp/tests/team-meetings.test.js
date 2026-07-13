@@ -182,3 +182,25 @@ describe('carry_forward_bullet', () => {
     assert.ok(r.error.includes('Admin'));
   });
 });
+
+describe('move_section', () => {
+  const { move_section } = require('../src/tools/move_section');
+
+  it('returns error when section_id is missing', async () => {
+    const r = await move_section({ target_section_id: 'sec-2' }, 'user-1');
+    assert.equal(r.success, false);
+    assert.ok(r.error.includes('section_id'));
+  });
+
+  it('returns error when target_section_id is missing', async () => {
+    const r = await move_section({ section_id: 'sec-1' }, 'user-1');
+    assert.equal(r.success, false);
+    assert.ok(r.error.includes('target_section_id'));
+  });
+
+  it('no-ops when dragged onto itself', async () => {
+    const r = await move_section({ section_id: 'sec-1', target_section_id: 'sec-1' }, 'user-1');
+    assert.equal(r.success, true);
+    assert.equal(r.data.section_id, 'sec-1');
+  });
+});
