@@ -88,67 +88,108 @@ async function create_user(params, caller_user_id) {
   // For new users, allow_both defaults to false — enforced at the DB level.
   // Only a super-admin can set allow_both = true via update_user (CC-19-06).
 
-  // Check for duplicate email in public.users
-  const { data: existingEmail } = await supabase
+  // Check for an existing public.users row — INCLUDING soft-deleted rows.
+  // A soft-deleted row (Arch-6) or an orphaned auth account (invite sent but
+  // the users insert failed) previously stranded the email: invisible in
+  // User Management yet rejected as "already has an active account".
+  const normalizedEmail = email.toLowerCase().trim();
+  const { data: existingRows } = await supabase
     .from('users')
-    .select('id')
-    .eq('email', email.toLowerCase().trim())
-    .is('deleted_at', null)
+    .select('id, deleted_at')
+    .eq('email', normalizedEmail)
     .limit(1);
+  const existing = existingRows?.[0] ?? null;
 
-  if (existingEmail && existingEmail.length > 0) {
+  if (existing && !existing.deleted_at) {
     return {
       success: false,
       error: `A user with email ${email} already exists.`
     };
   }
 
-  // Send Supabase Auth invite — creates auth.users record and emails the OTP (D-354).
-  const normalizedEmail = email.toLowerCase().trim();
-  const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
-    normalizedEmail,
-    {
-      data:       { display_name },
-      redirectTo: INVITE_REDIRECT_URL
-    }
-  );
+  let auth_user_id;
+  let newUser;
+  let recovery = null; // 'restored' | 'relinked' | null
 
-  if (authErr) {
-    // Supabase returns an error if the email already has a confirmed auth account (D-248).
-    if (/already.*registered/i.test(authErr.message) || /email.*exist/i.test(authErr.message)) {
+  if (existing && existing.deleted_at) {
+    // ── Restore path: soft-deleted row → reactivate in place. The auth account
+    // still exists, so no invite is sent — the user signs in as before.
+    const { data: restored, error: restoreErr } = await supabase
+      .from('users')
+      .update({
+        deleted_at:   null,
+        is_active:    true,
+        display_name: display_name.trim(),
+        is_admin:     flagInput.is_admin,
+        is_dcs:       flagInput.is_dcs,
+        is_epo:       flagInput.is_epo,
+        is_dol:       flagInput.is_dol,
+        is_ce:        flagInput.is_ce
+      })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (restoreErr || !restored) {
+      return { success: false, error: `Failed to restore the existing account: ${restoreErr?.message || 'unknown error'}` };
+    }
+    auth_user_id = existing.id;
+    newUser  = restored;
+    recovery = 'restored';
+  } else {
+    // ── Fresh path: send Supabase Auth invite (creates auth.users, emails OTP — D-354).
+    const { data: authData, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
+      normalizedEmail,
+      {
+        data:       { display_name },
+        redirectTo: INVITE_REDIRECT_URL
+      }
+    );
+
+    if (authErr && (/already.*registered/i.test(authErr.message) || /email.*exist/i.test(authErr.message))) {
+      // Orphaned auth account: exists in auth.users with NO public.users row.
+      // Relink — find the auth id and create the missing row. No invite email
+      // fires (the account is already confirmed); the user signs in normally.
+      const { data: authList, error: listErr } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const authUser = (authList?.users || []).find(u => (u.email || '').toLowerCase() === normalizedEmail);
+      if (listErr || !authUser) {
+        return {
+          success: false,
+          error: 'This email already has an auth account, but it could not be located to relink. Contact support.'
+        };
+      }
+      auth_user_id = authUser.id;
+      recovery = 'relinked';
+    } else if (authErr) {
+      return { success: false, error: `Failed to send invite email: ${authErr.message}` };
+    } else {
+      auth_user_id = authData.user.id;
+    }
+
+    // Insert public.users record with the Supabase auth UUID and the chosen role flags.
+    const { data: inserted, error: insertErr } = await supabase
+      .from('users')
+      .insert({
+        id:           auth_user_id,
+        email:        normalizedEmail,
+        display_name: display_name.trim(),
+        is_admin:     flagInput.is_admin,
+        is_dcs:       flagInput.is_dcs,
+        is_epo:       flagInput.is_epo,
+        is_dol:       flagInput.is_dol,
+        is_ce:        flagInput.is_ce,
+        allow_both_admin_and_functional_roles: false,
+        is_active:    true
+      })
+      .select()
+      .single();
+
+    if (insertErr) {
       return {
         success: false,
-        error: 'This email already has an active account.'
+        error: `Invitation sent but failed to create user record: ${insertErr.message}`
       };
     }
-    return { success: false, error: `Failed to send invite email: ${authErr.message}` };
-  }
-
-  const auth_user_id = authData.user.id;
-
-  // Insert public.users record with the Supabase auth UUID and the chosen role flags.
-  const { data: newUser, error: insertErr } = await supabase
-    .from('users')
-    .insert({
-      id:           auth_user_id,
-      email:        normalizedEmail,
-      display_name: display_name.trim(),
-      is_admin:     flagInput.is_admin,
-      is_dcs:       flagInput.is_dcs,
-      is_epo:       flagInput.is_epo,
-      is_dol:       flagInput.is_dol,
-      is_ce:        flagInput.is_ce,
-      allow_both_admin_and_functional_roles: false,
-      is_active:    true
-    })
-    .select()
-    .single();
-
-  if (insertErr) {
-    return {
-      success: false,
-      error: `Invitation sent but failed to create user record: ${insertErr.message}`
-    };
+    newUser = inserted;
   }
 
   // Contract 21: optional Division assignments. Skip inactive Divisions
@@ -189,12 +230,20 @@ async function create_user(params, caller_user_id) {
     }
   }
 
+  const message =
+    recovery === 'restored'
+      ? `Existing account for ${normalizedEmail} restored — no new invitation sent; they sign in as before.`
+      : recovery === 'relinked'
+        ? `Existing sign-in for ${normalizedEmail} relinked to a new user record — no new invitation sent.`
+        : `User created and invitation sent to ${normalizedEmail}.`;
+
   return {
     success: true,
     data:    newUser,
     assigned_division_ids,
     skipped_division_ids,
-    message: `User created and invitation sent to ${normalizedEmail}.`
+    recovery,
+    message
   };
 }
 

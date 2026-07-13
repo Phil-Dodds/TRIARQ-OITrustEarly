@@ -586,6 +586,21 @@ describe('Contract 21 — S-032 Division deactivation', () => {
     assert.ok(blockedMessage.includes('Reactivate'));
   });
 
+  // Stranded-account recovery: a soft-deleted users row or an orphaned
+  // auth.users account (invite sent, row insert failed) must be recoverable
+  // through Create User instead of dead-ending on "already has an active
+  // account". Source contract asserted (paths are DB-heavy; UAT covers live).
+  test('create_user: recovers soft-deleted and orphaned-auth accounts', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/create_user.js'), 'utf8');
+    // Email pre-check must see soft-deleted rows (no deleted_at filter).
+    assert.ok(/select\('id, deleted_at'\)/.test(src),
+      'email pre-check must include soft-deleted rows');
+    assert.ok(/recovery = 'restored'/.test(src), 'restore path must exist');
+    assert.ok(/recovery = 'relinked'/.test(src), 'orphaned-auth relink path must exist');
+    assert.ok(/listUsers/.test(src), 'relink must locate the auth account');
+  });
+
   test('create_user: division_ids accepted but optional', async () => {
     const { create_user } = require('../src/tools/create_user');
     // Missing required fields still rejected — proves the param does not
