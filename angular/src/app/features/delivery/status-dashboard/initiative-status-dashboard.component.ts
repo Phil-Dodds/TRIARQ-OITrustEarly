@@ -107,11 +107,11 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
         <table *ngIf="visibleRows.length" class="isd-table">
           <thead>
             <tr>
+              <!-- D-510: Division short name (left of Initiative); hidden when the view resolves to one division -->
+              <th *ngIf="showDivisionColumn" class="isd-sortable isd-fit" [class.isd-sorted]="sortField==='division'" (click)="setSort('division')">Division{{ activeArrow('division') }}</th>
               <th class="isd-sortable" [class.isd-sorted]="sortField==='initiative'" (click)="setSort('initiative')">Initiative Name{{ activeArrow('initiative') }}</th>
-              <!-- D-510: Division short name; hidden when the view resolves to one division -->
-              <th *ngIf="showDivisionColumn" class="isd-sortable" [class.isd-sorted]="sortField==='division'" (click)="setSort('division')">Division{{ activeArrow('division') }}</th>
-              <th class="isd-sortable" [class.isd-sorted]="sortField==='next_gate'" (click)="setSort('next_gate')">Next Gate{{ activeArrow('next_gate') }}</th>
-              <th class="isd-sortable" [class.isd-sorted]="sortField==='target_date'" (click)="setSort('target_date')">Target Date{{ activeArrow('target_date') }}</th>
+              <th class="isd-sortable isd-fit" [class.isd-sorted]="sortField==='next_gate'" (click)="setSort('next_gate')">Next Gate{{ activeArrow('next_gate') }}</th>
+              <th class="isd-sortable isd-fit" [class.isd-sorted]="sortField==='target_date'" (click)="setSort('target_date')">Target Date{{ activeArrow('target_date') }}</th>
               <th>Team</th>
               <th class="isd-sortable" [class.isd-sorted]="sortField==='updated_by'" (click)="setSort('updated_by')">Updated By{{ activeArrow('updated_by') }}</th>
               <th>Escalation</th>
@@ -122,15 +122,15 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
           </thead>
           <tbody>
             <tr *ngFor="let r of visibleRows; trackBy: trackByRow">
+              <td *ngIf="showDivisionColumn" class="isd-fit">{{ r.division_display_name_short || '—' }}</td>
               <td><a class="isd-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
-              <td *ngIf="showDivisionColumn">{{ r.division_display_name_short || '—' }}</td>
-              <td>
+              <td class="isd-fit">
                 {{ r.next_gate_label || '—' }}
                 <span *ngIf="r.next_gate_pending_approval" class="isd-pending-chip">Pending Approval</span>
               </td>
-              <td>
+              <td class="isd-fit">
                 <span *ngIf="r.next_gate_target_date"
-                      [class.isd-overdue]="isPastDate(r.next_gate_target_date)">{{ r.next_gate_target_date }}</span>
+                      [class.isd-overdue]="isPastDate(r.next_gate_target_date)">{{ gateDate(r.next_gate_target_date) }}</span>
                 <span *ngIf="!r.next_gate_target_date">—</span>
               </td>
               <!-- D-510: Team — grid-parity role chips -->
@@ -140,12 +140,15 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
                 <span *ngIf="r.assigned_dol_display_name" class="isd-team-chip" [title]="'DOL: ' + r.assigned_dol_display_name">{{ r.assigned_dol_display_name }}</span>
                 <span *ngIf="!r.assigned_dcs_display_name && !r.assigned_epo_display_name && !r.assigned_dol_display_name">—</span>
               </td>
-              <!-- D-510 merged Updated By: trio author = initials; non-trio = full name (external emphasis); age from chain root -->
-              <td>
+              <!-- D-510 merged Updated By: trio author = initials; non-trio = full name (external emphasis);
+                   age from chain root on its own line so "3 days" never splits -->
+              <td class="isd-fit">
                 <ng-container *ngIf="r.saved_at; else neverUpdated">
-                  <span *ngIf="r.is_trio_author" class="isd-author-initials" [title]="r.saved_by_name || ''">{{ initials(r.saved_by_name) }}</span>
-                  <span *ngIf="!r.is_trio_author" class="isd-author-external">{{ r.saved_by_name || 'Unknown' }}</span>
-                  <span class="isd-age">· {{ ageLabel(r.root_saved_at || r.saved_at) }}</span>
+                  <div>
+                    <span *ngIf="r.is_trio_author" class="isd-author-initials" [title]="r.saved_by_name || ''">{{ initials(r.saved_by_name) }}</span>
+                    <span *ngIf="!r.is_trio_author" class="isd-author-external">{{ r.saved_by_name || 'Unknown' }}</span>
+                  </div>
+                  <div class="isd-age">{{ ageLabel(r.root_saved_at || r.saved_at) }}</div>
                 </ng-container>
                 <ng-template #neverUpdated><span class="isd-never">Never</span></ng-template>
               </td>
@@ -269,7 +272,9 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
     .isd-team-chip { display:inline-block; background:#F0F5F8; color:#257099; border-radius:999px; padding:1px 8px; font-size:11px; margin:0 4px 3px 0; white-space:nowrap; }
     .isd-author-initials { background:#E3F0F7; color:#257099; border-radius:999px; padding:1px 8px; font-size:11px; font-weight:600; }
     .isd-author-external { font-weight:600; color:#1A1A1A; }
-    .isd-age { color:var(--triarq-color-text-secondary); font-size:12px; margin-left:4px; }
+    .isd-age { color:var(--triarq-color-text-secondary); font-size:12px; margin-top:3px; white-space:nowrap; }
+    /* Shrink-to-content columns — collapses the dead width between Next Gate and Target Date. */
+    .isd-table th.isd-fit, .isd-table td.isd-fit { width:1%; white-space:nowrap; }
   `]
 })
 export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
@@ -551,5 +556,14 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
   }
   isPastDate(iso: string): boolean {
     return iso < new Date().toISOString().split('T')[0];
+  }
+  /** Target Date display: "Jul 13"; year appended only when not the current year.
+   *  Parses the YYYY-MM-DD string directly — no Date() timezone shift. */
+  gateDate(iso: string): string {
+    const [y, m, d] = iso.split('-').map(Number);
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    if (!y || !m || !d) { return iso; }
+    const base = `${MONTHS[m - 1]} ${d}`;
+    return y === new Date().getFullYear() ? base : `${base}, ${y}`;
   }
 }

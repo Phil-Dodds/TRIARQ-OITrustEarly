@@ -9,6 +9,8 @@
 
 'use strict';
 
+const { resolveNextGate } = require('./gate-resolution');
+
 const GATE_LABELS = {
   brief_review:  'Brief Review',
   go_to_build:   'Go to Build',
@@ -131,6 +133,14 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
   }
   for (const label of atRiskLabels) {
     reasons.push(`At risk: ${label}`);
+  }
+
+  // 5) Next gate has no target date — nothing to track against, so the row
+  // can never surface as slipped or at-risk on dates. Callers must include
+  // target_date in the milestones they pass.
+  const nextGate = resolveNextGate(milestones || []);
+  if (nextGate && !nextGate.target_date) {
+    reasons.push(`No target date: ${nextGate.label}`);
   }
 
   return reasons;

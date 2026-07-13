@@ -130,10 +130,11 @@ async function get_latest_initiative_status(params, caller_user_id) {
     }
   }
 
-  // Needs Review reasons (D-485) — needs all gate statuses for at-risk eval.
+  // Needs Review reasons (D-485) — needs all gate statuses for at-risk eval;
+  // target_date for the missing-next-gate-date reason.
   const { data: allMilestones } = await supabase
     .from('cycle_milestone_dates')
-    .select('gate_name, date_status')
+    .select('gate_name, date_status, target_date')
     .eq('delivery_cycle_id', initiative_id)
     .is('deleted_at', null);
 
