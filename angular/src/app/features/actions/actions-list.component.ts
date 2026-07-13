@@ -112,6 +112,12 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
           <a class="ga-init-chip" [routerLink]="['/initiatives', item.delivery_cycle_id]"
              [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">{{ item.cycle_title }}</a>
           <app-consulted-status-indicator [summary]="item.consulted_summary" [gateStatus]="item.gate_status" [showLabel]="true"></app-consulted-status-indicator>
+          <!-- D-489: submitter's justification — one line, ellipsis; tap-through
+               opens the gate sub-panel like the rest of the row. -->
+          <a *ngIf="item.submission_note" class="ga-submission-note"
+             [routerLink]="['/initiatives', item.delivery_cycle_id]"
+             [queryParams]="{ gate: item.gate_name, returnTo: returnTo }"
+             [title]="item.submission_note">“{{ item.submission_note }}”</a>
         </span>
         <span class="ga-muted">{{ item.division_display_name_short }}</span>
         <!-- Submitted: when + who, stacked. -->
@@ -146,6 +152,14 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
   `,
   styles: [`
     .ga-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    /* D-489: one-line truncated submission justification under the item label */
+    .ga-submission-note {
+      display: block; max-width: 100%;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+      font-size: 11px; font-style: italic; color: #757575;
+      text-decoration: none; cursor: pointer;
+    }
+    .ga-submission-note:hover { color: var(--triarq-color-primary, #257099); }
     .ga-filters-btn { display:inline-flex;align-items:center;gap:6px;border:1px solid var(--triarq-color-border,#e0e0e0);
                       background:#fff;border-radius:var(--triarq-radius-button,5px);padding:6px 12px;cursor:pointer;font-size:13px; }
     .ga-filters-count { background:var(--triarq-color-primary,#257099);color:#fff;border-radius:999px;padding:0 7px;font-size:11px;font-weight:700; }

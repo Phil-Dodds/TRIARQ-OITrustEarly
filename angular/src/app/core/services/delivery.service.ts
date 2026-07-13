@@ -267,6 +267,8 @@ export class DeliveryService {
   submitGateForApproval(params: {
     delivery_cycle_id: string;
     gate_name:         GateName;
+    // D-489: optional "Why is this gate ready?" justification.
+    submission_note?:  string;
   }): Observable<McpResponse<GateRecord>> {
     return this.mcp.call<GateRecord>('delivery', 'submit_gate_for_approval', params as Record<string, unknown>);
   }

@@ -351,6 +351,8 @@ export interface GateRecord {
   // D-345: submission tracking. Set on submit_gate_for_approval, cleared on withdraw_gate_submission.
   submitted_at:                string | null;
   submitted_by_user_id:        string | null;
+  // D-489: submitter's "Why is this gate ready?" — set at submission, immutable after.
+  submission_note?:            string | null;
   created_at:                  string;
   updated_at:                  string;
   // Supplement Section 1: populated by get_delivery_cycle for the calling user
@@ -488,6 +490,8 @@ export interface PendingApprovalItem {
   // Contract 30 / D-468 (WS1.2): per-gate Consulted summary for the status
   // indicator. Omitted entirely when both counts are zero.
   consulted_summary?:            { pending_count: number; declined_count: number };
+  // D-489: submitter's justification — truncated one line in the Action Queue.
+  submission_note?:              string | null;
   // Contract 30 follow-up: approver decision attribution. On a consulted row the
   // UI shows "Approved by {approver} on {date}" / "Returned by {approver} on {date}"
   // once the approver decides. Null while the gate is still awaiting approval.

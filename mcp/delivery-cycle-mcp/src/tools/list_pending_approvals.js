@@ -45,7 +45,7 @@ async function list_pending_approvals(_params, caller_user_id) {
   // ── Accountable items: pending gate records the caller approves ──────────
   let gateQuery = supabase
     .from('gate_records')
-    .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, approver_decision_at, created_at')
+    .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, approver_decision_at, created_at, submission_note')
     .eq('gate_status', 'awaiting_approval')
     .is('deleted_at', null);
 
@@ -84,7 +84,7 @@ async function list_pending_approvals(_params, caller_user_id) {
   if (consultGateIds.length > 0) {
     const { data: cg, error: cgErr } = await supabase
       .from('gate_records')
-      .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, approver_decision_at, created_at')
+      .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, approver_decision_at, created_at, submission_note')
       .in('gate_record_id', consultGateIds)
       .in('gate_status', ['awaiting_approval', 'approved', 'returned'])
       .is('deleted_at', null);
@@ -218,6 +218,8 @@ async function list_pending_approvals(_params, caller_user_id) {
       // WS1.2/WS1.3 (D-472): created_at for the 21-day filter; gate_target_date for the Due column.
       created_at:                    g.created_at,
       gate_target_date:              milestoneTargetMap[`${g.delivery_cycle_id}|${g.gate_name}`] ?? null,
+      // D-489: submitter's justification — truncated one line in the Action Queue.
+      submission_note:               g.submission_note ?? null,
       // WS1.2 (D-468): Consulted summary — omitted when both counts are zero.
       ...(cs && (cs.pending_count > 0 || cs.declined_count > 0) ? { consulted_summary: cs } : {})
     };

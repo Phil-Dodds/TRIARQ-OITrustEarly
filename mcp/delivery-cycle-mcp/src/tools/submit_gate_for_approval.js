@@ -70,10 +70,17 @@ const RESOLVED_PREDECESSOR_STATUSES = new Set(['approved', 'skipped']);
  * @param {object} params
  * @param {string} params.delivery_cycle_id
  * @param {string} params.gate_name
+ * @param {string} [params.submission_note] - D-489: optional "Why is this gate
+ *   ready?" free text. Stored on gate_records.submission_note at submission;
+ *   not editable afterward (a re-submission is a new submission and overwrites).
  * @param {string} caller_user_id - from JWT
  */
 async function submit_gate_for_approval(params, caller_user_id) {
   const { delivery_cycle_id, gate_name } = params;
+  // D-489: trim to null — empty notes are stored as NULL, never ''.
+  const submission_note = (typeof params.submission_note === 'string' && params.submission_note.trim())
+    ? params.submission_note.trim()
+    : null;
 
   if (!delivery_cycle_id) {
     return { success: false, error: 'delivery_cycle_id is required.' };
@@ -368,7 +375,8 @@ async function submit_gate_for_approval(params, caller_user_id) {
       submitted_at:                   new Date().toISOString(),
       submitted_by_user_id:           caller_user_id,
       approver_user_id:               resolvedApproverId,
-      workstream_active_at_clearance: workstream_clearance
+      workstream_active_at_clearance: workstream_clearance,
+      submission_note                                        // D-489
     })
     .eq('gate_record_id', gate_record.gate_record_id)
     .select()

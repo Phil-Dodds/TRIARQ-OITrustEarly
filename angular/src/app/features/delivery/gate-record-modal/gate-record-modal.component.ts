@@ -38,7 +38,7 @@ import {
   HostListener
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { DeliveryService } from '../../../core/services/delivery.service';
@@ -83,7 +83,7 @@ const GATE_LABELS: Record<GateName, string> = {
   selector:        'app-gate-record-modal',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, ReactiveFormsModule, IonicModule, MatDialogModule, GateConsultationSectionComponent],
+  imports:         [CommonModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, GateConsultationSectionComponent],
   template: `
     <div class="grm-shell" [attr.aria-busy]="processing ? 'true' : null">
 
@@ -163,6 +163,14 @@ const GATE_LABELS: Record<GateName, string> = {
               {{ escalationDefaultLabel }}
             </span>
           </div>
+        </section>
+
+        <!-- SUBMISSION JUSTIFICATION — D-489. Above the Consulted section (D-461).
+             Set at submission; immutable afterward. Visible to everyone who can
+             open the sub-panel (approver + consulted are the audiences of record). -->
+        <section *ngIf="record?.submission_note" class="grm-section">
+          <div class="grm-label">Why is this gate ready?</div>
+          <div class="grm-submission-note">{{ record!.submission_note }}</div>
         </section>
 
         <!-- CONSULTED — Contract 29 WS2 (D-461). Self-hides when no records. -->
@@ -269,6 +277,16 @@ const GATE_LABELS: Record<GateName, string> = {
 
           <!-- pending / not_started — Submit for Approval (DS/CB) -->
           <ng-container *ngIf="canShowSubmit">
+            <!-- D-489: submission justification — encouraged, not required -->
+            <div class="grm-note-field">
+              <label class="grm-label" for="grm-submission-note">Why is this gate ready?</label>
+              <textarea id="grm-submission-note"
+                        class="grm-note-textarea"
+                        rows="2"
+                        [disabled]="processing"
+                        [(ngModel)]="submissionNoteDraft"
+                        placeholder="Optional — a short justification the approver and consulted parties will see."></textarea>
+            </div>
             <button class="grm-btn-primary"
                     type="button"
                     [disabled]="processing"
@@ -654,6 +672,19 @@ const GATE_LABELS: Record<GateName, string> = {
       background: var(--triarq-color-background-subtle); border-radius: 6px;
       padding: 8px 12px; font-size: 12px;
     }
+    /* D-489: submission justification — read display + submit-time entry field */
+    .grm-submission-note {
+      background: var(--triarq-color-background-subtle); border-radius: 6px;
+      padding: 8px 12px; font-size: 12px; white-space: pre-wrap;
+    }
+    .grm-note-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+    .grm-note-textarea {
+      box-sizing: border-box; width: 100%;
+      border: 1.5px solid var(--triarq-color-border); border-radius: 5px;
+      padding: 8px 10px; font-size: 13px; font-family: var(--triarq-font-family);
+      resize: vertical; outline: none;
+    }
+    .grm-note-textarea:focus { border-color: var(--triarq-color-primary); }
     .grm-submitted-meta {
       font-size: 11px; color: var(--triarq-color-text-secondary); margin-bottom: 8px;
     }
@@ -730,6 +761,8 @@ export class GateRecordModalComponent {
     | 'backdate-confirm' = 'none';
   /** Contract 29 WS3 (D-463/AC-32): resolved approver shown in the submit confirmation. */
   submittedApprover: { id: string; display_name: string | null } | null = null;
+  /** D-489: "Why is this gate ready?" draft — sent with submit, trimmed to null server-side. */
+  submissionNoteDraft = '';
   processing      = false;
   processingAction:
     | 'submit'
@@ -983,9 +1016,12 @@ export class GateRecordModalComponent {
   onSubmit(): void {
     this.startProcessing('submit');
 
+    const note = this.submissionNoteDraft.trim();
     this.delivery.submitGateForApproval({
       delivery_cycle_id: this.data.cycle.delivery_cycle_id,
-      gate_name:         this.data.gateName
+      gate_name:         this.data.gateName,
+      // D-489: optional justification travels with the submission.
+      ...(note ? { submission_note: note } : {})
     }).subscribe({
       next: (res) => {
         // D-448: skip interstitial — non-error response (success:true) that
