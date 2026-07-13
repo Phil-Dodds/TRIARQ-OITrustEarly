@@ -60,8 +60,10 @@ import {
   TierClassification,
   LifecycleStage,
   GateName,
-  GateStateMap
+  GateStateMap,
+  RoadmapTheme
 } from '../../../core/types/database';
+import { themedTitle } from '../shared/theme-display.util';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 // Contract 23 Item 2.2 / D-267: pure computeHeadline utility — 6-rule priority order.
 // Replaces inline headline()/headlineColor() logic; extracted for unit-testability.
@@ -164,6 +166,14 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                        padding:4px 12px;font-size:13px;white-space:nowrap;">
             Tier: {{ filterTier === 'tier_1' ? 'Tier 1 — Fast Lane' : filterTier === 'tier_2' ? 'Tier 2 — Structured' : 'Tier 3 — Governed' }}
             <button (click)="filterTier='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <!-- D-488: Roadmap Theme filter chip. -->
+          <span *ngIf="filterThemes.length"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Theme: {{ themeChipLabel }}
+            <button (click)="filterThemes=[];applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
           </span>
           <!-- D-279: chip shows "None assigned" or Division · Workstream short name. CC-Decision-2026-04-12-E. -->
           <span *ngIf="filterWorkstream"
@@ -482,6 +492,35 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </div>
           </div>
 
+          <!-- Filter row: Roadmap Theme — D-488 multi-select. Unthemed = no tag. -->
+          <div style="border-bottom:1px solid #F0F0F0;">
+            <button (click)="toggleFilterRow('theme')"
+                    style="width:100%;background:none;border:none;cursor:pointer;
+                           display:flex;align-items:center;justify-content:space-between;
+                           padding:14px 20px;font-size:14px;color:#1E1E1E;">
+              <span style="font-weight:500;">Roadmap Theme</span>
+              <span style="display:flex;align-items:center;gap:8px;">
+                <span *ngIf="stagedThemes.length" style="font-size:12px;color:var(--triarq-color-primary,#257099);">
+                  {{ stagedThemes.length }} selected
+                </span>
+                <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'theme' ? '▲' : '▼' }}</span>
+              </span>
+            </button>
+            <div *ngIf="openFilterRow === 'theme'" style="padding:0 20px 16px;display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;font-style:italic;">
+                <input type="checkbox" [checked]="stagedThemes.includes('__none__')" (change)="toggleStagedTheme('__none__')" />
+                Unthemed
+              </label>
+              <label *ngFor="let t of allThemes" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                <input type="checkbox" [checked]="stagedThemes.includes(t.id)" (change)="toggleStagedTheme(t.id)" />
+                {{ t.name }}
+              </label>
+              <div *ngIf="allThemes.length === 0" style="font-size:12px;color:#9E9E9E;font-style:italic;">
+                No Themes defined yet — add them in Admin → Divisions → Roadmap Themes.
+              </div>
+            </div>
+          </div>
+
           <!-- Filter row 6: Workstream — D-272: Normal/Bigger list, Division hierarchy, No workstream at top -->
           <div style="border-bottom:1px solid #F0F0F0;">
             <button (click)="toggleFilterRow('workstream')"
@@ -646,11 +685,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
           <!-- Col 2: Cycle Name — 3-line clamp + Tier badge. CC-Decision-2026-04-12-A: Contract 5 restores Tier badge (D-264 overridden). -->
           <div>
+            <!-- D-488: "[Theme] · [Name]" prefix when a Roadmap Theme is set. -->
             <div style="font-size:14px;font-weight:600;color:#1E1E1E;
                         display:-webkit-box;-webkit-line-clamp:3;
                         -webkit-box-orient:vertical;overflow:hidden;"
-                 title="{{ cycle.cycle_title }}">
-              {{ cycle.cycle_title }}
+                 title="{{ themedTitle(cycle) }}">
+              {{ themedTitle(cycle) }}
             </div>
             <div *ngIf="cycle.tier_classification" style="margin-top:4px;">
               <span [style.background]="tierBadgeBg(cycle.tier_classification)"
@@ -934,6 +974,28 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   filterDcs:                string  = '';
   filterEpo:                string  = '';
   filterDol:                string  = '';
+  // D-488: Roadmap Theme multi-select — theme ids, '__none__' = Unthemed.
+  filterThemes:             string[] = [];
+  stagedThemes:             string[] = [];
+  allThemes:                RoadmapTheme[] = [];
+
+  toggleStagedTheme(id: string): void {
+    this.stagedThemes = this.stagedThemes.includes(id)
+      ? this.stagedThemes.filter(t => t !== id)
+      : [...this.stagedThemes, id];
+    this.cdr.markForCheck();
+  }
+
+  get themeChipLabel(): string {
+    if (this.filterThemes.length === 1) {
+      const id = this.filterThemes[0];
+      return id === '__none__' ? 'Unthemed' : (this.allThemes.find(t => t.id === id)?.name ?? '1 selected');
+    }
+    return `${this.filterThemes.length} selected`;
+  }
+
+  /** D-488: "[Theme] · [Name]" name-cell prefix (shared util). */
+  readonly themedTitle = themedTitle;
 
   // S7: Hub summary card state — derived from loaded cycles + delivery summary
   deliverySummary: DeliverySummary | null = null;
@@ -1025,6 +1087,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     }
     // B-94: cycle drill-down from Gate Schedule / Deploy Schedule opens detail panel.
     if (qp['selected_cycle_id']) { this.selectedCycleId = qp['selected_cycle_id'] as string; }
+
+    // D-488: load the Theme vocabulary once for the filter row + chip labels.
+    this.delivery.listRoadmapThemes().subscribe({
+      next: res => { if (res.success) { this.allThemes = res.data ?? []; this.cdr.markForCheck(); } }
+    });
 
     // Item 4 (Part 3): Restore saved filter/sort state if no drill-down params present.
     // D-175 drill-down takes priority; restoreScreenState() skips if drillDownFromQp is set.
@@ -1536,7 +1603,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         filterEpo:             this.filterEpo,
         filterDol:             this.filterDol,
         filterGateStatus:      this.filterGateStatus,
-        filterAssignedPerson:  this.filterAssignedPerson
+        filterAssignedPerson:  this.filterAssignedPerson,
+        filterThemes:          this.filterThemes            // D-488 / D-171
       },
       {
         sortField: this.sortField,
@@ -1574,6 +1642,10 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (typeof filter['includeChildDivisions'] === 'boolean') {
       this.includeChildDivisions = filter['includeChildDivisions'];
     }
+    // D-488: theme multi-select persists per D-171.
+    if (Array.isArray(filter['filterThemes'])) {
+      this.filterThemes = (filter['filterThemes'] as unknown[]).filter((v): v is string => typeof v === 'string');
+    }
     if (typeof sort['sortField'] === 'string') {
       const allowed = ['cycle_title', 'current_lifecycle_stage', 'tier_classification', 'next_gate'];
       if (allowed.includes(sort['sortField'] as string)) {
@@ -1594,6 +1666,14 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     let result = this.cycles.filter(c => {
       if (this.filterStage && c.current_lifecycle_stage !== this.filterStage) { return false; }
       if (this.filterTier  && c.tier_classification    !== this.filterTier)  { return false; }
+
+      // D-488: Roadmap Theme multi-select — '__none__' matches untagged.
+      if (this.filterThemes.length) {
+        const matches = this.filterThemes.includes('__none__')
+          ? (!c.roadmap_theme_id || this.filterThemes.includes(c.roadmap_theme_id))
+          : (!!c.roadmap_theme_id && this.filterThemes.includes(c.roadmap_theme_id));
+        if (!matches) { return false; }
+      }
 
       // D-167: workstream filter — '__none__' shows cycles with no workstream assigned
       if (this.filterWorkstream === '__none__') {
@@ -1888,6 +1968,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (this.filterGateStatus)     { n++; }
     if (this.filterAssignedPerson) { n++; }
     if (this.filterDivision)       { n++; }
+    if (this.filterThemes.length)  { n++; }   // D-488
     return n;
   }
 
@@ -1917,6 +1998,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       this.stagedAssignedPerson = this.filterAssignedPerson;
       this.stagedDivision       = this.filterDivision;
       this.stagedIncludeChildren = this.includeChildDivisions;
+      this.stagedThemes         = [...this.filterThemes];   // D-488
       this.openFilterRow        = '';
       // Restore scope activator state from applied filter values. CC-Decision-2026-04-12-E/F.
       this.wsScope     = (this.filterWorkstream && this.filterWorkstream !== '__none__') ? 'normal' : (this.filterWorkstream === '__none__' ? 'none_terminal' : '');
@@ -1939,6 +2021,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterWorkstream     = this.stagedWorkstream;
     this.filterGateStatus     = this.stagedGateStatus;
     this.filterAssignedPerson = this.stagedAssignedPerson;
+    this.filterThemes         = [...this.stagedThemes];   // D-488
     // Division filter is server-side — reload if it changed
     const divisionChanged     = this.filterDivision !== this.stagedDivision || this.includeChildDivisions !== this.stagedIncludeChildren;
     this.filterDivision       = this.stagedDivision;
@@ -1960,6 +2043,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.stagedGateStatus     = '';
     this.stagedAssignedPerson = '';
     this.stagedDivision       = '';
+    this.stagedThemes         = [];   // D-488
     this.stagedIncludeChildren = true;   // Phil 2026-06-15: children-by-default
     this.openFilterRow        = '';
     this.wsScope              = '';  // CC-Decision-2026-04-12-E

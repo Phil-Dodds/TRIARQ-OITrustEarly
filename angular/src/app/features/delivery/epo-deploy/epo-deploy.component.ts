@@ -62,7 +62,8 @@ import {
   Division,
   DateStatus,
   CycleMilestoneDate,
-  RoadmapFreezeDate
+  RoadmapFreezeDate,
+  RoadmapTheme
 } from '../../../core/types/database';
 import {
   QuarterRef,
@@ -151,6 +152,22 @@ interface EpoGroup {
         Display only my Divisions
       </label>
 
+      <!-- D-488: Roadmap Theme multi-select filter (persists per D-171). -->
+      <div *ngIf="allThemes.length" class="edp-theme-filter">
+        <span class="edp-theme-filter-label">Theme:</span>
+        <button *ngFor="let t of allThemes"
+                type="button"
+                class="edp-theme-pill"
+                [class.edp-theme-pill-active]="selectedThemeIds.includes(t.id)"
+                (click)="toggleThemeFilter(t.id)">{{ t.name }}</button>
+        <button type="button"
+                class="edp-theme-pill"
+                [class.edp-theme-pill-active]="selectedThemeIds.includes('__none__')"
+                (click)="toggleThemeFilter('__none__')">Unthemed</button>
+        <button *ngIf="selectedThemeIds.length" type="button" class="edp-theme-clear"
+                (click)="selectedThemeIds = []; saveEpoDeployStatePublic()">Clear</button>
+      </div>
+
       <div *ngIf="loading">
         <div class="edp-row-skeleton" *ngFor="let _ of skeletonRows">
           <ion-skeleton-text animated style="height:14px;border-radius:4px;width:60%;"></ion-skeleton-text>
@@ -205,7 +222,9 @@ interface EpoGroup {
                 <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
               </div>
               <ng-container *ngIf="group.prior.length > 0; else priorEmpty">
-                <div *ngFor="let c of group.prior; trackBy: trackByCycleId"
+                <ng-container *ngFor="let sg of themeSubGroups(group.prior)">
+                <div *ngIf="sg.label" class="edp-subgroup edp-theme-subgroup">{{ sg.label }}</div>
+                <div *ngFor="let c of sg.cycles; trackBy: trackByCycleId"
                      class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="edp-cycle-title">
                     <span *ngIf="priorQuarterSymbolFor(c) as sym"
@@ -223,6 +242,7 @@ interface EpoGroup {
                     </span>
                   </span>
                 </div>
+                </ng-container>
               </ng-container>
               <ng-template #priorEmpty><div class="edp-row-empty">No Initiatives.</div></ng-template>
             </section>
@@ -236,7 +256,9 @@ interface EpoGroup {
                 <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
               </div>
               <ng-container *ngIf="group.current.length > 0; else currentEmpty">
-                <div *ngFor="let c of group.current; trackBy: trackByCycleId"
+                <ng-container *ngFor="let sg of themeSubGroups(group.current)">
+                <div *ngIf="sg.label" class="edp-subgroup edp-theme-subgroup">{{ sg.label }}</div>
+                <div *ngFor="let c of sg.cycles; trackBy: trackByCycleId"
                      class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="edp-cycle-title">{{ c.cycle_title }}</span>
                   <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
@@ -249,6 +271,7 @@ interface EpoGroup {
                     </span>
                   </span>
                 </div>
+                </ng-container>
               </ng-container>
               <ng-template #currentEmpty><div class="edp-row-empty">No Initiatives.</div></ng-template>
             </section>
@@ -264,7 +287,9 @@ interface EpoGroup {
               <!-- Q+1 sub-section -->
               <div class="edp-subgroup">{{ nextQ1.label }}</div>
               <ng-container *ngIf="group.nextQ1.length > 0; else q1Empty">
-                <div *ngFor="let c of group.nextQ1; trackBy: trackByCycleId"
+                <ng-container *ngFor="let sg of themeSubGroups(group.nextQ1)">
+                <div *ngIf="sg.label" class="edp-subgroup edp-theme-subgroup">{{ sg.label }}</div>
+                <div *ngFor="let c of sg.cycles; trackBy: trackByCycleId"
                      class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="edp-cycle-title">{{ c.cycle_title }}</span>
                   <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
@@ -277,12 +302,15 @@ interface EpoGroup {
                     </span>
                   </span>
                 </div>
+                </ng-container>
               </ng-container>
               <ng-template #q1Empty><div class="edp-row-empty">No Initiatives.</div></ng-template>
               <!-- Q+2 sub-section -->
               <div class="edp-subgroup">{{ nextQ2.label }}</div>
               <ng-container *ngIf="group.nextQ2.length > 0; else q2Empty">
-                <div *ngFor="let c of group.nextQ2; trackBy: trackByCycleId"
+                <ng-container *ngFor="let sg of themeSubGroups(group.nextQ2)">
+                <div *ngIf="sg.label" class="edp-subgroup edp-theme-subgroup">{{ sg.label }}</div>
+                <div *ngFor="let c of sg.cycles; trackBy: trackByCycleId"
                      class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="edp-cycle-title">{{ c.cycle_title }}</span>
                   <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
@@ -295,6 +323,7 @@ interface EpoGroup {
                     </span>
                   </span>
                 </div>
+                </ng-container>
               </ng-container>
               <ng-template #q2Empty><div class="edp-row-empty">No Initiatives.</div></ng-template>
             </section>
@@ -306,7 +335,9 @@ interface EpoGroup {
                 <span>Initiative</span><span>Stage</span><span>Deploy Date</span><span>Status</span>
               </div>
               <ng-container *ngIf="group.unscheduled.length > 0; else unschedEmpty">
-                <div *ngFor="let c of group.unscheduled; trackBy: trackByCycleId"
+                <ng-container *ngFor="let sg of themeSubGroups(group.unscheduled)">
+                <div *ngIf="sg.label" class="edp-subgroup edp-theme-subgroup">{{ sg.label }}</div>
+                <div *ngFor="let c of sg.cycles; trackBy: trackByCycleId"
                      class="edp-grid edp-grid-row" (click)="openCycle(c.delivery_cycle_id)">
                   <span class="edp-cycle-title">{{ c.cycle_title }}</span>
                   <span class="edp-meta">{{ c.current_lifecycle_stage }}</span>
@@ -319,6 +350,7 @@ interface EpoGroup {
                     </span>
                   </span>
                 </div>
+                </ng-container>
               </ng-container>
               <ng-template #unschedEmpty><div class="edp-row-empty">No Initiatives.</div></ng-template>
             </section>
@@ -376,6 +408,14 @@ interface EpoGroup {
     .edp-section { margin-top: var(--triarq-space-md); }
     .edp-section-header { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 4px; background: rgba(37,112,153,0.06); color: var(--triarq-color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
     .edp-subgroup { font-size: 11px; font-weight: 600; color: var(--triarq-color-text-secondary); padding: 6px 10px 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+    /* D-488: Theme sub-group header — slightly indented, primary tint. */
+    .edp-theme-subgroup { color: var(--triarq-color-primary, #257099); padding-left: 18px; text-transform: none; letter-spacing: 0.02em; }
+    /* D-488: Theme filter pills */
+    .edp-theme-filter { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 8px 0 12px; }
+    .edp-theme-filter-label { font-size: 12px; font-weight: 600; color: var(--triarq-color-text-secondary); }
+    .edp-theme-pill { background: #fff; border: 1px solid #BDBDBD; border-radius: 999px; color: #5A5A5A; padding: 2px 12px; font-size: 12px; cursor: pointer; }
+    .edp-theme-pill-active { background: var(--triarq-color-primary, #257099); border-color: var(--triarq-color-primary, #257099); color: #fff; }
+    .edp-theme-clear { background: none; border: none; color: var(--triarq-color-primary, #257099); font-size: 12px; cursor: pointer; text-decoration: underline; }
     .edp-grid { display: grid; grid-template-columns: 3fr 1fr 1.4fr 1.4fr; gap: var(--triarq-space-sm); padding: 8px 12px; align-items: center; font-size: var(--triarq-text-small); }
     .edp-grid-header { font-weight: 500; color: var(--triarq-color-text-secondary); border-bottom: 2px solid var(--triarq-color-border); }
     .edp-grid-row { border-bottom: 1px solid var(--triarq-color-border); cursor: pointer; }
@@ -441,6 +481,11 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
     // D-445: pivot resets to actual current quarter on every load.
     this.referenceQuarter = quarterOfDate(new Date());
 
+    // D-488: load the Theme vocabulary for the filter pills.
+    this.delivery.listRoadmapThemes().subscribe({
+      next: res => { if (res.success) { this.allThemes = res.data ?? []; this.cdr.markForCheck(); } }
+    });
+
     this.profileSub.add(
       this.profile.profile$.pipe(
         filter((p): p is NonNullable<typeof p> => p !== null),
@@ -457,6 +502,11 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
         const saved = await this.screenState.restore(SCREEN_KEYS.INITIATIVES_EPO_DEPLOY);
         if (saved?.filter_state && typeof saved.filter_state['showMyDivisionsOnly'] === 'boolean') {
           this.showMyDivisionsOnly = saved.filter_state['showMyDivisionsOnly'] as boolean;
+        }
+        // D-488: theme multi-select persists per D-171.
+        if (Array.isArray(saved?.filter_state?.['selectedThemeIds'])) {
+          this.selectedThemeIds = (saved!.filter_state['selectedThemeIds'] as unknown[])
+            .filter((v): v is string => typeof v === 'string');
         }
 
         // D-446: load persisted data-gap dismissal flag.
@@ -560,11 +610,7 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
   }
 
   onToggleChange(): void {
-    this.screenState.save(
-      SCREEN_KEYS.INITIATIVES_EPO_DEPLOY,
-      { showMyDivisionsOnly: this.showMyDivisionsOnly },
-      {}
-    );
+    this.saveEpoDeployState();
     this.loadCycles();
   }
 
@@ -706,9 +752,66 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
    *                                       falling in Q+1/Q+2. Active only. Sub-grouped Q+1, Q+2.
    *   4. Unscheduled Active             — active, target null OR target beyond Q+2.
    */
+  // ── D-488: Roadmap Theme filter + sub-grouping ─────────────────────────────
+  allThemes: RoadmapTheme[] = [];
+  /** Applied multi-select — theme ids, '__none__' = Unthemed. Persisted (D-171). */
+  selectedThemeIds: string[] = [];
+
+  toggleThemeFilter(id: string): void {
+    this.selectedThemeIds = this.selectedThemeIds.includes(id)
+      ? this.selectedThemeIds.filter(t => t !== id)
+      : [...this.selectedThemeIds, id];
+    this.saveEpoDeployState();
+    this.cdr.markForCheck();
+  }
+
+  private themeMatches(c: DeliveryCycle): boolean {
+    if (!this.selectedThemeIds.length) { return true; }
+    return c.roadmap_theme_id
+      ? this.selectedThemeIds.includes(c.roadmap_theme_id)
+      : this.selectedThemeIds.includes('__none__');
+  }
+
+  /** Splits a section's cycles into Theme sub-groups, "Unthemed" last (D-488).
+   *  Single all-unthemed group → label null (no header noise). */
+  themeSubGroups(cycles: DeliveryCycle[]): { label: string | null; cycles: DeliveryCycle[] }[] {
+    const themed = new Map<string, DeliveryCycle[]>();
+    const unthemed: DeliveryCycle[] = [];
+    for (const c of cycles) {
+      if (c.roadmap_theme_name) {
+        const list = themed.get(c.roadmap_theme_name) ?? [];
+        list.push(c);
+        themed.set(c.roadmap_theme_name, list);
+      } else {
+        unthemed.push(c);
+      }
+    }
+    if (themed.size === 0) { return [{ label: null, cycles: unthemed }]; }
+    const groups = [...themed.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([label, list]) => ({ label: label as string | null, cycles: list }));
+    if (unthemed.length) { groups.push({ label: 'Unthemed', cycles: unthemed }); }
+    return groups;
+  }
+
+  private saveEpoDeployState(): void {
+    this.screenState.save(
+      SCREEN_KEYS.INITIATIVES_EPO_DEPLOY,
+      { showMyDivisionsOnly: this.showMyDivisionsOnly, selectedThemeIds: this.selectedThemeIds },
+      {}
+    );
+  }
+
+  /** Template-facing wrapper for the Clear pill. */
+  saveEpoDeployStatePublic(): void {
+    this.saveEpoDeployState();
+    this.cdr.markForCheck();
+  }
+
   get epoGroups(): EpoGroup[] {
     const byEpo = new Map<string, { display_name: string; cycles: DeliveryCycle[] }>();
     for (const c of this.cycles) {
+      if (!this.themeMatches(c)) continue;   // D-488 theme filter
       if (!c.assigned_epo_user_id) continue;
       let entry = byEpo.get(c.assigned_epo_user_id);
       if (!entry) {

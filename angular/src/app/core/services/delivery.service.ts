@@ -10,6 +10,7 @@ import {
   McpResponse,
   DeliveryWorkstream,
   DeliveryCycle,
+  RoadmapTheme,
   CycleMilestoneDate,
   GateRecord,
   CycleEventLogEntry,
@@ -162,6 +163,7 @@ export class DeliveryService {
     assigned_dol_user_id?:    string;          // optional — D-391 (new); required before Brief Review gate
     outcome_statement?:       string;          // optional at creation
     jira_epic_key?:           string;          // optional
+    roadmap_theme_id?:        string | null;   // D-487: optional Theme tag
     milestone_target_dates?:  {               // optional gate target dates at creation
       brief_review?:   string;
       go_to_build?:    string;
@@ -186,6 +188,7 @@ export class DeliveryService {
     assigned_epo_user_id?:   string | null;
     assigned_dol_user_id?:   string | null;
     jira_epic_key?:          string | null;
+    roadmap_theme_id?:       string | null;   // D-487: null clears the tag
     // Contract 29 / D-458 (WS1): full-array replace; [] clears.
     other_consulted_user_ids?: string[];
     other_informed_user_ids?:  string[];
@@ -537,6 +540,27 @@ export class DeliveryService {
     return this.mcp.call<MyCompletedGatesResponse>(
       'delivery', 'list_my_completed_gates', params as Record<string, unknown>
     );
+  }
+
+  // ── Roadmap Themes (D-487) — Division-scoped vocabulary ──────────────────
+
+  listRoadmapThemes(division_id?: string, include_inactive = false): Observable<McpResponse<RoadmapTheme[]>> {
+    return this.mcp.call<RoadmapTheme[]>('delivery', 'list_roadmap_themes', {
+      ...(division_id ? { division_id } : {}),
+      ...(include_inactive ? { include_inactive: true } : {})
+    });
+  }
+
+  createRoadmapTheme(division_id: string, name: string): Observable<McpResponse<RoadmapTheme>> {
+    return this.mcp.call<RoadmapTheme>('delivery', 'create_roadmap_theme', { division_id, name });
+  }
+
+  updateRoadmapTheme(theme_id: string, patch: { name?: string; sort_order?: number }): Observable<McpResponse<RoadmapTheme>> {
+    return this.mcp.call<RoadmapTheme>('delivery', 'update_roadmap_theme', { theme_id, ...patch });
+  }
+
+  deactivateRoadmapTheme(theme_id: string): Observable<McpResponse<RoadmapTheme & { referencing_initiatives: number }>> {
+    return this.mcp.call('delivery', 'deactivate_roadmap_theme', { theme_id });
   }
 
   // ── Artifact Type management (D-437 origin; D-438 Contract 25 schema) ────

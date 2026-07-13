@@ -55,6 +55,7 @@ async function create_delivery_cycle(params, caller_user_id) {
     assigned_dol_user_id,
     outcome_statement,
     jira_epic_key,
+    roadmap_theme_id,        // D-487: optional Division-scoped theme tag
     milestone_target_dates
   } = params;
 
@@ -174,7 +175,8 @@ async function create_delivery_cycle(params, caller_user_id) {
       assigned_epo_user_id:    assigned_epo_user_id || null,  // D-390: nullable at creation
       assigned_dol_user_id:    assigned_dol_user_id || null,  // D-391: nullable at creation
       outcome_statement:       outcome_statement    || null,
-      jira_epic_key:           jira_epic_key        || null
+      jira_epic_key:           jira_epic_key        || null,
+      roadmap_theme_id:        roadmap_theme_id     || null   // D-487
     })
     .select()
     .single();

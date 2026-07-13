@@ -227,6 +227,17 @@ async function get_delivery_cycle(params, caller_user_id) {
     }
   }));
 
+  // D-487: resolve Roadmap Theme name (nullable tag).
+  let roadmap_theme_name = null;
+  if (cycle.roadmap_theme_id) {
+    const { data: themeRow } = await supabase
+      .from('roadmap_themes')
+      .select('name')
+      .eq('id', cycle.roadmap_theme_id)
+      .maybeSingle();
+    roadmap_theme_name = themeRow?.name ?? null;
+  }
+
   return {
     success: true,
     data: {
@@ -234,6 +245,8 @@ async function get_delivery_cycle(params, caller_user_id) {
       // Contract 17 UAT Bug 2 fix: include division_name + display_name_short.
       division_name:             cycle_division_name,
       display_name_short:        cycle_division_display_name_short,
+      // D-487: joined Theme name for the detail + Edit panels.
+      roadmap_theme_name,
       // D-389/D-390/D-391: DCS / EPO / DOL display names from joined user map.
       assigned_dcs_display_name: cycle.assigned_dcs_user_id ? (userMap[cycle.assigned_dcs_user_id] ?? null) : null,
       assigned_epo_display_name: cycle.assigned_epo_user_id ? (userMap[cycle.assigned_epo_user_id] ?? null) : null,

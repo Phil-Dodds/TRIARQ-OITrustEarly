@@ -43,6 +43,7 @@ import {
 import { BlockedActionComponent }      from '../../../shared/components/blocked-action/blocked-action.component';
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DivisionInitiativeCycleComponent } from './initiative-cycle/division-initiative-cycle.component';
+import { DivisionRoadmapThemesComponent }   from './division-roadmap-themes.component';
 import { UserPickerComponent }         from '../../../shared/pickers/user-picker/user-picker.component';
 import { UserProfileService }          from '../../../core/services/user-profile.service';
 import { Division, User }              from '../../../core/types/database';
@@ -91,7 +92,8 @@ const LEVEL_LABELS: Record<number, string> = {
     BlockedActionComponent,
     LoadingOverlayComponent,
     UserPickerComponent,
-    DivisionInitiativeCycleComponent
+    DivisionInitiativeCycleComponent,
+    DivisionRoadmapThemesComponent
   ],
   styles: [`
     :host{display:block}
@@ -470,6 +472,15 @@ const LEVEL_LABELS: Record<number, string> = {
                   [divisionId]="selectedDivision.id"
                   [divisionName]="selectedDivision.division_name">
                 </app-division-initiative-cycle>
+              </div>
+
+              <!-- D-487: Roadmap Themes — Division-scoped vocabulary
+                   (spec "tab" → section, same CC-32 precedent as above). -->
+              <div class="oi-zone">
+                <div class="oi-zone-title">Roadmap Themes</div>
+                <app-division-roadmap-themes
+                  [divisionId]="selectedDivision.id">
+                </app-division-roadmap-themes>
               </div>
 
             </div>

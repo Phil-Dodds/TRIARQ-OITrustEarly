@@ -31,6 +31,7 @@ const MUTABLE_FIELD_LABELS = {
   assigned_epo_user_id:    'Assigned Engineering Product Owner',
   assigned_dol_user_id:    'Assigned Domain Outcome Lead',
   jira_epic_key:           'Jira Epic Link',
+  roadmap_theme_id:        'Roadmap Theme',   // D-487: nullable — clearing removes the tag
   other_consulted_user_ids: 'Other Consulted',
   other_informed_user_ids:  'Other Informed'
 };

@@ -55,6 +55,8 @@ const { delete_gate_approver_config }    = require('./tools/delete_gate_approver
 // Contract 24 — approved gate queries (D-430, D-431).
 const { list_approved_gates }            = require('./tools/list_approved_gates');
 const { list_my_completed_gates }        = require('./tools/list_my_completed_gates');
+// D-487 — Roadmap Themes (Division-scoped vocabulary).
+const roadmapThemes                      = require('./tools/roadmap_themes');
 // Contract 24 — artifact type management (D-437).
 const { list_artifact_types }            = require('./tools/list_artifact_types');
 const { create_artifact_type }           = require('./tools/create_artifact_type');
@@ -103,6 +105,12 @@ const PORT = process.env.PORT || 3003;
 
 // ── Tool registry ─────────────────────────────────────────────────────────────
 const TOOLS = {
+  // D-487 — Roadmap Themes
+  list_roadmap_themes:      roadmapThemes.list_roadmap_themes,
+  create_roadmap_theme:     roadmapThemes.create_roadmap_theme,
+  update_roadmap_theme:     roadmapThemes.update_roadmap_theme,
+  deactivate_roadmap_theme: roadmapThemes.deactivate_roadmap_theme,
+
   // Workstream management
   create_delivery_workstream,
   list_delivery_workstreams,

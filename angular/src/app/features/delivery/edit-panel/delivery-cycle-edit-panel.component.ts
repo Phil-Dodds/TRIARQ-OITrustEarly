@@ -34,7 +34,7 @@ import {
   ElementRef, ViewChild
 } from '@angular/core';
 import {
-  FormBuilder, FormGroup, Validators, ReactiveFormsModule
+  FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule
 } from '@angular/forms';
 import { CommonModule }  from '@angular/common';
 import { IonicModule }   from '@ionic/angular';
@@ -49,7 +49,7 @@ import { UserPickerComponent }               from '../../../shared/pickers/user-
 import { DivisionAssignmentPickerComponent } from '../../../shared/pickers/division-assignment-picker/division-assignment-picker.component';
 import {
   DeliveryCycle, DeliveryWorkstream, Division, User,
-  TierClassification, McpResponse, EntityUserRef
+  TierClassification, McpResponse, EntityUserRef, RoadmapTheme
 } from '../../../core/types/database';
 import {
   DivisionTrustGroup,
@@ -76,7 +76,7 @@ function epAvatarColorFromName(name: string): string {
   selector: 'app-delivery-cycle-edit-panel',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule, IonicModule, WorkstreamPickerComponent, UserPickerComponent, DivisionAssignmentPickerComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, IonicModule, WorkstreamPickerComponent, UserPickerComponent, DivisionAssignmentPickerComponent],
   template: `
     <!-- S-006: Edit surface — pushes onto navigation stack, View remains below.
          Positioned as an absolute overlay within the detail panel container. -->
@@ -321,6 +321,18 @@ function epAvatarColorFromName(name: string): string {
               <input formControlName="jira_epic_key" class="ep-input"
                      type="text" placeholder="e.g. PS-2026-041" />
               <div class="ep-hint">Required before Go to Build Gate.</div>
+            </div>
+
+            <!-- 10. Roadmap Theme — D-487. Single-select, optional, scoped to
+                 the Initiative's Division's active Themes. -->
+            <div class="ep-field">
+              <label class="ep-label">Roadmap Theme</label>
+              <select class="ep-input" [ngModel]="selectedThemeId" [ngModelOptions]="{standalone: true}"
+                      (ngModelChange)="onThemeSelected($event)">
+                <option value="">— No Theme —</option>
+                <option *ngFor="let t of divisionThemes" [value]="t.id">{{ t.name }}</option>
+              </select>
+              <div class="ep-hint">Optional. Groups this Initiative on the roadmap. Themes are managed per Division in Admin → Divisions.</div>
             </div>
 
             <!-- Save error (D-200 Pattern 3) -->
@@ -602,6 +614,30 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   // Workstream picker state.
   showWorkstreamPicker                    = false;
   selectedWorkstream: DeliveryWorkstream | null = null;
+
+  // D-487: Roadmap Theme select — '' = No Theme. Scoped to the selected Division.
+  selectedThemeId = '';
+  divisionThemes: RoadmapTheme[] = [];
+
+  onThemeSelected(id: string): void {
+    this.selectedThemeId = id;
+    this.cdr.markForCheck();
+  }
+
+  private loadDivisionThemes(divisionId: string, clearIfMissing = false): void {
+    this.delivery.listRoadmapThemes(divisionId).subscribe({
+      next: res => {
+        this.divisionThemes = res.success ? (res.data ?? []) : [];
+        // Division changed: a theme from the old Division no longer applies.
+        if (clearIfMissing && this.selectedThemeId &&
+            !this.divisionThemes.some(t => t.id === this.selectedThemeId)) {
+          this.selectedThemeId = '';
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { this.divisionThemes = []; this.cdr.markForCheck(); }
+    });
+  }
   // B-25: warning shown when Workstream belongs to a different Division after Division change.
   // Does NOT clear the Workstream. Source: D-165, D-297, D-228, Contract 9.
   workstreamDivisionNote                  = '';
@@ -680,6 +716,15 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       outcome_statement:   [this.cycle.outcome_statement ?? ''],
       tier_classification: [this.cycle.tier_classification,  Validators.required],
       jira_epic_key:       [this.cycle.jira_epic_key        ?? '']
+    });
+
+    // D-487: Roadmap Theme — seed from cycle, load the Division's active themes.
+    // Follows the currently selected Division: changing Division reloads the
+    // list and clears a theme that no longer belongs (themes are Division-scoped).
+    this.selectedThemeId = this.cycle.roadmap_theme_id ?? '';
+    this.loadDivisionThemes(this.cycle.division_id);
+    this.form.get('division_id')?.valueChanges.subscribe((divId: string) => {
+      if (divId) this.loadDivisionThemes(divId, /*clearIfMissing*/ true);
     });
 
     // Pre-populate Workstream from cycle.
@@ -1030,6 +1075,11 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     if (newJira !== (this.cycle.jira_epic_key ?? null)) {
       payload.jira_epic_key = newJira;
     }
+    // D-487: Roadmap Theme — '' means No Theme (null clears the tag).
+    const newThemeId = this.selectedThemeId || null;
+    if (newThemeId !== (this.cycle.roadmap_theme_id ?? null)) {
+      payload.roadmap_theme_id = newThemeId;
+    }
 
     // D-458: Other Consulted / Other Informed — full-array replace, empty clears.
     // Only included when the id set differs from the originally loaded set.
@@ -1121,6 +1171,8 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       (this.selectedDcs?.id ?? null) !== (this.cycle.assigned_dcs_user_id ?? null) ||
       (this.selectedEpo?.id ?? null) !== (this.cycle.assigned_epo_user_id ?? null) ||
       (this.selectedDol?.id ?? null) !== (this.cycle.assigned_dol_user_id ?? null) ||
+      // D-487: Roadmap Theme changed.
+      (this.selectedThemeId || null) !== (this.cycle.roadmap_theme_id ?? null) ||
       // D-458: multi-user fields differ from the originally loaded id sets.
       !this.sameIdSet(this.otherConsulted.map(u => u.id),
                       (this.cycle.other_consulted_users ?? []).map(u => u.id)) ||

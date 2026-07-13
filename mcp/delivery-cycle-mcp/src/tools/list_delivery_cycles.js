@@ -87,6 +87,7 @@ async function list_delivery_cycles(params, caller_user_id) {
       assigned_epo_user_id,
       assigned_dol_user_id,
       jira_epic_key,
+      roadmap_theme_id,
       created_at,
       updated_at
     `)
@@ -257,8 +258,21 @@ async function list_delivery_cycles(params, caller_user_id) {
     }
   }
 
+  // ── D-487/D-488: resolve Roadmap Theme names for the name-cell prefix,
+  // EPO Deploy sub-grouping, and Theme filters.
+  const themeIdSet = new Set(cycles.map(c => c.roadmap_theme_id).filter(Boolean));
+  let themeMap = {};
+  if (themeIdSet.size > 0) {
+    const { data: themeRows } = await supabase
+      .from('roadmap_themes')
+      .select('id, name')
+      .in('id', Array.from(themeIdSet));
+    (themeRows || []).forEach(t => { themeMap[t.id] = t.name; });
+  }
+
   const enriched = cycles.map(c => ({
     ...c,
+    roadmap_theme_name:        c.roadmap_theme_id ? (themeMap[c.roadmap_theme_id] ?? null) : null,
     assigned_dcs_display_name: c.assigned_dcs_user_id ? (userMap[c.assigned_dcs_user_id] ?? null) : null,
     assigned_epo_display_name: c.assigned_epo_user_id ? (userMap[c.assigned_epo_user_id] ?? null) : null,
     assigned_dol_display_name: c.assigned_dol_user_id ? (userMap[c.assigned_dol_user_id] ?? null) : null,

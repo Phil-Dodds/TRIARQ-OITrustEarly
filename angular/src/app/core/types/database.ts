@@ -268,6 +268,15 @@ export interface DeliveryWorkstream {
   active_cycle_count?:     number;
 }
 
+// D-487: Division-scoped roadmap vocabulary. Deactivate-only when referenced (D-437 pattern).
+export interface RoadmapTheme {
+  id:          string;
+  division_id: string;
+  name:        string;
+  sort_order:  number;
+  active:      boolean;
+}
+
 export interface DeliveryCycle {
   delivery_cycle_id:       string;
   cycle_title:             string;
@@ -289,6 +298,9 @@ export interface DeliveryCycle {
   other_informed_user_ids?:  string[];
   pre_hold_lifecycle_stage: LifecycleStage | null;  // Stores stage before ON_HOLD — migration 024
   jira_epic_key:           string | null;
+  // D-487: optional Division-scoped Roadmap Theme tag.
+  roadmap_theme_id?:       string | null;
+  roadmap_theme_name?:     string | null;   // joined by get/list
   created_at:              string;
   updated_at:              string;
   deleted_at:              string | null;
