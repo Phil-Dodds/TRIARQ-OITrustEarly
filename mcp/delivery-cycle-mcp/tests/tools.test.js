@@ -125,14 +125,15 @@ describe('create_delivery_cycle', () => {
     assert.ok(result.error.includes('tier_classification'));
   });
 
-  test('error path: missing workstream_id', async () => {
-    const { create_delivery_cycle } = require('../src/tools/create_delivery_cycle');
-    const result = await create_delivery_cycle(
-      { cycle_title: 'Test', division_id: 'div-1', tier_classification: 'tier_1' },
-      DS_ID
+  // D-165: workstream_id is OPTIONAL at creation (assigned later from the
+  // Division screen). Source contract asserted per the suite's D-449 pattern.
+  test('D-165: workstream_id is optional at creation', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../src/tools/create_delivery_cycle.js'),
+      'utf8'
     );
-    assert.equal(result.success, false);
-    assert.ok(result.error.includes('workstream_id'));
+    assert.ok(/workstream_id is optional \(D-165\)/.test(src),
+      'create_delivery_cycle must not require workstream_id (D-165)');
   });
 
   // Contract 21 — S-032 / D-414: new Initiatives cannot be created in an
@@ -722,13 +723,14 @@ describe('set_milestone_actual_date', () => {
   });
 
   // ── Contract 28 / D-449 — Backdate path (skipped → complete) ──────────────
-  test('D-449 backdate: isBackdate branch checks date_status === skipped', () => {
+  test('D-449 backdate: isBackdate checks skipped AND excludes D-502 clears', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../src/tools/set_milestone_actual_date.js'),
       'utf8'
     );
-    assert.ok(/isBackdate\s*=\s*milestone\.date_status\s*===\s*'skipped'/.test(src),
-      'isBackdate must check milestone.date_status === skipped');
+    // Contract 36 (D-502): a null-clear is never a backdate.
+    assert.ok(/isBackdate\s*=\s*!isClear\s*&&\s*milestone\.date_status\s*===\s*'skipped'/.test(src),
+      'isBackdate must check !isClear && milestone.date_status === skipped');
   });
 
   test('D-449 backdate: updates gate_records.gate_status to approved', () => {

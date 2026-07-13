@@ -1,6 +1,8 @@
 // contract32-status.test.js
 // Pathways OI Trust — delivery-cycle-mcp (Contract 32 WS2, D-476–D-486).
-// Coverage for the needs-review helper + the four Initiative Status tools.
+// AMENDED Contract 36 (D-501–D-515): open authorship (D-506), supersede-edit
+// chains (D-507), 3-day recency window (D-508), dashboard D-510 shape, and the
+// missing-target-date review reason. Tests assert the Contract 36 contract.
 // Supabase singleton mocked via require.cache injection (FIFO response queue),
 // same technique as the division-mcp contract32 suite. DB-heavy confidence
 // write-through happy path is verified via UAT (cross-tool chain).
@@ -114,29 +116,70 @@ describe('save_initiative_status_update', () => {
     assert.ok(/pilot_confidence must be one of/.test(r.error));
   });
 
-  test('error — caller not on trio (403 semantics)', async () => {
-    queue = [{ data: {
-      delivery_cycle_id: CYC, current_lifecycle_stage: 'BUILD',
-      assigned_dol_user_id: DOL, assigned_dcs_user_id: DCS, assigned_epo_user_id: EPO
-    }, error: null }];
+  // D-506: trio membership no longer gates authorship — visibility does.
+  test('error — caller without Division visibility (D-506)', async () => {
+    queue = [
+      { data: { delivery_cycle_id: CYC, division_id: 'div', current_lifecycle_stage: 'BUILD',
+                assigned_dol_user_id: DOL, assigned_dcs_user_id: DCS, assigned_epo_user_id: EPO,
+                latest_status_update_id: null, status_overdue: false }, error: null },  // cycle
+      { data: { is_admin: false }, error: null },                                        // caller
+      { data: null, error: null }                                                        // membership → none
+    ];
     const r = await save_initiative_status_update({ initiative_id: CYC, escalation_needed: false }, OUT);
     assert.equal(r.success, false);
-    assert.ok(/DOL, DCS, or EPO/.test(r.error));
+    assert.ok(/visibility/.test(r.error));
   });
 
-  test('happy — saves row, links Initiative (no confidence)', async () => {
+  test('happy — trio author saves row, links Initiative (no confidence)', async () => {
     queue = [
-      { data: { delivery_cycle_id: CYC, current_lifecycle_stage: 'BUILD',
-                assigned_dol_user_id: DOL, assigned_dcs_user_id: DCS, assigned_epo_user_id: EPO }, error: null }, // cycle
+      { data: { delivery_cycle_id: CYC, division_id: 'div', current_lifecycle_stage: 'BUILD',
+                assigned_dol_user_id: DOL, assigned_dcs_user_id: DCS, assigned_epo_user_id: EPO,
+                latest_status_update_id: null, status_overdue: false }, error: null },  // cycle
+      { data: { is_admin: false }, error: null },                                        // caller (trio → no membership query)
       { data: [{ gate_name: 'go_to_deploy', date_status: 'on_track' },
-               { gate_name: 'close_review', date_status: 'not_started' }], error: null },                         // milestones
-      { data: { id: UPD, saved_at: '2026-06-30T12:00:00Z' }, error: null },                                       // insert
-      { data: [], error: null }                                                                                   // cycle update
+               { gate_name: 'close_review', date_status: 'not_started' }], error: null }, // milestones
+      { data: { id: UPD, saved_at: '2026-06-30T12:00:00Z' }, error: null },              // insert
+      { data: [], error: null }                                                          // cycle update
     ];
     const r = await save_initiative_status_update(
       { initiative_id: CYC, escalation_needed: true, accomplished_last_cycle: 'shipped X' }, DOL);
     assert.equal(r.success, true);
     assert.equal(r.data.status_update_id, UPD);
+    assert.equal(r.data.is_edit, false);
+    assert.equal(r.data.is_trio_author, true);
+  });
+
+  // D-507: edit = supersede row; overdue closes the edit window.
+  test('edit happy — supersede row within window (D-507)', async () => {
+    const recent = new Date().toISOString();
+    queue = [
+      { data: { delivery_cycle_id: CYC, division_id: 'div', current_lifecycle_stage: 'BUILD',
+                assigned_dol_user_id: DOL, assigned_dcs_user_id: DCS, assigned_epo_user_id: EPO,
+                latest_status_update_id: UPD, status_overdue: false }, error: null },    // cycle
+      { data: { is_admin: false }, error: null },                                        // caller
+      { data: [{ id: UPD, supersedes_update_id: null, saved_at: recent }], error: null }, // chain root walk
+      { data: { id: UPD, saved_by: DOL }, error: null },                                 // edit target
+      { data: [{ gate_name: 'go_to_deploy', date_status: 'on_track' }], error: null },   // milestones
+      { data: { id: 'update-2', saved_at: recent }, error: null },                       // insert
+      { data: [], error: null }                                                          // cycle update (head only)
+    ];
+    const r = await save_initiative_status_update(
+      { initiative_id: CYC, escalation_needed: false, supersedes_update_id: UPD }, DOL);
+    assert.equal(r.success, true);
+    assert.equal(r.data.is_edit, true);
+  });
+
+  test('edit rejected — initiative status_overdue closes the window (D-507)', async () => {
+    queue = [
+      { data: { delivery_cycle_id: CYC, division_id: 'div', current_lifecycle_stage: 'BUILD',
+                assigned_dol_user_id: DOL, assigned_dcs_user_id: DCS, assigned_epo_user_id: EPO,
+                latest_status_update_id: UPD, status_overdue: true }, error: null },     // cycle
+      { data: { is_admin: false }, error: null }                                         // caller
+    ];
+    const r = await save_initiative_status_update(
+      { initiative_id: CYC, escalation_needed: false, supersedes_update_id: UPD }, DOL);
+    assert.equal(r.success, false);
+    assert.ok(/overdue/.test(r.error));
   });
 });
 
@@ -148,29 +191,37 @@ describe('get_latest_initiative_status', () => {
     assert.equal(r.success, false);
   });
 
-  test('happy — latest + acknowledgments + needs review', async () => {
+  // Contract 36: non-trio author → chips for ALL trio members (D-506/D-513);
+  // chain context (D-507); missing-target-date review reason.
+  test('happy — non-trio author: chain, all-trio chips, needs review', async () => {
+    const recent = new Date().toISOString();
     queue = [
-      { data: { delivery_cycle_id: CYC, division_id: 'div', status_overdue: true,
+      { data: { delivery_cycle_id: CYC, division_id: 'div', status_overdue: false,
                 latest_status_update_id: UPD,
                 assigned_dol_user_id: DOL, assigned_dcs_user_id: DCS, assigned_epo_user_id: EPO }, error: null }, // cycle
-      { data: { id: UPD, saved_by: DOL, escalation_needed: true,
+      { data: { id: UPD, saved_by: OUT, supersedes_update_id: null, saved_at: recent, escalation_needed: true,
                 pilot_confidence_applicable: false, close_confidence_applicable: false }, error: null },          // latest
-      { data: [{ id: DOL, display_name: 'Dana' }, { id: DCS, display_name: 'Sam' }, { id: EPO, display_name: 'Eli' }], error: null }, // users
-      { data: [{ acknowledged_by: DCS, acknowledged_at: '2026-06-30T13:00:00Z' }], error: null },                // acks
-      { data: [{ gate_name: 'go_to_build', date_status: 'on_track' }], error: null },                            // milestones
-      { data: null, error: null }                                                                                 // rpc (no cadence → slip skipped)
-    ];
+      { data: [{ id: DOL, display_name: 'Dana' }, { id: DCS, display_name: 'Sam' },
+               { id: EPO, display_name: 'Eli' }, { id: OUT, display_name: 'Oz' }], error: null },                 // users
+      { data: [{ id: UPD, supersedes_update_id: null, saved_at: recent }], error: null },                        // chain root walk
+      { data: [{ status_update_id: UPD, acknowledged_by: DCS, acknowledged_at: '2026-06-30T13:00:00Z' }], error: null }, // acks
+      { data: [{ gate_name: 'go_to_build', date_status: 'on_track', target_date: null }], error: null }          // milestones
+    ]; // trailing rpc calls (cadence ×2) fall through to the null fallback
     const r = await get_latest_initiative_status({ initiative_id: CYC }, DCS);
     assert.equal(r.success, true);
-    assert.equal(r.data.saved_by_name, 'Dana');
-    // DCS acknowledged; EPO pending; DOL (save user) excluded.
+    assert.equal(r.data.saved_by_name, 'Oz');
+    assert.equal(r.data.is_trio_author, false);
+    assert.equal(r.data.chain.is_edited, false);
+    assert.equal(r.data.chain.edit_window_open, true);
+    // D-513: one chip per trio member — author is non-trio, so nobody is excluded.
+    assert.equal(r.data.acknowledgments.length, 3);
     const dcs = r.data.acknowledgments.find(a => a.user_id === DCS);
-    const epo = r.data.acknowledgments.find(a => a.user_id === EPO);
+    const dol = r.data.acknowledgments.find(a => a.user_id === DOL);
     assert.equal(dcs.acknowledged, true);
-    assert.equal(epo.acknowledged, false);
-    assert.ok(!r.data.acknowledgments.find(a => a.user_id === DOL));
+    assert.equal(dol.acknowledged, false);
     assert.ok(r.data.needs_review_reasons.includes('Escalation flagged'));
-    assert.ok(r.data.needs_review_reasons.includes('Status overdue'));
+    // Contract 36 UAT addition: next gate without a target date needs review.
+    assert.ok(r.data.needs_review_reasons.includes('No target date: Go to Build'));
   });
 });
 
@@ -300,20 +351,38 @@ describe('get_my_status_due', () => {
 // ── get_my_acknowledgments_due (D-484) ────────────────────────────────────────
 describe('get_my_acknowledgments_due', () => {
 
-  test('happy — within 5d, not save user, not acked', async () => {
+  // Contract 36 (D-506/D-508): non-trio-authored head, chain root within the
+  // 3-day window, caller not yet acked.
+  test('happy — non-trio author within 3d window, not acked', async () => {
     const recent = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(); // 1 day ago
     queue = [
-      { data: [{ delivery_cycle_id: CYC, cycle_title: 'Alpha', division_id: 'div', latest_status_update_id: UPD }], error: null }, // cycles
-      { data: [{ id: UPD, saved_by: DOL, saved_at: recent }], error: null },     // updates
+      { data: [{ delivery_cycle_id: CYC, cycle_title: 'Alpha', division_id: 'div', latest_status_update_id: UPD,
+                 assigned_dol_user_id: DOL, assigned_dcs_user_id: DCS, assigned_epo_user_id: EPO }], error: null }, // cycles
+      { data: [{ id: UPD, saved_by: OUT, saved_at: recent, supersedes_update_id: null }], error: null }, // updates
+      { data: [{ id: UPD, supersedes_update_id: null, saved_at: recent }], error: null },                // chain roots
       { data: [], error: null },                                                  // caller acks (none)
       { data: [{ id: 'div', division_name: 'Cardiology' }], error: null },        // divisions
-      { data: [{ id: DOL, display_name: 'Dana' }], error: null }                  // saver names
+      { data: [{ id: OUT, display_name: 'Oz' }], error: null }                    // saver names
     ];
     const r = await get_my_acknowledgments_due({}, DCS);
     assert.equal(r.success, true);
     assert.equal(r.data.length, 1);
-    assert.equal(r.data[0].saved_by_name, 'Dana');
+    assert.equal(r.data[0].saved_by_name, 'Oz');
     assert.equal(r.data[0].status_update_id, UPD);
+  });
+
+  test('trio-authored head generates no invitation (D-506)', async () => {
+    const recent = new Date().toISOString();
+    queue = [
+      { data: [{ delivery_cycle_id: CYC, cycle_title: 'Alpha', division_id: 'div', latest_status_update_id: UPD,
+                 assigned_dol_user_id: DOL, assigned_dcs_user_id: DCS, assigned_epo_user_id: EPO }], error: null },
+      { data: [{ id: UPD, saved_by: DOL, saved_at: recent, supersedes_update_id: null }], error: null },
+      { data: [{ id: UPD, supersedes_update_id: null, saved_at: recent }], error: null },
+      { data: [], error: null }
+    ];
+    const r = await get_my_acknowledgments_due({}, DCS);
+    assert.equal(r.success, true);
+    assert.equal(r.data.length, 0);
   });
 
   test('filters out the save user own update', async () => {
@@ -332,22 +401,33 @@ describe('get_my_acknowledgments_due', () => {
 // ── get_initiative_status_dashboard (D-485) ───────────────────────────────────
 describe('get_initiative_status_dashboard', () => {
 
-  test('happy — admin scope, rows with needs review', async () => {
+  // Contract 36 (D-510): short division name, canonical Next Gate label (never
+  // milestone_label), pending-approval flag, trio-author flag, chain-root age.
+  test('happy — admin scope, D-510 row shape with needs review', async () => {
     queue = [
       { data: { is_admin: true }, error: null },                                  // caller (privileged)
-      { data: [{ delivery_cycle_id: CYC, cycle_title: 'Alpha', division_id: 'div', current_lifecycle_stage: 'BUILD', status_overdue: true, latest_status_update_id: UPD }], error: null }, // cycles
-      { data: [{ id: 'div', division_name: 'Cardiology' }], error: null },        // divisions
+      { data: [{ delivery_cycle_id: CYC, cycle_title: 'Alpha', division_id: 'div', current_lifecycle_stage: 'BUILD',
+                 status_overdue: true, latest_status_update_id: UPD,
+                 assigned_dol_user_id: DOL, assigned_dcs_user_id: null, assigned_epo_user_id: null }, ], error: null }, // cycles
+      { data: [{ id: 'div', division_name: 'Cardiology', display_name_short: 'Cardio' }], error: null }, // divisions
       { data: [{ id: UPD, saved_by: DOL, escalation_needed: true, pilot_confidence: null, close_confidence: null, pilot_confidence_applicable: false, close_confidence_applicable: false, saved_at: '2026-06-20T00:00:00Z' }], error: null }, // updates
-      { data: [{ id: DOL, display_name: 'Dana' }], error: null },                 // saver names
-      { data: [{ delivery_cycle_id: CYC, gate_name: 'go_to_build', date_status: 'on_track' }], error: null }, // milestones
-      { data: null, error: null }                                                  // rpc (no cadence → slip skipped)
-    ];
+      { data: [{ id: UPD, supersedes_update_id: null, saved_at: '2026-06-20T00:00:00Z' }], error: null }, // chain roots
+      { data: [{ id: DOL, display_name: 'Dana' }], error: null },                 // author + team names
+      { data: [{ delivery_cycle_id: CYC, gate_name: 'go_to_build', date_status: 'on_track', milestone_label: 'Build Start', target_date: null }], error: null }, // milestones
+      { data: [{ delivery_cycle_id: CYC, gate_name: 'go_to_build', gate_status: 'awaiting_approval' }], error: null } // gate_records
+    ]; // needs-review cadence rpc falls through to the null fallback
     const r = await get_initiative_status_dashboard({}, DOL);
     assert.equal(r.success, true);
-    assert.equal(r.data[0].division_name, 'Cardiology');
+    assert.equal(r.data[0].division_display_name_short, 'Cardio');
     assert.equal(r.data[0].saved_by_name, 'Dana');
+    assert.equal(r.data[0].is_trio_author, true);
+    assert.equal(r.data[0].root_saved_at, '2026-06-20T00:00:00Z');
+    // Canonical gate name — 'Build Start' (milestone_label) must never surface.
+    assert.equal(r.data[0].next_gate_label, 'Go to Build');
+    assert.equal(r.data[0].next_gate_pending_approval, true);
     assert.ok(r.data[0].needs_review_reasons.includes('Escalation flagged'));
     assert.ok(r.data[0].needs_review_reasons.includes('Status overdue'));
+    assert.ok(r.data[0].needs_review_reasons.includes('No target date: Go to Build'));
   });
 
   test('non-admin with no memberships returns empty', async () => {
