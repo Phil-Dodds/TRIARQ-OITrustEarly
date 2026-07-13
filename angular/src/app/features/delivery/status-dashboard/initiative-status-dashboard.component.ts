@@ -124,7 +124,10 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
             <tr *ngFor="let r of visibleRows; trackBy: trackByRow">
               <td><a class="isd-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
               <td *ngIf="showDivisionColumn">{{ r.division_display_name_short || '—' }}</td>
-              <td>{{ r.next_gate_label || '—' }}</td>
+              <td>
+                {{ r.next_gate_label || '—' }}
+                <span *ngIf="r.next_gate_pending_approval" class="isd-pending-chip">Pending Approval</span>
+              </td>
               <td>
                 <span *ngIf="r.next_gate_target_date"
                       [class.isd-overdue]="isPastDate(r.next_gate_target_date)">{{ r.next_gate_target_date }}</span>
@@ -260,6 +263,8 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
     .isd-foot { padding:8px; font-size:12px; color:var(--triarq-color-text-secondary); }
     .isd-check { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; }
     .isd-overdue { color:var(--triarq-color-error,#E96127); font-weight:600; }
+    .isd-pending-chip { display:inline-block; background:#FFF8E1; color:#B26A00; border:1px solid #F2A620;
+                        border-radius:999px; padding:0 8px; font-size:10px; font-weight:600; margin-left:6px; white-space:nowrap; }
     .isd-team { max-width:180px; }
     .isd-team-chip { display:inline-block; background:#F0F5F8; color:#257099; border-radius:999px; padding:1px 8px; font-size:11px; margin:0 4px 3px 0; white-space:nowrap; }
     .isd-author-initials { background:#E3F0F7; color:#257099; border-radius:999px; padding:1px 8px; font-size:11px; font-weight:600; }

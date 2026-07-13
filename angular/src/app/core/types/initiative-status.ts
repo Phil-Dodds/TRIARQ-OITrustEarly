@@ -132,6 +132,8 @@ export interface InitiativeStatusDashboardRow {
   next_gate_label:         string | null;
   next_gate_name:          string | null;
   next_gate_target_date:   string | null;
+  /** Contract 36 UAT: the next gate is submitted and awaiting approval. */
+  next_gate_pending_approval?: boolean;
   // D-510: Team column (grid parity) + D-511 person filters
   assigned_dcs_user_id:    string | null;
   assigned_epo_user_id:    string | null;

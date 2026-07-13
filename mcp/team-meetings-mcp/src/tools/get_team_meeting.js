@@ -33,13 +33,24 @@ function resolveGateStatus(milestoneDates) {
   return 'not_started';
 }
 
+// Contract 36 UAT correction: labels are ALWAYS the five canonical gate names —
+// milestone_label carries milestone display names ("Pilot Start") which are
+// not gates and must not surface as "Next Gate".
+const NEXT_GATE_LABELS = {
+  brief_review:  'Brief Review',
+  go_to_build:   'Go to Build',
+  go_to_deploy:  'Go to Deploy',
+  go_to_release: 'Go to Release',
+  close_review:  'Close Review'
+};
+
 function resolveNextGate(milestoneDates) {
   for (const gate of GATE_FORWARD_ORDER) {
     const m = (milestoneDates || []).find(x => x.gate_name === gate);
     if (!m) continue;
     if (m.date_status === 'complete') continue;
     if (m.date_status === 'skipped')  continue;
-    return { label: m.milestone_label, target_date: m.target_date ?? null };
+    return { label: NEXT_GATE_LABELS[gate] || gate, target_date: m.target_date ?? null };
   }
   return null;
 }

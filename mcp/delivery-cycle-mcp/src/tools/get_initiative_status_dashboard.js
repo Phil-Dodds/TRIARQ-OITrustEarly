@@ -108,6 +108,18 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
     (milestonesByCycle[m.delivery_cycle_id] = milestonesByCycle[m.delivery_cycle_id] || []).push(m);
   }
 
+  // ── Contract 36 UAT: "Pending Approval" qualifier — gate_records status for
+  // the next gate (awaiting_approval → chip on the dashboard).
+  const { data: gateRows } = await supabase
+    .from('gate_records')
+    .select('delivery_cycle_id, gate_name, gate_status')
+    .in('delivery_cycle_id', cycles.map(c => c.delivery_cycle_id))
+    .is('deleted_at', null);
+  const gateStatusByCycle = {};
+  for (const g of (gateRows || [])) {
+    (gateStatusByCycle[g.delivery_cycle_id] = gateStatusByCycle[g.delivery_cycle_id] || {})[g.gate_name] = g.gate_status;
+  }
+
   // ── Build rows + Needs Review reasons (D-485, D-509 lifecycle in lib) ──────
   const rows = [];
   for (const c of cycles) {
@@ -139,6 +151,10 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
       next_gate_label:         nextGate?.label ?? null,
       next_gate_name:          nextGate?.gate_name ?? null,
       next_gate_target_date:   nextGate?.target_date ?? null,
+      // Contract 36 UAT: next gate's submission is awaiting approval → chip.
+      next_gate_pending_approval: nextGate
+        ? (gateStatusByCycle[c.delivery_cycle_id]?.[nextGate.gate_name] === 'awaiting_approval')
+        : false,
       // D-510: Team column — same fields the Initiatives Grid renders
       assigned_dcs_user_id:    c.assigned_dcs_user_id,
       assigned_epo_user_id:    c.assigned_epo_user_id,

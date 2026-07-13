@@ -34,7 +34,11 @@ function resolveGateStatusWalkback(milestoneDates) {
 }
 
 /** CC-017 forward resolution: first gate in forward order not complete/skipped.
- *  Returns { gate_name, label, target_date } or null when all gates resolved. */
+ *  Returns { gate_name, label, target_date } or null when all gates resolved.
+ *  Contract 36 UAT correction: label is ALWAYS the canonical gate name — the
+ *  five set gates (Brief Review / Go to Build / Go to Deploy / Go to Release /
+ *  Close Review). milestone_label carries milestone display names ("Build
+ *  Start", "Pilot Start") which are NOT gate names and must not surface here. */
 function resolveNextGate(milestoneDates) {
   for (const gate of GATE_FORWARD_ORDER) {
     const m = (milestoneDates || []).find(x => x.gate_name === gate);
@@ -43,7 +47,7 @@ function resolveNextGate(milestoneDates) {
     if (m.date_status === 'skipped')  continue;
     return {
       gate_name:   gate,
-      label:       m.milestone_label || GATE_LABELS[gate] || gate,
+      label:       GATE_LABELS[gate] || gate,
       target_date: m.target_date ?? null
     };
   }
