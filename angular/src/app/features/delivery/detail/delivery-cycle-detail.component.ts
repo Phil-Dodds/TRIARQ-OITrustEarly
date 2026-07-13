@@ -49,6 +49,7 @@ import { DeliveryCycleEditPanelComponent }  from '../edit-panel/delivery-cycle-e
 import { InitiativeStatusUpdatePanelComponent }  from '../status-panel/initiative-status-update-panel.component';
 import { InitiativeStatusHistoryPanelComponent } from '../status-panel/initiative-status-history-panel.component';
 import { LatestInitiativeStatus } from '../../../core/types/initiative-status';
+import { GATE_DATE_SEMANTICS } from '../../../shared/constants/gate-coaching.constants';
 import {
   GateRecordModalComponent,
   GateRecordModalData,
@@ -1023,6 +1024,16 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               </ng-template>
             </div>
 
+            <!-- D-527: date-semantics coaching — always visible while either date
+                 editor is open on this gate. Last grid child + full span so it
+                 renders as its own row under the four columns (D-514 style). -->
+            <div *ngIf="editingMilestoneGate === m.gate_name || editingActualDateGate === m.gate_name"
+                 (click)="$event.stopPropagation()"
+                 style="grid-column:1 / -1;font-size:11px;font-style:italic;color:#757575;
+                        padding:2px 0 4px 22px;line-height:1.5;cursor:default;">
+              {{ GATE_DATE_SEMANTICS }}
+            </div>
+
           </div><!-- end row div -->
 
         </div><!-- end *ngFor milestone rows -->
@@ -1746,8 +1757,9 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   expandedGates = new Set<string>();
 
   // Expose constants to template
-  readonly GATE_LABELS     = GATE_LABELS;
-  readonly STAGE_LABEL_MAP = STAGE_LABEL_MAP;
+  readonly GATE_LABELS         = GATE_LABELS;
+  readonly STAGE_LABEL_MAP     = STAGE_LABEL_MAP;
+  readonly GATE_DATE_SEMANTICS = GATE_DATE_SEMANTICS;
 
   constructor(
     private readonly route:          ActivatedRoute,

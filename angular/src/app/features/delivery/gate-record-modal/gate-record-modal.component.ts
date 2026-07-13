@@ -44,6 +44,7 @@ import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/materia
 import { DeliveryService } from '../../../core/services/delivery.service';
 import { UserProfileService } from '../../../core/services/user-profile.service';
 import { GateConsultationSectionComponent } from './gate-consultation-section.component';
+import { GATE_COACHING_SHORT } from '../../../shared/constants/gate-coaching.constants';
 import {
   DeliveryCycle,
   GateName,
@@ -94,6 +95,8 @@ const GATE_LABELS: Record<GateName, string> = {
           <div class="grm-subtitle">
             {{ data.cycle.cycle_title }} · Tier {{ tierShortLabel(data.cycle.tier_classification) }}
           </div>
+          <!-- D-527: one-line gate meaning at read point; unknown label renders nothing. -->
+          <div *ngIf="gateCoaching" class="grm-coaching">{{ gateCoaching }}</div>
         </div>
         <button class="grm-close"
                 type="button"
@@ -612,6 +615,7 @@ const GATE_LABELS: Record<GateName, string> = {
     .grm-titles { min-width: 0; }
     .grm-title { font-size: 18px; font-weight: 600; }
     .grm-subtitle { font-size: 12px; color: var(--triarq-color-text-secondary); margin-top: 2px; }
+    .grm-coaching { font-size: 11px; font-style: italic; color: #757575; margin-top: 4px; max-width: 560px; line-height: 1.5; }
     .grm-close {
       width: 28px; height: 28px; border-radius: 50%; background: none; border: none;
       cursor: pointer; font-size: 22px; line-height: 1;
@@ -735,6 +739,7 @@ const GATE_LABELS: Record<GateName, string> = {
 })
 export class GateRecordModalComponent {
   readonly gateLabel: string;
+  readonly gateCoaching: string | null;
   record:    GateRecord | null = null;
   milestone: CycleMilestoneDate | null = null;
 
@@ -806,7 +811,9 @@ export class GateRecordModalComponent {
     private readonly dialogRef: MatDialogRef<GateRecordModalComponent, GateRecordModalResult>,
     @Inject(MAT_DIALOG_DATA) public readonly data: GateRecordModalData
   ) {
-    this.gateLabel = GATE_LABELS[data.gateName];
+    this.gateLabel    = GATE_LABELS[data.gateName];
+    // D-527: coaching keyed by canonical label; missing key → renders nothing.
+    this.gateCoaching = GATE_COACHING_SHORT[this.gateLabel] ?? null;
 
     this.record    = data.cycle.gate_records?.find(g => g.gate_name === data.gateName) ?? null;
     this.milestone = data.cycle.milestone_dates?.find(m => m.gate_name === data.gateName) ?? null;
