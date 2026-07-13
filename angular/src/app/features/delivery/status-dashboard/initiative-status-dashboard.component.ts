@@ -109,7 +109,7 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
             <tr>
               <!-- D-510: Division short name (left of Initiative); hidden when the view resolves to one division -->
               <th *ngIf="showDivisionColumn" class="isd-sortable isd-fit" [class.isd-sorted]="sortField==='division'" (click)="setSort('division')">Division{{ activeArrow('division') }}</th>
-              <th class="isd-sortable" [class.isd-sorted]="sortField==='initiative'" (click)="setSort('initiative')">Initiative Name{{ activeArrow('initiative') }}</th>
+              <th class="isd-sortable isd-name" [class.isd-sorted]="sortField==='initiative'" (click)="setSort('initiative')">Initiative Name{{ activeArrow('initiative') }}</th>
               <th class="isd-sortable isd-fit" [class.isd-sorted]="sortField==='next_gate'" (click)="setSort('next_gate')">Next Gate{{ activeArrow('next_gate') }}</th>
               <th class="isd-sortable isd-fit" [class.isd-sorted]="sortField==='target_date'" (click)="setSort('target_date')">Target Date{{ activeArrow('target_date') }}</th>
               <th>Team</th>
@@ -123,10 +123,11 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
           <tbody>
             <tr *ngFor="let r of visibleRows; trackBy: trackByRow">
               <td *ngIf="showDivisionColumn" class="isd-fit">{{ r.division_display_name_short || '—' }}</td>
-              <td><a class="isd-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
+              <td class="isd-name"><a class="isd-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
+              <!-- Chip on its own line: inline it inflates the whole column's nowrap width -->
               <td class="isd-fit">
-                {{ r.next_gate_label || '—' }}
-                <span *ngIf="r.next_gate_pending_approval" class="isd-pending-chip">Pending Approval</span>
+                <div>{{ r.next_gate_label || '—' }}</div>
+                <div *ngIf="r.next_gate_pending_approval"><span class="isd-pending-chip">Pending Approval</span></div>
               </td>
               <td class="isd-fit">
                 <span *ngIf="r.next_gate_target_date"
@@ -275,6 +276,9 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
     .isd-age { color:var(--triarq-color-text-secondary); font-size:12px; margin-top:3px; white-space:nowrap; }
     /* Shrink-to-content columns — collapses the dead width between Next Gate and Target Date. */
     .isd-table th.isd-fit, .isd-table td.isd-fit { width:1%; white-space:nowrap; }
+    /* Initiative Name claims the freed width so shrink columns pack together. */
+    .isd-table th.isd-name, .isd-table td.isd-name { width:30%; min-width:220px; }
+    .isd-pending-chip { margin-left:0; margin-top:3px; }
   `]
 })
 export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
