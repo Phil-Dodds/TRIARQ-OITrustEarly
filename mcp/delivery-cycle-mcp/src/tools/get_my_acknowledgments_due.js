@@ -1,13 +1,16 @@
-// get_my_acknowledgments_due.js — Contract 32 (WS3)
-// Active Initiatives where the caller is a non-save trio member with no
-// acknowledgment on the latest update, saved within the last 5 days
-// (D-484 Needs Acknowledgment tab). Read-only, scoped to caller via JWT.
+// get_my_acknowledgments_due.js — Contract 32 (WS3), amended Contract 36 (D-506/D-508)
+// Active Initiatives where the caller is a trio member and the latest update:
+//   - was authored by a NON-trio user (D-506 — the only case generating
+//     acknowledgment invitations; trio-authored updates generate none),
+//   - has a chain ROOT saved within STATUS_RECENT_DAYS calendar days (D-508,
+//     replaces the 5-day filter; age from the root, never an edit — D-507),
+//   - has no acknowledgment by the caller on the CURRENT head row.
+// Read-only, scoped to caller via JWT.
 
 'use strict';
 
 const { supabase } = require('../db');
-
-const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+const { isWithinRecentCalendarDays, resolveChainRoots } = require('../lib/status-chain');
 
 /**
  * @param {object} _params - none (uses JWT)
@@ -16,7 +19,7 @@ const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
 async function get_my_acknowledgments_due(_params, caller_user_id) {
   const { data: cycles, error } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, division_id, latest_status_update_id')
+    .select('delivery_cycle_id, cycle_title, division_id, latest_status_update_id, assigned_dol_user_id, assigned_dcs_user_id, assigned_epo_user_id')
     .is('deleted_at', null)
     .not('current_lifecycle_stage', 'in', '(COMPLETE,CANCELLED)')
     .not('latest_status_update_id', 'is', null)
@@ -29,16 +32,19 @@ async function get_my_acknowledgments_due(_params, caller_user_id) {
     return { success: true, data: [] };
   }
 
-  // Latest updates: saved_by + saved_at.
+  // Latest (head) updates: saved_by + saved_at.
   const updateIds = cycles.map(c => c.latest_status_update_id).filter(Boolean);
   const { data: updates } = await supabase
     .from('initiative_status_updates')
-    .select('id, saved_by, saved_at')
+    .select('id, saved_by, saved_at, supersedes_update_id')
     .in('id', updateIds);
   const updateById = {};
   for (const u of (updates || [])) { updateById[u.id] = u; }
 
-  // Acks already made by the caller on these updates.
+  // Chain roots — the root's saved_at drives the recency window (D-507/D-508).
+  const rootMap = await resolveChainRoots(updateIds);
+
+  // Acks already made by the caller on the HEAD rows.
   const { data: acks } = await supabase
     .from('initiative_status_acknowledgments')
     .select('status_update_id')
@@ -46,14 +52,14 @@ async function get_my_acknowledgments_due(_params, caller_user_id) {
     .eq('acknowledged_by', caller_user_id);
   const ackedUpdateIds = new Set((acks || []).map(a => a.status_update_id));
 
-  const cutoff = Date.now() - FIVE_DAYS_MS;
-
-  // Filter to: not the save user, within 5 days, not yet acknowledged by caller.
+  // Filter: NON-trio author (D-506), root within window (D-508), not yet acked.
   const eligible = cycles.filter(c => {
     const u = updateById[c.latest_status_update_id];
     if (!u) { return false; }
-    if (u.saved_by === caller_user_id) { return false; }
-    if (new Date(u.saved_at).getTime() < cutoff) { return false; }
+    const trio = [c.assigned_dol_user_id, c.assigned_dcs_user_id, c.assigned_epo_user_id];
+    if (trio.includes(u.saved_by)) { return false; }   // trio-authored → no invitations
+    const root = rootMap.get(u.id);
+    if (!root || !isWithinRecentCalendarDays(root.root_saved_at)) { return false; }
     if (ackedUpdateIds.has(u.id)) { return false; }
     return true;
   });

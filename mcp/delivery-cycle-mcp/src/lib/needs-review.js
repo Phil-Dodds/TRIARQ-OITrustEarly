@@ -95,13 +95,23 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
     reasons.push(`Gate date slipped: ${label}`);
   }
 
-  // 4) At risk — confidence values and/or gate date_status at_risk/behind
+  // 4) At risk — confidence values and/or gate date_status at_risk/behind.
+  // D-509 lifecycle: a confidence-based reason fires while the gate that
+  // confidence applies to is NOT complete — regardless of the update's age
+  // (no time decay) — and clears the moment the gate is approved/completed.
+  const statusByGate = {};
+  for (const m of (milestones || [])) { statusByGate[m.gate_name] = m.date_status; }
+
   const atRiskLabels = new Set();
   if (latestUpdate) {
-    if (latestUpdate.pilot_confidence_applicable && AT_RISK_STATES.includes(latestUpdate.pilot_confidence)) {
+    if (latestUpdate.pilot_confidence_applicable &&
+        AT_RISK_STATES.includes(latestUpdate.pilot_confidence) &&
+        statusByGate.go_to_deploy !== 'complete') {
       atRiskLabels.add(GATE_LABELS.go_to_deploy);
     }
-    if (latestUpdate.close_confidence_applicable && AT_RISK_STATES.includes(latestUpdate.close_confidence)) {
+    if (latestUpdate.close_confidence_applicable &&
+        AT_RISK_STATES.includes(latestUpdate.close_confidence) &&
+        statusByGate.close_review !== 'complete') {
       atRiskLabels.add(GATE_LABELS.close_review);
     }
   }

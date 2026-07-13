@@ -15,6 +15,7 @@
 
 const { supabase } = require('../db');
 const { update_milestone_status } = require('./update_milestone_status');
+const { STATUS_RECENT_DAYS, isWithinRecentCalendarDays, resolveChainRoots } = require('../lib/status-chain');
 
 const VALID_CONFIDENCE = ['not_started', 'on_track', 'at_risk', 'behind', 'complete'];
 
@@ -45,12 +46,17 @@ const CONFIDENCE_GATE_LABEL = {
  * @param {boolean} params.escalation_needed
  * @param {string} [params.pilot_confidence]   one of VALID_CONFIDENCE
  * @param {string} [params.close_confidence]   one of VALID_CONFIDENCE
+ * @param {string} [params.supersedes_update_id] — D-507 edit path: inserts a new
+ *   row superseding the initiative's CURRENT latest update. Validations:
+ *   latest-only, chain root within STATUS_RECENT_DAYS, initiative not overdue,
+ *   caller is the row's author or a trio member. An edit never clears/refreshes
+ *   the overdue clock (chain-root timestamp governs).
  * @param {string} caller_user_id - from JWT
  */
 async function save_initiative_status_update(params, caller_user_id) {
   const {
     initiative_id, accomplished_last_cycle, plan_next_cycle, blockers,
-    escalation_needed, pilot_confidence, close_confidence
+    escalation_needed, pilot_confidence, close_confidence, supersedes_update_id
   } = params;
 
   if (!initiative_id) {
@@ -68,7 +74,7 @@ async function save_initiative_status_update(params, caller_user_id) {
   // ── Fetch Initiative + trio assignment ────────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, current_lifecycle_stage, assigned_dol_user_id, assigned_dcs_user_id, assigned_epo_user_id')
+    .select('delivery_cycle_id, division_id, current_lifecycle_stage, assigned_dol_user_id, assigned_dcs_user_id, assigned_epo_user_id, latest_status_update_id, status_overdue')
     .eq('delivery_cycle_id', initiative_id)
     .is('deleted_at', null)
     .single();
@@ -77,13 +83,62 @@ async function save_initiative_status_update(params, caller_user_id) {
     return { success: false, error: 'Initiative not found or has been deleted.' };
   }
 
-  // ── Auth: caller must be DOL, DCS, or EPO on this Initiative (D-478) ───────
+  // ── Auth (D-506, amends D-483): ANY user with visibility may author. ───────
+  // Visibility = Admin, or an active membership on the Initiative's Division
+  // (same scoping rule as list_delivery_cycles). Trio membership no longer
+  // gates authorship — it only decides whether acknowledgment invitations fire.
   const trio = [cycle.assigned_dol_user_id, cycle.assigned_dcs_user_id, cycle.assigned_epo_user_id];
-  if (!trio.includes(caller_user_id)) {
-    return {
-      success: false,
-      error: 'Only the DOL, DCS, or EPO assigned to this Initiative can save a status update.'
-    };
+  const isTrioAuthor = trio.includes(caller_user_id);
+
+  const { data: caller } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('id', caller_user_id)
+    .is('deleted_at', null)
+    .single();
+
+  if (caller?.is_admin !== true && !isTrioAuthor) {
+    const { data: membership } = await supabase
+      .from('division_memberships')
+      .select('id')
+      .eq('user_id', caller_user_id)
+      .eq('division_id', cycle.division_id)
+      .is('revoked_at', null)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!membership) {
+      return {
+        success: false,
+        error: 'You do not have visibility on this Initiative. Status updates can be saved by anyone with access to the Initiative\'s Division.'
+      };
+    }
+  }
+
+  // ── D-507 edit path: validate before anything writes ──────────────────────
+  const isEdit = !!supersedes_update_id;
+  if (isEdit) {
+    if (supersedes_update_id !== cycle.latest_status_update_id) {
+      return { success: false, error: 'Only the latest status update can be edited. Save a new update instead.' };
+    }
+    if (cycle.status_overdue === true) {
+      return { success: false, error: 'This Initiative\'s status is overdue — edits are closed. Save a new update instead.' };
+    }
+    const rootMap = await resolveChainRoots([supersedes_update_id]);
+    const root = rootMap.get(supersedes_update_id);
+    if (!root || !isWithinRecentCalendarDays(root.root_saved_at)) {
+      return { success: false, error: `Edits are open for ${STATUS_RECENT_DAYS} calendar days after the original save. Save a new update instead.` };
+    }
+    const { data: target } = await supabase
+      .from('initiative_status_updates')
+      .select('id, saved_by')
+      .eq('id', supersedes_update_id)
+      .single();
+    if (!target) {
+      return { success: false, error: 'The status update being edited was not found.' };
+    }
+    if (target.saved_by !== caller_user_id && !isTrioAuthor && caller?.is_admin !== true) {
+      return { success: false, error: 'Only the update\'s author or a trio member (DOL/DCS/EPO) can edit it.' };
+    }
   }
 
   // ── Compute confidence applicability (D-479) ──────────────────────────────
@@ -103,7 +158,7 @@ async function save_initiative_status_update(params, caller_user_id) {
   const pilotApplicable = !bothComplete && !reached;
   const closeApplicable = !bothComplete && reached;
 
-  // ── Insert the immutable status update row (D-476) ────────────────────────
+  // ── Insert the immutable status update row (D-476; supersede per D-507) ───
   const insertRow = {
     initiative_id,
     accomplished_last_cycle: accomplished_last_cycle || null,
@@ -114,7 +169,8 @@ async function save_initiative_status_update(params, caller_user_id) {
     close_confidence:        closeApplicable ? (close_confidence || null) : null,
     pilot_confidence_applicable: pilotApplicable,
     close_confidence_applicable: closeApplicable,
-    saved_by:                caller_user_id
+    saved_by:                caller_user_id,
+    supersedes_update_id:    isEdit ? supersedes_update_id : null
   };
 
   const { data: saved, error: saveErr } = await supabase
@@ -127,10 +183,15 @@ async function save_initiative_status_update(params, caller_user_id) {
     return { success: false, error: `Failed to save status update: ${saveErr?.message || 'unknown error'}` };
   }
 
-  // ── Point the Initiative at the new latest update; clear overdue (D-482) ──
+  // ── Point the Initiative at the new head ──────────────────────────────────
+  // Fresh save: clears overdue (D-482). Edit (D-507): the head pointer moves
+  // but the overdue clock is NOT touched — the chain root governs.
+  const cyclePatch = isEdit
+    ? { latest_status_update_id: saved.id }
+    : { latest_status_update_id: saved.id, status_overdue: false };
   const { error: cycleUpdateErr } = await supabase
     .from('delivery_cycles')
-    .update({ latest_status_update_id: saved.id, status_overdue: false })
+    .update(cyclePatch)
     .eq('delivery_cycle_id', initiative_id);
 
   if (cycleUpdateErr) {
@@ -144,7 +205,17 @@ async function save_initiative_status_update(params, caller_user_id) {
   await writeConfidenceThrough(pilotApplicable, pilot_confidence, 'go_to_deploy', initiative_id, caller_user_id);
   await writeConfidenceThrough(closeApplicable, close_confidence, 'close_review', initiative_id, caller_user_id);
 
-  return { success: true, data: { status_update_id: saved.id, saved_at: saved.saved_at } };
+  // D-506: is_trio_author tells the client whether ack invitations fire
+  // (they are derived — non-trio-authored heads populate the trio's queues).
+  return {
+    success: true,
+    data: {
+      status_update_id: saved.id,
+      saved_at:         saved.saved_at,
+      is_edit:          isEdit,
+      is_trio_author:   isTrioAuthor
+    }
+  };
 }
 
 async function writeConfidenceThrough(applicable, value, gate_name, initiative_id, caller_user_id) {

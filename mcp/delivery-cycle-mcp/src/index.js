@@ -97,6 +97,8 @@ const { acknowledge_status_update }      = require('./tools/acknowledge_status_u
 const { get_my_status_due }              = require('./tools/get_my_status_due');
 const { get_my_acknowledgments_due }     = require('./tools/get_my_acknowledgments_due');
 const { get_initiative_status_dashboard } = require('./tools/get_initiative_status_dashboard');
+// Contract 36 (D-512): dashboard polling change signal.
+const { status_dashboard_changed_since } = require('./tools/status_dashboard_changed_since');
 const { trigger_status_refresh }         = require('./tools/trigger_status_refresh');
 const { get_status_refresh_last_run }    = require('./tools/get_status_refresh_last_run');
 
@@ -194,6 +196,7 @@ const TOOLS = {
   acknowledge_status_update,
   get_my_status_due,
   get_my_acknowledgments_due,
+  status_dashboard_changed_since,
   get_initiative_status_dashboard,
   trigger_status_refresh,
   get_status_refresh_last_run
