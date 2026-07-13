@@ -366,14 +366,13 @@ pull into a directive/service next contract) · `track-settings.component.ts`
 per function; split into tracks/, sections/, membership/ files if it grows).
 Under threshold: tracks-list 356, service 220, others < 200.
 
-**(8) Deployment.** Angular: gh-pages force-push per deploy procedure — final
-build staged at `C:/tmp/oi-deploy-guards-2026-07-12` (commit `aece6ac`), Phil
-executes the push. MCP: Render manual redeploys performed by Phil after each
-MCP-touching push (final MCP change: `7643450`). Migrations 056/057/058
-executed by Phil in Supabase. UAT checklists were issued per increment
-in-session and executed live by Phil; remaining open item: verify the
-busy-guard build after the final gh-pages push (checkbox rapid-click, presenter
-toggle "Saving…" states).
+**(8) Deployment.** Complete. Angular: gh-pages force-pushed through the final
+busy-guard build (`aece6ac`, deployed 2026-07-12). MCP: Render manual redeploys
+performed by Phil after each MCP-touching push (final MCP change: `7643450`).
+Migrations 056/057/058 executed by Phil in Supabase. UAT checklists were issued
+per increment in-session and executed live by Phil; remaining open item: retest
+rapid-click on the panel checkboxes and the presenter-toggle "Saving…" states
+against the deployed busy-guard build.
 
 ## Stage check (S-020)
 
