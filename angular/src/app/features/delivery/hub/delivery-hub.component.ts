@@ -141,6 +141,15 @@ const HUB_CARDS: HubCard[] = [
     route:       '/initiatives/gates-approved',
     icon:        '✓',
     description: 'Gates approved in the last 4 weeks, across all initiatives in your divisions.'
+  },
+  // D-527 follow-on: card 10 — Initiative Guide (concept guide / OI Library seed).
+  {
+    title:       'How Initiative Tracking Works',
+    route:       '/initiatives/guide',
+    icon:        'ℹ',
+    description: 'A short guide to the concepts behind these views: what an Initiative is, what ' +
+                 'each of the five gates means, how target and actual dates behave, statuses vs ' +
+                 'approvals, and how status updates and acknowledgments flow.'
   }
 ];
 

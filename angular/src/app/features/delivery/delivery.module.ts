@@ -102,6 +102,13 @@ import { IonicModule }  from '@ionic/angular';
           import('./status-dashboard/initiative-status-dashboard.component')
             .then(c => c.InitiativeStatusDashboardComponent)
       },
+      // D-527 follow-on: Initiative Guide — concept guide / OI Library seed.
+      {
+        path: 'guide',
+        loadComponent: () =>
+          import('./guide/initiative-guide.component')
+            .then(c => c.InitiativeGuideComponent)
+      },
       // ── Initiative detail — must be last (param route) ────────────────────
       {
         path: ':cycle_id',

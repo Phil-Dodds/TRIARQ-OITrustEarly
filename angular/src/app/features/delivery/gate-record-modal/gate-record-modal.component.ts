@@ -38,6 +38,7 @@ import {
   HostListener
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -95,8 +96,12 @@ const GATE_LABELS: Record<GateName, string> = {
           <div class="grm-subtitle">
             {{ data.cycle.cycle_title }} · Tier {{ tierShortLabel(data.cycle.tier_classification) }}
           </div>
-          <!-- D-527: one-line gate meaning at read point; unknown label renders nothing. -->
-          <div *ngIf="gateCoaching" class="grm-coaching">{{ gateCoaching }}</div>
+          <!-- D-527: one-line gate meaning at read point; unknown label renders nothing.
+               "More →" deep-links to the Initiative Guide's section for this gate. -->
+          <div *ngIf="gateCoaching" class="grm-coaching">
+            {{ gateCoaching }}
+            <a class="grm-coaching-more" (click)="openGuide()">More →</a>
+          </div>
         </div>
         <button class="grm-close"
                 type="button"
@@ -616,6 +621,7 @@ const GATE_LABELS: Record<GateName, string> = {
     .grm-title { font-size: 18px; font-weight: 600; }
     .grm-subtitle { font-size: 12px; color: var(--triarq-color-text-secondary); margin-top: 2px; }
     .grm-coaching { font-size: 11px; font-style: italic; color: #757575; margin-top: 4px; max-width: 560px; line-height: 1.5; }
+    .grm-coaching-more { color: var(--triarq-color-primary, #257099); cursor: pointer; font-style: normal; white-space: nowrap; }
     .grm-close {
       width: 28px; height: 28px; border-radius: 50%; background: none; border: none;
       cursor: pointer; font-size: 22px; line-height: 1;
@@ -808,6 +814,7 @@ export class GateRecordModalComponent {
     private readonly delivery:  DeliveryService,
     private readonly profile:   UserProfileService,
     private readonly cdr:       ChangeDetectorRef,
+    private readonly router:    Router,
     private readonly dialogRef: MatDialogRef<GateRecordModalComponent, GateRecordModalResult>,
     @Inject(MAT_DIALOG_DATA) public readonly data: GateRecordModalData
   ) {
@@ -997,6 +1004,14 @@ export class GateRecordModalComponent {
     // must refresh to show the new awaiting_approval state (Contract 29 WS3).
     const refreshKind = this.confirmMode === 'submitted' ? 'partial' : 'none';
     this.dialogRef.close({ refreshKind });
+  }
+
+  /** D-527: "More →" — close and deep-link to this gate's Guide section. */
+  openGuide(): void {
+    if (this.processing) return;
+    const anchor = this.gateLabel.toLowerCase().replace(/\s+/g, '-');
+    this.onDismiss();
+    this.router.navigate(['/initiatives/guide'], { fragment: anchor });
   }
 
   /**
