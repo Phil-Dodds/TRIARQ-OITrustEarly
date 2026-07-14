@@ -56,6 +56,10 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
             <button type="button" (click)="removePerson(role)" [attr.aria-label]="'Clear ' + role.toUpperCase()">×</button>
           </span>
         </ng-container>
+        <span *ngIf="appliedSubmitter" class="ga-chip">
+          Submitted by: {{ appliedSubmitter }}
+          <button type="button" (click)="removeSubmitter()" aria-label="Clear submitter filter">×</button>
+        </span>
       </div>
     </div>
 
@@ -94,6 +98,19 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
             <input type="radio" [name]="'pf-' + role" [checked]="stagedPerson[role] === p.id" (change)="stagedPerson[role] = p.id" /> {{ p.name }}
           </label>
           <div *ngIf="personOptions(role).length === 0" class="ga-opt-empty">No {{ role.toUpperCase() }}s in this list.</div>
+        </div>
+      </div>
+      <div class="ga-panel-row">
+        <button class="ga-panel-rowhead" type="button" (click)="toggleRow('submitter')">
+          <span>Submitted by</span><span>{{ openRow === 'submitter' ? '▲' : '▼' }}</span>
+        </button>
+        <div *ngIf="openRow === 'submitter'" class="ga-panel-opts">
+          <label class="ga-opt">
+            <input type="radio" name="pf-submitter" [checked]="!stagedSubmitter" (change)="stagedSubmitter = ''" /> All
+          </label>
+          <label *ngFor="let s of submitterOptions" class="ga-opt">
+            <input type="radio" name="pf-submitter" [checked]="stagedSubmitter === s" (change)="stagedSubmitter = s" /> {{ s }}
+          </label>
         </div>
       </div>
       <div class="ga-panel-row">
@@ -247,8 +264,12 @@ export class ActionsListComponent implements OnChanges {
   appliedPerson: Record<'epo' | 'dol' | 'dcs', string> = { epo: '', dol: '', dcs: '' };
   stagedPerson:  Record<'epo' | 'dol' | 'dcs', string> = { epo: '', dol: '', dcs: '' };
 
+  // Submitted-by filter — single-select, keyed by display name (the payload key).
+  appliedSubmitter = '';
+  stagedSubmitter  = '';
+
   panelOpen = false;
-  openRow: 'gate' | 'division' | 'date' | 'epo' | 'dol' | 'dcs' | null = null;
+  openRow: 'gate' | 'division' | 'date' | 'epo' | 'dol' | 'dcs' | 'submitter' | null = null;
 
   sortField: SortField = 'submitted';
   sortDir: 'asc' | 'desc' = 'desc';
@@ -274,6 +295,7 @@ export class ActionsListComponent implements OnChanges {
           if (pf && typeof pf === 'object') {
             this.appliedPerson = { epo: pf.epo || '', dol: pf.dol || '', dcs: pf.dcs || '' };
           }
+          if (typeof f['submitter'] === 'string') { this.appliedSubmitter = f['submitter'] as string; }
           if (typeof s['field'] === 'string') { this.sortField = s['field'] as SortField; }
           if (s['dir'] === 'asc' || s['dir'] === 'desc') { this.sortDir = s['dir']; }
           this.syncStagedFromApplied();
@@ -296,6 +318,7 @@ export class ActionsListComponent implements OnChanges {
         const id = this.appliedPerson[role];
         if (id && this.personId(i, role) !== id) { return false; }
       }
+      if (this.appliedSubmitter && i.submitted_by_display_name !== this.appliedSubmitter) { return false; }
       return true;
     });
     const dir = this.sortDir === 'asc' ? 1 : -1;
@@ -351,9 +374,19 @@ export class ActionsListComponent implements OnChanges {
     this.persist();
   }
 
+  get submitterOptions(): string[] {
+    return [...new Set(this.items.map(i => i.submitted_by_display_name).filter(Boolean))].sort();
+  }
+  removeSubmitter(): void {
+    this.appliedSubmitter = '';
+    this.stagedSubmitter  = '';
+    this.persist();
+  }
+
   get activeFilterCount(): number {
     return (this.appliedDateActive ? 1 : 0) + this.appliedGates.length + this.appliedDivisions.length
-      + this.personRoles.filter(r => !!this.appliedPerson[r]).length;
+      + this.personRoles.filter(r => !!this.appliedPerson[r]).length
+      + (this.appliedSubmitter ? 1 : 0);
   }
 
   setSort(field: SortField): void {
@@ -374,6 +407,7 @@ export class ActionsListComponent implements OnChanges {
     this.appliedGates      = [...this.stagedGates];
     this.appliedDivisions  = [...this.stagedDivisions];
     this.appliedPerson     = { ...this.stagedPerson };
+    this.appliedSubmitter  = this.stagedSubmitter;
     this.panelOpen = false;
     this.persist();
   }
@@ -381,7 +415,8 @@ export class ActionsListComponent implements OnChanges {
     this.stagedDateActive = false;
     this.stagedGates.clear();
     this.stagedDivisions.clear();
-    this.stagedPerson = { epo: '', dol: '', dcs: '' };
+    this.stagedPerson    = { epo: '', dol: '', dcs: '' };
+    this.stagedSubmitter = '';
   }
 
   removeDate(): void { this.appliedDateActive = false; this.stagedDateActive = false; this.persist(); }
@@ -393,12 +428,14 @@ export class ActionsListComponent implements OnChanges {
     this.stagedGates      = new Set(this.appliedGates);
     this.stagedDivisions  = new Set(this.appliedDivisions);
     this.stagedPerson     = { ...this.appliedPerson };
+    this.stagedSubmitter  = this.appliedSubmitter;
   }
 
   private persist(): void {
     this.screenState.save(
       SCREEN_KEYS.ACTIONS_LIST,
-      { dateActive: this.appliedDateActive, gates: this.appliedGates, divisions: this.appliedDivisions, person: this.appliedPerson },
+      { dateActive: this.appliedDateActive, gates: this.appliedGates, divisions: this.appliedDivisions,
+        person: this.appliedPerson, submitter: this.appliedSubmitter },
       { field: this.sortField, dir: this.sortDir }
     );
   }
