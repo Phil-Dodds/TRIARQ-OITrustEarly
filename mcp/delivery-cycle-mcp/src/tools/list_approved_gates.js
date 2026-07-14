@@ -140,7 +140,7 @@ async function list_approved_gates(params, caller_user_id) {
 
   let cycleQuery = supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, division_id')
+    .select('delivery_cycle_id, cycle_title, division_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
     .in('delivery_cycle_id', cycleIds)
     .is('deleted_at', null);
   if (effectiveDivisionIds !== null) {
@@ -157,25 +157,33 @@ async function list_approved_gates(params, caller_user_id) {
   const visibleCycleIds = [...cycleMap.keys()];
   const divisionIds     = [...new Set((cycles || []).map(c => c.division_id).filter(Boolean))];
 
-  const [{ data: divisions }, { data: approvers }] = await Promise.all([
+  // One name lookup covers approvers + team (DCS/EPO/DOL) display names.
+  const nameIds = new Set(approverIds);
+  for (const c of (cycles || [])) {
+    if (c.assigned_dcs_user_id) nameIds.add(c.assigned_dcs_user_id);
+    if (c.assigned_epo_user_id) nameIds.add(c.assigned_epo_user_id);
+    if (c.assigned_dol_user_id) nameIds.add(c.assigned_dol_user_id);
+  }
+
+  const [{ data: divisions }, { data: namedUsers }] = await Promise.all([
     divisionIds.length
       ? supabase.from('divisions')
           .select('id, division_name, display_name_short')
           .in('id', divisionIds)
           .is('deleted_at', null)
       : Promise.resolve({ data: [] }),
-    approverIds.length
+    nameIds.size
       ? supabase.from('users')
           .select('id, display_name')
-          .in('id', approverIds)
+          .in('id', [...nameIds])
           .is('deleted_at', null)
       : Promise.resolve({ data: [] })
   ]);
 
   const divisionMap = new Map();
-  const approverMap = new Map();
-  for (const d of (divisions || [])) { divisionMap.set(d.id, d); }
-  for (const u of (approvers || [])) { approverMap.set(u.id, u.display_name); }
+  const nameMap     = new Map();
+  for (const d of (divisions || []))  { divisionMap.set(d.id, d); }
+  for (const u of (namedUsers || [])) { nameMap.set(u.id, u.display_name); }
 
   const items = gates
     .filter(g => cycleMap.has(g.delivery_cycle_id)) // Drop gates filtered out by Division access.
@@ -191,8 +199,12 @@ async function list_approved_gates(params, caller_user_id) {
         division_id:           c.division_id,
         division_short_name:   d.display_name_short || d.division_name || '',
         approver_user_id:      g.approver_user_id,
-        approver_display_name: approverMap.get(g.approver_user_id) || 'Unknown',
-        approver_decision_at:  g.approver_decision_at
+        approver_display_name: nameMap.get(g.approver_user_id) || 'Unknown',
+        approver_decision_at:  g.approver_decision_at,
+        // Team on the row (Phil 2026-07-13) — grid-parity display names.
+        assigned_dcs_display_name: c.assigned_dcs_user_id ? (nameMap.get(c.assigned_dcs_user_id) ?? null) : null,
+        assigned_epo_display_name: c.assigned_epo_user_id ? (nameMap.get(c.assigned_epo_user_id) ?? null) : null,
+        assigned_dol_display_name: c.assigned_dol_user_id ? (nameMap.get(c.assigned_dol_user_id) ?? null) : null
       };
     });
 

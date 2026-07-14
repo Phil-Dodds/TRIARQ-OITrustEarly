@@ -712,7 +712,8 @@ export interface GateDecisionResult {
 
 // ── Contract 24 — approved gate feeds (D-430, D-431) ──────────────────────────
 
-/** Single row in the Recently Approved Gates feed (D-431). */
+/** Single row in the Recently Approved Gates feed (D-431).
+ *  Team fields added 2026-07-13 (Phil: display the initiative team on the row). */
 export interface ApprovedGateRow {
   gate_record_id:        string;
   gate_name:             GateName;
@@ -724,6 +725,9 @@ export interface ApprovedGateRow {
   approver_user_id:      string | null;
   approver_display_name: string;
   approver_decision_at:  string;
+  assigned_dcs_display_name?: string | null;
+  assigned_epo_display_name?: string | null;
+  assigned_dol_display_name?: string | null;
 }
 
 /** Single row in the My Completed Gates home card feed (D-430). */

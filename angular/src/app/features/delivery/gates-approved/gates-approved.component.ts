@@ -6,10 +6,14 @@
 // JWT. Hub card 9 footer links here. My Completed Gates home card footer
 // links here with ?personFilter=<userId> pre-set per D-430.
 //
-// Columns (S-036 sortable): Gate · Initiative · Division · Approved by ·
+// Columns (S-036 sortable): Division · Gate · Initiative · Team · Approved by ·
 // Approved date. Default sort: approver_decision_at descending.
 // Pagination: 50 rows + "Load more" button. No date range filter (fixed
 // 28-day window). No + New Initiative button (explicit D-431 exception).
+//
+// 2026-07-13 (Phil): the deferred S-010..S-013 filter panel is now built —
+// Division + Gate filters, staged apply, chips bar, D-171 memory. Division
+// column moved to far left; Team column added (grid parity).
 //
 // D-440 (Contract 25): Initiative chips on this surface open the D-180
 // right panel (this surface has a right-panel slot per D-440) rather than
@@ -80,16 +84,38 @@ const PAGE_SIZE = 50;
     <div class="ga-shell" [class.ga-shell-with-panel]="!!selectedCycleId">
 
       <div class="ga-header">
-        <h3 class="ga-title">Recently Approved Gates</h3>
-        <p class="ga-subtitle">
-          Gates approved in the last 4 weeks, across all Initiatives in your Divisions.
-          {{ personFilterUserId ? 'Filtered to your approvals.' : '' }}
-        </p>
+        <div>
+          <h3 class="ga-title">Recently Approved Gates</h3>
+          <p class="ga-subtitle">
+            Gates approved in the last 4 weeks, across all Initiatives in your Divisions.
+            {{ personFilterUserId ? 'Filtered to your approvals.' : '' }}
+          </p>
+        </div>
+        <button class="ga-filter-btn" type="button" (click)="openFilters()">
+          Filters <span *ngIf="activeFilterCount" class="ga-filter-badge">{{ activeFilterCount }}</span>
+        </button>
+      </div>
+
+      <!-- S-012 active filter chips -->
+      <div *ngIf="activeFilterCount" class="ga-chips-bar">
+        <span class="ga-filter-chip" *ngFor="let id of selectedDivisionIds">
+          Division: {{ divisionLabel(id) }}
+          <span class="ga-chip-x" (click)="removeDivision(id)">✕</span>
+        </span>
+        <span class="ga-filter-chip" *ngFor="let g of selectedGates">
+          Gate: {{ gateLabel(g) }}
+          <span class="ga-chip-x" (click)="removeGate(g)">✕</span>
+        </span>
       </div>
 
       <!-- D-196: header always visible. S-036 sortable headers. -->
       <div class="ga-grid">
         <div class="ga-row ga-header-row">
+          <span class="oi-sort-th"
+                [class.oi-sort-active]="isSorted('division_short_name')"
+                (click)="onSortColumn('division_short_name')">
+            Division {{ glyph('division_short_name') }}
+          </span>
           <span class="oi-sort-th"
                 [class.oi-sort-active]="isSorted('gate_name_display')"
                 (click)="onSortColumn('gate_name_display')">
@@ -100,11 +126,7 @@ const PAGE_SIZE = 50;
                 (click)="onSortColumn('initiative_name')">
             Initiative {{ glyph('initiative_name') }}
           </span>
-          <span class="oi-sort-th"
-                [class.oi-sort-active]="isSorted('division_short_name')"
-                (click)="onSortColumn('division_short_name')">
-            Division {{ glyph('division_short_name') }}
-          </span>
+          <span>Team</span>
           <span class="oi-sort-th"
                 [class.oi-sort-active]="isSorted('approver_display_name')"
                 (click)="onSortColumn('approver_display_name')">
@@ -125,15 +147,17 @@ const PAGE_SIZE = 50;
             <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
             <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
             <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
+            <ion-skeleton-text animated style="height:16px;border-radius:4px;"></ion-skeleton-text>
           </div>
         </ng-container>
 
         <div *ngIf="!loading && pageRows.length === 0" class="ga-empty">
-          No gates approved in the last 28 days.
+          {{ activeFilterCount ? 'No approved gates match the current filters.' : 'No gates approved in the last 28 days.' }}
         </div>
 
         <div class="ga-row ga-data" *ngFor="let row of pageRows"
              [class.ga-row-selected]="selectedCycleId === row.delivery_cycle_id">
+          <span class="ga-cell ga-muted">{{ row.division_short_name }}</span>
           <span class="ga-cell">{{ row.gate_name_display }}</span>
           <button class="ga-chip"
                   type="button"
@@ -141,7 +165,13 @@ const PAGE_SIZE = 50;
                   [title]="row.initiative_name">
             {{ row.initiative_name }}
           </button>
-          <span class="ga-cell ga-muted">{{ row.division_short_name }}</span>
+          <!-- Team — grid-parity role chips (dashboard treatment) -->
+          <span class="ga-team">
+            <span *ngIf="row.assigned_dcs_display_name" class="ga-team-chip" [title]="'DCS: ' + row.assigned_dcs_display_name">{{ row.assigned_dcs_display_name }}</span>
+            <span *ngIf="row.assigned_epo_display_name" class="ga-team-chip" [title]="'EPO: ' + row.assigned_epo_display_name">{{ row.assigned_epo_display_name }}</span>
+            <span *ngIf="row.assigned_dol_display_name" class="ga-team-chip" [title]="'DOL: ' + row.assigned_dol_display_name">{{ row.assigned_dol_display_name }}</span>
+            <span *ngIf="!row.assigned_dcs_display_name && !row.assigned_epo_display_name && !row.assigned_dol_display_name" class="ga-muted">—</span>
+          </span>
           <span class="ga-cell ga-muted">{{ row.approver_display_name }}</span>
           <span class="ga-cell">{{ formatDate(row.approver_decision_at) }}</span>
         </div>
@@ -149,7 +179,7 @@ const PAGE_SIZE = 50;
 
       <div *ngIf="rows.length > 0" class="ga-footer">
         <span class="ga-count">
-          Showing {{ pageRows.length }} of {{ rows.length }} approved gates
+          Showing {{ pageRows.length }} of {{ sortedRows.length }} approved gates{{ activeFilterCount ? ' (filtered from ' + rows.length + ')' : '' }}
         </span>
         <button class="ga-load-more"
                 *ngIf="hasMore"
@@ -170,6 +200,33 @@ const PAGE_SIZE = 50;
     </div>
 
     </div>
+
+    <!-- S-010/S-011 filter panel — staged draft, Apply commits -->
+    <div *ngIf="filterOpen" class="oi-scrim oi-scrim-detail" (click)="filterOpen = false"></div>
+    <div *ngIf="filterOpen" class="oi-side-panel oi-side-detail" role="dialog" aria-label="Filters">
+      <div class="oi-side-head">
+        <strong>Filters</strong>
+        <button class="oi-close-btn" (click)="filterOpen = false" aria-label="Close">✕</button>
+      </div>
+      <div class="oi-side-body">
+        <div class="oi-zone-title">Division</div>
+        <label class="ga-check" *ngFor="let d of divisionOptions">
+          <input type="checkbox" [checked]="draftDivisionIds.includes(d.id)" (change)="toggleDraftDivision(d.id)" />
+          <span>{{ d.name }}</span>
+        </label>
+        <div *ngIf="divisionOptions.length === 0" class="oi-zone-explain">No divisions in the current results.</div>
+
+        <div class="oi-zone-title" style="margin-top:14px;">Gate</div>
+        <label class="ga-check" *ngFor="let g of gateOptions">
+          <input type="checkbox" [checked]="draftGates.includes(g.name)" (change)="toggleDraftGate(g.name)" />
+          <span>{{ g.label }}</span>
+        </label>
+      </div>
+      <div class="oi-side-foot oi-side-foot-split">
+        <button class="oi-btn-secondary" (click)="clearFilters()">Clear all</button>
+        <button class="oi-btn-primary" (click)="applyFilters()">Apply filters</button>
+      </div>
+    </div>
   `,
   styles: [`
     .ga-flex { display: flex; align-items: stretch; min-height: calc(100vh - 64px); }
@@ -184,7 +241,20 @@ const PAGE_SIZE = 50;
       height: 100vh;
       overflow-y: auto;
     }
-    .ga-header { margin-bottom: var(--triarq-space-md); }
+    .ga-header { margin-bottom: var(--triarq-space-md); display: flex; align-items: flex-start;
+                 justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .ga-filter-btn { font-size: 11px; padding: 3px 10px; border: 1px solid var(--triarq-color-border, #e0e0e0);
+                     border-radius: 5px; background: #fff; cursor: pointer; color: #1E1E1E; }
+    .ga-filter-badge { background: var(--triarq-color-primary, #257099); color: #fff; border-radius: 999px;
+                       padding: 0 6px; font-size: 11px; margin-left: 4px; }
+    .ga-chips-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+    .ga-filter-chip { background: var(--triarq-color-fog, #f4f4f4); border-radius: 999px; padding: 2px 10px;
+                      font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+    .ga-chip-x { cursor: pointer; color: var(--triarq-color-text-secondary); }
+    .ga-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+    .ga-team { display: flex; flex-wrap: wrap; gap: 3px 4px; min-width: 0; }
+    .ga-team-chip { display: inline-block; background: #F0F5F8; color: #257099; border-radius: 999px;
+                    padding: 1px 8px; font-size: 11px; white-space: nowrap; }
     .ga-title  { margin: 0; font-size: 18px; font-weight: 600; color: #1E1E1E; }
     .ga-subtitle {
       margin: 4px 0 0; font-size: 11px; font-style: italic; color: #5A5A5A;
@@ -196,7 +266,7 @@ const PAGE_SIZE = 50;
     }
     .ga-row {
       display: grid;
-      grid-template-columns: 140px 1.6fr 140px 1.2fr 140px;
+      grid-template-columns: 90px 120px 1.5fr 1.4fr 1fr 120px;
       gap: var(--triarq-space-sm);
       padding: 8px var(--triarq-space-md);
       border-bottom: 1px solid #E8E8E8;
@@ -258,6 +328,20 @@ export class GatesApprovedComponent implements OnInit {
 
   sortState: SortState<GaSortColumn> = { ...DEFAULT_GA_SORT };
 
+  // ── S-010..S-013 filters (Division + Gate), staged draft + D-171 memory ────
+  filterOpen = false;
+  selectedDivisionIds: string[] = [];
+  selectedGates:       string[] = [];
+  draftDivisionIds:    string[] = [];
+  draftGates:          string[] = [];
+  readonly gateOptions: { name: string; label: string }[] = [
+    { name: 'brief_review',  label: 'Brief Review'  },
+    { name: 'go_to_build',   label: 'Go to Build'   },
+    { name: 'go_to_deploy',  label: 'Go to Deploy'  },
+    { name: 'go_to_release', label: 'Go to Release' },
+    { name: 'close_review',  label: 'Close Review'  }
+  ];
+
   readonly skeletonRows = [1, 2, 3, 4, 5, 6, 7, 8];
 
   constructor(
@@ -278,12 +362,24 @@ export class GatesApprovedComponent implements OnInit {
   }
 
   get hasMore(): boolean {
-    return this.visibleCount < this.rows.length;
+    return this.visibleCount < this.filteredRows.length;
+  }
+
+  /** Client-side filter pass — the 28-day window is already loaded. */
+  private get filteredRows(): ApprovedGateRow[] {
+    let out = this.rows;
+    if (this.selectedDivisionIds.length) {
+      out = out.filter(r => this.selectedDivisionIds.includes(r.division_id));
+    }
+    if (this.selectedGates.length) {
+      out = out.filter(r => this.selectedGates.includes(r.gate_name));
+    }
+    return out;
   }
 
   get sortedRows(): ApprovedGateRow[] {
     const { column, direction } = this.sortState;
-    return [...this.rows].sort((a, b) => {
+    return [...this.filteredRows].sort((a, b) => {
       switch (column) {
         case 'approver_decision_at':
           return compareDate(a.approver_decision_at, b.approver_decision_at, direction);
@@ -299,11 +395,7 @@ export class GatesApprovedComponent implements OnInit {
   onSortColumn(column: GaSortColumn): void {
     const firstClick: 'asc' | 'desc' = column === 'approver_decision_at' ? 'desc' : 'asc';
     this.sortState = applySortToggle(this.sortState, column, firstClick);
-    this.screenState.save(
-      SCREEN_KEYS.INITIATIVES_GATES_APPROVED,
-      {},
-      this.sortState as unknown as Record<string, unknown>
-    );
+    this.persistState(); // sort + filters saved together — a sort must not wipe filters
     this.cdr.markForCheck();
   }
 
@@ -329,8 +421,74 @@ export class GatesApprovedComponent implements OnInit {
   }
 
   loadMore(): void {
-    this.visibleCount = Math.min(this.visibleCount + this.pageSize, this.rows.length);
+    this.visibleCount = Math.min(this.visibleCount + this.pageSize, this.filteredRows.length);
     this.cdr.markForCheck();
+  }
+
+  // ── Filter panel (S-010..S-013) ─────────────────────────────────────────────
+  get divisionOptions(): { id: string; name: string }[] {
+    const seen = new Map<string, string>();
+    for (const r of this.rows) {
+      if (r.division_id) { seen.set(r.division_id, r.division_short_name || r.division_id); }
+    }
+    return [...seen.entries()].map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  divisionLabel(id: string): string {
+    return this.divisionOptions.find(d => d.id === id)?.name || id;
+  }
+  gateLabel(name: string): string {
+    return this.gateOptions.find(g => g.name === name)?.label || name;
+  }
+  get activeFilterCount(): number {
+    return this.selectedDivisionIds.length + this.selectedGates.length;
+  }
+  openFilters(): void {
+    this.draftDivisionIds = [...this.selectedDivisionIds];
+    this.draftGates       = [...this.selectedGates];
+    this.filterOpen = true;
+    this.cdr.markForCheck();
+  }
+  toggleDraftDivision(id: string): void {
+    this.draftDivisionIds = this.draftDivisionIds.includes(id)
+      ? this.draftDivisionIds.filter(x => x !== id)
+      : [...this.draftDivisionIds, id];
+  }
+  toggleDraftGate(name: string): void {
+    this.draftGates = this.draftGates.includes(name)
+      ? this.draftGates.filter(x => x !== name)
+      : [...this.draftGates, name];
+  }
+  applyFilters(): void {
+    this.selectedDivisionIds = [...this.draftDivisionIds];
+    this.selectedGates       = [...this.draftGates];
+    this.filterOpen   = false;
+    this.visibleCount = Math.min(PAGE_SIZE, this.filteredRows.length);
+    this.persistState();
+    this.cdr.markForCheck();
+  }
+  clearFilters(): void {
+    this.draftDivisionIds = [];
+    this.draftGates       = [];
+  }
+  removeDivision(id: string): void {
+    this.selectedDivisionIds = this.selectedDivisionIds.filter(x => x !== id);
+    this.visibleCount = Math.min(PAGE_SIZE, this.filteredRows.length);
+    this.persistState();
+    this.cdr.markForCheck();
+  }
+  removeGate(name: string): void {
+    this.selectedGates = this.selectedGates.filter(x => x !== name);
+    this.visibleCount = Math.min(PAGE_SIZE, this.filteredRows.length);
+    this.persistState();
+    this.cdr.markForCheck();
+  }
+  private persistState(): void {
+    this.screenState.save(
+      SCREEN_KEYS.INITIATIVES_GATES_APPROVED,
+      { division_ids: this.selectedDivisionIds, gate_names: this.selectedGates },
+      this.sortState as unknown as Record<string, unknown>
+    );
   }
 
   formatDate(iso: string | null | undefined): string {
@@ -345,6 +503,12 @@ export class GatesApprovedComponent implements OnInit {
   private async restoreSort(): Promise<void> {
     const saved = await this.screenState.restore(SCREEN_KEYS.INITIATIVES_GATES_APPROVED);
     if (!saved) { return; }
+    // D-171 filter memory (Division + Gate).
+    const f = saved.filter_state as { division_ids?: string[]; gate_names?: string[] } | null;
+    if (f && typeof f === 'object') {
+      if (Array.isArray(f.division_ids)) { this.selectedDivisionIds = f.division_ids.filter(x => typeof x === 'string'); }
+      if (Array.isArray(f.gate_names))   { this.selectedGates       = f.gate_names.filter(x => typeof x === 'string'); }
+    }
     const s = saved.sort_state as Partial<SortState<GaSortColumn>> | null;
     if (s && typeof s === 'object') {
       const validCol = (c: unknown): c is GaSortColumn =>
