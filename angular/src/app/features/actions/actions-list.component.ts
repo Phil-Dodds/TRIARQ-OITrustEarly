@@ -50,6 +50,12 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
           Division: {{ d }}
           <button type="button" (click)="removeDivision(d)" [attr.aria-label]="'Clear ' + d">×</button>
         </span>
+        <ng-container *ngFor="let role of personRoles">
+          <span *ngIf="appliedPerson[role]" class="ga-chip">
+            {{ role.toUpperCase() }}: {{ personLabel(role, appliedPerson[role]) }}
+            <button type="button" (click)="removePerson(role)" [attr.aria-label]="'Clear ' + role.toUpperCase()">×</button>
+          </span>
+        </ng-container>
       </div>
     </div>
 
@@ -73,6 +79,21 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
             <input type="checkbox" [checked]="stagedDivisions.has(d)" (change)="toggleStaged(stagedDivisions, d)" /> {{ d }}
           </label>
           <div *ngIf="divisionOptions.length === 0" class="ga-opt-empty">No Divisions in this list.</div>
+        </div>
+      </div>
+      <!-- EPO / DOL / DCS person filters — grid pattern, single-select per role -->
+      <div class="ga-panel-row" *ngFor="let role of personRoles">
+        <button class="ga-panel-rowhead" type="button" (click)="toggleRow(role)">
+          <span>{{ role.toUpperCase() }}</span><span>{{ openRow === role ? '▲' : '▼' }}</span>
+        </button>
+        <div *ngIf="openRow === role" class="ga-panel-opts">
+          <label class="ga-opt">
+            <input type="radio" [name]="'pf-' + role" [checked]="!stagedPerson[role]" (change)="stagedPerson[role] = ''" /> All
+          </label>
+          <label *ngFor="let p of personOptions(role)" class="ga-opt">
+            <input type="radio" [name]="'pf-' + role" [checked]="stagedPerson[role] === p.id" (change)="stagedPerson[role] = p.id" /> {{ p.name }}
+          </label>
+          <div *ngIf="personOptions(role).length === 0" class="ga-opt-empty">No {{ role.toUpperCase() }}s in this list.</div>
         </div>
       </div>
       <div class="ga-panel-row">
@@ -152,12 +173,13 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
   `,
   styles: [`
     .ga-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-    /* D-489: one-line truncated submission justification under the item label */
+    /* D-489: submission justification under the item label — two-line clamp
+       with ellipsis (Phil 2026-07-13); full text on hover via title. */
     .ga-submission-note {
-      display: block; max-width: 100%;
-      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-      font-size: 11px; font-style: italic; color: #757575;
-      text-decoration: none; cursor: pointer;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+      max-width: 100%; overflow: hidden;
+      font-size: 11px; font-style: italic; color: #757575; line-height: 1.5;
+      text-decoration: none; cursor: pointer; flex-basis: 100%;
     }
     .ga-submission-note:hover { color: var(--triarq-color-primary, #257099); }
     .ga-filters-btn { display:inline-flex;align-items:center;gap:6px;border:1px solid var(--triarq-color-border,#e0e0e0);
@@ -220,8 +242,13 @@ export class ActionsListComponent implements OnChanges {
   stagedGates     = new Set<string>();
   stagedDivisions = new Set<string>();
 
+  // EPO/DOL/DCS person filters — single-select per role (grid/dashboard pattern).
+  readonly personRoles = ['epo', 'dol', 'dcs'] as const;
+  appliedPerson: Record<'epo' | 'dol' | 'dcs', string> = { epo: '', dol: '', dcs: '' };
+  stagedPerson:  Record<'epo' | 'dol' | 'dcs', string> = { epo: '', dol: '', dcs: '' };
+
   panelOpen = false;
-  openRow: 'gate' | 'division' | 'date' | null = null;
+  openRow: 'gate' | 'division' | 'date' | 'epo' | 'dol' | 'dcs' | null = null;
 
   sortField: SortField = 'submitted';
   sortDir: 'asc' | 'desc' = 'desc';
@@ -243,6 +270,10 @@ export class ActionsListComponent implements OnChanges {
           if (typeof f['dateActive'] === 'boolean') { this.appliedDateActive = f['dateActive'] as boolean; }
           if (Array.isArray(f['gates']))     { this.appliedGates     = f['gates'] as string[]; }
           if (Array.isArray(f['divisions'])) { this.appliedDivisions = f['divisions'] as string[]; }
+          const pf = f['person'] as Record<'epo' | 'dol' | 'dcs', string> | undefined;
+          if (pf && typeof pf === 'object') {
+            this.appliedPerson = { epo: pf.epo || '', dol: pf.dol || '', dcs: pf.dcs || '' };
+          }
           if (typeof s['field'] === 'string') { this.sortField = s['field'] as SortField; }
           if (s['dir'] === 'asc' || s['dir'] === 'desc') { this.sortDir = s['dir']; }
           this.syncStagedFromApplied();
@@ -261,6 +292,10 @@ export class ActionsListComponent implements OnChanges {
       if (cutoff && (i.submitted_at ?? '') < cutoff) { return false; }
       if (gateSet.size && !gateSet.has(i.gate_name)) { return false; }
       if (divSet.size && !divSet.has(i.division_display_name_short)) { return false; }
+      for (const role of this.personRoles) {
+        const id = this.appliedPerson[role];
+        if (id && this.personId(i, role) !== id) { return false; }
+      }
       return true;
     });
     const dir = this.sortDir === 'asc' ? 1 : -1;
@@ -282,8 +317,43 @@ export class ActionsListComponent implements OnChanges {
     return [...new Set(this.items.map(i => i.division_display_name_short).filter(Boolean))].sort();
   }
 
+  /** Typed accessors for the role-keyed team columns (no dynamic indexing). */
+  private personId(i: PendingApprovalItem, role: 'epo' | 'dol' | 'dcs'): string | null {
+    switch (role) {
+      case 'epo': return i.assigned_epo_user_id ?? null;
+      case 'dol': return i.assigned_dol_user_id ?? null;
+      case 'dcs': return i.assigned_dcs_user_id ?? null;
+    }
+  }
+  private personName(i: PendingApprovalItem, role: 'epo' | 'dol' | 'dcs'): string | null {
+    switch (role) {
+      case 'epo': return i.assigned_epo_display_name ?? null;
+      case 'dol': return i.assigned_dol_display_name ?? null;
+      case 'dcs': return i.assigned_dcs_display_name ?? null;
+    }
+  }
+  personOptions(role: 'epo' | 'dol' | 'dcs'): { id: string; name: string }[] {
+    const seen = new Map<string, string>();
+    for (const i of this.items) {
+      const id = this.personId(i, role);
+      const name = this.personName(i, role);
+      if (id && name) { seen.set(id, name); }
+    }
+    return [...seen.entries()].map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  personLabel(role: 'epo' | 'dol' | 'dcs', id: string): string {
+    return this.personOptions(role).find(p => p.id === id)?.name || id;
+  }
+  removePerson(role: 'epo' | 'dol' | 'dcs'): void {
+    this.appliedPerson = { ...this.appliedPerson, [role]: '' };
+    this.stagedPerson  = { ...this.stagedPerson,  [role]: '' };
+    this.persist();
+  }
+
   get activeFilterCount(): number {
-    return (this.appliedDateActive ? 1 : 0) + this.appliedGates.length + this.appliedDivisions.length;
+    return (this.appliedDateActive ? 1 : 0) + this.appliedGates.length + this.appliedDivisions.length
+      + this.personRoles.filter(r => !!this.appliedPerson[r]).length;
   }
 
   setSort(field: SortField): void {
@@ -296,13 +366,14 @@ export class ActionsListComponent implements OnChanges {
     return this.sortDir === 'asc' ? '↑' : '↓';
   }
 
-  toggleRow(row: 'gate' | 'division' | 'date'): void { this.openRow = this.openRow === row ? null : row; }
+  toggleRow(row: 'gate' | 'division' | 'date' | 'epo' | 'dol' | 'dcs'): void { this.openRow = this.openRow === row ? null : row; }
   toggleStaged(set: Set<string>, value: string): void { if (set.has(value)) { set.delete(value); } else { set.add(value); } }
 
   applyFilters(): void {
     this.appliedDateActive = this.stagedDateActive;
     this.appliedGates      = [...this.stagedGates];
     this.appliedDivisions  = [...this.stagedDivisions];
+    this.appliedPerson     = { ...this.stagedPerson };
     this.panelOpen = false;
     this.persist();
   }
@@ -310,6 +381,7 @@ export class ActionsListComponent implements OnChanges {
     this.stagedDateActive = false;
     this.stagedGates.clear();
     this.stagedDivisions.clear();
+    this.stagedPerson = { epo: '', dol: '', dcs: '' };
   }
 
   removeDate(): void { this.appliedDateActive = false; this.stagedDateActive = false; this.persist(); }
@@ -320,12 +392,13 @@ export class ActionsListComponent implements OnChanges {
     this.stagedDateActive = this.appliedDateActive;
     this.stagedGates      = new Set(this.appliedGates);
     this.stagedDivisions  = new Set(this.appliedDivisions);
+    this.stagedPerson     = { ...this.appliedPerson };
   }
 
   private persist(): void {
     this.screenState.save(
       SCREEN_KEYS.ACTIONS_LIST,
-      { dateActive: this.appliedDateActive, gates: this.appliedGates, divisions: this.appliedDivisions },
+      { dateActive: this.appliedDateActive, gates: this.appliedGates, divisions: this.appliedDivisions, person: this.appliedPerson },
       { field: this.sortField, dir: this.sortDir }
     );
   }

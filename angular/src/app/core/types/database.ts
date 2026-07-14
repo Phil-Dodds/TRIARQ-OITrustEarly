@@ -509,6 +509,13 @@ export interface PendingApprovalItem {
   // once the approver decides. Null while the gate is still awaiting approval.
   approver_display_name?:        string | null;
   approver_decision_at?:         string | null;
+  // Team ids + names — EPO/DOL/DCS person filters (2026-07-13).
+  assigned_dcs_user_id?:         string | null;
+  assigned_epo_user_id?:         string | null;
+  assigned_dol_user_id?:         string | null;
+  assigned_dcs_display_name?:    string | null;
+  assigned_epo_display_name?:    string | null;
+  assigned_dol_display_name?:    string | null;
 }
 
 // Contract 30 follow-up: a completed action the caller took — powers the My Actions

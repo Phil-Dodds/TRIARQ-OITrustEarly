@@ -142,19 +142,21 @@ async function list_pending_approvals(_params, caller_user_id) {
   // ── Resolve cycles, divisions, workstreams, submitters in parallel ──────
   const cycleIds     = [...new Set(gates.map(g => g.delivery_cycle_id))];
   // Resolve submitter + approver display names from one users lookup.
-  const userIds = [...new Set([
-    ...gates.map(g => g.submitted_by_user_id),
-    ...gates.map(g => g.approver_user_id)
-  ].filter(Boolean))];
-
   const { data: cycles } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, tier_classification, division_id, workstream_id')
+    .select('delivery_cycle_id, cycle_title, tier_classification, division_id, workstream_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
     .in('delivery_cycle_id', cycleIds)
     .is('deleted_at', null);
 
   const cycleMap = {};
   (cycles || []).forEach(c => { cycleMap[c.delivery_cycle_id] = c; });
+
+  // Name lookup covers submitters, approvers, and team (EPO/DOL/DCS filters).
+  const userIds = [...new Set([
+    ...gates.map(g => g.submitted_by_user_id),
+    ...gates.map(g => g.approver_user_id),
+    ...(cycles || []).flatMap(c => [c.assigned_dcs_user_id, c.assigned_epo_user_id, c.assigned_dol_user_id])
+  ].filter(Boolean))];
 
   const divisionIds   = [...new Set((cycles || []).map(c => c.division_id).filter(Boolean))];
   const workstreamIds = [...new Set((cycles || []).map(c => c.workstream_id).filter(Boolean))];
@@ -220,6 +222,13 @@ async function list_pending_approvals(_params, caller_user_id) {
       gate_target_date:              milestoneTargetMap[`${g.delivery_cycle_id}|${g.gate_name}`] ?? null,
       // D-489: submitter's justification — truncated one line in the Action Queue.
       submission_note:               g.submission_note ?? null,
+      // Team ids + names — EPO/DOL/DCS person filters (Phil 2026-07-13).
+      assigned_dcs_user_id:          c.assigned_dcs_user_id ?? null,
+      assigned_epo_user_id:          c.assigned_epo_user_id ?? null,
+      assigned_dol_user_id:          c.assigned_dol_user_id ?? null,
+      assigned_dcs_display_name:     c.assigned_dcs_user_id ? (userNameMap[c.assigned_dcs_user_id] ?? null) : null,
+      assigned_epo_display_name:     c.assigned_epo_user_id ? (userNameMap[c.assigned_epo_user_id] ?? null) : null,
+      assigned_dol_display_name:     c.assigned_dol_user_id ? (userNameMap[c.assigned_dol_user_id] ?? null) : null,
       // WS1.2 (D-468): Consulted summary — omitted when both counts are zero.
       ...(cs && (cs.pending_count > 0 || cs.declined_count > 0) ? { consulted_summary: cs } : {})
     };
