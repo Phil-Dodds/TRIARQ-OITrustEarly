@@ -380,7 +380,13 @@ interface InitiativeSearchResult {
       .tmd-ref-col { max-width: 100%; height: auto; position: relative; }
     }
 
-    .tmd-meeting-title-row { margin-bottom: 20px; }
+    /* Sticky header (Phil 2026-07-14): back link, title, date, and pull
+       controls stay visible while scrolling long meetings — same always-there
+       feel as the Initiative View panel header. */
+    .tmd-meeting-title-row { margin-bottom: 20px; position: sticky; top: 0; z-index: 40;
+                             background: var(--triarq-color-background, #fff);
+                             padding: 10px 0 10px; margin-top: -10px;
+                             box-shadow: 0 6px 8px -6px rgba(0,0,0,0.12); }
     .tmd-back-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
     .tmd-back-link { font: 13px Roboto; color: var(--triarq-color-primary, #257099); text-decoration: none; }
     .tmd-series-btn { background: none; border: 1px solid #BDBDBD; border-radius: 5px; color: #5A5A5A; font: 500 12px Roboto; padding: 4px 10px; cursor: pointer; }

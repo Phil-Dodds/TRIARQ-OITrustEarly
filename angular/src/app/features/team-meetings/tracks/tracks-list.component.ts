@@ -50,7 +50,7 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
       <!-- Admin toggle -->
       <label *ngIf="isAdmin" class="tk-admin-toggle">
         <input type="checkbox" [checked]="includeAll" (change)="toggleIncludeAll()">
-        Include meetings that you do not participate (Admins)
+        Show meetings that you do not participate in (Admins)
       </label>
 
       <!-- Loading -->
@@ -76,9 +76,10 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
           <span>Series</span>
           <span>Members</span>
           <span>Latest Meeting</span>
+          <span>Latest Change</span>
           <span></span>
         </div>
-        <div *ngFor="let t of tracks"
+        <div *ngFor="let t of visibleTracks"
              class="tk-row"
              [class.tk-row-deleted]="t.deleted_at"
              [class.tk-row-unread]="t.unread && !t.deleted_at"
@@ -92,15 +93,18 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
             <span *ngIf="t.is_public" class="tk-public-chip">Public</span>
             <span *ngIf="t.deleted_at" class="tk-deleted-chip">Deleted</span>
             <span *ngIf="isAdmin && !t.is_member" class="tk-nonmember-chip">Not a member</span>
-            <!-- Latest-activity preview: WHAT changed; the bold marks THAT it did -->
-            <span *ngIf="t.latest_activity" class="tk-activity-preview" [title]="t.latest_activity.snippet">
-              “{{ t.latest_activity.snippet }}”<ng-container *ngIf="t.latest_activity.author_name"> — {{ t.latest_activity.author_name }}</ng-container> · {{ t.latest_activity.section_title }}
-            </span>
           </span>
           <span class="tk-muted">{{ t.member_count }}</span>
           <span class="tk-muted tk-latest-date">
             <ng-container *ngIf="t.latest_meeting">{{ t.latest_meeting.meeting_date | date:'MMM d, y' }}</ng-container>
             <ng-container *ngIf="!t.latest_meeting">—</ng-container>
+          </span>
+          <!-- Latest-change preview: WHAT changed (bold when unseen — the row bold marks THAT) -->
+          <span class="tk-activity-cell" [title]="t.latest_activity?.snippet || ''">
+            <ng-container *ngIf="t.latest_activity">
+              “{{ t.latest_activity.snippet }}”<ng-container *ngIf="t.latest_activity.author_name"> — {{ initials(t.latest_activity.author_name) }}</ng-container>
+            </ng-container>
+            <ng-container *ngIf="!t.latest_activity">—</ng-container>
           </span>
           <span class="tk-row-actions" (click)="$event.stopPropagation()">
             <ng-container *ngIf="isAdmin && t.deleted_at">
@@ -191,7 +195,7 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
     .tk-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
     .tk-btn-ghost { background: transparent; color: var(--triarq-color-primary, #257099); border: 1px solid var(--triarq-color-primary, #257099); border-radius: 5px; padding: 8px 16px; font: 500 14px Roboto, sans-serif; cursor: pointer; text-decoration: none; white-space: nowrap; }
     .tk-admin-toggle { display: flex; align-items: center; gap: 8px; font: 13px Roboto, sans-serif; color: #5A5A5A; margin-bottom: 12px; cursor: pointer; }
-    .tk-list-header, .tk-row { display: grid; grid-template-columns: 1fr 90px 140px 220px; gap: 8px; padding: 10px 12px; align-items: center; }
+    .tk-list-header, .tk-row { display: grid; grid-template-columns: 1.2fr 70px 110px 1fr auto; gap: 8px; padding: 10px 12px; align-items: center; }
     .tk-list-header { font: 600 12px Roboto, sans-serif; color: #757575; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid #E0E0E0; }
     .tk-row { border-bottom: 1px solid #F5F5F5; cursor: pointer; transition: background 0.1s; border-radius: 4px; }
     .tk-row:hover { background: #F5F9FC; }
@@ -203,9 +207,11 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
     /* Unread = latest meeting never opened or changed since last view */
     .tk-row-unread .tk-track-name, .tk-row-unread .tk-latest-date { font-weight: 700; color: #1A1A1A; }
     .tk-row-unread .tk-track-name { color: var(--triarq-color-primary, #257099); }
-    .tk-activity-preview { flex-basis: 100%; font: italic 11px/1.5 Roboto, sans-serif; color: #757575;
-                           font-weight: 400; margin-top: 2px; overflow: hidden; white-space: nowrap;
-                           text-overflow: ellipsis; min-width: 0; }
+    /* Latest Change column — wraps to two lines then ellipses; bold when unread */
+    .tk-activity-cell { font: italic 11px/1.5 Roboto, sans-serif; color: #757575; min-width: 0;
+                        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+                        overflow: hidden; }
+    .tk-row-unread .tk-activity-cell { font-weight: 700; color: #1A1A1A; }
     .tk-deleted-chip { background: #FDECEA; color: #D32F2F; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
     .tk-nonmember-chip { background: #F0F0F0; color: #757575; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
     .tk-muted { color: #757575; font: 13px Roboto, sans-serif; }
@@ -255,6 +261,19 @@ export class TracksListComponent implements OnInit {
   loadError  = '';
   includeAll = false;
   isAdmin    = false;
+
+  /** Admin toggle SWAPS the view (Phil 2026-07-14): checked = only meetings
+   *  you do NOT participate in (deleted series stay visible for restore/purge
+   *  — including your own); unchecked = your meetings. */
+  get visibleTracks(): TrackListItem[] {
+    if (!this.includeAll) { return this.tracks; }
+    return this.tracks.filter(t => !t.is_member || t.deleted_at);
+  }
+
+  /** "Phil Dodds" → "PD" for the Latest Change column. */
+  initials(name: string): string {
+    return name.split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join('');
+  }
 
   showNewPanel = false;
   saving       = false;

@@ -96,7 +96,7 @@ function todayIso(): string {
             {{ m.title }}
             <!-- Latest-activity preview: WHAT changed; the bold marks THAT it did -->
             <span *ngIf="m.latest_activity" class="tm-activity-preview" [title]="m.latest_activity.snippet">
-              “{{ m.latest_activity.snippet }}”<ng-container *ngIf="m.latest_activity.author_name"> — {{ m.latest_activity.author_name }}</ng-container> · {{ m.latest_activity.section_title }}
+              “{{ m.latest_activity.snippet }}”<ng-container *ngIf="m.latest_activity.author_name"> — {{ initials(m.latest_activity.author_name) }}</ng-container>
             </span>
           </span>
           <span class="tm-col-date">{{ m.meeting_date | date:'MMM d, y' }}</span>
@@ -427,6 +427,11 @@ export class TeamMeetingsListComponent implements OnInit {
   onTrackDeleted(): void {
     this.showSettings = false;
     this.router.navigate(['/team-meetings']);
+  }
+
+  /** "Phil Dodds" → "PD" for the latest-change preview line. */
+  initials(name: string): string {
+    return name.split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join('');
   }
 
   openMeeting(id: string): void {
