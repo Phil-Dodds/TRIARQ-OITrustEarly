@@ -132,7 +132,8 @@ async function list_my_tracks(params, caller_user_id) {
 }
 
 // ── create_track ───────────────────────────────────────────────────────────────
-// Restricted to TRACK_CREATOR_EMAIL.
+// Open to ANY authenticated user (Phil 2026-07-14 — was pdodds-only during the
+// Contract 33 pilot). Creator becomes the first member and leader.
 // sections (optional, from a meeting template): [{ section_key?, title, sub_label?, bar_color? }].
 //   - section_key matching a catalog row links it (catalog_id + key; provided
 //     title/sub_label override catalog values when given).
@@ -148,9 +149,6 @@ async function create_track(params, caller_user_id) {
 
   const caller = await getCaller(caller_user_id);
   if (!caller) return { success: false, error: 'User not found.' };
-  if (caller.email?.toLowerCase() !== TRACK_CREATOR_EMAIL) {
-    return { success: false, error: 'Creating meeting series is currently restricted. Contact Phil Dodds to have a series created.' };
-  }
 
   const { data: track, error: tErr } = await supabase
     .from('team_meeting_tracks')

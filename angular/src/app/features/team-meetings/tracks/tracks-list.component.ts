@@ -10,13 +10,13 @@ import { CommonModule }         from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TeamMeetingsService }  from '../team-meetings.service';
-import { AuthService }          from '../../../core/services/auth.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { TrackListItem }        from '../../../core/types/team-meetings';
 import { MEETING_TEMPLATES }    from './meeting-templates';
 
 // Business rule (session 2026-07-11): series creation restricted to Phil for now.
-const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
+// Series creation is open to any authenticated user (Phil 2026-07-14 —
+// pdodds-only during the Contract 33 pilot).
 
 @Component({
   selector:        'app-tracks-list',
@@ -35,10 +35,15 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
           </p>
         </div>
         <div class="tk-header-actions">
-          <a class="tk-btn-ghost" routerLink="/team-meetings/public">Search Public Meetings to Join</a>
-          <button *ngIf="canCreate" class="tk-btn-primary" (click)="openNewPanel()" type="button">
-            + New Series
-          </button>
+          <div class="tk-actions-row">
+            <a class="tk-btn-ghost" routerLink="/team-meetings/public">Search Public Meetings to Join</a>
+            <button class="tk-btn-primary" (click)="openNewPanel()" type="button">
+              + New Series
+            </button>
+          </div>
+          <p class="tk-create-hint">
+            Anyone can start a series — 1:1s, team check-ins, working sessions. You'll be its leader.
+          </p>
         </div>
       </div>
 
@@ -62,7 +67,7 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
       <!-- Empty -->
       <div *ngIf="!loading && !loadError && tracks.length === 0" class="tk-empty">
         You are not part of any meeting series yet.
-        <a routerLink="/team-meetings/public" class="tk-link">Search public series to join</a><ng-container *ngIf="canCreate">, or create a new series</ng-container>.
+        <a routerLink="/team-meetings/public" class="tk-link">Search public series to join</a>, or create a new series.
       </div>
 
       <!-- Series grid — sorted by most recent meeting date; bold = unread latest meeting -->
@@ -176,7 +181,8 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
     .tk-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
     .tk-title { font: 600 22px/1.2 Roboto, sans-serif; color: var(--triarq-text-primary, #1A1A1A); margin: 0 0 4px; }
     .tk-subtitle { font: italic 11px/1.4 Roboto, sans-serif; color: #5A5A5A; margin: 0; }
-    .tk-header-actions { display: flex; align-items: center; gap: 10px; }
+    .tk-header-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .tk-actions-row { display: flex; align-items: center; gap: 10px; }
     .tk-btn-primary { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 5px; padding: 8px 16px; font: 500 14px Roboto, sans-serif; cursor: pointer; white-space: nowrap; }
     .tk-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
     .tk-btn-ghost { background: transparent; color: var(--triarq-color-primary, #257099); border: 1px solid var(--triarq-color-primary, #257099); border-radius: 5px; padding: 8px 16px; font: 500 14px Roboto, sans-serif; cursor: pointer; text-decoration: none; white-space: nowrap; }
@@ -242,7 +248,6 @@ export class TracksListComponent implements OnInit {
   loadError  = '';
   includeAll = false;
   isAdmin    = false;
-  canCreate  = false;
 
   showNewPanel = false;
   saving       = false;
@@ -256,7 +261,6 @@ export class TracksListComponent implements OnInit {
 
   constructor(
     private readonly svc:     TeamMeetingsService,
-    private readonly auth:    AuthService,
     private readonly profile: UserProfileService,
     private readonly fb:      FormBuilder,
     private readonly router:  Router,
@@ -264,9 +268,7 @@ export class TracksListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const email = this.auth.getCurrentUser()?.email?.toLowerCase() ?? '';
-    this.canCreate = email === TRACK_CREATOR_EMAIL;
-    this.isAdmin   = !!this.profile.getCurrentProfile()?.is_admin;
+    this.isAdmin = !!this.profile.getCurrentProfile()?.is_admin;
     this.newForm = this.fb.group({
       track_name: ['', Validators.required],
       is_public:  [false],
