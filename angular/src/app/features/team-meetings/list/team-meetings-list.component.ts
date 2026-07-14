@@ -77,10 +77,17 @@ function todayIso(): string {
 
       <!-- Meeting grid -->
       <div *ngIf="!loading && !loadError && meetings.length > 0" class="tm-list">
+        <!-- Deleted-meetings toggle — leaders/admins, only when something is deleted -->
+        <label *ngIf="isLeader && deletedCount > 0" class="tm-deleted-toggle">
+          <input type="checkbox" [checked]="showDeleted" (change)="toggleShowDeleted()">
+          Show deleted meetings ({{ deletedCount }})
+        </label>
+
         <div class="tm-list-header">
           <span class="tm-col-title">Meeting Title</span>
           <span class="tm-col-date">Meeting Date</span>
           <span class="tm-col-updated">Last Updated</span>
+          <span>Latest Change</span>
           <span></span>
         </div>
         <!-- D-308 / S-005: full-row tap navigates to meeting prep/run screen -->
@@ -90,40 +97,50 @@ function todayIso(): string {
              [class.tm-row-unread]="m.unread"
              role="button"
              tabindex="0"
-             (click)="confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)"
-             (keydown.enter)="confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)">
+             (click)="!showDeleted && confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)"
+             (keydown.enter)="!showDeleted && confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)">
           <span class="tm-col-title tm-meeting-name">
             {{ m.title }}
-            <!-- Latest-activity preview: WHAT changed; the bold marks THAT it did -->
-            <span *ngIf="m.latest_activity" class="tm-activity-preview" [title]="m.latest_activity.snippet">
-              “{{ m.latest_activity.snippet }}”<ng-container *ngIf="m.latest_activity.author_name"> — {{ initials(m.latest_activity.author_name) }}</ng-container>
-            </span>
+            <span *ngIf="showDeleted" class="tm-deleted-chip">Deleted</span>
           </span>
           <span class="tm-col-date">{{ m.meeting_date | date:'MMM d, y' }}</span>
-          <!-- content_updated_at = anything changed by anyone; bold when unseen by you -->
-          <span class="tm-col-updated tm-muted">{{ m.content_updated_at | date:'MMM d, y' }}</span>
-          <!-- Row actions — edit + delete -->
-          <span class="tm-row-actions" (click)="$event.stopPropagation()">
-            <ng-container *ngIf="confirmDeleteId !== m.id">
-              <button class="tm-edit-btn"
-                      type="button"
-                      title="Edit meeting"
-                      (click)="openEditMeeting(m)">
-                ✎
-              </button>
-              <button class="tm-delete-btn"
-                      type="button"
-                      [disabled]="deletingId === m.id"
-                      title="Delete meeting"
-                      (click)="confirmDeleteId = m.id">
-                {{ deletingId === m.id ? '…' : '🗑' }}
-              </button>
+          <!-- content_updated_at = anything changed by anyone (incl. deletes/moves,
+               which is why it can run ahead of the Latest Change preview) -->
+          <span class="tm-col-updated tm-muted">{{ m.content_updated_at | date:'MMM d, y h:mm a' }}</span>
+          <!-- Latest-change preview: WHAT changed (bold with the row when unread) -->
+          <span class="tm-activity-cell" [title]="m.latest_activity?.snippet || ''">
+            <ng-container *ngIf="m.latest_activity">
+              “{{ m.latest_activity.snippet }}”<ng-container *ngIf="m.latest_activity.author_name"> — {{ initials(m.latest_activity.author_name) }}</ng-container>
             </ng-container>
-            <span *ngIf="confirmDeleteId === m.id" class="tm-delete-confirm">
-              Delete?
-              <button class="tm-delete-confirm-btn" type="button" (click)="deleteMeeting(m)">Yes</button>
-              <button class="tm-delete-cancel-btn" type="button" (click)="confirmDeleteId = null">Cancel</button>
-            </span>
+            <ng-container *ngIf="!m.latest_activity">—</ng-container>
+          </span>
+          <!-- Row actions — edit + delete (live view) / restore (deleted view) -->
+          <span class="tm-row-actions" (click)="$event.stopPropagation()">
+            <button *ngIf="showDeleted" class="tm-restore-btn" type="button"
+                    [disabled]="restoringId === m.id"
+                    (click)="restoreMeeting(m)">{{ restoringId === m.id ? 'Restoring…' : 'Restore' }}</button>
+            <ng-container *ngIf="!showDeleted">
+              <ng-container *ngIf="confirmDeleteId !== m.id">
+                <button class="tm-edit-btn"
+                        type="button"
+                        title="Edit meeting"
+                        (click)="openEditMeeting(m)">
+                  ✎
+                </button>
+                <button class="tm-delete-btn"
+                        type="button"
+                        [disabled]="deletingId === m.id"
+                        title="Delete meeting"
+                        (click)="confirmDeleteId = m.id">
+                  {{ deletingId === m.id ? '…' : '🗑' }}
+                </button>
+              </ng-container>
+              <span *ngIf="confirmDeleteId === m.id" class="tm-delete-confirm">
+                Delete?
+                <button class="tm-delete-confirm-btn" type="button" (click)="deleteMeeting(m)">Yes</button>
+                <button class="tm-delete-cancel-btn" type="button" (click)="confirmDeleteId = null">Cancel</button>
+              </span>
+            </ng-container>
           </span>
         </div>
       </div>
@@ -227,7 +244,7 @@ function todayIso(): string {
     }
     .tm-list-header, .tm-row {
       display: grid;
-      grid-template-columns: 1fr 140px 140px 72px;
+      grid-template-columns: 1.2fr 105px 150px 1fr 80px;
       gap: 8px;
       padding: 10px 12px;
       align-items: center;
@@ -251,9 +268,19 @@ function todayIso(): string {
     .tm-row-unread .tm-meeting-name { font-weight: 700; }
     .tm-row-unread .tm-col-date, .tm-row-unread .tm-col-updated { font-weight: 700; color: #1A1A1A; }
     .tm-meeting-name { font: 500 14px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); min-width: 0; }
-    .tm-activity-preview { display: block; font: italic 11px/1.5 Roboto, sans-serif; color: #757575;
-                           font-weight: 400; margin-top: 2px; overflow: hidden; white-space: nowrap;
-                           text-overflow: ellipsis; }
+    /* Latest Change column — two-line clamp; bolds with the row when unread */
+    .tm-activity-cell { font: italic 11px/1.5 Roboto, sans-serif; color: #757575; min-width: 0;
+                        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+                        overflow: hidden; }
+    .tm-row-unread .tm-activity-cell { font-weight: 700; color: #1A1A1A; }
+    .tm-deleted-toggle { display: flex; align-items: center; gap: 8px; font: 13px Roboto, sans-serif;
+                         color: #5A5A5A; margin: 0 0 10px; cursor: pointer; }
+    .tm-deleted-chip { background: #9E9E9E; color: #fff; border-radius: 999px; padding: 1px 8px;
+                       font: 500 10px Roboto, sans-serif; margin-left: 6px; vertical-align: middle; }
+    .tm-restore-btn { background: none; border: 1px solid var(--triarq-color-primary, #257099);
+                      color: var(--triarq-color-primary, #257099); border-radius: 5px; padding: 3px 10px;
+                      font: 12px Roboto, sans-serif; cursor: pointer; }
+    .tm-restore-btn:disabled { opacity: 0.6; cursor: default; }
     .tm-muted { color: #757575; font-size: 13px; }
     .tm-row-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
     .tm-edit-btn { background: none; border: none; color: #BDBDBD; cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 3px; transition: color 0.1s; }
@@ -400,15 +427,22 @@ export class TeamMeetingsListComponent implements OnInit {
     this.loading   = true;
     this.loadError = '';
     this.cdr.markForCheck();
-    this.svc.listMeetings(this.trackId).subscribe({
+    this.svc.listMeetings(this.trackId, 20, 0, this.showDeleted).subscribe({
       next: res => {
         if (res.success) {
           this.meetings = res.data ?? [];
-          const trackInfo = (res as unknown as { track?: { track_name: string; is_leader: boolean; suggested_next_meeting_date?: string } }).track;
+          const trackInfo = (res as unknown as { track?: { track_name: string; is_leader: boolean; deleted_count?: number; suggested_next_meeting_date?: string } }).track;
           if (trackInfo) {
             this.trackName     = trackInfo.track_name;
             this.isLeader      = trackInfo.is_leader;
+            this.deletedCount  = trackInfo.deleted_count ?? 0;
             this.suggestedDate = trackInfo.suggested_next_meeting_date ?? '';
+          }
+          // Graveyard emptied (last restore) → drop back to the live list.
+          if (this.showDeleted && this.deletedCount === 0) {
+            this.showDeleted = false;
+            this.loadMeetings();
+            return;
           }
         } else {
           this.loadError = res.error ?? 'Failed to load meetings.';
@@ -432,6 +466,30 @@ export class TeamMeetingsListComponent implements OnInit {
   /** "Phil Dodds" → "PD" for the latest-change preview line. */
   initials(name: string): string {
     return name.split(/\s+/).filter(Boolean).map(w => w[0].toUpperCase()).slice(0, 2).join('');
+  }
+
+  // ── Deleted meetings (graveyard) view — leaders/admins, transient ────────────
+  showDeleted  = false;
+  deletedCount = 0;
+  restoringId: string | null = null;
+
+  toggleShowDeleted(): void {
+    this.showDeleted = !this.showDeleted;
+    this.loadMeetings();
+  }
+
+  restoreMeeting(m: TeamMeetingListItem): void {
+    if (this.restoringId) { return; }
+    this.restoringId = m.id;
+    this.cdr.markForCheck();
+    this.svc.restoreMeeting(m.id).subscribe({
+      next: res => {
+        this.restoringId = null;
+        if (res.success) { this.loadMeetings(); }
+        else { this.loadError = res.error ?? 'Failed to restore the meeting.'; this.cdr.markForCheck(); }
+      },
+      error: () => { this.restoringId = null; this.loadError = 'Failed to restore the meeting.'; this.cdr.markForCheck(); }
+    });
   }
 
   openMeeting(id: string): void {

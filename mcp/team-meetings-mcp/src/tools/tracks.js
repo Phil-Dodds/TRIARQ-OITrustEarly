@@ -42,7 +42,10 @@ async function list_my_tracks(params, caller_user_id) {
     .select('track_id, track_name, is_public, ref_panel_person_type, created_by, created_at, deleted_at')
     .is('purged_at', null)
     .order('track_name', { ascending: true });
-  if (trackIds) query = query.in('track_id', trackIds).is('deleted_at', null);
+  // Member mode now INCLUDES the caller's own deleted series (flagged via
+  // deleted_at) so the client can render "Show deleted series (N)" only when
+  // there is something to show. Client hides them unless that toggle is on.
+  if (trackIds) query = query.in('track_id', trackIds);
 
   const { data: tracks, error: tErr } = await query;
   if (tErr) return { success: false, error: tErr.message };

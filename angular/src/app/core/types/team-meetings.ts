@@ -81,6 +81,8 @@ export interface TeamMeetingListItem {
   unread:             boolean;
   /** Preview: latest bullet/note activity in this meeting (2026-07-14). */
   latest_activity?:   LatestMeetingActivity | null;
+  /** Set on graveyard rows (include_deleted view). */
+  deleted_at?:        string | null;
 }
 
 // ── Tracks ─────────────────────────────────────────────────────────────────────

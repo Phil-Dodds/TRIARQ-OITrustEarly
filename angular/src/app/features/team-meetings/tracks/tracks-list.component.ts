@@ -52,6 +52,11 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
         <input type="checkbox" [checked]="includeAll" (change)="toggleIncludeAll()">
         Show meetings that you do not participate in (Admins)
       </label>
+      <!-- Deleted-series toggle — admins, only when something is deleted (transient) -->
+      <label *ngIf="isAdmin && deletedSeriesCount > 0" class="tk-admin-toggle">
+        <input type="checkbox" [checked]="showDeletedSeries" (change)="showDeletedSeries = !showDeletedSeries">
+        Show deleted series ({{ deletedSeriesCount }})
+      </label>
 
       <!-- Loading -->
       <div *ngIf="loading" class="tk-list">
@@ -262,12 +267,24 @@ export class TracksListComponent implements OnInit {
   includeAll = false;
   isAdmin    = false;
 
-  /** Admin toggle SWAPS the view (Phil 2026-07-14): checked = only meetings
-   *  you do NOT participate in (deleted series stay visible for restore/purge
-   *  — including your own); unchecked = your meetings. */
+  /** Scope toggle SWAPS the view (Phil 2026-07-14): checked = only meetings
+   *  you do NOT participate in; unchecked = yours. Deleted visibility is the
+   *  SEPARATE showDeletedSeries toggle (state, not scope) — admin-only since
+   *  restore/purge is admin-only, rendered only when something is deleted. */
+  showDeletedSeries = false;
+
+  private get scopeTracks(): TrackListItem[] {
+    return this.includeAll
+      ? this.tracks.filter(t => !t.is_member)
+      : this.tracks.filter(t => t.is_member);
+  }
+  get deletedSeriesCount(): number {
+    return this.scopeTracks.filter(t => !!t.deleted_at).length;
+  }
   get visibleTracks(): TrackListItem[] {
-    if (!this.includeAll) { return this.tracks; }
-    return this.tracks.filter(t => !t.is_member || t.deleted_at);
+    return this.showDeletedSeries
+      ? this.scopeTracks.filter(t => !!t.deleted_at)
+      : this.scopeTracks.filter(t => !t.deleted_at);
   }
 
   /** "Phil Dodds" → "PD" for the Latest Change column. */
@@ -335,6 +352,7 @@ export class TracksListComponent implements OnInit {
 
   toggleIncludeAll(): void {
     this.includeAll = !this.includeAll;
+    this.showDeletedSeries = false; // state toggle resets when scope changes
     this.load();
   }
 

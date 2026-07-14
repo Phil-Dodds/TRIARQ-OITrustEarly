@@ -10,7 +10,11 @@ const { suggestNextMeetingDate } = require('../cadence');
 const { latestActivityByMeeting } = require('../latest_activity');
 
 /**
- * @param {{ track_id: string, limit?: number, offset?: number }} params
+ * @param {{ track_id: string, limit?: number, offset?: number, include_deleted?: boolean }} params
+ *   include_deleted: true → return ONLY soft-deleted meetings (the "Show
+ *   deleted meetings" graveyard view; leaders/admins restore from it).
+ *   Default (false) keeps the original non-deleted list — other consumers
+ *   (latest-meeting detection, carry-forward) are unaffected.
  * @param {string} caller_user_id
  */
 async function list_team_meetings(params, caller_user_id) {
@@ -19,19 +23,29 @@ async function list_team_meetings(params, caller_user_id) {
 
   const limit  = Math.min(params.limit  ?? 20, 100);
   const offset = params.offset ?? 0;
+  const includeDeleted = params.include_deleted === true;
 
   const access = await assertTrackAccess(track_id, caller_user_id);
   if (access.error) return { success: false, error: access.error };
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('team_meetings')
-    .select('id, title, meeting_date, created_at, updated_at, content_updated_at')
+    .select('id, title, meeting_date, created_at, updated_at, content_updated_at, deleted_at')
     .eq('track_id', track_id)
-    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
+  query = includeDeleted ? query.not('deleted_at', 'is', null) : query.is('deleted_at', null);
+  const { data, error } = await query;
 
   if (error) return { success: false, error: error.message };
+
+  // Deleted count — renders the "Show deleted meetings (N)" toggle only when
+  // there is something to show.
+  const { count: deletedCount } = await supabase
+    .from('team_meetings')
+    .select('id', { count: 'exact', head: true })
+    .eq('track_id', track_id)
+    .not('deleted_at', 'is', null);
 
   // Unread flag per meeting: caller never viewed it, or content changed since
   // their last view (same semantics as the series list).
@@ -78,9 +92,10 @@ async function list_team_meetings(params, caller_user_id) {
     success: true,
     data: enriched,
     track: {
-      track_id:   access.track.track_id,
-      track_name: access.track.track_name,
-      is_leader:  !!access.membership?.is_leader || access.caller.is_admin,
+      track_id:      access.track.track_id,
+      track_name:    access.track.track_name,
+      is_leader:     !!access.membership?.is_leader || access.caller.is_admin,
+      deleted_count: deletedCount ?? 0,
       suggested_next_meeting_date: suggestNextMeetingDate(cadRow?.meeting_cadence ?? null, latestByDate?.meeting_date ?? null)
     }
   };

@@ -38,8 +38,15 @@ export class TeamMeetingsService {
     return this.mcp.call<TeamMeeting>('team-meetings', 'get_team_meeting', { meeting_id });
   }
 
-  listMeetings(track_id: string, limit = 20, offset = 0): Observable<McpResponse<TeamMeetingListItem[]>> {
-    return this.mcp.call<TeamMeetingListItem[]>('team-meetings', 'list_team_meetings', { track_id, limit, offset });
+  /** include_deleted: true → ONLY soft-deleted meetings (graveyard view). */
+  listMeetings(track_id: string, limit = 20, offset = 0, include_deleted = false): Observable<McpResponse<TeamMeetingListItem[]>> {
+    return this.mcp.call<TeamMeetingListItem[]>('team-meetings', 'list_team_meetings',
+      { track_id, limit, offset, ...(include_deleted ? { include_deleted: true } : {}) });
+  }
+
+  /** Un-delete a meeting — series leaders + admins. */
+  restoreMeeting(meeting_id: string): Observable<McpResponse<{ meeting_id: string }>> {
+    return this.mcp.call('team-meetings', 'restore_team_meeting', { meeting_id });
   }
 
   addBullet(
