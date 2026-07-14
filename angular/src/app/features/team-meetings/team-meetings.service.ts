@@ -198,8 +198,10 @@ export class TeamMeetingsService {
     return this.mcp.call('team-meetings', 'add_presenter_sections_all', { track_id, ...(meeting_id ? { meeting_id } : {}) });
   }
 
-  moveBullet(bullet_id: string, target_section_id: string): Observable<McpResponse<unknown>> {
-    return this.mcp.call('team-meetings', 'move_bullet', { bullet_id, target_section_id });
+  /** target_bullet_id: dragged bullet takes that bullet's position; omitted → append. */
+  moveBullet(bullet_id: string, target_section_id: string, target_bullet_id?: string): Observable<McpResponse<unknown>> {
+    return this.mcp.call('team-meetings', 'move_bullet',
+      { bullet_id, target_section_id, ...(target_bullet_id ? { target_bullet_id } : {}) });
   }
 
   /** Section reorder within one meeting — dragged section takes the target's position. */

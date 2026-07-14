@@ -1057,9 +1057,13 @@ async function add_presenter_sections_all(params, caller_user_id) {
   return { success: true, data: { created } };
 }
 
-// ── move_bullet — drag & drop between sections of the same meeting ─────────────
+// ── move_bullet — drag & drop within and between sections of one meeting ──────
+// target_bullet_id (optional): the dragged bullet takes that bullet's position
+// (same take-the-target's-position semantics as move_section). Without it,
+// cross-section drops append at the end (original behavior) and same-section
+// drops are a no-op.
 async function move_bullet(params, caller_user_id) {
-  const { bullet_id, target_section_id } = params;
+  const { bullet_id, target_section_id, target_bullet_id } = params;
   if (!bullet_id || !target_section_id) {
     return { success: false, error: 'bullet_id and target_section_id are required.' };
   }
@@ -1070,7 +1074,8 @@ async function move_bullet(params, caller_user_id) {
     .eq('id', bullet_id)
     .maybeSingle();
   if (!bullet) return { success: false, error: 'Bullet not found.' };
-  if (bullet.section_id === target_section_id) return { success: true, data: { bullet_id } };
+  const sameSection = bullet.section_id === target_section_id;
+  if (sameSection && !target_bullet_id) return { success: true, data: { bullet_id } };
 
   const { assertSectionAccess, bumpMeeting } = require('../track_access');
   const sourceAccess = await assertSectionAccess(bullet.section_id, caller_user_id);
@@ -1085,6 +1090,43 @@ async function move_bullet(params, caller_user_id) {
     .maybeSingle();
   if (!target || target.meeting_id !== sourceAccess.meeting.id) {
     return { success: false, error: 'Bullets can only be moved between sections of the same meeting.' };
+  }
+
+  // Positioned drop: rewrite the target section's order with the dragged
+  // bullet at the target bullet's position.
+  if (target_bullet_id) {
+    const { data: rows } = await supabase
+      .from('team_meeting_bullets')
+      .select('id, sort_order')
+      .eq('section_id', target_section_id)
+      .order('sort_order', { ascending: true });
+    const ids0 = (rows || []).map(r => r.id);
+    const to0  = ids0.indexOf(target_bullet_id);
+
+    if (to0 !== -1) {
+      const ids = [...ids0];
+      const from = ids.indexOf(bullet_id);
+      if (from !== -1) { ids.splice(from, 1); }
+      // Same-section drag-down lands after the target (indexes computed on the
+      // original list, matching move_section); cross-section inserts before it.
+      ids.splice(from !== -1 ? to0 : ids.indexOf(target_bullet_id), 0, bullet_id);
+
+      const orderById = new Map((rows || []).map(r => [r.id, r.sort_order]));
+      for (let i = 0; i < ids.length; i++) {
+        const isDragged = ids[i] === bullet_id;
+        if (isDragged || orderById.get(ids[i]) !== i + 1) {
+          const patch = isDragged
+            ? { section_id: target_section_id, sort_order: i + 1 }
+            : { sort_order: i + 1 };
+          const { error } = await supabase
+            .from('team_meeting_bullets').update(patch).eq('id', ids[i]);
+          if (error) return { success: false, error: error.message };
+        }
+      }
+      await bumpMeeting(sourceAccess.meeting.id);
+      return { success: true, data: { bullet_id, target_section_id, target_bullet_id } };
+    }
+    // Target bullet vanished (concurrent delete) — fall through to append.
   }
 
   const { data: maxRow } = await supabase

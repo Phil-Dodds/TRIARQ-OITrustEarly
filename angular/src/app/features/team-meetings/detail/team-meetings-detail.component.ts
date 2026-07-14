@@ -160,8 +160,12 @@ interface InitiativeSearchResult {
                   <div *ngFor="let bullet of section.bullets; trackBy: trackById"
                        class="tmd-bullet-row"
                        [class.tmd-bullet-dragging]="draggingBulletId === bullet.id"
+                       [class.tmd-bullet-dropline]="dragOverBulletId === bullet.id"
                        [class.tmd-bullet-pending]="bullet.pending"
-                       [class.tmd-bullet-removing]="removingBulletId === bullet.id">
+                       [class.tmd-bullet-removing]="removingBulletId === bullet.id"
+                       (dragover)="onBulletRowDragOver($event, bullet)"
+                       (dragleave)="dragOverBulletId === bullet.id && (dragOverBulletId = null)"
+                       (drop)="onBulletRowDrop($event, section, bullet)">
                     <!-- Drag handle = the main row only, so note textareas keep normal text selection.
                          Draggable off while editing — selecting text in the edit input must not start a drag. -->
                     <div class="tmd-bullet-main-row"
@@ -509,6 +513,8 @@ interface InitiativeSearchResult {
     .tmd-bullet-main-row[draggable="true"] { cursor:grab; }
     .tmd-bullet-dragging { opacity:.4; }
     .tmd-section-dragover { outline:2px dashed var(--triarq-color-primary,#257099); outline-offset:-2px; }
+    /* Positioned bullet drop target — insertion line above the hovered row */
+    .tmd-bullet-dropline { box-shadow: inset 0 2px 0 var(--triarq-color-primary,#257099); }
     /* Section chooser popover */
     .tmd-chooser {
       position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
@@ -1119,7 +1125,61 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     this.draggingBulletId    = null;
     this.dragSourceSectionId = null;
     this.dragOverSectionId   = null;
+    this.dragOverBulletId    = null;
     this.cdr.markForCheck();
+  }
+
+  // ── Positioned bullet drop: drop ON a bullet = take its position (reorder
+  //    within a section, or insert at position across sections). Dropping on a
+  //    section's empty area keeps the original append behavior. ────────────────
+  dragOverBulletId: string | null = null;
+
+  onBulletRowDragOver(event: DragEvent, bullet: TeamMeetingBullet): void {
+    if (!this.draggingBulletId || this.draggingBulletId === bullet.id || bullet.pending) return;
+    event.preventDefault();
+    event.stopPropagation(); // keep the section-level dragover from claiming it
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    if (this.dragOverBulletId !== bullet.id) {
+      this.dragOverBulletId = bullet.id;
+      this.cdr.markForCheck();
+    }
+  }
+
+  onBulletRowDrop(event: DragEvent, section: TeamMeetingSection, targetBullet: TeamMeetingBullet): void {
+    if (!this.draggingBulletId) return; // section drags fall through to the section handler
+    event.preventDefault();
+    event.stopPropagation();
+    const bulletId = this.draggingBulletId;
+    const sourceId = this.dragSourceSectionId;
+    this.onBulletDragEnd();
+    if (!bulletId || !sourceId || bulletId === targetBullet.id || !this.meeting) return;
+
+    const source = this.meeting.sections.find(s => s.id === sourceId);
+    const bullet = source?.bullets.find(b => b.id === bulletId);
+    if (!source || !bullet) return;
+
+    // Optimistic splice mirroring the server: same-section uses original-index
+    // semantics (drag down lands after the target); cross-section inserts before.
+    if (source.id === section.id) {
+      const arr  = [...section.bullets];
+      const from = arr.findIndex(b => b.id === bulletId);
+      const to   = arr.findIndex(b => b.id === targetBullet.id);
+      if (from < 0 || to < 0) return;
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+      section.bullets = arr;
+    } else {
+      source.bullets = source.bullets.filter(b => b.id !== bulletId);
+      const arr = [...section.bullets];
+      const to  = arr.findIndex(b => b.id === targetBullet.id);
+      arr.splice(to < 0 ? arr.length : to, 0, bullet);
+      section.bullets = arr;
+    }
+    this.cdr.markForCheck();
+    this.svc.moveBullet(bulletId, section.id, targetBullet.id).subscribe({
+      next: res => { if (!res.success) this.refetchAndMerge(); },
+      error: () => this.refetchAndMerge()
+    });
   }
 
   // ── Section reorder drag (header = handle, meeting-local order) ──────────────

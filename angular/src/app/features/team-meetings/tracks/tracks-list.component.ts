@@ -28,7 +28,11 @@ const TRACK_CREATOR_EMAIL = 'pdodds@triarqhealth.com';
       <div class="tk-header">
         <div>
           <h1 class="tk-title">My Team Meetings</h1>
-          <p class="tk-subtitle">Your meeting series, most recent first. Bold = the latest meeting has activity you haven't seen.</p>
+          <p class="tk-subtitle">
+            Plan the agenda before the meeting, organize and take notes during it — everyone edits
+            live — and pull items forward from last time. Your series, most recent first;
+            bold = the latest meeting has activity you haven't seen.
+          </p>
         </div>
         <div class="tk-header-actions">
           <a class="tk-btn-ghost" routerLink="/team-meetings/public">Search Public Meetings to Join</a>
