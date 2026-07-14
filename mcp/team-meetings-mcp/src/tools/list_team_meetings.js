@@ -7,6 +7,7 @@
 const { supabase } = require('../db');
 const { assertTrackAccess } = require('../track_access');
 const { suggestNextMeetingDate } = require('../cadence');
+const { latestActivityByMeeting } = require('../latest_activity');
 
 /**
  * @param {{ track_id: string, limit?: number, offset?: number }} params
@@ -44,12 +45,16 @@ async function list_team_meetings(params, caller_user_id) {
       .in('meeting_id', meetingIds);
     (views || []).forEach(v => { viewByMeeting[v.meeting_id] = v.viewed_at; });
   }
+  // Preview line: latest bullet/note activity per meeting.
+  const activityByMeeting = await latestActivityByMeeting(meetingIds);
+
   const enriched = (data || []).map(m => {
     const viewedAt = viewByMeeting[m.id];
     return {
       ...m,
       unread: !viewedAt ||
-        new Date(m.content_updated_at).getTime() > new Date(viewedAt).getTime()
+        new Date(m.content_updated_at).getTime() > new Date(viewedAt).getTime(),
+      latest_activity: activityByMeeting.get(m.id) ?? null
     };
   });
 

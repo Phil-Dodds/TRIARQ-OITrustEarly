@@ -102,6 +102,10 @@ async function list_my_tracks(params, caller_user_id) {
     (views || []).forEach(v => { viewByMeeting[v.meeting_id] = v.viewed_at; });
   }
 
+  // Preview line: latest bullet/note activity in each track's latest meeting.
+  const { latestActivityByMeeting } = require('../latest_activity');
+  const activityByMeeting = await latestActivityByMeeting(latestIds);
+
   return {
     success: true,
     data: tracks.map(t => {
@@ -124,6 +128,7 @@ async function list_my_tracks(params, caller_user_id) {
         latest_meeting:        latest
                                  ? { id: latest.id, title: latest.title, meeting_date: latest.meeting_date }
                                  : null,
+        latest_activity:       latest ? (activityByMeeting.get(latest.id) ?? null) : null,
         unread,
         deleted_at:            t.deleted_at
       };

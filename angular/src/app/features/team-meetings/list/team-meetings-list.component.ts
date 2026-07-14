@@ -92,7 +92,13 @@ function todayIso(): string {
              tabindex="0"
              (click)="confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)"
              (keydown.enter)="confirmDeleteId !== m.id && editingMeeting?.id !== m.id && openMeeting(m.id)">
-          <span class="tm-col-title tm-meeting-name">{{ m.title }}</span>
+          <span class="tm-col-title tm-meeting-name">
+            {{ m.title }}
+            <!-- Latest-activity preview: WHAT changed; the bold marks THAT it did -->
+            <span *ngIf="m.latest_activity" class="tm-activity-preview" [title]="m.latest_activity.snippet">
+              “{{ m.latest_activity.snippet }}”<ng-container *ngIf="m.latest_activity.author_name"> — {{ m.latest_activity.author_name }}</ng-container> · {{ m.latest_activity.section_title }}
+            </span>
+          </span>
           <span class="tm-col-date">{{ m.meeting_date | date:'MMM d, y' }}</span>
           <!-- content_updated_at = anything changed by anyone; bold when unseen by you -->
           <span class="tm-col-updated tm-muted">{{ m.content_updated_at | date:'MMM d, y' }}</span>
@@ -244,7 +250,10 @@ function todayIso(): string {
     /* Unread = meeting changed since your last view (or never viewed) */
     .tm-row-unread .tm-meeting-name { font-weight: 700; }
     .tm-row-unread .tm-col-date, .tm-row-unread .tm-col-updated { font-weight: 700; color: #1A1A1A; }
-    .tm-meeting-name { font: 500 14px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); }
+    .tm-meeting-name { font: 500 14px Roboto, sans-serif; color: var(--triarq-color-primary, #257099); min-width: 0; }
+    .tm-activity-preview { display: block; font: italic 11px/1.5 Roboto, sans-serif; color: #757575;
+                           font-weight: 400; margin-top: 2px; overflow: hidden; white-space: nowrap;
+                           text-overflow: ellipsis; }
     .tm-muted { color: #757575; font-size: 13px; }
     .tm-row-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
     .tm-edit-btn { background: none; border: none; color: #BDBDBD; cursor: pointer; font-size: 16px; padding: 2px 4px; border-radius: 3px; transition: color 0.1s; }

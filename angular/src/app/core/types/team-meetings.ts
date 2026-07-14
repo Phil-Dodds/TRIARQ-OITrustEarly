@@ -79,6 +79,8 @@ export interface TeamMeetingListItem {
   content_updated_at: string;
   /** Caller never viewed this meeting, or it changed since their last view. */
   unread:             boolean;
+  /** Preview: latest bullet/note activity in this meeting (2026-07-14). */
+  latest_activity?:   LatestMeetingActivity | null;
 }
 
 // ── Tracks ─────────────────────────────────────────────────────────────────────
@@ -94,9 +96,19 @@ export interface TrackListItem {
   first_leader_name:     string | null;
   member_count:          number;
   latest_meeting:        { id: string; title: string; meeting_date: string } | null;
+  /** Preview: latest bullet/note activity in the latest meeting (2026-07-14). */
+  latest_activity?:      LatestMeetingActivity | null;
   /** Caller has not viewed the latest meeting, or it changed since their last view. */
   unread:                boolean;
   deleted_at:            string | null;
+}
+
+/** One-line preview of the newest bullet/note in a meeting. */
+export interface LatestMeetingActivity {
+  at:            string;
+  snippet:       string;
+  author_name:   string | null;
+  section_title: string;
 }
 
 export interface TrackMember {

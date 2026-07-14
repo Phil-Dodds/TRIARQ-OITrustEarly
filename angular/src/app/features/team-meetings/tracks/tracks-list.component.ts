@@ -92,6 +92,10 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
             <span *ngIf="t.is_public" class="tk-public-chip">Public</span>
             <span *ngIf="t.deleted_at" class="tk-deleted-chip">Deleted</span>
             <span *ngIf="isAdmin && !t.is_member" class="tk-nonmember-chip">Not a member</span>
+            <!-- Latest-activity preview: WHAT changed; the bold marks THAT it did -->
+            <span *ngIf="t.latest_activity" class="tk-activity-preview" [title]="t.latest_activity.snippet">
+              “{{ t.latest_activity.snippet }}”<ng-container *ngIf="t.latest_activity.author_name"> — {{ t.latest_activity.author_name }}</ng-container> · {{ t.latest_activity.section_title }}
+            </span>
           </span>
           <span class="tk-muted">{{ t.member_count }}</span>
           <span class="tk-muted tk-latest-date">
@@ -199,6 +203,9 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
     /* Unread = latest meeting never opened or changed since last view */
     .tk-row-unread .tk-track-name, .tk-row-unread .tk-latest-date { font-weight: 700; color: #1A1A1A; }
     .tk-row-unread .tk-track-name { color: var(--triarq-color-primary, #257099); }
+    .tk-activity-preview { flex-basis: 100%; font: italic 11px/1.5 Roboto, sans-serif; color: #757575;
+                           font-weight: 400; margin-top: 2px; overflow: hidden; white-space: nowrap;
+                           text-overflow: ellipsis; min-width: 0; }
     .tk-deleted-chip { background: #FDECEA; color: #D32F2F; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
     .tk-nonmember-chip { background: #F0F0F0; color: #757575; border-radius: 999px; padding: 1px 8px; font: 500 10px Roboto, sans-serif; }
     .tk-muted { color: #757575; font: 13px Roboto, sans-serif; }
