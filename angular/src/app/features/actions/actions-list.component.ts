@@ -399,7 +399,7 @@ export class ActionsListComponent implements OnChanges {
     return this.sortDir === 'asc' ? '↑' : '↓';
   }
 
-  toggleRow(row: 'gate' | 'division' | 'date' | 'epo' | 'dol' | 'dcs'): void { this.openRow = this.openRow === row ? null : row; }
+  toggleRow(row: NonNullable<typeof this.openRow>): void { this.openRow = this.openRow === row ? null : row; }
   toggleStaged(set: Set<string>, value: string): void { if (set.has(value)) { set.delete(value); } else { set.add(value); } }
 
   applyFilters(): void {
