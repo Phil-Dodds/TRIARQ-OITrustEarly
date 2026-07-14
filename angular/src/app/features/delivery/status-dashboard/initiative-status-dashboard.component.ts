@@ -31,7 +31,12 @@ import { InitiativeStatusDashboardRow } from '../../../core/types/initiative-sta
 
 type DashSort =
   | 'initiative' | 'division' | 'next_gate' | 'target_date'
-  | 'updated_by' | 'epo_target';
+  | 'updated_by' | 'epo_target' | 'epo_gate_division' | 'epo_div_gate_target';
+
+/** Lifecycle order for gate sorts — Brief Review first, never alphabetical. */
+const GATE_SORT_ORDER: Record<string, number> = {
+  brief_review: 0, go_to_build: 1, go_to_deploy: 2, go_to_release: 3, close_review: 4
+};
 
 const POLL_INTERVAL_MS = 10000;   // D-512 / D-499
 
@@ -63,7 +68,9 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
           <select class="isd-sort-select" [value]="offeredSortValue" (change)="applyOfferedSort($any($event.target).value)">
             <option value="">Sort…</option>
             <option value="target_date">Next Gate Target Date</option>
-            <option value="epo_target">EPO, then Target Date</option>
+            <option value="epo_target">EPO · Target Date</option>
+            <option value="epo_gate_division">EPO · Next Gate · Division</option>
+            <option value="epo_div_gate_target">EPO · Division · Next Gate · Target Date</option>
           </select>
           <label class="isd-toggle">
             <input type="checkbox" [checked]="needsReviewOnly" (change)="toggleNeedsReview()" />
@@ -80,6 +87,10 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
         <span class="isd-chip" *ngFor="let id of selectedDivisionIds">
           Division: {{ divisionLabel(id) }}
           <span class="isd-chip-x" (click)="removeDivision(id)">✕</span>
+        </span>
+        <span class="isd-chip" *ngFor="let g of selectedGates">
+          Next Gate: {{ gateOptionLabel(g) }}
+          <span class="isd-chip-x" (click)="removeGate(g)">✕</span>
         </span>
         <span class="isd-chip" *ngIf="personFilter.dcs">
           DCS: {{ personLabel('dcs', personFilter.dcs) }}
@@ -192,6 +203,12 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
         </label>
         <div *ngIf="divisionOptions.length === 0" class="oi-zone-explain">No divisions in the current results.</div>
 
+        <div class="oi-zone-title" style="margin-top:14px;">Next Gate</div>
+        <label class="isd-check" *ngFor="let g of gateFilterOptions">
+          <input type="checkbox" [checked]="draftGates.includes(g.name)" (change)="toggleDraftGate(g.name)" />
+          <span>{{ g.label }}</span>
+        </label>
+
         <!-- D-511: EPO / DOL / DCS person filters (grid pattern: single-select per role) -->
         <ng-container *ngFor="let role of personRoles">
           <div class="oi-zone-title" style="margin-top:14px;">{{ role.toUpperCase() }}</div>
@@ -211,14 +228,16 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
       </div>
     </div>
 
-    <!-- Row-tap detail — standard right panel (S-006), fixed overlay + scrim. -->
-    <div *ngIf="detailCycleId" class="oi-scrim oi-scrim-detail" (click)="detailCycleId = null; load()"></div>
+    <!-- Row-tap detail — standard right panel (S-006), fixed overlay + scrim.
+         Close refreshes SILENTLY (no skeleton, rows merge in place via trackBy)
+         so viewing an initiative never flashes the whole grid (Phil 2026-07-13). -->
+    <div *ngIf="detailCycleId" class="oi-scrim oi-scrim-detail" (click)="detailCycleId = null; load(true)"></div>
     <div *ngIf="detailCycleId"
          style="position:fixed;top:0;right:0;width:60%;max-width:980px;height:100vh;background:#fff;
                 border-left:1px solid #E0E0E0;overflow-y:auto;z-index:1000;">
       <app-delivery-cycle-detail
         [cycleId]="detailCycleId"
-        (close)="detailCycleId = null; load()">
+        (close)="detailCycleId = null; load(true)">
       </app-delivery-cycle-detail>
     </div>
 
@@ -234,8 +253,8 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
       [hasNext]="viewIndex >= 0 && viewIndex < visibleRows.length - 1"
       (prev)="stepView(-1)"
       (next)="stepView(1)"
-      (saved)="load()"
-      (acknowledged)="load()"
+      (saved)="load(true)"
+      (acknowledged)="load(true)"
       (viewInitiative)="openDetail(viewId!); viewId = null"
       (cancelled)="viewId = null">
     </app-initiative-status-update-panel>
@@ -291,6 +310,17 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
   selectedDivisionIds: string[] = [];
   draftDivisionIds: string[] = [];
 
+  // Next Gate filter (Phil 2026-07-13) — multi-select on the canonical five.
+  selectedGates: string[] = [];
+  draftGates:    string[] = [];
+  readonly gateFilterOptions: { name: string; label: string }[] = [
+    { name: 'brief_review',  label: 'Brief Review'  },
+    { name: 'go_to_build',   label: 'Go to Build'   },
+    { name: 'go_to_deploy',  label: 'Go to Deploy'  },
+    { name: 'go_to_release', label: 'Go to Release' },
+    { name: 'close_review',  label: 'Close Review'  }
+  ];
+
   // D-511: person filters (single-select per role, grid pattern).
   readonly personRoles: PersonRole[] = ['epo', 'dol', 'dcs'];
   personFilter: Record<PersonRole, string> = { dcs: '', epo: '', dol: '' };
@@ -320,6 +350,9 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
     this.screenState.restore(SCREEN_KEYS.INITIATIVE_STATUS_DASHBOARD).then(s => {
       if (s?.filter_state?.['division_ids']) {
         this.selectedDivisionIds = (s.filter_state['division_ids'] as string[]) || [];
+      }
+      if (Array.isArray(s?.filter_state?.['gate_names'])) {
+        this.selectedGates = (s!.filter_state['gate_names'] as string[]).filter(x => typeof x === 'string');
       }
       const pf = s?.filter_state?.['person_filter'] as Record<PersonRole, string> | undefined;
       if (pf) { this.personFilter = { dcs: pf.dcs || '', epo: pf.epo || '', dol: pf.dol || '' }; }
@@ -430,32 +463,48 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
       ? this.draftDivisionIds.filter(x => x !== id)
       : [...this.draftDivisionIds, id];
   }
+  toggleDraftGate(name: string): void {
+    this.draftGates = this.draftGates.includes(name)
+      ? this.draftGates.filter(x => x !== name)
+      : [...this.draftGates, name];
+  }
+  gateOptionLabel(name: string): string {
+    return this.gateFilterOptions.find(g => g.name === name)?.label || name;
+  }
   applyFilters(): void {
     this.selectedDivisionIds = [...this.draftDivisionIds];
+    this.selectedGates = [...this.draftGates];
     this.personFilter = { ...this.draftPerson };
     this.filterOpen = false;
     this.persistFilter();
   }
   clearFilters(): void {
     this.draftDivisionIds = [];
+    this.draftGates = [];
     this.draftPerson = { dcs: '', epo: '', dol: '' };
   }
   removeDivision(id: string): void {
     this.selectedDivisionIds = this.selectedDivisionIds.filter(x => x !== id);
     this.persistFilter();
   }
+  removeGate(name: string): void {
+    this.selectedGates = this.selectedGates.filter(x => x !== name);
+    this.persistFilter();
+    this.cdr.markForCheck();
+  }
   openFilters(): void {
     this.draftDivisionIds = [...this.selectedDivisionIds];
+    this.draftGates = [...this.selectedGates];
     this.draftPerson = { ...this.personFilter };
     this.filterOpen = true;
   }
   get activeFilterCount(): number {
-    return this.selectedDivisionIds.length +
+    return this.selectedDivisionIds.length + this.selectedGates.length +
       (this.personFilter.dcs ? 1 : 0) + (this.personFilter.epo ? 1 : 0) + (this.personFilter.dol ? 1 : 0);
   }
   private persistFilter(): void {
     this.screenState.save(SCREEN_KEYS.INITIATIVE_STATUS_DASHBOARD,
-      { division_ids: this.selectedDivisionIds, person_filter: this.personFilter },
+      { division_ids: this.selectedDivisionIds, gate_names: this.selectedGates, person_filter: this.personFilter },
       { field: this.sortField, dir: this.sortDir });
   }
 
@@ -470,6 +519,9 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
     let out = this.rows;
     if (this.selectedDivisionIds.length) {
       out = out.filter(r => this.selectedDivisionIds.includes(r.division_id));
+    }
+    if (this.selectedGates.length) {
+      out = out.filter(r => r.next_gate_name && this.selectedGates.includes(r.next_gate_name));
     }
     for (const role of this.personRoles) {
       const id = this.personFilter[role];
@@ -496,6 +548,24 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
           if (e !== 0) { return e * dir; }
           return ((a.next_gate_target_date || FAR_FUTURE).localeCompare(b.next_gate_target_date || FAR_FUTURE)) * dir;
         }
+        // Offered sort (c): EPO → Next Gate (lifecycle order) → Division.
+        case 'epo_gate_division': {
+          const e = (a.assigned_epo_display_name || 'zzz').localeCompare(b.assigned_epo_display_name || 'zzz');
+          if (e !== 0) { return e * dir; }
+          const g = this.gateRank(a) - this.gateRank(b);
+          if (g !== 0) { return g * dir; }
+          return (a.division_display_name_short || '').localeCompare(b.division_display_name_short || '') * dir;
+        }
+        // Offered sort (d): EPO → Division → Next Gate → Target Date.
+        case 'epo_div_gate_target': {
+          const e = (a.assigned_epo_display_name || 'zzz').localeCompare(b.assigned_epo_display_name || 'zzz');
+          if (e !== 0) { return e * dir; }
+          const d = (a.division_display_name_short || '').localeCompare(b.division_display_name_short || '');
+          if (d !== 0) { return d * dir; }
+          const g = this.gateRank(a) - this.gateRank(b);
+          if (g !== 0) { return g * dir; }
+          return ((a.next_gate_target_date || FAR_FUTURE).localeCompare(b.next_gate_target_date || FAR_FUTURE)) * dir;
+        }
         // D-512: "Never updated" rows sort oldest under Updated By sort.
         case 'updated_by': {
           const ka = a.root_saved_at || a.saved_at || EPOCH;
@@ -514,14 +584,21 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
   }
   activeArrow(f: DashSort): string { return this.sortField === f ? (this.sortDir === 'asc' ? ' ↑' : ' ↓') : ''; }
 
-  /** D-512 offered sorts — dropdown maps to the two spec'd sorts (asc). */
+  /** Gates rank in lifecycle order; rows with no next gate sort last. */
+  private gateRank(r: InitiativeStatusDashboardRow): number {
+    return r.next_gate_name != null ? (GATE_SORT_ORDER[r.next_gate_name] ?? 98) : 99;
+  }
+
+  /** D-512 offered sorts — dropdown maps to the offered sorts (asc). */
+  private static readonly OFFERED_SORTS: DashSort[] =
+    ['target_date', 'epo_target', 'epo_gate_division', 'epo_div_gate_target'];
   get offeredSortValue(): string {
-    return (this.sortField === 'target_date' || this.sortField === 'epo_target') && this.sortDir === 'asc'
+    return InitiativeStatusDashboardComponent.OFFERED_SORTS.includes(this.sortField) && this.sortDir === 'asc'
       ? this.sortField : '';
   }
   applyOfferedSort(v: string): void {
-    if (v !== 'target_date' && v !== 'epo_target') { return; }
-    this.sortField = v;
+    if (!InitiativeStatusDashboardComponent.OFFERED_SORTS.includes(v as DashSort)) { return; }
+    this.sortField = v as DashSort;
     this.sortDir = 'asc';
     this.persistFilter();
     this.cdr.markForCheck();
