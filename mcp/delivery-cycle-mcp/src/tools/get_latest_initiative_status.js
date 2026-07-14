@@ -28,7 +28,7 @@ async function get_latest_initiative_status(params, caller_user_id) {
 
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, division_id, status_overdue, latest_status_update_id, assigned_dol_user_id, assigned_dcs_user_id, assigned_epo_user_id')
+    .select('delivery_cycle_id, division_id, status_overdue, status_due_at, latest_status_update_id, assigned_dol_user_id, assigned_dcs_user_id, assigned_epo_user_id')
     .eq('delivery_cycle_id', initiative_id)
     .is('deleted_at', null)
     .single();
@@ -139,7 +139,7 @@ async function get_latest_initiative_status(params, caller_user_id) {
     .is('deleted_at', null);
 
   const needs_review_reasons = await computeNeedsReviewReasons(
-    supabase, cycle, latest, allMilestones || []
+    supabase, cycle, latest, allMilestones || [], chain?.root_saved_at ?? null
   );
 
   return {
@@ -152,6 +152,8 @@ async function get_latest_initiative_status(params, caller_user_id) {
       chain,                          // D-507: { root_saved_at, is_edited, edit_window_open }
       // D-514: cadence name for helper text ('weekly'|'triweekly'|'monthly'|null).
       resolved_cadence: await resolveCadenceName(supabase, cycle.division_id),
+      // D-482 amendment: next meeting date — client derives the amber nudge.
+      status_due_at:    cycle.status_due_at ?? null,
       acknowledgments,
       needs_review_reasons
     }

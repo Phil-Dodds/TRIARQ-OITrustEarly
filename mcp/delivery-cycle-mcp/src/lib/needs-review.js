@@ -78,15 +78,24 @@ async function computeSlippedGateLabels(supabase, delivery_cycle_id, cadenceInte
   return Array.from(labels);
 }
 
+/** YYYY-MM-DD minus N days (pure string math via UTC). */
+function isoDateMinusDays(isoDate, days) {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
 /**
- * Full Needs Review reason list for one Initiative (D-485 conditions).
+ * Full Needs Review reason list for one Initiative (D-485 conditions,
+ * D-482 meeting-window amendment 2026-07-14).
  * @param supabase       service-role client
- * @param cycle          { delivery_cycle_id, division_id, status_overdue }
+ * @param cycle          { delivery_cycle_id, division_id, status_due_at }
  * @param latestUpdate   latest initiative_status_updates row or null
- * @param milestones     array of { gate_name, date_status }
+ * @param milestones     array of { gate_name, date_status, target_date }
+ * @param rootSavedAt    D-507 chain-root saved_at ISO (null when no update)
  * @returns string[] (empty when nothing needs review)
  */
-async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, milestones) {
+async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, milestones, rootSavedAt = null) {
   const reasons = [];
 
   // 1) Escalation flagged
@@ -94,9 +103,22 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
     reasons.push('Escalation flagged');
   }
 
-  // 2) Status overdue
-  if (cycle.status_overdue === true) {
-    reasons.push('Status overdue');
+  // 2) Not updated for THIS meeting (D-482 as amended): red fires only on the
+  // meeting day itself, when the chain root predates the 2-day prep window.
+  // Computed LIVE from status_due_at (= next meeting date, maintained by the
+  // refresh cron) so it flips at day boundaries regardless of cron timing.
+  // The pre-meeting amber nudge is client-side and never a review reason;
+  // mid-cycle there is no status signal at all.
+  const dueStr = typeof cycle.status_due_at === 'string' ? cycle.status_due_at.slice(0, 10) : '';
+  if (dueStr) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (today === dueStr) {
+      const windowStart = isoDateMinusDays(dueStr, 2);
+      const rootDay = rootSavedAt ? rootSavedAt.slice(0, 10) : null;
+      if (!rootDay || rootDay < windowStart) {
+        reasons.push('Not updated for this meeting');
+      }
+    }
   }
 
   // 3) Gate date slipped within cadence period (D-486)
@@ -149,6 +171,7 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
 module.exports = {
   GATE_LABELS,
   CADENCE_INTERVAL_DAYS,
+  isoDateMinusDays,
   resolveCadenceIntervalDays,
   resolveCadenceName,
   computeSlippedGateLabels,

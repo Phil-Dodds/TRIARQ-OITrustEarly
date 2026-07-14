@@ -205,6 +205,11 @@ const CADENCE_PHRASE: Record<string, string> = {
                 </div>
               </div>
 
+              <!-- D-482 amendment: amber prep nudge (window days; meeting day goes red above) -->
+              <div *ngIf="updateDueForMeeting()" style="margin-top:8px;">
+                <span class="isp-due-chip">Update due for meeting</span>
+              </div>
+
               <!-- D-512 act-from-panel: Update Status (any user) + Edit (window rules) -->
               <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
                 <button class="oi-btn-primary" (click)="startNewUpdate()">Update Status</button>
@@ -252,6 +257,9 @@ const CADENCE_PHRASE: Record<string, string> = {
       border-radius:var(--radius-pill, 999px); padding:2px 10px; font-size:11px;
     }
     .isp-link { color:var(--triarq-color-primary, #257099); cursor:pointer; font-size:13px; }
+    /* D-482 amber prep nudge */
+    .isp-due-chip { display:inline-block; background:#FFF8E1; color:#B26A00; border:1px solid #F2A620;
+                    border-radius:999px; padding:1px 10px; font-size:11px; font-weight:600; white-space:nowrap; }
   `]
 })
 export class InitiativeStatusUpdatePanelComponent implements OnInit, OnChanges {
@@ -422,6 +430,21 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit, OnChanges {
     if (me.is_admin === true) { return true; }
     if (this.latest.latest.saved_by === me.id) { return true; }
     return this.latest.acknowledgments.some(a => a.user_id === me.id);
+  }
+
+  /** D-482 amendment: amber prep nudge — today within the 2 days BEFORE the
+   *  division meeting and the chain root predates the window (or no update).
+   *  Meeting day itself renders red via needs_review_reasons. */
+  updateDueForMeeting(): boolean {
+    const due = (this.latest?.status_due_at || '').slice(0, 10);
+    if (!due) { return false; }
+    const today = new Date().toISOString().slice(0, 10);
+    const win = new Date(`${due}T00:00:00Z`);
+    win.setUTCDate(win.getUTCDate() - 2);
+    const winStart = win.toISOString().slice(0, 10);
+    if (!(today >= winStart && today < due)) { return false; }
+    const root = (this.latest?.chain?.root_saved_at || this.latest?.latest?.saved_at || '').slice(0, 10);
+    return !root || root < winStart;
   }
 
   startEditLatest(): void {

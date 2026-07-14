@@ -85,19 +85,50 @@ describe('needs-review helper', () => {
     assert.deepEqual(labels, []);
   });
 
-  test('computeNeedsReviewReasons: escalation + overdue + at-risk milestone', async () => {
+  // D-482 as amended 2026-07-14: red = "Not updated for this meeting", fires
+  // ONLY on meeting day (status_due_at) when the chain root predates the
+  // 2-day window. Mid-cycle there is no status signal at all.
+  test('computeNeedsReviewReasons: escalation + meeting-day red + at-risk milestone', async () => {
+    const today = new Date().toISOString().slice(0, 10);
     queue = [
       { data: null, error: null }                       // rpc → no cadence config (slip skipped)
     ];
     const reasons = await nr.computeNeedsReviewReasons(
       chain,
-      { delivery_cycle_id: CYC, division_id: 'div', status_overdue: true },
+      { delivery_cycle_id: CYC, division_id: 'div', status_due_at: `${today}T00:00:00Z` },
       { escalation_needed: true, pilot_confidence_applicable: false, close_confidence_applicable: false },
-      [{ gate_name: 'go_to_build', date_status: 'behind' }]
+      [{ gate_name: 'go_to_build', date_status: 'behind' }],
+      null // no update ever → stale for today's meeting
     );
     assert.ok(reasons.includes('Escalation flagged'));
-    assert.ok(reasons.includes('Status overdue'));
+    assert.ok(reasons.includes('Not updated for this meeting'));
     assert.ok(reasons.includes('At risk: Go to Build'));
+  });
+
+  test('computeNeedsReviewReasons: mid-cycle stale root produces NO status reason', async () => {
+    const farDue = '2099-12-31T00:00:00Z'; // next meeting far away → no signal
+    queue = [ { data: null, error: null } ];
+    const reasons = await nr.computeNeedsReviewReasons(
+      chain,
+      { delivery_cycle_id: CYC, division_id: 'div', status_due_at: farDue },
+      { escalation_needed: false, pilot_confidence_applicable: false, close_confidence_applicable: false },
+      [],
+      '2026-01-01T00:00:00Z' // ancient root — still no reason mid-cycle
+    );
+    assert.ok(!reasons.some(r => /updated|overdue/i.test(r)));
+  });
+
+  test('computeNeedsReviewReasons: meeting-day with window-fresh root stays clean', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    queue = [ { data: null, error: null } ];
+    const reasons = await nr.computeNeedsReviewReasons(
+      chain,
+      { delivery_cycle_id: CYC, division_id: 'div', status_due_at: `${today}T00:00:00Z` },
+      { escalation_needed: false, pilot_confidence_applicable: false, close_confidence_applicable: false },
+      [],
+      new Date().toISOString() // updated today → fresh for today's meeting
+    );
+    assert.ok(!reasons.includes('Not updated for this meeting'));
   });
 });
 
@@ -407,7 +438,8 @@ describe('get_initiative_status_dashboard', () => {
     queue = [
       { data: { is_admin: true }, error: null },                                  // caller (privileged)
       { data: [{ delivery_cycle_id: CYC, cycle_title: 'Alpha', division_id: 'div', current_lifecycle_stage: 'BUILD',
-                 status_overdue: true, latest_status_update_id: UPD,
+                 status_overdue: true, status_due_at: `${new Date().toISOString().slice(0, 10)}T00:00:00Z`,
+                 latest_status_update_id: UPD,
                  assigned_dol_user_id: DOL, assigned_dcs_user_id: null, assigned_epo_user_id: null }, ], error: null }, // cycles
       { data: [{ id: 'div', division_name: 'Cardiology', display_name_short: 'Cardio' }], error: null }, // divisions
       { data: [{ id: UPD, saved_by: DOL, escalation_needed: true, pilot_confidence: null, close_confidence: null, pilot_confidence_applicable: false, close_confidence_applicable: false, saved_at: '2026-06-20T00:00:00Z' }], error: null }, // updates
@@ -426,7 +458,9 @@ describe('get_initiative_status_dashboard', () => {
     assert.equal(r.data[0].next_gate_label, 'Go to Build');
     assert.equal(r.data[0].next_gate_pending_approval, true);
     assert.ok(r.data[0].needs_review_reasons.includes('Escalation flagged'));
-    assert.ok(r.data[0].needs_review_reasons.includes('Status overdue'));
+    // D-482 amendment: meeting is TODAY (status_due_at) + root 2026-06-20 predates
+    // the window → meeting-day red replaces the retired durable "Status overdue".
+    assert.ok(r.data[0].needs_review_reasons.includes('Not updated for this meeting'));
     assert.ok(r.data[0].needs_review_reasons.includes('No target date: Go to Build'));
   });
 
