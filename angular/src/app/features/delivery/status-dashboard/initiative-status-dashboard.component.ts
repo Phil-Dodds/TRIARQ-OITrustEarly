@@ -163,8 +163,6 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
                   <div class="isd-age">{{ ageLabel(r.root_saved_at || r.saved_at) }}</div>
                 </ng-container>
                 <ng-template #neverUpdated><span class="isd-never">Never</span></ng-template>
-                <!-- D-482 amendment: amber prep nudge — window days only, never a review reason -->
-                <div *ngIf="updateDueForMeeting(r)"><span class="isd-due-chip">Update due for meeting</span></div>
               </td>
               <td>
                 <span *ngIf="r.escalation_needed" class="isd-esc">Yes</span>
@@ -300,9 +298,6 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
     /* Initiative Name claims the freed width so shrink columns pack together. */
     .isd-table th.isd-name, .isd-table td.isd-name { width:30%; min-width:220px; }
     .isd-pending-chip { margin-left:0; margin-top:3px; }
-    /* D-482 amber nudge — same visual weight as Pending Approval */
-    .isd-due-chip { display:inline-block; background:#FFF8E1; color:#B26A00; border:1px solid #F2A620;
-                    border-radius:999px; padding:0 8px; font-size:10px; font-weight:600; margin-top:3px; white-space:nowrap; }
   `]
 })
 export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
@@ -643,24 +638,6 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
   isPastDate(iso: string): boolean {
     return iso < new Date().toISOString().split('T')[0];
   }
-  /** D-482 amendment: amber prep nudge — today within the 2 days BEFORE the
-   *  meeting (meeting day itself goes red via needs_review_reasons) and the
-   *  chain root predates the window (or no update exists). */
-  updateDueForMeeting(r: InitiativeStatusDashboardRow): boolean {
-    const due = (r.status_due_at || '').slice(0, 10);
-    if (!due) { return false; }
-    const today = new Date().toISOString().slice(0, 10);
-    const winStart = this.isoMinusDays(due, 2);
-    if (!(today >= winStart && today < due)) { return false; }
-    const root = (r.root_saved_at || r.saved_at || '').slice(0, 10);
-    return !root || root < winStart;
-  }
-  private isoMinusDays(isoDate: string, days: number): string {
-    const d = new Date(`${isoDate}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() - days);
-    return d.toISOString().slice(0, 10);
-  }
-
   /** Target Date display: "Jul 13"; year appended only when not the current year.
    *  Parses the YYYY-MM-DD string directly — no Date() timezone shift. */
   gateDate(iso: string): string {

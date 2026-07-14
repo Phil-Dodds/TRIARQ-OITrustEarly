@@ -49,7 +49,7 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
 
   let query = supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, division_id, current_lifecycle_stage, status_overdue, status_due_at, latest_status_update_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
+    .select('delivery_cycle_id, cycle_title, division_id, current_lifecycle_stage, status_overdue, latest_status_update_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
     .is('deleted_at', null)
     .not('current_lifecycle_stage', 'in', '(COMPLETE,CANCELLED)');
   if (scopeIds) { query = query.in('division_id', scopeIds); }
@@ -124,10 +124,10 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
   const rows = [];
   for (const c of cycles) {
     const latest = c.latest_status_update_id ? (updateById[c.latest_status_update_id] || null) : null;
-    // D-507: age + meeting-window evaluation both key off the chain ROOT.
+    // D-507: age keys off the chain ROOT, never an edit.
     const root = latest ? rootMap.get(latest.id) : null;
     const reasons = await computeNeedsReviewReasons(
-      supabase, c, latest, milestonesByCycle[c.delivery_cycle_id] || [], root?.root_saved_at ?? null
+      supabase, c, latest, milestonesByCycle[c.delivery_cycle_id] || []
     );
     if (needsReviewOnly && reasons.length === 0) { continue; }
 
@@ -147,9 +147,6 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
       division_display_name_short: div.display_name_short || div.division_name || null,
       current_lifecycle_stage: c.current_lifecycle_stage,
       status_overdue:          c.status_overdue,
-      // D-482 amendment: next meeting date — client derives the amber
-      // "Update due for meeting" nudge from this + root_saved_at.
-      status_due_at:           c.status_due_at ?? null,
       // D-510: Next Gate + Target Date columns (shared resolution, no 4th walkback copy)
       next_gate_label:         nextGate?.label ?? null,
       next_gate_name:          nextGate?.gate_name ?? null,

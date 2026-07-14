@@ -63,9 +63,6 @@ export interface LatestInitiativeStatus {
   chain?:               StatusChainInfo | null;
   // D-514: 'weekly' | 'triweekly' | 'monthly' | null (unconfigured → omit phrase).
   resolved_cadence?:    string | null;
-  /** D-482 amendment (2026-07-14): next division meeting date — drives the
-   *  amber "Update due for meeting" nudge client-side. */
-  status_due_at?:       string | null;
   acknowledgments:      TrioAckStatus[];
   needs_review_reasons: string[];
 }
@@ -130,9 +127,9 @@ export interface InitiativeStatusDashboardRow {
   division_name:           string | null;
   division_display_name_short: string | null;
   current_lifecycle_stage: string;
+  /** D-482 final (2026-07-14): chain root predates the most recently opened
+   *  prep window (meeting − 2 days). Surfaces as the "Status overdue" reason. */
   status_overdue:          boolean;
-  /** D-482 amendment (2026-07-14): next division meeting date (amber nudge input). */
-  status_due_at?:          string | null;
   // D-510: Next Gate + Target Date (shared gate resolution)
   next_gate_label:         string | null;
   next_gate_name:          string | null;
