@@ -102,6 +102,11 @@ const { status_dashboard_changed_since } = require('./tools/status_dashboard_cha
 const { trigger_status_refresh }         = require('./tools/trigger_status_refresh');
 const { get_status_refresh_last_run }    = require('./tools/get_status_refresh_last_run');
 
+// Contract 37 (D-549–D-553): Sprint Calendars + Gate Date Rules.
+const sprintCalendars                    = require('./tools/sprint_calendars');
+const { set_division_sprint_calendar, get_effective_sprint_calendar } = require('./tools/division_sprint_calendar');
+const { set_gate_date_rule }             = require('./tools/set_gate_date_rule');
+
 const app  = express();
 const PORT = process.env.PORT || 3003;
 
@@ -159,6 +164,18 @@ const TOOLS = {
   set_milestone_target_date,
   set_milestone_actual_date,
   update_milestone_status,
+
+  // Contract 37 — Sprint Calendars + Gate Date Rules (D-549–D-553)
+  list_sprint_calendars:   sprintCalendars.list_sprint_calendars,
+  create_sprint_calendar:  sprintCalendars.create_sprint_calendar,
+  update_sprint_calendar:  sprintCalendars.update_sprint_calendar,
+  delete_sprint_calendar:  sprintCalendars.delete_sprint_calendar,
+  list_sprints:            sprintCalendars.list_sprints,
+  upsert_sprints:          sprintCalendars.upsert_sprints,
+  delete_sprint:           sprintCalendars.delete_sprint,
+  set_division_sprint_calendar,
+  get_effective_sprint_calendar,
+  set_gate_date_rule,
 
   // Artifact tracking
   attach_cycle_artifact,

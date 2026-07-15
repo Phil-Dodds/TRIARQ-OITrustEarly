@@ -30,12 +30,16 @@ import { CommonModule }        from '@angular/common';
 import { RouterModule }        from '@angular/router';
 import {
   ReactiveFormsModule,
+  FormsModule,
   FormBuilder,
   FormGroup,
   Validators
 } from '@angular/forms';
 import { IonicModule }                 from '@ionic/angular';
 import { McpService }                  from '../../../core/services/mcp.service';
+// Contract 37 (D-550): Sprint Calendar assignment selector.
+import { SprintCalendarService }       from '../../../core/services/sprint-calendar.service';
+import { DeliveryService }             from '../../../core/services/delivery.service';
 import {
   ScreenStateService,
   SCREEN_KEYS
@@ -46,7 +50,7 @@ import { DivisionInitiativeCycleComponent } from './initiative-cycle/division-in
 import { DivisionRoadmapThemesComponent }   from './division-roadmap-themes.component';
 import { UserPickerComponent }         from '../../../shared/pickers/user-picker/user-picker.component';
 import { UserProfileService }          from '../../../core/services/user-profile.service';
-import { Division, User }              from '../../../core/types/database';
+import { Division, User, SprintCalendar } from '../../../core/types/database';
 import {
   ALL_ROLE_FLAGS,
   ROLE_FLAG_ABBREVIATIONS,
@@ -88,6 +92,7 @@ const LEVEL_LABELS: Record<number, string> = {
     CommonModule,
     RouterModule,
     ReactiveFormsModule,
+    FormsModule,
     IonicModule,
     BlockedActionComponent,
     LoadingOverlayComponent,
@@ -574,6 +579,23 @@ const LEVEL_LABELS: Record<number, string> = {
                     <div class="dm-owner-readonly">Only Phil can change the Division Leader.</div>
                   </ng-container>
                 </div>
+                <!-- Contract 37 (D-550, spec §4.2/§4.3): Sprint Calendar selector.
+                     Inherit shows the resolved effective calendar; None is the
+                     explicit opt-out (Date mode only for this subtree). -->
+                <div class="oi-field-row">
+                  <label class="oi-field-label">Sprint Calendar</label>
+                  <select class="oi-input" style="width:100%;"
+                          [ngModel]="editSprintCalendarValue"
+                          [ngModelOptions]="{standalone: true}"
+                          (ngModelChange)="setEditSprintCalendar($event)">
+                    <option value="inherit">Inherit (currently: {{ inheritEffectiveCalendarName || 'none' }})</option>
+                    <option *ngFor="let cal of activeSprintCalendars" [value]="cal.id">{{ cal.calendar_name }}</option>
+                    <option value="none">None — Date mode only</option>
+                  </select>
+                  <span style="font-size:11px;color:var(--triarq-color-text-secondary);">
+                    Reassignment never moves existing Gate dates — rules that no longer resolve are flagged stale.
+                  </span>
+                </div>
                 <div class="oi-zone-explain">
                   Level and Parent Division are structural — changes require a Design session.
                 </div>
@@ -685,6 +707,12 @@ export class DivisionsComponent implements OnInit {
   editOwnerDisplayName: string | null = null;
   ownerPickerOpen = false;
 
+  // ── Contract 37 (D-550): Sprint Calendar assignment edit state. ────────────
+  activeSprintCalendars: SprintCalendar[] = [];
+  editSprintCalendarValue: string = 'inherit';           // 'inherit' | 'none' | calendar uuid
+  private editSprintCalendarOriginal: string = 'inherit';
+  inheritEffectiveCalendarName: string | null = null;    // "Inherit (currently: X)" label
+
   // ── Members state ─────────────────────────────────────────────────────────
   members: User[]      = [];
   loadingMembers       = false;
@@ -703,6 +731,8 @@ export class DivisionsComponent implements OnInit {
     private readonly screenState: ScreenStateService,
     private readonly fb:          FormBuilder,
     private readonly profile:     UserProfileService,
+    private readonly calendarService: SprintCalendarService,
+    private readonly delivery:    DeliveryService,
     private readonly cdr:         ChangeDetectorRef
   ) {}
 
@@ -720,6 +750,15 @@ export class DivisionsComponent implements OnInit {
     this.profile.profile$.subscribe(p => {
       this.isPhil = p?.is_super_admin === true;
       this.cdr.markForCheck();
+    });
+    // Contract 37 (D-550): active calendars for the assignment selector.
+    this.calendarService.listSprintCalendars().subscribe({
+      next: (res) => {
+        this.activeSprintCalendars = (res.success && res.data ? res.data : [])
+          .filter(c => c.active_status);
+        this.cdr.markForCheck();
+      },
+      error: () => { /* selector renders Inherit/None only */ }
     });
     this.loadDivisions();
     this.loadUsersOnce();
@@ -1062,9 +1101,36 @@ export class DivisionsComponent implements OnInit {
     this.editOwnerUserId      = d.owner_user_id ?? null;
     this.editOwnerDisplayName = d.owner_display_name ?? null;
     this.ownerPickerOpen      = false;
+    // Contract 37 (D-550): seed the Sprint Calendar selector from the row.
+    this.editSprintCalendarValue = d.sprint_calendar_none === true
+      ? 'none'
+      : (d.sprint_calendar_id ?? 'inherit');
+    this.editSprintCalendarOriginal = this.editSprintCalendarValue;
+    this.loadInheritEffectiveName(d);
     this.showDeactivateConfirm = false;
     this.editError = '';
     this.panelMode = 'edit';
+    this.cdr.markForCheck();
+  }
+
+  /** Contract 37 (D-550): what "Inherit" would resolve to = the parent's
+   *  effective calendar (roots with no parent inherit nothing). */
+  private loadInheritEffectiveName(d: Division): void {
+    this.inheritEffectiveCalendarName = null;
+    if (!d.parent_division_id) { return; }
+    this.delivery.getEffectiveSprintCalendar(d.parent_division_id).subscribe({
+      next: (res) => {
+        this.inheritEffectiveCalendarName = res.success && res.data?.calendar
+          ? res.data.calendar.calendar_name : null;
+        this.cdr.markForCheck();
+      },
+      error: () => { /* label falls back to 'none' */ }
+    });
+  }
+
+  setEditSprintCalendar(value: string): void {
+    this.editSprintCalendarValue = value;
+    this.editForm.markAsDirty();
     this.cdr.markForCheck();
   }
 
@@ -1168,19 +1234,21 @@ export class DivisionsComponent implements OnInit {
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
-          this.successMsg = 'Division updated.';
-          setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
           // Reload the grid + refresh selected. update_division returns the raw
           // Division row without owner_display_name — carry the edited name so the
           // View panel's Division Leader chip renders immediately (WS4, D-471).
-          this.loadDivisions();
           this.selectedDivision = { ...res.data, owner_display_name: this.editOwnerDisplayName };
-          this.panelMode = 'view';
-          this.editForm.markAsPristine();
+          // Contract 37 (D-550): chain the Sprint Calendar assignment when it
+          // changed. Separate tool — never moves dates; stale-flag pass only.
+          if (this.editSprintCalendarValue !== this.editSprintCalendarOriginal) {
+            this.saveSprintCalendarAssignment();
+            return; // finishEditSave runs after the assignment call resolves
+          }
+          this.finishEditSave();
         } else {
           this.editError = res.error ?? 'Save failed.';
+          this.saving = false;
         }
-        this.saving = false;
         this.cdr.markForCheck();
       },
       error: (err: { error?: string }) => {
@@ -1189,6 +1257,48 @@ export class DivisionsComponent implements OnInit {
         this.cdr.markForCheck();
       }
     });
+  }
+
+  /** Contract 37 (D-550): persist the Sprint Calendar selector via
+   *  set_division_sprint_calendar, then finish the edit save. */
+  private saveSprintCalendarAssignment(): void {
+    this.calendarService.setDivisionSprintCalendar(
+      this.selectedDivisionId as string,
+      this.editSprintCalendarValue
+    ).subscribe({
+      next: (res) => {
+        if (res.success) {
+          if (this.selectedDivision) {
+            this.selectedDivision = {
+              ...this.selectedDivision,
+              sprint_calendar_none: this.editSprintCalendarValue === 'none',
+              sprint_calendar_id: this.editSprintCalendarValue === 'none' || this.editSprintCalendarValue === 'inherit'
+                ? null : this.editSprintCalendarValue
+            };
+          }
+          this.finishEditSave();
+        } else {
+          this.editError = res.error ?? 'The Sprint Calendar assignment did not save. Other changes were saved.';
+          this.saving = false;
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.editError = err.error ?? 'The Sprint Calendar assignment did not save. Other changes were saved.';
+        this.saving = false;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  private finishEditSave(): void {
+    this.successMsg = 'Division updated.';
+    setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
+    this.loadDivisions();
+    this.panelMode = 'view';
+    this.editForm.markAsPristine();
+    this.saving = false;
+    this.cdr.markForCheck();
   }
 
   // ── Members ───────────────────────────────────────────────────────────────

@@ -62,6 +62,11 @@ export interface Division {
   // the DOL null pre-check for Initiatives in this Division. DCS / Workstream
   // pre-checks unchanged. Default true at DB level.
   dol_required?:      boolean;
+  // Contract 37 (D-550) Migration 066: direct Sprint Calendar assignment.
+  // NULL = inherit via ancestor walk. sprint_calendar_none TRUE = explicit
+  // opt-out truncating the walk (Date mode only for the subtree).
+  sprint_calendar_id?:   string | null;
+  sprint_calendar_none?: boolean;
   // Contract 21 (D-413): member_count is surfaced by list_divisions when
   // with_member_counts is requested. Optional because not every caller asks.
   member_count?:      number;
@@ -349,6 +354,65 @@ export interface CycleMilestoneDate {
   status_override_reason: string | null;
   created_at:            string;
   updated_at:            string;
+  // Contract 37 (D-551) — gate date rule metadata (migration 066). target_date
+  // above REMAINS the canonical resolved gate target; these columns only
+  // record how it was derived. Optional: rows loaded before migration 066 ran
+  // (or trimmed MCP projections) may omit them — absent means manual.
+  date_rule_type?:       GateDateRuleType;
+  rule_sprint_id?:       string | null;
+  rule_anchor?:          SprintAnchor | null;
+  rule_sprint_count?:    number | null;
+  rule_day_offset?:      number | null;
+  rule_stale?:           boolean;
+}
+
+// ── Contract 37 (D-549–D-553) — Sprint Calendars + Gate Date Rules ───────────
+
+export type GateDateRuleType = 'manual' | 'sprint' | 'relative';
+export type SprintAnchor     = 'start' | 'end';
+
+export interface SprintCalendar {
+  id:             string;
+  calendar_name:  string;
+  active_status:  boolean;
+  created_at?:    string;
+  updated_at?:    string;
+  // list_sprint_calendars enrichment
+  sprint_count?:    number;
+  divisions_using?: number;
+}
+
+// D-549: sprint_id is TEXT end-to-end — '2026.10' keeps its zero. Sort by
+// start_date, never by sprint_id.
+export interface SprintRow {
+  id?:         string;   // absent on not-yet-saved grid rows
+  sprint_id:   string;
+  start_date:  string;   // YYYY-MM-DD
+  end_date:    string;   // YYYY-MM-DD
+}
+
+// D-550: get_effective_sprint_calendar result — calendar null means no
+// effective calendar (all-null ancestor walk or explicit None) → Date mode only.
+export interface EffectiveSprintCalendar {
+  calendar:            SprintCalendar | null;
+  sprints:             SprintRow[];
+  source_division_id:  string | null;
+}
+
+// D-552: one cascade shift row (pre-flight confirmation + commit result).
+export interface GateDateShift {
+  gate_name:       GateName;
+  gate_label:      string;
+  old_target_date: string | null;
+  new_target_date: string;
+}
+
+export interface SetGateDateRuleResult {
+  requires_confirmation?: boolean;
+  resolved_date?:         string | null;
+  milestone?:             CycleMilestoneDate;
+  shifts:                 GateDateShift[];
+  unresolved:             { gate_name: GateName; reason: string }[];
 }
 
 export interface GateRecord {

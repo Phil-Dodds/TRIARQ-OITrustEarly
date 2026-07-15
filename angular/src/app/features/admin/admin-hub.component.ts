@@ -94,6 +94,14 @@ const ADMIN_CARDS: AdminCard[] = [
     who:         'Phil and Admin',
     route:       'meeting-sections',
     icon:        '▤'
+  },
+  // Contract 37 (D-549/D-550): Sprint Calendars.
+  {
+    title:       'Sprint Calendars',
+    description: 'Sprint calendars for sprint-based Gate target dates. Manage each calendar\'s sprints here; assign calendars to Divisions on the Divisions screen — children inherit.',
+    who:         'Phil and Admin',
+    route:       'sprint-calendars',
+    icon:        '▦'
   }
 ];
 

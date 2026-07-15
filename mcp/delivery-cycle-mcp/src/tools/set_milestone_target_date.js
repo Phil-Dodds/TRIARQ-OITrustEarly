@@ -96,7 +96,19 @@ async function set_milestone_target_date(params, caller_user_id) {
     .from('cycle_milestone_dates')
     .update({
       target_date,
-      date_status: new_date_status
+      date_status: new_date_status,
+      // Contract 37 (D-551 §6.4 / D-501): any direct target-date write through
+      // this legacy tool converts the gate to manual — rule metadata is
+      // cleared so a stored rule can never disagree with a manually-set date,
+      // and clearing the date also clears its rule. The gate date editor
+      // routes through set_gate_date_rule (which also runs the D-552 cascade);
+      // this tool remains for non-editor callers.
+      date_rule_type: 'manual',
+      rule_sprint_id: null,
+      rule_anchor: null,
+      rule_sprint_count: null,
+      rule_day_offset: null,
+      rule_stale: false
     })
     .eq('milestone_id', milestone.milestone_id)
     .select()

@@ -32,6 +32,38 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-15',
+    builtAt:       '05:00 UTC',
+    contractLabel: 'Contract 37 — Sprint Calendars & Gate Date Rules',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Gate target date editor',
+        description: 'Set gate target dates by sprint: a Date · Sprint · After prior gate toggle, a sprint dropdown with real dates, and a live "Resolves to" preview. The saved date stays a normal calendar date — dashboards and overdue logic are unchanged.'
+      },
+      {
+        audience:    'All',
+        surface:     'Gates & Milestone Dates grid',
+        description: 'Target dates now show as "Mon DD" with a small rule chip beneath ruled gates (e.g. "Sprint 2026.11 end + 14d"). A warning chip appears when a rule no longer matches the Division\'s calendar — the date itself never moves on its own.'
+      },
+      {
+        audience:    'All',
+        surface:     'Cascading date moves',
+        description: 'Gates set "After prior gate" follow their anchor: moving an upstream target shows exactly which downstream dates will shift (old → new) before anything saves. Cancel aborts the whole change. Gate approvals never move dates.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Sprint Calendars admin',
+        description: 'New Admin screen to manage sprint calendars and their sprints (add, edit, delete). Editing sprint dates asks for confirmation with the number of affected Initiatives.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Division Sprint Calendar assignment',
+        description: 'Divisions can inherit a calendar from their parent, pick one directly, or opt out with None (date-only editing for that subtree). Reassignment never moves existing gate dates.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-12',
     builtAt:       '23:30 UTC',
     contractLabel: 'Contract 36 — Initiative Status & Date Management',

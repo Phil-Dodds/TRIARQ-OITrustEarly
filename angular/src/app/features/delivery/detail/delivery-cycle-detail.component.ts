@@ -67,8 +67,21 @@ import {
   GateStateMap,
   TierClassification,
   LifecycleStage,
-  DateStatus
+  DateStatus,
+  // Contract 37 (D-549–D-553)
+  EffectiveSprintCalendar,
+  GateDateRuleType,
+  SprintAnchor,
+  SprintRow,
+  GateDateShift
 } from '../../../core/types/database';
+import {
+  resolveSprintRule,
+  resolveRelativeRule,
+  formatTargetDateDisplay,
+  sprintDropdownLabel,
+  ruleChipLabel
+} from '../../../core/utils/sprint-resolution';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:   'Brief Review',
@@ -863,20 +876,83 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               </div>
             </div>
 
-            <!-- Col 2: Target Date — editable date input. D-275. -->
+            <!-- Col 2: Target Date — editable. D-275; Contract 37 (D-553) rule editor:
+                 mode toggle Date · Sprint · After prior gate, live "Resolves to" preview. -->
             <div (click)="$event.stopPropagation()">
               <ng-container *ngIf="editingMilestoneGate === m.gate_name; else targetDateDisplay">
-                <input [formControl]="milestoneDateControl"
+                <!-- Mode toggle — Sprint/relative render only when an effective
+                     calendar resolves (§4.3); relative hidden on Brief Review. -->
+                <div *ngIf="sprintModesAvailable"
+                     style="display:flex;gap:2px;margin-bottom:4px;flex-wrap:wrap;">
+                  <button *ngFor="let mode of ['manual','sprint','relative']"
+                          [hidden]="mode === 'relative' && m.gate_name === 'brief_review'"
+                          (click)="setDateRuleMode($any(mode))"
+                          [style.background]="dateRuleMode === mode ? 'var(--triarq-color-primary)' : 'none'"
+                          [style.color]="dateRuleMode === mode ? '#fff' : '#5A5A5A'"
+                          [style.border]="dateRuleMode === mode ? 'none' : '1px solid #D0D0D0'"
+                          style="font-size:10px;padding:2px 7px;border-radius:999px;cursor:pointer;">
+                    {{ mode === 'manual' ? 'Date' : (mode === 'sprint' ? 'Sprint' : 'After prior gate') }}
+                  </button>
+                </div>
+
+                <!-- Date mode (today's behavior) -->
+                <input *ngIf="dateRuleMode === 'manual'"
+                       [formControl]="milestoneDateControl"
                        type="date"
                        class="oi-input"
                        style="width:100%;font-size:12px;padding:3px 6px;" />
+
+                <!-- Sprint mode: sprint dropdown + Start/End + ±days (§7.1) -->
+                <ng-container *ngIf="dateRuleMode === 'sprint'">
+                  <select [(ngModel)]="ruleSprintId" class="oi-input"
+                          style="width:100%;font-size:12px;padding:3px 6px;margin-bottom:3px;">
+                    <option value="">Select sprint…</option>
+                    <option *ngFor="let s of effectiveSprints" [value]="s.sprint_id">{{ sprintOptionLabel(s) }}</option>
+                  </select>
+                  <div style="display:flex;gap:3px;align-items:center;">
+                    <select [(ngModel)]="ruleAnchor" class="oi-input" style="font-size:12px;padding:3px 6px;flex:1;">
+                      <option value="start">Start</option>
+                      <option value="end">End</option>
+                    </select>
+                    <input type="number" [(ngModel)]="ruleDayOffset" class="oi-input" placeholder="0"
+                           title="+ days (negative allowed)"
+                           style="width:56px;font-size:12px;padding:3px 6px;" />
+                    <span style="font-size:10px;color:#757575;">days</span>
+                  </div>
+                </ng-container>
+
+                <!-- Relative mode: X sprints + Z days after the prior gate's target (§7.1) -->
+                <ng-container *ngIf="dateRuleMode === 'relative'">
+                  <div style="font-size:10px;color:#757575;margin-bottom:2px;">
+                    After {{ priorGateLabelFor(m.gate_name) }} target:
+                  </div>
+                  <div style="display:flex;gap:3px;align-items:center;">
+                    <input type="number" min="0" [(ngModel)]="ruleSprintCount" class="oi-input" placeholder="0"
+                           title="+ sprints" style="width:48px;font-size:12px;padding:3px 6px;" />
+                    <span style="font-size:10px;color:#757575;">sprints</span>
+                    <input type="number" [(ngModel)]="ruleDayOffset" class="oi-input" placeholder="0"
+                           title="+ days (negative allowed)" style="width:48px;font-size:12px;padding:3px 6px;" />
+                    <span style="font-size:10px;color:#757575;">days</span>
+                  </div>
+                </ng-container>
+
+                <!-- Live "Resolves to" preview (§7.1). Server recomputes at save — its result is canonical (D-551). -->
+                <div *ngIf="dateRuleMode !== 'manual'" style="font-size:11px;margin-top:3px;">
+                  <ng-container *ngIf="rulePreview(m.gate_name).date as previewDate">
+                    <span style="color:#1a1a1a;">Resolves to <strong>{{ formatTargetDate(previewDate) }}</strong></span>
+                  </ng-container>
+                  <span *ngIf="rulePreview(m.gate_name).error" style="color:#757575;font-style:italic;">
+                    {{ rulePreview(m.gate_name).error }}
+                  </span>
+                </div>
+
                 <div style="display:flex;gap:4px;margin-top:4px;">
                   <!-- D-501 (AC 5): Save enables on any difference incl. set→blank (clear). -->
                   <button (click)="saveMilestoneDate(m.gate_name)"
-                          [disabled]="savingMilestone || milestoneTargetUnchanged(m.gate_name)"
+                          [disabled]="ruleSaveDisabled(m)"
                           style="font-size:11px;padding:2px 8px;background:var(--triarq-color-primary);
                                  color:#fff;border:none;border-radius:4px;cursor:pointer;">
-                    {{ savingMilestone ? 'Saving…' : 'Save' }}
+                    {{ savingMilestone ? 'Saving…' : (confirmRuleRemovalGate === m.gate_name ? 'Confirm' : 'Save') }}
                   </button>
                   <button (click)="cancelMilestoneEdit()"
                           style="font-size:11px;padding:2px 8px;background:none;
@@ -884,15 +960,21 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     Cancel
                   </button>
                 </div>
+                <!-- §6.4: direct date edit on a ruled gate removes its rule — inline confirm. -->
+                <div *ngIf="confirmRuleRemovalGate === m.gate_name"
+                     style="font-size:11px;color:var(--triarq-color-sunray,#F2A620);margin-top:2px;">
+                  This gate follows a rule ({{ ruleChip(m) }}). Saving a date directly removes the rule. Press Confirm to proceed.
+                </div>
                 <div *ngIf="milestoneError" style="font-size:11px;color:var(--triarq-color-error);margin-top:2px;">{{ milestoneError }}</div>
               </ng-container>
               <ng-template #targetDateDisplay>
                 <!-- D-300 / B-15 fix: date text neutral black — status dot and label carry color, not date text. -->
+                <!-- D-553 §7.2: resolved date primary (D-520 format), muted rule chip beneath. -->
                 <span *ngIf="m.target_date"
                       (click)="startMilestoneEdit(m)"
                       style="cursor:pointer;text-decoration:underline dotted;color:#1a1a1a;"
-                      title="Click to edit target date">
-                  {{ m.target_date }}
+                      [title]="'Click to edit target date (' + m.target_date + ')'">
+                  {{ formatTargetDate(m.target_date) }}
                 </span>
                 <span *ngIf="!m.target_date"
                       (click)="startMilestoneEdit(m)"
@@ -901,6 +983,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                       title="Click to set target date">
                   Set date
                 </span>
+                <!-- Rule chip: muted; warning treatment + suffix when stale (§6.5/§7.2). -->
+                <div *ngIf="ruleChip(m)"
+                     [style.color]="m.rule_stale ? 'var(--triarq-color-sunray,#F2A620)' : '#757575'"
+                     style="font-size:10px;margin-top:2px;">
+                  <span *ngIf="m.rule_stale">⚠ </span>{{ ruleChip(m) }}<span *ngIf="m.rule_stale"> — not in current calendar</span>
+                </div>
                 <!-- D-503: non-blocking retained-status note after a clear. -->
                 <div *ngIf="milestoneNote && milestoneNoteGate === m.gate_name"
                      style="font-size:10px;font-style:italic;color:#757575;margin-top:2px;">
@@ -1024,6 +1112,37 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               </ng-template>
             </div>
 
+            <!-- Contract 37 §6.3 (D-552/D-183/S-023): cascade pre-flight confirmation.
+                 Inline, full-span; lists every downstream shift old → new. Cancel
+                 aborts the whole save — the server wrote nothing on the pre-flight. -->
+            <div *ngIf="cascadeConfirmGate === m.gate_name && cascadeShifts.length > 0"
+                 (click)="$event.stopPropagation()"
+                 style="grid-column:1 / -1;margin:4px 0 6px 22px;padding:8px 10px;
+                        border-left:3px solid var(--triarq-color-sunray,#f5a623);
+                        background:rgba(245,166,35,0.08);border-radius:0 5px 5px 0;
+                        font-size:11px;cursor:default;">
+              <div style="margin-bottom:6px;color:var(--triarq-color-text-primary);">
+                Also moves:
+                <span *ngFor="let s of cascadeShifts; let last = last">
+                  {{ s.gate_label }} {{ formatTargetDate(s.old_target_date) || 'not set' }} → {{ formatTargetDate(s.new_target_date) }}<span *ngIf="!last">, </span>
+                </span>
+              </div>
+              <div style="display:flex;gap:4px;">
+                <button (click)="confirmCascadeSave(m.gate_name)"
+                        [disabled]="savingMilestone"
+                        style="font-size:11px;padding:2px 10px;background:var(--triarq-color-primary);
+                               color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                  {{ savingMilestone ? 'Saving…' : 'Confirm — move these dates' }}
+                </button>
+                <button (click)="cancelCascadeConfirm()"
+                        [disabled]="savingMilestone"
+                        style="font-size:11px;padding:2px 10px;background:none;
+                               border:1px solid #D0D0D0;border-radius:4px;cursor:pointer;color:#5A5A5A;">
+                  Cancel
+                </button>
+              </div>
+            </div>
+
             <!-- D-527: date-semantics coaching — always visible while either date
                  editor is open on this gate. Last grid child + full span so it
                  renders as its own row under the four columns (D-514 style). -->
@@ -1031,6 +1150,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                  (click)="$event.stopPropagation()"
                  style="grid-column:1 / -1;font-size:11px;font-style:italic;color:#757575;
                         padding:2px 0 4px 22px;line-height:1.5;cursor:default;">
+              <!-- §7.1 caption: sprint real dates + rule restated, then the D-530 line
+                   (the rule editor coexists with it — never removed or duplicated). -->
+              <span *ngIf="editingMilestoneGate === m.gate_name && ruleEditorCaption(m.gate_name)">
+                {{ ruleEditorCaption(m.gate_name) }} ·
+              </span>
               {{ GATE_DATE_SEMANTICS }}
             </div>
 
@@ -1669,6 +1793,28 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   confirmClearCompleteGate: GateName | null = null;
   milestoneDateControl  = new FormControl('');
 
+  // Contract 37 (D-551/D-552/D-553): gate date rule editor state.
+  // Loaded once per cycle — calendar null means sprint/relative modes hidden.
+  effectiveSprintCalendar: EffectiveSprintCalendar | null = null;
+  dateRuleMode: GateDateRuleType = 'manual';
+  ruleSprintId    = '';
+  ruleAnchor: SprintAnchor = 'end';
+  ruleSprintCount = 0;
+  ruleDayOffset   = 0;
+  // §6.4: inline confirm — direct Date save on a ruled gate removes the rule.
+  confirmRuleRemovalGate: GateName | null = null;
+  // §6.3: cascade pre-flight confirmation state (server returned shifts).
+  cascadeConfirmGate: GateName | null = null;
+  cascadeShifts: GateDateShift[] = [];
+  private pendingRuleSave: {
+    date_rule_type: GateDateRuleType;
+    target_date?: string | null;
+    rule_sprint_id?: string;
+    rule_anchor?: SprintAnchor;
+    rule_sprint_count?: number;
+    rule_day_offset?: number;
+  } | null = null;
+
   // Artifacts
   showAttachForm    = false;
   attaching         = false;
@@ -1846,6 +1992,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           this.initExpandedGates(); // Zone 6: expand current + past gates by default
           this.loadEvents(cycleId);
           this.loadLatestStatus(cycleId); // Contract 32 (WS2): Current Status section
+          this.loadEffectiveSprintCalendar(res.data.division_id); // Contract 37 (D-550)
           // B-69: Stage Track scrollIntoView (B-61) and panel mount sometimes leave
           // an ambient text selection on Gate Record content. Clear it once on load.
           if (typeof window !== 'undefined') {
@@ -2824,13 +2971,222 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.milestoneError    = '';
     this.milestoneNote     = '';
     this.milestoneNoteGate = null;
+    // Contract 37 (D-553): open in the gate's current mode with its rule
+    // pre-loaded; manual (or missing metadata) opens in Date mode.
+    this.dateRuleMode    = (m.date_rule_type === 'sprint' || m.date_rule_type === 'relative')
+      ? m.date_rule_type : 'manual';
+    this.ruleSprintId    = m.rule_sprint_id ?? '';
+    this.ruleAnchor      = (m.rule_anchor === 'start' || m.rule_anchor === 'end') ? m.rule_anchor : 'end';
+    this.ruleSprintCount = m.rule_sprint_count ?? 0;
+    this.ruleDayOffset   = m.rule_day_offset ?? 0;
+    this.confirmRuleRemovalGate = null;
+    this.clearCascadeConfirm();
     this.cdr.markForCheck();
   }
 
   cancelMilestoneEdit(): void {
     this.editingMilestoneGate = null;
     this.milestoneError       = '';
+    this.confirmRuleRemovalGate = null;
+    this.clearCascadeConfirm();
     this.cdr.markForCheck();
+  }
+
+  // ── Contract 37 (D-550–D-553): gate date rules ─────────────────────────────
+
+  private loadEffectiveSprintCalendar(divisionId: string): void {
+    this.delivery.getEffectiveSprintCalendar(divisionId).subscribe({
+      next: (res) => {
+        this.effectiveSprintCalendar = res.success && res.data ? res.data : null;
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        // No calendar = Date mode only — the editor degrades per spec §4.3.
+        this.effectiveSprintCalendar = null;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  /** Sprint + relative modes render only when an effective calendar resolves (§7.1). */
+  get sprintModesAvailable(): boolean {
+    return !!this.effectiveSprintCalendar?.calendar
+        && (this.effectiveSprintCalendar?.sprints?.length ?? 0) > 0;
+  }
+
+  get effectiveSprints(): SprintRow[] {
+    return this.effectiveSprintCalendar?.sprints ?? [];
+  }
+
+  setDateRuleMode(mode: GateDateRuleType): void {
+    this.dateRuleMode = mode;
+    this.milestoneError = '';
+    this.confirmRuleRemovalGate = null;
+    this.clearCascadeConfirm();
+    this.cdr.markForCheck();
+  }
+
+  sprintOptionLabel(s: SprintRow): string {
+    return sprintDropdownLabel(s);
+  }
+
+  /** Prior gate in the canonical five-gate order (D-108/D-154); null on Brief Review. */
+  priorGateLabelFor(gate: GateName): string | null {
+    const order: GateName[] = ['brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'];
+    const idx = order.indexOf(gate);
+    return idx > 0 ? GATE_LABELS[order[idx - 1]] : null;
+  }
+
+  private priorGateTargetFor(gate: GateName): string | null {
+    const order: GateName[] = ['brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'];
+    const idx = order.indexOf(gate);
+    if (idx <= 0) { return null; }
+    return this.cycle?.milestone_dates?.find(m => m.gate_name === order[idx - 1])?.target_date ?? null;
+  }
+
+  /** Live "Resolves to" preview (§7.1) — same algorithm as the server lib. */
+  rulePreview(gate: GateName): { date?: string; error?: string } {
+    if (this.dateRuleMode === 'sprint') {
+      if (!this.ruleSprintId) { return { error: 'Select a sprint.' }; }
+      const r = resolveSprintRule(this.effectiveSprints, this.ruleSprintId, this.ruleAnchor, Number(this.ruleDayOffset) || 0);
+      return r.error ? { error: r.error } : { date: r.resolved_date };
+    }
+    if (this.dateRuleMode === 'relative') {
+      const r = resolveRelativeRule(this.effectiveSprints, this.priorGateTargetFor(gate),
+        Number(this.ruleSprintCount) || 0, Number(this.ruleDayOffset) || 0);
+      return r.error ? { error: r.error } : { date: r.resolved_date };
+    }
+    return {};
+  }
+
+  /** D-520 display for target dates + previews. */
+  formatTargetDate(iso: string | null | undefined): string {
+    return formatTargetDateDisplay(iso);
+  }
+
+  /** Grid rule chip (§7.2) — empty string for manual rows. */
+  ruleChip(m: CycleMilestoneDate): string {
+    return ruleChipLabel(m, this.priorGateLabelFor(m.gate_name) ?? '');
+  }
+
+  /** §7.1 caption: sprint real dates + rule restated. Empty in Date mode. */
+  ruleEditorCaption(gate: GateName): string {
+    if (this.dateRuleMode === 'sprint' && this.ruleSprintId) {
+      const s = this.effectiveSprints.find(x => x.sprint_id === this.ruleSprintId);
+      if (!s) { return ''; }
+      const days = Number(this.ruleDayOffset) || 0;
+      const daysPart = days !== 0 ? ` ${days > 0 ? '+' : '−'} ${Math.abs(days)} days` : '';
+      return `Sprint ${s.sprint_id} runs ${this.formatTargetDate(s.start_date)} – ${this.formatTargetDate(s.end_date)}; target = sprint ${this.ruleAnchor}${daysPart}`;
+    }
+    if (this.dateRuleMode === 'relative') {
+      const prior = this.priorGateLabelFor(gate);
+      if (!prior) { return ''; }
+      const x = Number(this.ruleSprintCount) || 0;
+      const days = Number(this.ruleDayOffset) || 0;
+      const parts = [`${x} sprint${x === 1 ? '' : 's'}`, `${days} day${days === 1 ? '' : 's'}`];
+      return `Target = ${prior} target + ${parts.join(' + ')}; recomputes when ${prior} moves`;
+    }
+    return '';
+  }
+
+  ruleSaveDisabled(m: CycleMilestoneDate): boolean {
+    if (this.savingMilestone || this.cascadeConfirmGate === m.gate_name) { return true; }
+    if (this.dateRuleMode === 'manual') {
+      // Unchanged-date guard applies only when the gate is already manual —
+      // switching a ruled gate to Date mode with the same date still converts it (§6.4).
+      const hasRule = m.date_rule_type === 'sprint' || m.date_rule_type === 'relative';
+      return !hasRule && this.milestoneTargetUnchanged(m.gate_name);
+    }
+    if (this.dateRuleMode === 'sprint') { return !this.ruleSprintId; }
+    return !this.rulePreview(m.gate_name).date;
+  }
+
+  private clearCascadeConfirm(): void {
+    this.cascadeConfirmGate = null;
+    this.cascadeShifts      = [];
+    this.pendingRuleSave    = null;
+  }
+
+  /** §6.3: user cancelled the cascade confirmation — abort, nothing written. */
+  cancelCascadeConfirm(): void {
+    this.clearCascadeConfirm();
+    this.cdr.markForCheck();
+  }
+
+  /** §6.3: user confirmed — commit the save plus every listed shift. */
+  confirmCascadeSave(gate: GateName): void {
+    if (!this.pendingRuleSave) { return; }
+    this.executeRuleSave(gate, this.pendingRuleSave, true);
+  }
+
+  private executeRuleSave(gate: GateName, rule: NonNullable<typeof this.pendingRuleSave>, confirmed: boolean): void {
+    if (!this.cycle) { return; }
+    const milestone = this.cycle.milestone_dates?.find(m => m.gate_name === gate);
+    const isClear = rule.date_rule_type === 'manual' && rule.target_date === null;
+    // Pre-save status capture — same D-503 / Behind-reset handling as before.
+    const wasBehind = !isClear && milestone?.date_status === 'behind';
+    const trackedStatus = ['on_track', 'at_risk', 'behind'].includes(milestone?.date_status ?? '');
+
+    this.savingMilestone = true;
+    this.milestoneError  = '';
+    this.milestoneNote   = '';
+    this.cdr.markForCheck();
+
+    this.delivery.setGateDateRule({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      gate_name: gate,
+      rule,
+      confirmed
+    }).subscribe({
+      next: (res) => {
+        this.savingMilestone = false;
+        if (!res.success || !res.data) {
+          this.milestoneError = res.error ?? 'Save failed.';
+          this.cdr.markForCheck();
+          return;
+        }
+        if (res.data.requires_confirmation) {
+          // §6.3: nothing written yet — show the shift list inline.
+          this.cascadeConfirmGate = gate;
+          this.cascadeShifts      = res.data.shifts;
+          this.pendingRuleSave    = rule;
+          this.cdr.markForCheck();
+          return;
+        }
+        // Committed: merge the gate row + apply cascade shifts locally.
+        if (res.data.milestone && this.cycle!.milestone_dates) {
+          const idx = this.cycle!.milestone_dates.findIndex(m => m.gate_name === gate);
+          if (idx !== -1) {
+            const updated = { ...this.cycle!.milestone_dates[idx], ...res.data.milestone };
+            if (wasBehind && updated.date_status === 'behind') {
+              updated.date_status = 'not_started';
+            }
+            this.cycle!.milestone_dates[idx] = updated;
+          }
+        }
+        for (const shift of res.data.shifts ?? []) {
+          const row = this.cycle!.milestone_dates?.find(m => m.gate_name === shift.gate_name);
+          if (row) { row.target_date = shift.new_target_date; row.rule_stale = false; }
+        }
+        for (const u of res.data.unresolved ?? []) {
+          const row = this.cycle!.milestone_dates?.find(m => m.gate_name === u.gate_name);
+          if (row) { row.rule_stale = true; }
+        }
+        this.editingMilestoneGate = null;
+        this.confirmRuleRemovalGate = null;
+        this.clearCascadeConfirm();
+        if (isClear && trackedStatus) {
+          this.milestoneNote     = 'Status retained; no target date to track against.';
+          this.milestoneNoteGate = gate;
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.milestoneError  = err.error ?? 'Save failed.';
+        this.savingMilestone = false;
+        this.cdr.markForCheck();
+      }
+    });
   }
 
   /** D-501 (AC 5): Save enables only when the field differs from the stored
@@ -2841,59 +3197,46 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return newVal === (m?.target_date ?? null);
   }
 
+  /** Contract 37: every target-date save routes through set_gate_date_rule —
+   *  the server resolves, writes date + rule atomically, and runs the D-552
+   *  cascade (with pre-flight confirmation when downstream gates would move). */
   saveMilestoneDate(gate: GateName): void {
     if (!this.cycle) { return; }
-    // D-501: blank persists as NULL — clear is a first-class save.
-    const newVal: string | null = this.milestoneDateControl.value || null;
     const milestone = this.cycle.milestone_dates?.find(m => m.gate_name === gate);
-    if (newVal === (milestone?.target_date ?? null)) { return; }  // no-op guard (AC 5)
+    if (!milestone) { return; }
 
-    const isClear = newVal === null;
-    this.savingMilestone = true;
-    this.milestoneError  = '';
-    this.milestoneNote   = '';
-    this.cdr.markForCheck();
-
-    // Capture pre-save status — if Behind, CHANGING the target date resets to
-    // Not Started (spec Item 1). A CLEAR never touches status (D-503).
-    const wasBehind = !isClear && milestone?.date_status === 'behind';
-    // D-503: tracked statuses get the retained-status note after a clear.
-    const trackedStatus = ['on_track', 'at_risk', 'behind'].includes(milestone?.date_status ?? '');
-
-    this.delivery.setMilestoneTargetDate({
-      delivery_cycle_id: this.cycle.delivery_cycle_id,
-      gate_name:         gate,
-      target_date:       newVal
-    }).subscribe({
-      next: (res) => {
-        if (res.success && res.data) {
-          const idx = this.cycle!.milestone_dates?.findIndex(m => m.gate_name === gate) ?? -1;
-          if (idx !== -1 && this.cycle!.milestone_dates) {
-            const updated = res.data;
-            // If milestone was Behind and target date changed, reset status to Not Started
-            if (wasBehind && updated.date_status === 'behind') {
-              updated.date_status = 'not_started';
-            }
-            this.cycle!.milestone_dates[idx] = updated;
-          }
-          this.editingMilestoneGate = null;
-          // D-503: non-blocking inline note when clearing under a tracked status.
-          if (isClear && trackedStatus) {
-            this.milestoneNote     = 'Status retained; no target date to track against.';
-            this.milestoneNoteGate = gate;
-          }
-        } else {
-          this.milestoneError = res.error ?? 'Save failed.';
-        }
-        this.savingMilestone = false;
+    let rule: NonNullable<typeof this.pendingRuleSave>;
+    if (this.dateRuleMode === 'sprint') {
+      if (!this.ruleSprintId) { this.milestoneError = 'Select a sprint.'; this.cdr.markForCheck(); return; }
+      rule = {
+        date_rule_type: 'sprint',
+        rule_sprint_id: this.ruleSprintId,
+        rule_anchor: this.ruleAnchor,
+        rule_day_offset: Number(this.ruleDayOffset) || 0
+      };
+    } else if (this.dateRuleMode === 'relative') {
+      rule = {
+        date_rule_type: 'relative',
+        rule_sprint_count: Number(this.ruleSprintCount) || 0,
+        rule_day_offset: Number(this.ruleDayOffset) || 0
+      };
+    } else {
+      // D-501: blank persists as NULL — clear is a first-class save (and also
+      // clears any rule).
+      const newVal: string | null = this.milestoneDateControl.value || null;
+      const hasRule = milestone.date_rule_type === 'sprint' || milestone.date_rule_type === 'relative';
+      if (!hasRule && newVal === (milestone.target_date ?? null)) { return; }  // no-op guard (AC 5)
+      // §6.4: direct date edit on a ruled gate converts it to manual — inline
+      // confirmation before the first save click proceeds.
+      if (hasRule && this.confirmRuleRemovalGate !== gate) {
+        this.confirmRuleRemovalGate = gate;
         this.cdr.markForCheck();
-      },
-      error: (err: { error?: string }) => {
-        this.milestoneError  = err.error ?? 'Save failed.';
-        this.savingMilestone = false;
-        this.cdr.markForCheck();
+        return;
       }
-    });
+      rule = { date_rule_type: 'manual', target_date: newVal };
+    }
+
+    this.executeRuleSave(gate, rule, false);
   }
 
   // ── Artifacts ──────────────────────────────────────────────────────────────

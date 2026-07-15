@@ -1,6 +1,4 @@
-
-
-# CLAUDE.md — Pathways OI Trust | v2.7 | June 2026 | CONFIDENTIAL
+# CLAUDE.md — Pathways OI Trust | v3.3 | June 2026 | CONFIDENTIAL
 
 ---
 
@@ -18,36 +16,10 @@ Read decision-registry.md for content lookup only. Never claim or assign a D-num
 
 ## Build and Test Commands
 
-### Local dev
-- Run dev server: `npm start` (ng serve)
-- Test (Angular): `ng test`
-- Test (MCP servers): `node --test tests/*.test.js` — `node --test tests/` and
-  the packaged `npm test` FAIL on this setup (Contract 36 correction).
-
-### Deploy build
-- ALWAYS use `npm run build` (or `npm run build:prod`) — the postbuild step writes
-  `dist/.../browser/version.json` with the current git SHA. Skipping it (e.g.
-  `npx ng build`) deploys with no version.json and the S-033 "new version
-  available" banner never fires — users keep their cached SPA forever.
-- Look for `[write-version] wrote …/version.json (build_version=<sha>)` in
-  stdout to confirm the postbuild ran.
-
-### Deploy procedure
-- **MCP (Render):** Render does NOT auto-deploy on push (Contract 36 correction
-  of the earlier v2.7 text). After any push that changes `mcp/<service>/src/`,
-  Phil manually redeploys that service in the Render dashboard — BOTH services
-  (delivery-cycle-mcp, team-meetings-mcp) require this.
-- **Angular (GitHub Pages):** does NOT auto-deploy from master. Deploy explicitly:
-  1. `npm run build` (writes version.json)
-  2. Copy `angular/dist/pathways-oi-trust/browser/` to a staging dir OUTSIDE the
-     worktree (e.g. `/c/tmp/oi-deploy-c{NN}-{date}/`) — inherited GIT_DIR breaks
-     angular-cli-ghpages silently
-  3. Inside the staging dir, `cp index.html 404.html` and `touch .nojekyll`
-  4. `git init -b gh-pages && git add -A && git commit -m "..."`
-  5. `git remote add origin https://github.com/Phil-Dodds/TRIARQ-OITrustEarly.git`
-  6. `git push --force origin gh-pages`
-- After deploy: GitHub Pages CDN propagates in 30–60s; the S-033 banner
-  surfaces the update on existing tabs within 5 min (or on next route change).
+- Build: `ng build`
+- Test: `ng test`
+- MCP test invocation: `node --test tests/` fails on this setup ("Cannot find module tests"). Working invocation: `node --test tests/*.test.js`. (CC-32 CLAUDE.md candidate 2, 2026-06-30.)
+- Deploy: `ng build` → copy `dist/.../browser/` to deploy folder → push to gh-pages branch. MCP (Render): `git push origin master`. **Render does NOT auto-deploy on push. Both MCP services require a manual redeploy in the Render dashboard after every MCP-touching push. Confirm redeploy before UAT.** (CC-32 CLAUDE.md candidate 1, 2026-06-30.)
 
 ---
 
@@ -56,22 +28,24 @@ Read decision-registry.md for content lookup only. Never claim or assign a D-num
 Violating any of these is an error, not a style preference.
 
 ### Arch-1 — MCP-Only Database Access
-
-All database operations go through MCP servers. No direct Supabase client calls from Angular components or services. No exceptions.
+All database operations go through MCP servers. No direct Supabase client calls from Angular components or services.
 - NEVER: import @supabase/supabase-js in any Angular component or service
 - NEVER: bypass the MCP layer for "simple" reads
 
-### Arch-2 — UI as Presentation Layer Only
+**Authorized exceptions (Design-locked only):**
+- `system_config` — pre-auth maintenance mode read (D-MaintenanceMode). Scoped to `maintenance_mode` and `maintenance_message` columns only.
+- `user_screen_state` — pending MCP migration in Contract 17 (D-380). After migration this exception is closed.
 
+**Escalation rule (D-381):** Any direct Supabase access from Angular is an Arch-1 conflict under Rule 2. Flag and STOP — do not implement, do not rationalize, do not record as a CC-decision and proceed. Surface to Design before writing any code. Rule 30 autonomy does not apply to Arch-1 violations or any security boundary decision.
+
+### Arch-2 — UI as Presentation Layer Only
 Angular components render what they receive. No business logic, prompts, or data access in components.
 - NEVER: put prompt text or business rules in any component or service
 
 ### Arch-3 — No Prompts in TypeScript
-
 NEVER put prompt text in TypeScript files, Angular components, or services.
 
 ### Arch-4 — Environment Variables Only
-
 All credentials, keys, and configuration are environment variables. Never hardcode them.
 
 Required environment variables (never in source code):
@@ -83,7 +57,6 @@ Required environment variables (never in source code):
 - NEVER: commit .env files or log environment variable values
 
 ### Arch-5 — JWT Validation on Every MCP Tool Call
-
 Every MCP server validates the Supabase JWT before executing any tool. No tool executes without a valid JWT.
 - Validate JWT as the first operation in every tool handler
 - Return 401 with clear error message on invalid JWT
@@ -91,7 +64,6 @@ Every MCP server validates the Supabase JWT before executing any tool. No tool e
 - NEVER: execute any database operation before JWT validation
 
 ### Arch-6 — Soft Delete Only
-
 Never hard delete records. Set deleted_at timestamp. Records with deleted_at are excluded from all queries by default.
 - Set deleted_at = now() for all delete operations
 - Add WHERE deleted_at IS NULL to every SELECT on soft-deletable tables
@@ -104,6 +76,16 @@ Never hard delete records. Set deleted_at timestamp. Records with deleted_at are
 **TypeScript:** Strict mode. No `any` without justification in a comment. All MCP tool parameters, return types, and database table shapes are fully typed interfaces in /types/database.ts.
 
 **Angular:** Standalone components preferred. OnPush change detection on all components. Reactive forms only. No logic in templates beyond simple conditionals and pipes.
+
+**Rule — Optimistic UI reversion.**
+Rule: Never revert an optimistic UI state on a timer. Revert only on a server-confirmed state transition.
+Conformance test: Does any component revert optimistic state via setTimeout or interval? No = pass.
+Exceptions: None.
+
+**Rule — Busy guard on MCP-calling controls.**
+Rule: Every control that fires an MCP call disables itself with a Saving…/spinner state until the call resolves.
+Conformance test: Does every server-calling control have a disabled/busy state during the in-flight call? Yes = pass.
+Exceptions: None.
 
 **Node.js MCP Servers:** Express.js for HTTP layer. All tool handlers are async with try/catch. All errors return `{ success: false, error: string }` — never throw to HTTP layer. Log all tool calls with: tool_name, user_id, division_id, timestamp, duration_ms. Never log JWT values, file content, or personal data.
 
@@ -360,7 +342,7 @@ Before producing the CodeClose output, run a mandatory verification pass. Report
 
 **(2) Regression check** — for every surface touched, confirm no behavior present before the contract was removed or broken. State how verified (test result or manual UAT note).
 
-**(3) Test ratchet** — list every logic-touching change and the test protecting it. If no test exists for a logic-touching change, state why and flag it explicitly as a CLAUDE.md candidate.
+**(3) Test ratchet** — list every logic-touching change and the test protecting it. If no test exists for a logic-touching change, state why and flag it explicitly as a CLAUDE.md candidate. Per D-442: include an explicit untested-item list (or zero-gap statement) and record Phil's acknowledgment before CodeClose is complete. View-only template changes with no logic are exempt.
 
 **(4) Pattern sweep** — if a shared pattern was modified this contract, list components searched and findings. If no shared pattern was modified, state: "Pattern sweep: no shared pattern modified this contract."
 
@@ -380,54 +362,96 @@ maintenance mode off). Report the result explicitly:
 - If no user-facing surfaces were touched this contract: state "Deployment:
   not required this contract" and omit UAT Checklist.
 
-**Conformance test:** Does the CodeClose output contain all eight numbered sections under "CodeClose Verification" with explicit declarations for each? Yes = compliant. Any section absent = violation.
+**(9) Repo cleanliness** — when this contract adds new MCP tool files or new Angular imports: run `git status -s mcp/ angular/src/` before any deploy push. Confirm no `??` entries exist for files named in any committed `require()` or `import` statement. If found: `git add` before pushing. State result: "Repo cleanliness: clean" or "Repo cleanliness: [N] untracked files found and added." If no new files this contract: state "Repo cleanliness: not applicable — no new tool files this contract."
+
+**Conformance test:** Does the CodeClose output contain all nine numbered sections under "CodeClose Verification" with explicit declarations for each? Yes = compliant. Any section absent = violation.
 
 **Exceptions:** None.
 
 ---
 
-### Rule 35 — Optimistic UI Reversion
+### Rule 30 — Autonomous Decision Threshold (D-373)
 
-Never revert an optimistic UI state on a timer. Revert only on a server-confirmed state transition.
+Before escalating to Design mid-session, apply this test:
 
-**Conformance test:** Does any component revert optimistic state via setTimeout or interval? No = pass.
+- Is Phil's explicit approval required by an existing rule? (Rule 11 override, CodeClose sign-off, branch routing — check the specific rule text.)
+- Does the decision contradict a locked decision in decisions-active.md? (Search before concluding it does not.)
 
-**Exceptions:** None.
-<!-- RATIONALE
-Why: CC-038 — timer-based reverts plus a slow (cold-start) server response visibly unchecked a checkbox mid-save and invited duplicate submissions.
-Considered: Shorter timers (rejected — same race, smaller window). Server-confirmed transitions only (adopted).
-Downsides: A failed request leaves optimistic state until the next poll/correction. Mitigated by poll correction and error surfacing.
--->
-<!-- GOVERNING: D-493, CC-038 -->
+If both answers are **no** and you have a stated lean with reasoning: take it, record as a CC-decision, proceed. Do not interrupt the session for Design adjudication.
 
----
+If either answer is **yes**: stop and surface to Design.
 
-### Rule 36 — Busy Guard on MCP-Calling Controls
-
-Every control that fires an MCP call disables itself with a Saving…/spinner state until the call resolves.
-
-**Conformance test:** Does every server-calling control have a disabled/busy state during the in-flight call? Yes = pass.
-
-**Exceptions:** None.
-<!-- RATIONALE
-Why: CC-038 audit found four unguarded controls; rapid clicks inserted duplicate rows.
-Considered: Debounce only (rejected — masks, does not prevent). Disable-until-resolve (adopted).
-Downsides: Slight UI chrome cost. Negligible.
--->
-<!-- GOVERNING: D-493, CC-038 -->
+All autonomous decisions recorded under Rule 30 appear in the CC-decisions section of the CodeClose output. Design reviews at the next session open.
 
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | July 2026 | v2.8*
+### Rule 31 — Worktree Branch Sanity Check at Session Open
 
-**v2.8 (2026-07-12, Contract 36 §7)** — Rules 35/36 added (optimistic-UI
-reversion; busy guards). Corrections: Render manual redeploy for BOTH MCP
-services (auto-deploy text was wrong); MCP test invocation is
-`node --test tests/*.test.js`.
+At session open, before plan mode and before reading any file from the worktree, verify the worktree branch points at source, not a deploy artifact.
 
-**v2.7 (2026-06-11)** — Build and Test Commands section rewritten. `ng build`
-replaced with `npm run build` (postbuild writes `version.json` for S-033
-banner). Deploy procedure corrected — Angular GitHub Pages does NOT auto-deploy
-from master; explicit gh-pages copy + force push required. MCP Render auto-deploy
-on master push unchanged. Triggered by Contract 22 deploy: `npx ng build` produced
-dist without version.json, S-033 banner stayed silent, Phil hit stale SPA.
+**Check:** Does the working tree contain `angular/`, `mcp/`, and `db/` directories at the repo root?
+
+- **Yes** → source confirmed. Proceed.
+- **No** → branch is on a deploy artifact (gh-pages or similar). Run `git switch -C <branch-name> origin/master` to reset the branch ref to source HEAD. Then run `npm install` in both `mcp/<service>/` and `angular/` before any test run or build — node_modules are gitignored and will not be present after the overlay.
+
+Record the branch state (source-confirmed or reset-required) in the implementation plan header under "Worktree Hygiene."
+
+**Conformance test:** Does the implementation plan header declare the worktree branch state before the first file read or plan-mode statement? If a reset was required, did `npm install` run in both directories before the first build or test invocation? Yes to both applicable conditions = compliant.
+
+**Exceptions:** Sessions explicitly scoped to dist artifacts or deploy-only work — Phil states this at session open.
+
+---
+
+### Rule 34 — Schema-First SQL Authoring
+
+Before composing any mutation SQL (UPDATE, DELETE, transaction blocks) or any diagnostic SQL referencing columns beyond a table's primary key, open `types/database.ts` and verify: (1) the correct column names for every column referenced, (2) the primary key column name for every table in scope.
+
+For operations that DELETE or UPDATE rows referenced by foreign keys — particularly any operation touching `public.users.id` — run an `information_schema.referential_constraints` query first to enumerate all FK columns before composing the mutation.
+
+**Conformance test:** For every mutation SQL block and every non-trivial diagnostic SQL block this session, were column names verified against `types/database.ts` before the SQL was written? Yes = compliant. Any column-name or constraint error caught at execution = violation.
+
+**Exceptions:** SQL operating only on tables created this session (schema not yet reflected in `database.ts`). Simple primary-key lookups (`SELECT * FROM table WHERE id = $1`) on well-known tables are exempt.
+
+---
+
+### Rule 35 — Build-After-Commit Sequence
+
+Run `ng build` AFTER committing — not before. `version.json` stamps the current HEAD SHA at build time; building before the commit ships a `version.json` one SHA behind the deployed code.
+
+**Conformance test:** Does `git commit` precede `ng build` in the deploy sequence? Yes = pass. No = violation.
+
+**Exceptions:** None.
+
+---
+
+### Rule 36 — Gate Labels from Canonical Source Only
+
+Gate labels in any UI component or MCP response must derive exclusively from the canonical five gate names via `gate-resolution.js` `GATE_LABELS` / `NEXT_GATE_LABELS`. `milestone_label` must never be used as a gate label. Any code path reading `milestone_label` for gate display is a defect.
+
+**Conformance test:** Does any gate display path read `milestone_label`? Yes = violation. No = pass.
+
+**Exceptions:** None.
+
+---
+
+### Rule 37 — team-meetings-mcp Test Mock Limitation
+
+`team-meetings-mcp`'s single-result mock cannot sequence multi-query tools. New multi-query tools must either: (a) write validation-path tests only, or (b) adopt the FIFO-queue mock pattern from `delivery-cycle-mcp/contract32-status.test.js` before adding happy-path coverage.
+
+**Conformance test:** Do new multi-query tool tests assert success paths against the single-result mock? Yes = violation. No = pass.
+
+**Exceptions:** None.
+
+---
+
+### Rule 38 — RLS Enabled in Every CREATE TABLE Migration
+
+Every migration that creates a table must include `ENABLE ROW LEVEL SECURITY` in the same file. Deny-all (zero policies) is the correct default for MCP-only tables — the service role bypasses RLS (Arch-1), so the app is unaffected. Per-user policies apply only to tables read under user JWTs.
+
+**Conformance test:** Does any `CREATE TABLE` migration in this session lack an `ENABLE ROW LEVEL SECURITY` statement? Yes = violation. No = pass.
+
+**Exceptions:** None.
+
+---
+
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | June 2026 | v3.3*

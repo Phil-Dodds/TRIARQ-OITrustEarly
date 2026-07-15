@@ -38,7 +38,12 @@ import {
   ConsultationResponse,
   GateConsultation,
   GateApproverConfig,
-  GateApproverConfigRow
+  GateApproverConfigRow,
+  // Contract 37 (D-549–D-553)
+  EffectiveSprintCalendar,
+  GateDateRuleType,
+  SprintAnchor,
+  SetGateDateRuleResult
 } from '../types/database';
 import {
   LatestInitiativeStatus,
@@ -389,6 +394,35 @@ export class DeliveryService {
     target_date:       string | null;
   }): Observable<McpResponse<CycleMilestoneDate>> {
     return this.mcp.call<CycleMilestoneDate>('delivery', 'set_milestone_target_date', params as Record<string, unknown>);
+  }
+
+  // ── Contract 37 (D-550/D-551/D-552) — Sprint Calendars + Gate Date Rules ────
+
+  /** D-550 ancestor walk. calendar null = no effective calendar → Date mode only. */
+  getEffectiveSprintCalendar(divisionId: string): Observable<McpResponse<EffectiveSprintCalendar>> {
+    return this.mcp.call<EffectiveSprintCalendar>('delivery', 'get_effective_sprint_calendar',
+      { division_id: divisionId });
+  }
+
+  /**
+   * D-551/D-552: resolve + save a gate target date rule. Two-call pattern —
+   * a cascading save first returns { requires_confirmation, shifts } without
+   * writing; re-call with confirmed: true to commit every listed shift.
+   */
+  setGateDateRule(params: {
+    delivery_cycle_id: string;
+    gate_name:         GateName;
+    rule: {
+      date_rule_type:     GateDateRuleType;
+      target_date?:       string | null;      // manual mode; null clears date + rule (D-501)
+      rule_sprint_id?:    string;
+      rule_anchor?:       SprintAnchor;
+      rule_sprint_count?: number;
+      rule_day_offset?:   number;
+    };
+    confirmed?: boolean;
+  }): Observable<McpResponse<SetGateDateRuleResult>> {
+    return this.mcp.call<SetGateDateRuleResult>('delivery', 'set_gate_date_rule', params as unknown as Record<string, unknown>);
   }
 
   // D-502 null contract: explicit null CLEARS the date (status untouched, D-503).

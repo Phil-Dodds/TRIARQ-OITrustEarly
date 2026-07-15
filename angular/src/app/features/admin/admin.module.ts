@@ -28,7 +28,9 @@ import { IonicModule }  from '@ionic/angular';
       // Contract 31 (D-475): API Keys admin screen (Phil-only).
       { path: 'api-keys', loadComponent: () => import('./api-keys/api-keys.component').then(c => c.ApiKeysComponent) },
       // Tracks Phase A: shared Team Meeting section list.
-      { path: 'meeting-sections', loadComponent: () => import('./meeting-sections/meeting-sections.component').then(c => c.MeetingSectionsComponent) }
+      { path: 'meeting-sections', loadComponent: () => import('./meeting-sections/meeting-sections.component').then(c => c.MeetingSectionsComponent) },
+      // Contract 37 (D-549): Sprint Calendars admin screen.
+      { path: 'sprint-calendars', loadComponent: () => import('./sprint-calendars/sprint-calendars.component').then(c => c.SprintCalendarsComponent) }
     ])
   ]
 })
