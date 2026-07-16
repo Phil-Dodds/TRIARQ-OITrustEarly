@@ -9,13 +9,12 @@
 // every request, so it isn't a clean login signal — needs a session-gap
 // heuristic added later).
 //
-// Scroll/recycle rule (Phil, 2026-07-16): NO hard age window — take the most
-// recent PER_SOURCE from each source, merge newest-first, cap MAX_ITEMS. This
-// is a rolling "last N" buffer: as new events arrive the oldest fall off, and
-// the feed is never empty while any history exists (the banner then loops the
-// current set continuously client-side). Trade-off: on a dead-quiet system old
-// events can still show — acceptable now; add a soft "prefer recent, backfill"
-// rule later if it feels stale.
+// Scroll/window rule (Phil, 2026-07-16): each category surfaces only its last
+// WINDOW_DAYS of activity, most-recent PER_SOURCE, merged newest-first, capped
+// MAX_ITEMS. If nothing falls in the window the feed is empty and the banner
+// goes quiet — that's acceptable. Windows are PER-CATEGORY so different event
+// types can use different freshness (e.g. logins, when added, will use a ~30
+// MINUTE window instead of days — see WINDOW_MINUTES hook below).
 
 'use strict';
 
@@ -31,6 +30,12 @@ const GATE_LABELS = {
 
 const PER_SOURCE = 12;   // pull up to N recent from each source
 const MAX_ITEMS  = 30;   // cap the merged feed
+
+// Per-category freshness. Days for the current sources; minutes reserved for
+// future short-lived events (logins → ~30 min so "just logged in" stays true).
+const WINDOW_DAYS = { gate: 14, meeting: 14, egg: 14, user: 14, status: 14, ack: 14 };
+// const WINDOW_MINUTES = { login: 30 };  // when logins are added
+const cutoffDays = (days) => new Date(Date.now() - days * 86400000).toISOString();
 
 // Resolve delivery_cycle titles for a set of cycle ids.
 async function titlesFor(cycleIds) {
@@ -52,6 +57,7 @@ async function get_news_ticker(params, caller_user_id) {
       .from('cycle_event_log')
       .select('delivery_cycle_id, event_metadata, created_at')
       .eq('event_type', 'gate_approved')
+      .gte('created_at', cutoffDays(WINDOW_DAYS.gate))
       .order('created_at', { ascending: false })
       .limit(PER_SOURCE);
     const titleById = await titlesFor((approvals || []).map(a => a.delivery_cycle_id));
@@ -70,6 +76,7 @@ async function get_news_ticker(params, caller_user_id) {
       .from('team_meetings')
       .select('title, created_at, created_by, users:created_by(display_name)')
       .is('deleted_at', null)
+      .gte('created_at', cutoffDays(WINDOW_DAYS.meeting))
       .order('created_at', { ascending: false })
       .limit(PER_SOURCE);
     for (const m of meetings || []) {
@@ -84,6 +91,7 @@ async function get_news_ticker(params, caller_user_id) {
       .from('user_egg_finds')
       .select('found_at, users:user_id(display_name), easter_eggs:egg_id(asset_ref)')
       .is('deleted_at', null)
+      .gte('found_at', cutoffDays(WINDOW_DAYS.egg))
       .order('found_at', { ascending: false })
       .limit(PER_SOURCE);
     for (const f of finds || []) {
@@ -98,6 +106,7 @@ async function get_news_ticker(params, caller_user_id) {
       .from('users')
       .select('display_name, created_at')
       .is('deleted_at', null)
+      .gte('created_at', cutoffDays(WINDOW_DAYS.user))
       .order('created_at', { ascending: false })
       .limit(PER_SOURCE);
     for (const u of users || []) {
@@ -110,6 +119,7 @@ async function get_news_ticker(params, caller_user_id) {
     const { data: updates } = await supabase
       .from('initiative_status_updates')
       .select('initiative_id, saved_at, users:saved_by(display_name)')
+      .gte('saved_at', cutoffDays(WINDOW_DAYS.status))
       .order('saved_at', { ascending: false })
       .limit(PER_SOURCE);
     const titleById = await titlesFor((updates || []).map(u => u.initiative_id));
@@ -129,6 +139,7 @@ async function get_news_ticker(params, caller_user_id) {
     const { data: acks } = await supabase
       .from('initiative_status_acknowledgments')
       .select('acknowledged_at, users:acknowledged_by(display_name)')
+      .gte('acknowledged_at', cutoffDays(WINDOW_DAYS.ack))
       .order('acknowledged_at', { ascending: false })
       .limit(PER_SOURCE);
     for (const a of acks || []) {
