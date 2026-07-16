@@ -293,12 +293,12 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
   /** Random show/hide loop: first appearance 30–90s after load, then every
-   *  4–9 minutes, visible ~7s each time. */
+   *  1–3 minutes (Phil 2026-07-16 — was 4–9), visible ~7s each time. */
   private scheduleEggTeaser(first: boolean): void {
     if (!this.eggTeaserEligible) return;
     const delayMs = first
       ? 30000 + Math.random() * 60000
-      : 240000 + Math.random() * 300000;
+      : 60000 + Math.random() * 120000;
     this.eggTeaserTimer = setTimeout(() => {
       if (!this.eggTeaserEligible) return;
       this.eggTeaserAsset = EGG_ASSET_REFS[Math.floor(Math.random() * EGG_ASSET_REFS.length)];
