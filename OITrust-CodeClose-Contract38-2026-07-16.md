@@ -509,6 +509,36 @@ AMBER_WINDOW_DAYS (CC-38-27) removed — superseded same session by CC-38-28.
 6. Post a fresh status update → grid digest line takes the next gate's current status color. Approve that gate later → digest shows " · as of [gate]" and the panel Current Status shows the staleness nudge. Pass/Fail.
 7. Pre-migration statuses: digest renders in neutral grey, no as-of note. Pass/Fail.
 
+---
+
+# Follow-on 8 — Halo Marks the Working Gate (same session)
+
+Phil: strong visual for "where we're currently working" on the diamond track;
+refined in discussion to two-tone (his suggestion). Deployed SHA: 7c2b385
+(gh-pages 7ec2525). Angular-only.
+
+- **CC-38-32 (amends CC-38-29)** — Halo marker on the walkback next gate, both
+  StageTrack modes: diamond scales (paint-only transform + box-shadow — zero
+  layout shift) with a ring in its own status color. Purple moves from the
+  FILL to the ring: a submitted gate keeps the user's status fill inside a
+  purple halo, so approvers read "submitted and behind" in one glance and
+  submission never hides team status. Grey/hollow fills take a Deep Navy ring
+  (self-colored ring would vanish). All five approved → no halo. Grid
+  condensed scale 1.35 / ring 2.5+4.5px; panel full scale 1.25 / ring 3+6px.
+  Condensed tooltips gain "Next gate" prefix; raw underscores humanized.
+
+**Verification deltas:** view-only visual change (transform/shadow bindings +
+resolver branch removal); build green; no MCP surface; S-035 changelog in
+deploy commit 7c2b385; no new files.
+
+**Addendum UAT:**
+1. Grid: exactly one haloed diamond per unfinished row, on the next unapproved gate; none on finished rows. Pass/Fail.
+2. Halo ring matches the diamond's status color (green/amber/red/blue); grey no-status diamonds get a navy ring. Pass/Fail.
+3. Submit a gate → diamond KEEPS your status color, ring turns purple in grid and panel. Approve → halo moves to the following gate. Pass/Fail.
+4. Rows don't jump or resize as halos render (paint-only check). Pass/Fail.
+5. Panel full track shows the same halo on the same gate as the grid row. Pass/Fail.
+6. Hover a haloed diamond in the grid → tooltip starts "Next gate —" (or "Next gate (awaiting approval) —"). Pass/Fail.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
