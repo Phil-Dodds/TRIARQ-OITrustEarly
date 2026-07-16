@@ -11,6 +11,9 @@ const {
   assertTrackAccess, parseEmails
 } = require('../track_access');
 const { suggestNextMeetingDate, validateCadence } = require('../cadence');
+const {
+  resolveLeaderPlaceholder, firstNameOf, firstLeaderFirstName
+} = require('../leader_placeholder');
 
 // ── list_my_tracks ─────────────────────────────────────────────────────────────
 // Tracks where caller is an active member. Admin + include_all=true → every
@@ -181,6 +184,10 @@ async function create_track(params, caller_user_id) {
     .is('deleted_at', null)
     .order('sort_order', { ascending: true });
 
+  // {leader} in catalog text resolves to the creator's first name — the creator
+  // is the series' first leader at this point (migration 071 design).
+  const leaderName = firstNameOf(caller.display_name);
+
   let rows;
   if (Array.isArray(sections) && sections.length) {
     const { randomUUID } = require('crypto');
@@ -194,8 +201,10 @@ async function create_track(params, caller_user_id) {
           track_id:    track.track_id,
           catalog_id:  cat?.id ?? null,
           section_key: cat?.section_key ?? `custom-${randomUUID()}`,
-          title:       (s.title?.trim()) || cat.title,
-          sub_label:   s.sub_label !== undefined ? (s.sub_label || '').trim() : (cat?.sub_label ?? ''),
+          title:       resolveLeaderPlaceholder((s.title?.trim()) || cat.title, leaderName),
+          sub_label:   resolveLeaderPlaceholder(
+                         s.sub_label !== undefined ? (s.sub_label || '').trim() : (cat?.sub_label ?? ''),
+                         leaderName),
           bar_color:   s.bar_color || cat?.bar_color || '#5A5A5A',
           sort_order:  i + 1
         };
@@ -204,7 +213,9 @@ async function create_track(params, caller_user_id) {
     // Blank / default: seed all active catalog sections — leader trims in setup.
     rows = (catalog || []).map(c => ({
       track_id: track.track_id, catalog_id: c.id, section_key: c.section_key,
-      title: c.title, sub_label: c.sub_label, bar_color: c.bar_color, sort_order: c.sort_order
+      title:      resolveLeaderPlaceholder(c.title, leaderName),
+      sub_label:  resolveLeaderPlaceholder(c.sub_label, leaderName),
+      bar_color: c.bar_color, sort_order: c.sort_order
     }));
   }
   if (rows.length) {
@@ -584,7 +595,13 @@ async function add_track_section(params, caller_user_id) {
       .is('deleted_at', null)
       .maybeSingle();
     if (!cat) return { success: false, error: 'Catalog section not found.' };
-    row = { catalog_id: cat.id, section_key: cat.section_key, title: cat.title, sub_label: cat.sub_label, bar_color: cat.bar_color };
+    const leaderName = await firstLeaderFirstName(track_id);
+    row = {
+      catalog_id: cat.id, section_key: cat.section_key,
+      title:      resolveLeaderPlaceholder(cat.title, leaderName),
+      sub_label:  resolveLeaderPlaceholder(cat.sub_label, leaderName),
+      bar_color:  cat.bar_color
+    };
   } else {
     const { randomUUID } = require('crypto');
     row = {
@@ -807,6 +824,10 @@ async function reorder_track_sections(params, caller_user_id) {
 // ── Section catalog (shared list) ──────────────────────────────────────────────
 
 // Any authenticated user can read the catalog (for series setup).
+// resolve_for_track_id (optional): resolve {leader} tokens with that track's
+// first leader's first name — used by the series-settings "Add from shared
+// list" dropdown. Omitted → raw text (admin catalog editor must see the
+// placeholder, not a resolved copy that a save would bake in).
 async function list_section_catalog(params, caller_user_id) {
   const caller = await getCaller(caller_user_id);
   if (!caller) return { success: false, error: 'User not found.' };
@@ -817,7 +838,19 @@ async function list_section_catalog(params, caller_user_id) {
     .is('deleted_at', null)
     .order('sort_order', { ascending: true });
   if (error) return { success: false, error: error.message };
-  return { success: true, data: data || [] };
+
+  let rows = data || [];
+  if (params.resolve_for_track_id) {
+    const access = await assertTrackAccess(params.resolve_for_track_id, caller_user_id);
+    if (access.error) return { success: false, error: access.error };
+    const leaderName = await firstLeaderFirstName(params.resolve_for_track_id);
+    rows = rows.map(c => ({
+      ...c,
+      title:     resolveLeaderPlaceholder(c.title, leaderName),
+      sub_label: resolveLeaderPlaceholder(c.sub_label, leaderName)
+    }));
+  }
+  return { success: true, data: rows };
 }
 
 // Admin-only create/update of a catalog section.
@@ -1450,19 +1483,61 @@ async function get_latest_meeting(params, caller_user_id) {
   return { success: true, data: { meeting_id: latest.id, track_name: access.track.track_name } };
 }
 
-// ── meeting_changed_since — cheap 10s poll ─────────────────────────────────────
-// Returns only the timestamp; client refetches full meeting when newer.
+// ── meeting_changed_since — cheap 10s poll + presence heartbeat ────────────────
+// Returns the timestamp check plus live presence: the poll doubles as an
+// "I'm here, looking at section X" heartbeat (session 2026-07-16). Presence
+// rows are upserted, never deleted — freshness window decides "here now".
+// Presence failures never break the change poll (table may lag deploy).
+const PRESENCE_FRESH_MS = 25000; // 2.5 poll intervals
+
 async function meeting_changed_since(params, caller_user_id) {
-  const { meeting_id, since } = params;
+  const { meeting_id, since, focused_section_key } = params;
   if (!meeting_id) return { success: false, error: 'meeting_id is required.' };
 
   const { assertMeetingAccess } = require('../track_access');
   const access = await assertMeetingAccess(meeting_id, caller_user_id);
   if (access.error) return { success: false, error: access.error };
 
+  const nowIso = new Date().toISOString();
+  const { error: presenceWriteErr } = await supabase
+    .from('team_meeting_presence')
+    .upsert({
+      meeting_id,
+      user_id:      caller_user_id,
+      section_key:  focused_section_key ?? null,
+      last_seen_at: nowIso,
+      updated_at:   nowIso
+    }, { onConflict: 'meeting_id,user_id' });
+
+  let presence = [];
+  if (!presenceWriteErr) {
+    const freshCutoff = new Date(Date.now() - PRESENCE_FRESH_MS).toISOString();
+    const { data: presenceRows } = await supabase
+      .from('team_meeting_presence')
+      .select('user_id, section_key, last_seen_at')
+      .eq('meeting_id', meeting_id)
+      .neq('user_id', caller_user_id)
+      .gte('last_seen_at', freshCutoff);
+    if (presenceRows?.length) {
+      const presentIds = [...new Set(presenceRows.map(p => p.user_id))];
+      const { data: presentUsers } = await supabase
+        .from('users')
+        .select('id, display_name')
+        .in('id', presentIds);
+      const nameById = {};
+      (presentUsers || []).forEach(u => { nameById[u.id] = u.display_name; });
+      presence = presenceRows.map(p => ({
+        user_id:      p.user_id,
+        display_name: nameById[p.user_id] ?? '',
+        section_key:  p.section_key,
+        last_seen_at: p.last_seen_at
+      }));
+    }
+  }
+
   const current = access.meeting.content_updated_at;
   const changed = !since || (current && new Date(current).getTime() > new Date(since).getTime());
-  return { success: true, data: { changed, content_updated_at: current } };
+  return { success: true, data: { changed, content_updated_at: current, presence } };
 }
 
 module.exports = {

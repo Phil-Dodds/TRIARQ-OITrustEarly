@@ -21,6 +21,7 @@ import {
   PublicTrackListItem,
   CatalogSection,
   InviteReport,
+  MeetingPresenceEntry,
   RefPanelPersonType
 } from '../../core/types/team-meetings';
 
@@ -110,10 +111,14 @@ export class TeamMeetingsService {
     return this.mcp.call('team-meetings', 'delete_team_meeting', { meeting_id });
   }
 
-  // ── Polling sync (10s, cheap change-check) ───────────────────────────────────
+  // ── Polling sync (10s, cheap change-check + presence heartbeat) ──────────────
 
-  meetingChangedSince(meeting_id: string, since: string | null): Observable<McpResponse<{ changed: boolean; content_updated_at: string }>> {
-    return this.mcp.call('team-meetings', 'meeting_changed_since', { meeting_id, ...(since ? { since } : {}) });
+  meetingChangedSince(meeting_id: string, since: string | null, focused_section_key?: string | null): Observable<McpResponse<{ changed: boolean; content_updated_at: string; presence?: MeetingPresenceEntry[] }>> {
+    return this.mcp.call('team-meetings', 'meeting_changed_since', {
+      meeting_id,
+      ...(since ? { since } : {}),
+      ...(focused_section_key ? { focused_section_key } : {})
+    });
   }
 
   // ── Tracks ───────────────────────────────────────────────────────────────────
@@ -225,8 +230,11 @@ export class TeamMeetingsService {
     return this.mcp.call('team-meetings', 'pull_from_last_meeting', { meeting_id, ...(section_id ? { section_id } : {}) });
   }
 
-  listSectionCatalog(): Observable<McpResponse<CatalogSection[]>> {
-    return this.mcp.call<CatalogSection[]>('team-meetings', 'list_section_catalog', {});
+  /** resolve_for_track_id: resolve {leader} tokens with that track's first leader's
+   *  first name. Omit for the admin catalog editor — it must see the raw placeholder. */
+  listSectionCatalog(resolve_for_track_id?: string): Observable<McpResponse<CatalogSection[]>> {
+    return this.mcp.call<CatalogSection[]>('team-meetings', 'list_section_catalog',
+      resolve_for_track_id ? { resolve_for_track_id } : {});
   }
 
   saveCatalogSection(section: { id?: string; title: string; sub_label?: string; bar_color?: string; sort_order?: number }): Observable<McpResponse<CatalogSection>> {

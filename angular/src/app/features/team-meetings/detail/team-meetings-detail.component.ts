@@ -23,12 +23,19 @@ import { TrackSettingsComponent }        from '../tracks/track-settings.componen
 import { EggSpotComponent }              from '../../easter-eggs/egg-spot.component';
 import { EGG_KEYS }                      from '../../../core/constants/easter-egg.constants';
 import {
-  TeamMeeting, TeamMeetingSection, TeamMeetingBullet
+  TeamMeeting, TeamMeetingSection, TeamMeetingBullet, MeetingPresenceEntry
 } from '../../../core/types/team-meetings';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
 const POLL_INTERVAL_MS = 10000;
+
+// Presence avatars use the same id-hashed palette as the reference panel and
+// the MCP presenter sections — one person, one color, everywhere.
+const PRESENCE_AVATAR_COLORS = [
+  '#257099','#534AB7','#E96127','#0071AF','#5A5A5A',
+  '#F2A620','#4CAF50','#D32F2F','#795548','#607D8B'
+];
 
 interface InitiativeSearchResult {
   id:    string;
@@ -78,10 +85,20 @@ interface InitiativeSearchResult {
             <div class="tmd-back-row">
               <a [routerLink]="meeting.track ? ['/team-meetings/track', meeting.track.track_id] : ['/team-meetings']"
                  class="tmd-back-link">← {{ meeting.track?.track_name || 'Team Meetings' }}</a>
-              <button *ngIf="meeting.track?.is_leader"
-                      class="tmd-series-btn" type="button"
-                      title="Series settings — sections, members, invites"
-                      (click)="showSettings = true">⚙ Series</button>
+              <span class="tmd-back-right">
+                <!-- Live presence — everyone else on this meeting right now (10s poll) -->
+                <span *ngIf="presentOthers.length" class="tmd-presence-stack">
+                  <span class="tmd-presence-label">Here now</span>
+                  <span *ngFor="let p of presentOthers; trackBy: trackByUser"
+                        class="tmd-presence-avatar"
+                        [style.background]="presenceColor(p.user_id)"
+                        [title]="p.display_name + ' is viewing this meeting'">{{ initials(p.display_name) }}</span>
+                </span>
+                <button *ngIf="meeting.track?.is_leader"
+                        class="tmd-series-btn" type="button"
+                        title="Series settings — sections, members, invites"
+                        (click)="showSettings = true">⚙ Series</button>
+              </span>
             </div>
             <!-- Inline title edit -->
             <div *ngIf="!editingTitle" class="tmd-title-display">
@@ -142,6 +159,11 @@ interface InitiativeSearchResult {
                   <span *ngIf="section.sub_label" class="tmd-section-sublabel">{{ section.sub_label }}</span>
                 </div>
                 <span class="tmd-section-header-actions">
+                  <!-- Presence chips — who is focused in this section right now -->
+                  <span *ngFor="let p of presenceInSection(section); trackBy: trackByUser"
+                        class="tmd-presence-avatar tmd-presence-avatar-sm"
+                        [style.background]="presenceColor(p.user_id)"
+                        [title]="p.display_name + ' is in this section'">{{ initials(p.display_name) }}</span>
                   <!-- Subtle per-section pull -->
                   <button *ngIf="previousMeetingId"
                           class="tmd-section-pull-btn"
@@ -260,7 +282,7 @@ interface InitiativeSearchResult {
                               [class.tmd-note-filled]="!!bullet.bullet_note"
                               [placeholder]="'Add a note…'"
                               [value]="bullet.bullet_note ?? ''"
-                              (focus)="focusedBulletNoteId = bullet.id"
+                              (focus)="focusedBulletNoteId = bullet.id; setFocusedSection(section)"
                               (input)="autoGrow($event)"
                               (blur)="focusedBulletNoteId = null; onBulletNoteBlur(bullet, $event)"
                               rows="1">
@@ -275,6 +297,7 @@ interface InitiativeSearchResult {
                            type="text"
                            [placeholder]="addPlaceholder"
                            [(ngModel)]="addInputs[section.id]"
+                           (focus)="setFocusedSection(section)"
                            (input)="onBulletInput($event, section)"
                            (keydown.enter)="addBulletFromInput(section)"
                            (keydown.escape)="closeInitiativePicker()">
@@ -308,7 +331,7 @@ interface InitiativeSearchResult {
                   <textarea class="tmd-notes-textarea"
                             placeholder="Capture discussion, decisions, or follow-ups here…"
                             [value]="getNotes(section)"
-                            (focus)="focusedNotesSectionId = section.id"
+                            (focus)="focusedNotesSectionId = section.id; setFocusedSection(section)"
                             (input)="autoGrow($event)"
                             (blur)="focusedNotesSectionId = null; onNotesBlur(section, $event)"
                             rows="3">
@@ -396,6 +419,20 @@ interface InitiativeSearchResult {
                              padding: 10px 0 10px; margin-top: -10px;
                              box-shadow: 0 6px 8px -6px rgba(0,0,0,0.12); }
     .tmd-back-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .tmd-back-right { display: flex; align-items: center; gap: 12px; }
+    /* Live presence avatars — colored circle + initials, matching the reference panel */
+    .tmd-presence-stack { display: flex; align-items: center; }
+    .tmd-presence-label { font: italic 11px Roboto; color: #9E9E9E; margin-right: 8px; }
+    .tmd-presence-avatar {
+      width: 24px; height: 24px; border-radius: 50%;
+      color: #fff; font: 500 10px Roboto;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 2px solid #fff; box-sizing: content-box;
+      flex-shrink: 0; cursor: default;
+    }
+    .tmd-presence-avatar + .tmd-presence-avatar { margin-left: -7px; }
+    .tmd-presence-avatar-sm { width: 20px; height: 20px; font-size: 9px; border-width: 1px; }
+    .tmd-section-header-actions .tmd-presence-avatar-sm + .tmd-presence-avatar-sm { margin-left: -6px; }
     .tmd-back-link { font: 13px Roboto; color: var(--triarq-color-primary, #257099); text-decoration: none; }
     .tmd-series-btn { background: none; border: 1px solid #BDBDBD; border-radius: 5px; color: #5A5A5A; font: 500 12px Roboto; padding: 4px 10px; cursor: pointer; }
     .tmd-series-btn:hover { border-color: var(--triarq-color-primary, #257099); color: var(--triarq-color-primary, #257099); }
@@ -602,6 +639,10 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   focusedNotesSectionId: string | null = null;
   focusedBulletNoteId:   string | null = null;
 
+  // Live presence — everyone else on this meeting screen (fed by the 10s poll).
+  presentOthers: MeetingPresenceEntry[] = [];
+  private focusedSectionKey: string | null = null;
+
   get initiativesGatesSectionId(): string {
     return this.meeting?.sections.find(s => s.section_key === 'initiatives-gates')?.id ?? '';
   }
@@ -642,6 +683,8 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
       this.isLatestMeeting = true;
       this.previousMeetingId = null;
       this.lastContentStamp  = null;
+      this.presentOthers     = [];
+      this.focusedSectionKey = null;
       this.loadMeeting();
     });
 
@@ -674,6 +717,9 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
         this.loading = false;
         this.cdr.markForCheck();
         this.sizeAllNotes();
+        // Seed presence right away — announce "I'm here" and show who else is,
+        // instead of waiting for the first 10s poll tick.
+        if (this.meeting) this.pollForChanges();
       },
       error: err => {
         this.loadError = err?.error ?? 'Unable to load meeting.';
@@ -689,9 +735,13 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
     // Mid-drag DOM reorder would kill the drag — skip this tick, next one catches up.
     if (this.draggingBulletId || this.draggingSectionId) return;
     this.pollInFlight = true;
-    this.svc.meetingChangedSince(this.meetingId, this.lastContentStamp).subscribe({
+    this.svc.meetingChangedSince(this.meetingId, this.lastContentStamp, this.focusedSectionKey).subscribe({
       next: res => {
         this.pollInFlight = false;
+        if (res.success) {
+          this.presentOthers = res.data?.presence ?? [];
+          this.cdr.markForCheck();
+        }
         if (res.success && res.data?.changed) {
           this.refetchAndMerge();
         }
@@ -699,6 +749,24 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
       error: () => { this.pollInFlight = false; }
     });
   }
+
+  // ── Live presence ────────────────────────────────────────────────────────────
+  /** Remember which section the user is working in — sent with the next poll heartbeat. */
+  setFocusedSection(section: TeamMeetingSection): void {
+    this.focusedSectionKey = section.section_key;
+  }
+
+  presenceInSection(section: TeamMeetingSection): MeetingPresenceEntry[] {
+    return this.presentOthers.filter(p => p.section_key === section.section_key);
+  }
+
+  presenceColor(user_id: string): string {
+    let h = 0;
+    for (let i = 0; i < user_id.length; i++) h = (h * 31 + user_id.charCodeAt(i)) >>> 0;
+    return PRESENCE_AVATAR_COLORS[h % PRESENCE_AVATAR_COLORS.length];
+  }
+
+  trackByUser(_i: number, p: MeetingPresenceEntry): string { return p.user_id; }
 
   private refetchAndMerge(): void {
     this.svc.getMeeting(this.meetingId).subscribe({
@@ -787,6 +855,13 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   // ── Section collapse ────────────────────────────────────────────────────────
   toggleSection(section: TeamMeetingSection): void {
     section.collapsed = !section.collapsed;
+    // Presence follows attention: expanding a section marks it as focused;
+    // collapsing the focused section clears the focus.
+    if (!section.collapsed) {
+      this.focusedSectionKey = section.section_key;
+    } else if (this.focusedSectionKey === section.section_key) {
+      this.focusedSectionKey = null;
+    }
     this.cdr.markForCheck();
     if (!section.collapsed) { this.sizeAllNotes(); } // freshly rendered textareas
     this.svc.updateSectionCollapsed(section.id, section.collapsed).subscribe();

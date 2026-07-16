@@ -320,7 +320,7 @@ export class TrackSettingsComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
-    this.svc.listSectionCatalog().subscribe({
+    this.svc.listSectionCatalog(this.trackId).subscribe({
       next: res => { if (res.success) { this.catalog = res.data ?? []; this.cdr.markForCheck(); } }
     });
   }

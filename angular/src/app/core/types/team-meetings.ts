@@ -181,6 +181,14 @@ export interface CatalogSection {
   sort_order:  number;
 }
 
+/** Live presence — who else is on this meeting screen and which section they last focused. */
+export interface MeetingPresenceEntry {
+  user_id:      string;
+  display_name: string;
+  section_key:  string | null;
+  last_seen_at: string;
+}
+
 export interface InviteReport {
   added:     { email: string; display_name: string }[];
   already:   { email: string; display_name: string }[];
