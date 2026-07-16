@@ -388,6 +388,31 @@ direction — no further flags.
 4. Sidebar: Home, My Actions, Team Meetings, Initiative Tracking all show "Live". Pass/Fail.
 5. Hub screens (Delivery hub, Admin hub): card heights unchanged. Pass/Fail.
 
+---
+
+# Follow-on 5 — "Coming Soon …" Sidebar Group (same session)
+
+Phil: collapse all coming-soon nav items under one expandable menu below
+Contact an Admin. Deployed SHA: 350f54e (gh-pages ece47e3). Angular-only.
+
+- **CC-38-24** — Sidebar: single collapsible "Coming Soon …" parent (below
+  Contact an Admin, above Admin) holds To Dos, OI Library, Chat, AI Governance
+  Boards, Policy Committee. Status chips hidden on grouping parents and on
+  sublist children — the group label carries the message. Sidebar nests one
+  level, so the former grandchildren (Skills Management, Context, Artifact,
+  AI Inventory, Meeting Archives) are removed from the sidebar until built —
+  D-163 entry points restored per feature at build time.
+
+**Verification deltas:** NAV_ITEMS constant + template conditional only; build
+green; S-035 changelog entry folded into the 16:30 deploy entry, deployed
+350f54e; no new files.
+
+**Addendum UAT:**
+1. Sidebar order: … Contact an Admin, "Coming Soon …", Admin (admin users). Pass/Fail.
+2. "Coming Soon …" collapsed by default; click expands five items (To Dos, OI Library, Chat, AI Governance Boards, Policy Committee). Pass/Fail.
+3. OI Library and Chat sub-items still navigate to their stub routes. Pass/Fail.
+4. No status chips on the group or its children; Live/Pilot chips unchanged on top-level items. Pass/Fail.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
