@@ -15,6 +15,9 @@ import { MyActivityCardComponent }       from './components/my-activity-card.com
 import { MyCompletedGatesCardComponent } from './components/my-completed-gates-card.component';
 import { EmbeddedChatCardComponent }     from './components/embedded-chat-card.component';
 import { OnboardingMessageCardComponent } from './components/onboarding-message-card.component';
+import { MyEasterEggsCardComponent }     from '../easter-eggs/my-easter-eggs-card.component';
+import { CommunityEggsCardComponent }    from '../easter-eggs/community-eggs-card.component';
+import { EggSpotComponent }              from '../easter-eggs/egg-spot.component';
 
 @NgModule({
   declarations: [
@@ -34,6 +37,9 @@ import { OnboardingMessageCardComponent } from './components/onboarding-message-
     MyDeliveryCyclesCardComponent,
     MyActivityCardComponent,
     MyCompletedGatesCardComponent,
+    MyEasterEggsCardComponent,
+    CommunityEggsCardComponent,
+    EggSpotComponent,
     RouterModule.forChild([{ path: '', component: HomeComponent }])
   ]
 })

@@ -23,13 +23,15 @@ import { PendingApprovalItem, CompletedActionItem } from '../../core/types/datab
 import { ActionsListComponent }          from './actions-list.component';
 import { CompletedActionsListComponent } from './completed-actions-list.component';
 import { MyInitiativeStatusComponent }   from '../delivery/my-initiative-status/my-initiative-status.component';
+import { EggSpotComponent }              from '../easter-eggs/egg-spot.component';
+import { EGG_KEYS }                      from '../../core/constants/easter-egg.constants';
 
 type ActiveTab = 'open' | 'completed' | 'due' | 'ack';
 
 @Component({
   selector:        'app-my-actions',
   standalone:      true,
-  imports:         [CommonModule, ActionsListComponent, CompletedActionsListComponent, MyInitiativeStatusComponent],
+  imports:         [CommonModule, ActionsListComponent, CompletedActionsListComponent, MyInitiativeStatusComponent, EggSpotComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="ma-page">
@@ -86,6 +88,14 @@ type ActiveTab = 'open' | 'completed' | 'due' | 'ack';
         [visibleTab]="statusVisibleTab"
         (countsChanged)="onStatusCounts($event)">
       </app-my-initiative-status>
+
+      <!-- Easter Egg Hunt spots — foot of the Update Statuses / Acknowledge tabs -->
+      <div *ngIf="activeTab === 'due'" style="text-align:center; padding:14px 0 4px;">
+        <app-egg-spot [placementKey]="EGG_KEYS.ACTIONS_UPDATE_FOOTER"></app-egg-spot>
+      </div>
+      <div *ngIf="activeTab === 'ack'" style="text-align:center; padding:14px 0 4px;">
+        <app-egg-spot [placementKey]="EGG_KEYS.ACTIONS_ACK_FOOTER"></app-egg-spot>
+      </div>
     </div>
   `,
   styles: [`
@@ -112,6 +122,7 @@ type ActiveTab = 'open' | 'completed' | 'due' | 'ack';
   `]
 })
 export class MyActionsComponent implements OnInit {
+  readonly EGG_KEYS = EGG_KEYS;
   activeTab: ActiveTab = 'open';
 
   loadingOpen = true;

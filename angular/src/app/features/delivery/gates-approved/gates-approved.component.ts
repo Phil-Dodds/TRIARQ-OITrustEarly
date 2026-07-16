@@ -46,6 +46,8 @@ import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { IonicModule }                 from '@ionic/angular';
 
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
+import { EggSpotComponent }  from '../../easter-eggs/egg-spot.component';
+import { EGG_KEYS }          from '../../../core/constants/easter-egg.constants';
 import { DeliveryService }   from '../../../core/services/delivery.service';
 import {
   ScreenStateService,
@@ -78,7 +80,7 @@ const PAGE_SIZE = 50;
   selector:        'app-gates-approved',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, RouterModule, IonicModule, DeliveryCycleDetailComponent],
+  imports:         [CommonModule, RouterModule, IonicModule, DeliveryCycleDetailComponent, EggSpotComponent],
   template: `
     <div class="ga-flex">
     <div class="ga-shell" [class.ga-shell-with-panel]="!!selectedCycleId">
@@ -188,6 +190,11 @@ const PAGE_SIZE = 50;
           Load more
         </button>
       </div>
+
+      <!-- Easter Egg Hunt spot — below the approved-gates grid -->
+      <div style="text-align:center; padding:16px 0 4px;">
+        <app-egg-spot [placementKey]="EGG_KEYS.GATES_APPROVED_FOOTER"></app-egg-spot>
+      </div>
     </div>
 
     <!-- D-180 / D-440: right-panel slot. Reuses canonical Initiative View
@@ -221,6 +228,11 @@ const PAGE_SIZE = 50;
           <input type="checkbox" [checked]="draftGates.includes(g.name)" (change)="toggleDraftGate(g.name)" />
           <span>{{ g.label }}</span>
         </label>
+
+        <!-- Easter Egg Hunt spot — bottom of the Filters slide-in -->
+        <div style="text-align:center; padding:16px 0 4px;">
+          <app-egg-spot [placementKey]="EGG_KEYS.FILTERS_FOOTER"></app-egg-spot>
+        </div>
       </div>
       <div class="oi-side-foot oi-side-foot-split">
         <button class="oi-btn-secondary" (click)="clearFilters()">Clear all</button>
@@ -314,6 +326,7 @@ const PAGE_SIZE = 50;
   `]
 })
 export class GatesApprovedComponent implements OnInit {
+  readonly EGG_KEYS = EGG_KEYS;
   rows:    ApprovedGateRow[] = [];
   loading              = false;
   loadError            = '';

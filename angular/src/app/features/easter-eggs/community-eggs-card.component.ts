@@ -1,0 +1,68 @@
+// community-eggs-card.component.ts — Easter Egg Hunt (spec §9)
+// Home card: recent finds across all users. Others' finds are anonymous eggs
+// with the location withheld (EE-01); the caller's own rows show the name.
+// Completion achievements are announced to everyone.
+
+import {
+  Component, ChangeDetectionStrategy, ChangeDetectorRef, OnInit, OnDestroy
+} from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
+import { EasterEggService, RecentEggFeed } from '../../core/services/easter-egg.service';
+import { EggIconComponent, EggAssetRef } from './egg-icon.component';
+
+@Component({
+  selector: 'app-community-eggs-card',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, EggIconComponent],
+  template: `
+    <div class="oi-card" style="height:100%; box-sizing:border-box;">
+      <div style="font-weight:500; margin-bottom:12px;">Egg hunt — community</div>
+
+      <div *ngIf="feed as f">
+        <div *ngFor="let a of f.achievements"
+             style="display:flex; align-items:center; gap:8px; padding:7px 10px; margin-bottom:8px;
+                    background:rgba(245,166,35,0.10); border-radius:5px;">
+          <span aria-hidden="true">🏆</span>
+          <span style="font-size:13px; color:#854F0B;">{{ a.display_name }} collected all ten eggs</span>
+        </div>
+
+        <div *ngFor="let row of f.finds" style="display:flex; align-items:center; gap:10px; padding:5px 0;">
+          <app-egg-icon [assetRef]="asset(row.asset_ref)" [size]="22"></app-egg-icon>
+          <div style="font-size:13px;">
+            <span style="font-weight:500;">{{ row.is_own ? 'You' : row.display_name }}</span>
+            <ng-container *ngIf="row.is_own && row.egg_name; else hiddenLoc">
+              found <span style="color:var(--triarq-color-primary,#257099);">{{ row.egg_name }}</span>
+            </ng-container>
+            <ng-template #hiddenLoc>
+              found an egg <span style="color:#9E9E9E;">· location hidden until you find it</span>
+            </ng-template>
+          </div>
+        </div>
+
+        <div *ngIf="f.finds.length === 0 && f.achievements.length === 0"
+             style="font-size:12px; font-style:italic; color:#9E9E9E;">
+          No eggs found yet. Be the first — they're hiding in the quiet corners.
+        </div>
+      </div>
+    </div>
+  `
+})
+export class CommunityEggsCardComponent implements OnInit, OnDestroy {
+  feed: RecentEggFeed | null = null;
+  private subs = new Subscription();
+
+  constructor(private readonly eggs: EasterEggService, private readonly cdr: ChangeDetectorRef) {}
+
+  ngOnInit(): void {
+    this.subs.add(this.eggs.getRecentFinds(15).subscribe(f => { this.feed = f; this.cdr.markForCheck(); }));
+    // Refresh the community feed when the caller's own basket changes.
+    this.subs.add(this.eggs.basket$.subscribe(() => {
+      this.subs.add(this.eggs.getRecentFinds(15).subscribe(f => { this.feed = f; this.cdr.markForCheck(); }));
+    }));
+  }
+  ngOnDestroy(): void { this.subs.unsubscribe(); }
+
+  asset(ref: string | null): EggAssetRef { return (ref as EggAssetRef) || 'egg-01'; }
+}

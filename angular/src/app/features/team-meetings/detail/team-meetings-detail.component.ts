@@ -20,6 +20,8 @@ import { AuthService }                   from '../../../core/services/auth.servi
 import { DcsReferencePanelComponent }    from './dcs-reference-panel.component';
 import { DeliveryCycleDetailComponent }  from '../../delivery/detail/delivery-cycle-detail.component';
 import { TrackSettingsComponent }        from '../tracks/track-settings.component';
+import { EggSpotComponent }              from '../../easter-eggs/egg-spot.component';
+import { EGG_KEYS }                      from '../../../core/constants/easter-egg.constants';
 import {
   TeamMeeting, TeamMeetingSection, TeamMeetingBullet
 } from '../../../core/types/team-meetings';
@@ -40,7 +42,8 @@ interface InitiativeSearchResult {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, RouterModule, FormsModule, IonicModule,
-    DcsReferencePanelComponent, DeliveryCycleDetailComponent, TrackSettingsComponent
+    DcsReferencePanelComponent, DeliveryCycleDetailComponent, TrackSettingsComponent,
+    EggSpotComponent
   ],
   template: `
     <!-- Loading state -->
@@ -329,6 +332,11 @@ interface InitiativeSearchResult {
           </app-dcs-reference-panel>
         </div>
       </div>
+
+      <!-- Easter Egg Hunt spot — bottom of the meeting series screen -->
+      <div style="text-align:center; padding:16px 0 4px;">
+        <app-egg-spot [placementKey]="EGG_KEYS.TEAM_MEETINGS_FOOTER"></app-egg-spot>
+      </div>
     </ng-container>
 
     <!-- Section chooser — initiative add with no presenter section and no Initiatives & Gates -->
@@ -550,6 +558,7 @@ interface InitiativeSearchResult {
   `]
 })
 export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
+  readonly EGG_KEYS = EGG_KEYS;
   meeting:   TeamMeeting | null = null;
   loading    = false;
   loadError  = '';

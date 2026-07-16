@@ -30,11 +30,14 @@ interface GuideGate {
 
 const GATE_ORDER = ['Brief Review', 'Go to Build', 'Go to Deploy', 'Go to Release', 'Close Review'];
 
+import { EggSpotComponent } from '../../easter-eggs/egg-spot.component';
+import { EGG_KEYS }         from '../../../core/constants/easter-egg.constants';
+
 @Component({
   selector:        'app-initiative-guide',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, RouterModule],
+  imports:         [CommonModule, RouterModule, EggSpotComponent],
   template: `
     <div class="ig-shell">
       <div class="ig-header">
@@ -142,6 +145,11 @@ const GATE_ORDER = ['Brief Review', 'Go to Build', 'Go to Deploy', 'Go to Releas
           between exists to keep the work pointed at it.
         </p>
       </div>
+
+      <!-- Easter Egg Hunt spot — foot of the guide, after Outcomes -->
+      <div style="text-align:center; padding:16px 0 4px;">
+        <app-egg-spot [placementKey]="EGG_KEYS.INITIATIVE_GUIDE_FOOTER"></app-egg-spot>
+      </div>
     </div>
   `,
   styles: [`
@@ -164,6 +172,7 @@ const GATE_ORDER = ['Brief Review', 'Go to Build', 'Go to Deploy', 'Go to Releas
   `]
 })
 export class InitiativeGuideComponent implements OnInit, OnDestroy {
+  readonly EGG_KEYS = EGG_KEYS;
   readonly dateSemantics = GATE_DATE_SEMANTICS;
   readonly outcome       = OUTCOME_COACHING;
   readonly gates: GuideGate[] = GATE_ORDER.map(label => ({

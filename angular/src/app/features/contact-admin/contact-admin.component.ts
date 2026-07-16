@@ -20,12 +20,14 @@ import { RouterModule }          from '@angular/router';
 import { IonicModule }           from '@ionic/angular';
 import { UserProfileService }    from '../../core/services/user-profile.service';
 import { User }                  from '../../core/types/database';
+import { EggSpotComponent }      from '../easter-eggs/egg-spot.component';
+import { EGG_KEYS }              from '../../core/constants/easter-egg.constants';
 
 @Component({
   selector: 'app-contact-admin',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, IonicModule],
+  imports: [CommonModule, RouterModule, IonicModule, EggSpotComponent],
   template: `
     <div style="max-width:640px;margin:var(--triarq-space-2xl) auto;
                 padding:0 var(--triarq-space-md);">
@@ -118,10 +120,16 @@ import { User }                  from '../../core/types/database';
         </a>
       </div>
 
+      <!-- Easter Egg Hunt spot — bottom of Contact an Admin -->
+      <div style="text-align:center; padding:16px 0 4px;">
+        <app-egg-spot [placementKey]="EGG_KEYS.CONTACT_ADMIN_FOOTER"></app-egg-spot>
+      </div>
+
     </div>
   `
 })
 export class ContactAdminComponent implements OnInit {
+  readonly EGG_KEYS = EGG_KEYS;
   admins:    User[] = [];
   loading    = true;
   loadError  = '';

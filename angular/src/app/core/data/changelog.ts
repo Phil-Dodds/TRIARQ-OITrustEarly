@@ -33,6 +33,23 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-15',
+    builtAt:       '12:00 UTC',
+    contractLabel: 'Easter Egg Hunt',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Easter Egg Hunt',
+        description: 'Ten Easter eggs are hidden in quiet corners across OI Trust. Spot one and click to collect it — each is named for where it was hiding. Find all ten for a little celebration (and a note from the OI Trust team).'
+      },
+      {
+        audience:    'All',
+        surface:     'Home — My Easter Eggs',
+        description: 'A new Home card shows your basket: eggs you\'ve found (with their names) and mystery slots for the ones still hidden. A second card shows recent finds across the team — locations stay secret until you find them yourself.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-15',
     builtAt:       '05:00 UTC',
     contractLabel: 'Contract 37 — Sprint Calendars & Gate Date Rules',
     items: [

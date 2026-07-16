@@ -48,6 +48,9 @@ import { Observable }             from 'rxjs';
           <router-outlet></router-outlet>
         </main>
       </div>
+
+      <!-- Easter Egg Hunt — completion celebration, fires on any screen -->
+      <app-egg-celebration-overlay></app-egg-celebration-overlay>
     </div>
   `,
   styles: [`

@@ -82,6 +82,8 @@ import {
   sprintDropdownLabel,
   ruleChipLabel
 } from '../../../core/utils/sprint-resolution';
+import { EggSpotComponent } from '../../easter-eggs/egg-spot.component';
+import { EGG_KEYS }         from '../../../core/constants/easter-egg.constants';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:   'Brief Review',
@@ -114,7 +116,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent, InitiativeStatusUpdatePanelComponent, InitiativeStatusHistoryPanelComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent, InitiativeStatusUpdatePanelComponent, InitiativeStatusHistoryPanelComponent, EggSpotComponent],
   styles: [`:host { display: block; position: relative; }`],
   template: `
 
@@ -1721,12 +1723,18 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             {{ ev.event_description }}
           </span>
         </div>
+
+        <!-- Easter Egg Hunt spot — foot of the Event Log -->
+        <div style="text-align:center; padding:14px 0 4px;">
+          <app-egg-spot [placementKey]="EGG_KEYS.EVENT_LOG_FOOTER"></app-egg-spot>
+        </div>
       </div>
 
     </div>
   `
 })
 export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
+  readonly EGG_KEYS = EGG_KEYS;
 
   /** Panel mode: cycleId provided as @Input from dashboard. Route mode: read from ActivatedRoute. */
   @Input() cycleId?: string;

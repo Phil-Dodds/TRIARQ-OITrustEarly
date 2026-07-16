@@ -69,6 +69,15 @@
     <app-embedded-chat-card>
     </app-embedded-chat-card>
 
+    <!-- Easter Egg Hunt — all roles (spec §9) -->
+    <app-my-easter-eggs-card></app-my-easter-eggs-card>
+    <app-community-eggs-card></app-community-eggs-card>
+
+  </div>
+
+  <!-- Egg spot #1 — Home page footer (EGG_KEYS.HOME_FOOTER) -->
+  <div *ngIf="showMainCards" style="text-align:center; padding:18px 0 8px;">
+    <app-egg-spot [placementKey]="EGG_KEYS.HOME_FOOTER"></app-egg-spot>
   </div>
 
 </div>

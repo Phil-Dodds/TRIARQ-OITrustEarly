@@ -12,6 +12,7 @@ import { UserProfileService } from '../../core/services/user-profile.service';
 import { McpService }         from '../../core/services/mcp.service';
 import { User }               from '../../core/types/database';
 import { firstValueFrom }     from 'rxjs';
+import { EGG_KEYS }           from '../../core/constants/easter-egg.constants';
 
 @Component({
   selector:        'app-home',
@@ -22,6 +23,7 @@ export class HomeComponent implements OnInit {
   profile:      User | null = null;
   hasDivision:  boolean = false;
   loading:      boolean = true;
+  readonly EGG_KEYS = EGG_KEYS;
 
   constructor(
     private readonly profileService: UserProfileService,

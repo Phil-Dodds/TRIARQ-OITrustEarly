@@ -19,11 +19,13 @@ import {
 import { CommonModule } from '@angular/common';
 
 import { CHANGELOG, ChangelogEntry } from '../../../core/data/changelog';
+import { EggSpotComponent } from '../../../features/easter-eggs/egg-spot.component';
+import { EGG_KEYS }         from '../../../core/constants/easter-egg.constants';
 
 @Component({
   selector:        'app-about-panel',
   standalone:      true,
-  imports:         [CommonModule],
+  imports:         [CommonModule, EggSpotComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div *ngIf="show"
@@ -71,6 +73,11 @@ import { CHANGELOG, ChangelogEntry } from '../../../core/data/changelog';
                 <span class="ab-desc">{{ item.description }}</span>
               </li>
             </ul>
+          </div>
+
+          <!-- Easter Egg Hunt spot — foot of the About panel -->
+          <div style="text-align:center; padding:14px 0 4px;">
+            <app-egg-spot [placementKey]="EGG_KEYS.ABOUT_FOOTER"></app-egg-spot>
           </div>
         </div>
       </aside>
@@ -129,6 +136,7 @@ import { CHANGELOG, ChangelogEntry } from '../../../core/data/changelog';
   `]
 })
 export class AboutPanelComponent {
+  readonly EGG_KEYS = EGG_KEYS;
   @Input()  show = false;
   @Output() close = new EventEmitter<void>();
 
