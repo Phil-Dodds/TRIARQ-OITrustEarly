@@ -71,7 +71,7 @@ import {
   computeHeadline, HeadlineResult, HeadlineBand, headlineBandStyle, formatHeadlineDate,
   GATE_DISPLAY_NAMES, nextUnapprovedGate
 } from './cycle-headline.utils';
-import { buildUnifiedGateStateMap } from '../gate-visual.utils';
+import { buildUnifiedGateStateMap, nextGateInOrder, nextGateIsSubmitted } from '../gate-visual.utils';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -726,6 +726,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <app-stage-track
               [currentStageId]="cycle.current_lifecycle_stage"
               [gateStateMap]="gateStateMapsCache.get(cycle.delivery_cycle_id) ?? EMPTY_GATE_STATE_MAP"
+              [nextGateId]="nextGateIdFor(cycle)"
+              [nextGateSubmitted]="nextGateSubmittedFor(cycle)"
               [displayMode]="'condensed'">
             </app-stage-track>
           </div>
@@ -2210,6 +2212,15 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
    * because the case was missing, leaving the gate diamond fog-colored after submission.
    * Contract 23 fixes that. The overdue → blocked branch is new in Contract 23 (Item 2.1).
    */
+  /** CC-38-32 halo marker inputs — primitives, so OnPush stays stable. */
+  nextGateIdFor(cycle: DeliveryCycle): GateName | null {
+    return nextGateInOrder(cycle.gate_records);
+  }
+
+  nextGateSubmittedFor(cycle: DeliveryCycle): boolean {
+    return nextGateIsSubmitted(cycle.gate_records);
+  }
+
   /** CC-38-28: delegates to the shared resolver — grid diamonds now show the
    *  user's D-205 status (workflow overrides: approved blue, submitted purple).
    *  Overdue no longer forces red here — the ⚠ principle flags date conflicts

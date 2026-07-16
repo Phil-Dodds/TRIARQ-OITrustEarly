@@ -33,6 +33,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-16',
+    builtAt:       '19:50 UTC',
+    contractLabel: 'Contract 38 follow-on — halo marks the working gate',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Gate tracks (grid + panel)',
+        description: 'The gate you\'re working toward now wears a halo — slightly larger with a ring in its status color (navy when no status is set). When the gate is submitted for approval the ring turns purple while the diamond keeps YOUR status color, so approvers can spot "submitted and behind" at a glance. Done initiatives show no halo.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-16',
     builtAt:       '18:15 UTC',
     contractLabel: 'Contract 38 follow-on — one gate color language',
     items: [

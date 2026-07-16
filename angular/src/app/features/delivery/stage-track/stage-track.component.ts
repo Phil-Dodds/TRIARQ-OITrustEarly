@@ -133,9 +133,11 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
             <div
               [style.background]="gateColor(node.id)"
               [style.border]="gateBorder(node.id)"
+              [style.transform]="gateTransform(node.id)"
+              [style.box-shadow]="gateHaloShadow(node.id)"
               [attr.title]="gateTitle(node.id)"
               (click)="onGateClick(node.id)"
-              style="width:24px;height:24px;border-radius:4px;transform:rotate(45deg);
+              style="width:24px;height:24px;border-radius:4px;
                      cursor:pointer;transition:opacity 0.15s;box-sizing:border-box;"
             ></div>
           </div>
@@ -161,11 +163,11 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
           <div
             [style.background]="gateColor(gate.id)"
             [style.border]="gateBorder(gate.id)"
-            [attr.title]="gateDisplayState(gate.id) === 'skipped'
-                            ? null
-                            : (gate.label + ': ' + gateDisplayState(gate.id))"
+            [style.transform]="gateTransform(gate.id)"
+            [style.box-shadow]="gateHaloShadow(gate.id)"
+            [attr.title]="condensedGateTooltip(gate.id, gate.label)"
             style="width:10px;height:10px;border-radius:2px;
-                   transform:rotate(45deg);flex-shrink:0;box-sizing:border-box;"
+                   flex-shrink:0;box-sizing:border-box;"
           ></div>
         </ng-container>
       </div>
@@ -186,6 +188,12 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
    *  full-mode tooltip "Skipped — [MMM D, YYYY]". Condensed mode never
    *  shows the tooltip per spec. */
   @Input() gateSkippedAtMap: Partial<Record<GateName, string | null>> = {};
+  /** CC-38-32 halo marker: the walkback next gate renders scaled with a ring.
+   *  Ring echoes the diamond's status color; purple when submitted for
+   *  approval; Deep Navy when the fill is grey (no status set). Null = no halo
+   *  (all gates resolved — done goes quiet). */
+  @Input() nextGateId: GateName | null = null;
+  @Input() nextGateSubmitted = false;
 
   @Output() gateClicked = new EventEmitter<GateName>();
   /** D-360 Surface 3: emitted when the user clicks the next free stage circle.
@@ -341,6 +349,45 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
       return 'none';
     }
     return '2px solid var(--triarq-color-primary)';
+  }
+
+  // ── CC-38-32 halo marker ──────────────────────────────────────────────────
+  private isHaloGate(gateId: string): boolean { return this.nextGateId === gateId; }
+
+  /** Ring color: purple when submitted; Deep Navy over grey/hollow fills;
+   *  otherwise the fill's own color amplified. */
+  private haloRingColor(gateId: string): string {
+    if (this.nextGateSubmitted) { return '#7E57C2'; }
+    const state = this.gateDisplayState(gateId);
+    if (state === 'not_started' || state === 'upcoming' || state === 'skipped' || state === 'returned') {
+      return '#12274A';
+    }
+    return this.gateColor(gateId);
+  }
+
+  /** Paint-only emphasis — transform + shadow never shift row layout. */
+  gateTransform(gateId: string): string {
+    const scale = this.displayMode === 'condensed' ? 1.35 : 1.25;
+    return this.isHaloGate(gateId) ? `rotate(45deg) scale(${scale})` : 'rotate(45deg)';
+  }
+
+  gateHaloShadow(gateId: string): string {
+    if (!this.isHaloGate(gateId)) { return 'none'; }
+    const ring = this.haloRingColor(gateId);
+    return this.displayMode === 'condensed'
+      ? `0 0 0 2.5px #fff, 0 0 0 4.5px ${ring}`
+      : `0 0 0 3px #fff, 0 0 0 6px ${ring}`;
+  }
+
+  /** Human tooltip label — 'Next gate' prefix on the halo gate; underscores out. */
+  condensedGateTooltip(gateId: string, label: string): string | null {
+    const state = this.gateDisplayState(gateId);
+    if (state === 'skipped') { return null; }
+    const stateLabel = String(state).replace(/_/g, ' ');
+    const prefix = this.isHaloGate(gateId)
+      ? (this.nextGateSubmitted ? 'Next gate (awaiting approval) — ' : 'Next gate — ')
+      : '';
+    return `${prefix}${label}: ${stateLabel}`;
   }
 
   gateColor(gateId: string): string {

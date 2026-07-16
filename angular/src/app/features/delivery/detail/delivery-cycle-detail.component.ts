@@ -50,7 +50,7 @@ import { InitiativeStatusUpdatePanelComponent }  from '../status-panel/initiativ
 import { InitiativeStatusHistoryPanelComponent } from '../status-panel/initiative-status-history-panel.component';
 import { LatestInitiativeStatus } from '../../../core/types/initiative-status';
 import { GATE_DATE_SEMANTICS } from '../../../shared/constants/gate-coaching.constants';
-import { buildUnifiedGateStateMap, gateDateConflict, nextGateInOrder } from '../gate-visual.utils';
+import { buildUnifiedGateStateMap, gateDateConflict, nextGateInOrder, nextGateIsSubmitted } from '../gate-visual.utils';
 import {
   GateRecordModalComponent,
   GateRecordModalData,
@@ -482,6 +482,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         <app-stage-track
           [currentStageId]="cycle.current_lifecycle_stage"
           [gateStateMap]="gateStateMap"
+          [nextGateId]="haloNextGateId"
+          [nextGateSubmitted]="haloNextGateSubmitted"
           [gateSkippedAtMap]="gateSkippedAtMap"
           displayMode="full"
           (gateClicked)="openGatePanel($event)"
@@ -2159,10 +2161,14 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   // ── Computed properties ────────────────────────────────────────────────────
 
   /** CC-38-28: shared resolver — panel track now matches the grid track
-   *  exactly (user D-205 status colors; approved blue; submitted purple). */
+   *  exactly (user D-205 status fills; approved blue; purple on the halo). */
   get gateStateMap(): GateStateMap {
     return buildUnifiedGateStateMap(this.cycle?.gate_records, this.cycle?.milestone_dates);
   }
+
+  /** CC-38-32 halo marker inputs. */
+  get haloNextGateId(): GateName | null { return nextGateInOrder(this.cycle?.gate_records); }
+  get haloNextGateSubmitted(): boolean  { return nextGateIsSubmitted(this.cycle?.gate_records); }
 
   /** D-447 tooltip data — ISO timestamp per skipped gate, read from the event
    *  log. Surfaced to StageTrackComponent via [gateSkippedAtMap] so the

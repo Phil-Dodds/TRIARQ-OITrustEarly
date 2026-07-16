@@ -37,8 +37,8 @@ export function resolveGateDisplayState(
   userDateStatus: DateStatus | null | undefined
 ): GateDisplayState {
   if (workflowStatus === 'approved')           { return 'complete'; }
-  if (workflowStatus === 'awaiting_approval')  { return 'awaiting_approval'; }
-  if (workflowStatus === 'pending')            { return 'pending'; }
+  // CC-38-32 (amends CC-38-29): a submitted gate keeps the USER's status fill —
+  // purple lives on the halo ring only, so submission never hides team status.
   if (workflowStatus === 'blocked')            { return 'blocked'; }
   if (workflowStatus === 'skipped')            { return 'skipped'; }
   if (workflowStatus === 'returned')           { return 'returned'; }
@@ -75,6 +75,15 @@ export function nextGateInOrder(gateRecords: GateRecordLite[] | undefined): Gate
     if (s !== 'approved' && s !== 'skipped') { return gate; }
   }
   return null;
+}
+
+/** True when the walkback next gate is sitting with an approver — drives the
+ *  purple halo (CC-38-32). */
+export function nextGateIsSubmitted(gateRecords: GateRecordLite[] | undefined): boolean {
+  const next = nextGateInOrder(gateRecords);
+  if (!next) { return false; }
+  const rec = (gateRecords ?? []).find(g => g.gate_name === next);
+  return rec?.gate_status === 'awaiting_approval' || rec?.gate_status === 'pending';
 }
 
 /** Warning principle: system disagreement never recolors — it flags. True when
