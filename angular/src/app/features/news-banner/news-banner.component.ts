@@ -131,12 +131,13 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
             background: #fff; border-radius: 50%; padding: 1px; line-height: 0; }
     .nb-chip {
       display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px;
-      background: rgba(255,255,255,0.12); border: none; color: #fff; cursor: pointer;
+      background: transparent; border: none; color: #fff; cursor: pointer;
       border-radius: 999px; font-size: 11px;
     }
-    .nb-chip:hover { background: rgba(255,255,255,0.28); }
-    .nb-chip-mine { background: rgba(233,97,39,0.35); }
-    .nb-chip-mine:hover { background: rgba(233,97,39,0.5); }
+    .nb-chip:hover { background: rgba(255,255,255,0.18); }
+    /* "you reacted" — a crisp 1px ring (box-shadow so layout doesn't shift),
+       no translucent fill behind the icon so it stays sharp. */
+    .nb-chip-mine { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.6); }
     .nb-chip-n { opacity: 0.9; }
     .nb-picker { display: inline-flex; align-items: center; gap: 2px; }
     .nb-emoji {
