@@ -67,7 +67,9 @@ import { themedTitle } from '../shared/theme-display.util';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 // Contract 23 Item 2.2 / D-267: pure computeHeadline utility — 6-rule priority order.
 // Replaces inline headline()/headlineColor() logic; extracted for unit-testability.
-import { computeHeadline, headlineColorCss, HeadlineResult } from './cycle-headline.utils';
+import {
+  computeHeadline, HeadlineResult, HeadlineBand, headlineBandStyle, formatHeadlineDate
+} from './cycle-headline.utils';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -692,15 +694,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                  title="{{ themedTitle(cycle) }}">
               {{ themedTitle(cycle) }}
             </div>
-            <div *ngIf="cycle.tier_classification" style="margin-top:4px;">
-              <span [style.background]="tierBadgeBg(cycle.tier_classification)"
-                    [style.color]="tierBadgeColor(cycle.tier_classification)"
-                    style="display:inline-block;border-radius:4px;padding:3px 8px;
-                           font-size:12px;font-weight:500;font-family:Roboto,sans-serif;">
-                Tier {{ tierLabel(cycle.tier_classification) }} —
-                {{ cycle.tier_classification === 'tier_1' ? 'Fast Lane' : cycle.tier_classification === 'tier_2' ? 'Structured' : 'Governed' }}
-              </span>
-            </div>
+            <!-- Tier chip removed (Phil 2026-07-16, CC-38-25) — tier remains in
+                 the filter panel and detail view; the badge was row clutter. -->
           </div>
 
           <!-- Col 3: Outcome — 3-line clamp, tooltip on hover. D-266. -->
@@ -733,14 +728,28 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </app-stage-track>
           </div>
 
-          <!-- Col 5: Headline — 6-rule computeHeadline utility. D-267 + Contract 23 Item 2.2. -->
+          <!-- Col 5: Headline — 6-rule computeHeadline utility. D-267 + Contract 23 Item 2.2.
+               CC-38-26/27: status-banded cell (D-200 Pattern-2-style tint + 3px bar keyed to
+               the next gate's state) with a second line carrying the latest status digest. -->
           <div style="overflow:hidden;padding-top:2px;min-width:160px;">
-            <div style="font-size:12px;
-                        display:-webkit-box;-webkit-line-clamp:3;
-                        -webkit-box-orient:vertical;overflow:hidden;"
-                 [style.color]="headlineColor(cycle)"
-                 title="{{ headlineText(cycle) }}">
-              {{ headlineText(cycle) }}
+            <div [style.border-left]="headlineBar(cycle)"
+                 [style.background]="headlineBg(cycle)"
+                 [style.padding]="headlineBand(cycle) === 'none' ? '0' : '6px 10px'">
+              <div style="font-size:12px;font-weight:500;
+                          display:-webkit-box;-webkit-line-clamp:2;
+                          -webkit-box-orient:vertical;overflow:hidden;"
+                   [style.color]="headlineColor(cycle)"
+                   title="{{ headlineText(cycle) }}">
+                {{ headlineText(cycle) }}
+              </div>
+              <div *ngIf="statusDigest(cycle) as digest"
+                   style="font-size:11px;margin-top:2px;
+                          display:-webkit-box;-webkit-line-clamp:2;
+                          -webkit-box-orient:vertical;overflow:hidden;"
+                   [style.color]="headlineSubColor(cycle)"
+                   title="{{ digest }}">
+                {{ digest }}<span style="opacity:0.6;"> · {{ statusDigestAge(cycle) }}</span>
+              </div>
             </div>
           </div>
 
@@ -2069,23 +2078,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.applyFilters(false);
   }
 
-  /** Tier badge background per Visual Layout Standards 1.7 (border-radius 4px, not pill). */
-  tierBadgeBg(tier: TierClassification): string {
-    if (tier === 'tier_1') { return '#E3F2FD'; }
-    if (tier === 'tier_2') { return '#E0F2F1'; }
-    return '#FFF3E0';
-  }
-
-  /** Tier badge text color per Visual Layout Standards 1.7. */
-  tierBadgeColor(tier: TierClassification): string {
-    if (tier === 'tier_1') { return '#1565C0'; }
-    if (tier === 'tier_2') { return '#00695C'; }
-    return '#E65100';
-  }
-
-  tierLabel(tier: TierClassification): string {
-    return tier === 'tier_1' ? '1' : tier === 'tier_2' ? '2' : '3';
-  }
+  // Tier badge helpers removed with the row chip (CC-38-25) — tier remains
+  // filterable and visible on the detail panel.
 
   /** Safe stage label lookup — accepts plain string for filter chip display. */
   stageLabelFor(stage: string): string {
@@ -2134,8 +2128,42 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return this.headlineFor(cycle).text;
   }
 
+  // CC-38-26/27: banded headline cell — bar/tint/text keyed to the next gate's
+  // state via headlineBandStyle. Dark same-hue text replaces the old weak
+  // sunray/oravive text colors.
+  headlineBand(cycle: DeliveryCycle): HeadlineBand {
+    return this.headlineFor(cycle).band;
+  }
+
+  headlineBar(cycle: DeliveryCycle): string {
+    const bar = headlineBandStyle(this.headlineFor(cycle).band).bar;
+    return bar ? `3px solid ${bar}` : 'none';
+  }
+
+  headlineBg(cycle: DeliveryCycle): string {
+    return headlineBandStyle(this.headlineFor(cycle).band).bg || 'transparent';
+  }
+
   headlineColor(cycle: DeliveryCycle): string {
-    return headlineColorCss(this.headlineFor(cycle).color);
+    return headlineBandStyle(this.headlineFor(cycle).band).text;
+  }
+
+  headlineSubColor(cycle: DeliveryCycle): string {
+    return headlineBandStyle(this.headlineFor(cycle).band).sub;
+  }
+
+  /** "Done: … · Next: …" from the latest status update; null hides the line. */
+  statusDigest(cycle: DeliveryCycle): string | null {
+    const s = cycle.latest_status;
+    if (!s) { return null; }
+    const parts: string[] = [];
+    if (s.accomplished_last_cycle?.trim()) { parts.push(`Done: ${s.accomplished_last_cycle.trim()}`); }
+    if (s.plan_next_cycle?.trim())         { parts.push(`Next: ${s.plan_next_cycle.trim()}`); }
+    return parts.length ? parts.join(' · ') : null;
+  }
+
+  statusDigestAge(cycle: DeliveryCycle): string {
+    return formatHeadlineDate(cycle.latest_status?.status_created_at ?? null);
   }
 
   /**

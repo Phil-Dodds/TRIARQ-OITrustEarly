@@ -36,9 +36,19 @@ export const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOM
 
 export type HeadlineColor = 'default' | 'sunray' | 'oravive';
 
+/** Status band for the headline cell (Phil 2026-07-16, CC-38-27):
+ *  blue = awaiting approval · red = gate overdue · amber = next gate due soon
+ *  (≤ AMBER_WINDOW_DAYS) or undated · green = next gate on track · none = neutral. */
+export type HeadlineBand = 'green' | 'amber' | 'red' | 'blue' | 'none';
+
+/** "Due soon" threshold for the amber band. D-482's window is meeting-anchored
+ *  and not applicable to gate proximity, so this is its own constant. */
+export const AMBER_WINDOW_DAYS = 7;
+
 export interface HeadlineResult {
   text:  string;
   color: HeadlineColor;
+  band:  HeadlineBand;
 }
 
 // Module-local date helpers. No central date utility exists in the codebase;
@@ -115,7 +125,8 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
     const date = formatHeadlineDate(ms?.target_date, now);
     return {
       text:  `Awaiting ${GATE_DISPLAY_NAMES[awaiting.gate_name]} approval${date ? ` · ${date}` : ''}`,
-      color: 'default'
+      color: 'default',
+      band:  'blue'
     };
   }
 
@@ -132,7 +143,8 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
       const days = Math.abs(d);
       return {
         text:  `${GATE_DISPLAY_NAMES[g]} approval overdue · ${days} ${days === 1 ? 'day' : 'days'}`,
-        color: 'oravive'
+        color: 'oravive',
+        band:  'red'
       };
     }
   }
@@ -146,12 +158,19 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
   const isPreDeploy  = PRE_DEPLOY_STAGES.includes(stage);
   const isPostDeploy = POST_DEPLOY_STAGES.includes(stage);
 
+  // Band for on-track vs due-soon: next gate undated or within the window → amber;
+  // dated beyond the window → green.
+  const nextGateDays = nextMs?.target_date ? daysFromToday(nextMs.target_date, now) : null;
+  const preDeployBand: HeadlineBand =
+    (nextGateDays === null || nextGateDays <= AMBER_WINDOW_DAYS) ? 'amber' : 'green';
+
   // Rule 3 — Pre-deploy AND Go to Deploy target set
   if (isPreDeploy && deployMs?.target_date && nextGate) {
     const deployStr = formatHeadlineDate(deployMs.target_date, now);
     return {
       text:  `Next: ${nextLabel}${nextDateStr ? ` ${nextDateStr}` : ''} · Deploy ${deployStr}`,
-      color: 'sunray'
+      color: 'sunray',
+      band:  preDeployBand
     };
   }
 
@@ -159,7 +178,8 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
   if (isPreDeploy && !deployMs?.target_date && nextGate) {
     return {
       text:  `Next: ${nextLabel}${nextDateStr ? ` ${nextDateStr}` : ''}`,
-      color: 'sunray'
+      color: 'sunray',
+      band:  preDeployBand
     };
   }
 
@@ -175,20 +195,22 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
       // Fall through to rule 5 shape when no dates are known on a post-deploy cycle.
       return {
         text:  `In ${STAGE_DISPLAY_NAMES[stage] ?? stage}${nextLabel ? ` · Next: ${nextLabel}` : ''}`,
-        color: 'default'
+        color: 'default',
+        band:  'none'
       };
     }
-    return { text: parts.join(' · '), color: 'default' };
+    return { text: parts.join(' · '), color: 'default', band: 'none' };
   }
 
   // Rule 5 — Default: "In [Stage] · Next: [next gate] [date]"
   const stageLabel = STAGE_DISPLAY_NAMES[stage] ?? stage;
   if (!nextGate) {
-    return { text: `In ${stageLabel}`, color: 'default' };
+    return { text: `In ${stageLabel}`, color: 'default', band: 'none' };
   }
   return {
     text:  `In ${stageLabel} · Next: ${nextLabel}${nextDateStr ? ` ${nextDateStr}` : ''}`,
-    color: 'sunray'
+    color: 'sunray',
+    band:  preDeployBand
   };
 }
 
@@ -199,4 +221,26 @@ export function headlineColorCss(color: HeadlineColor): string {
     case 'sunray':  return '#F2A620';
     default:        return 'var(--triarq-color-text-secondary, #5A5A5A)';
   }
+}
+
+/** Visual treatment per band — D-200 Pattern-2-style tinted band with a 3px
+ *  left bar; text uses dark stops of the same hue for readability (CC-38-26/27).
+ *  'none' renders flat: no bar, no tint, dark neutral text. */
+export interface HeadlineBandStyle {
+  bar:  string;   // left border color ('' = no border)
+  bg:   string;   // background tint ('' = transparent)
+  text: string;   // headline line color
+  sub:  string;   // status digest line color
+}
+
+const BAND_STYLES: Record<HeadlineBand, HeadlineBandStyle> = {
+  green: { bar: '#1D9E75', bg: 'rgba(29,158,117,0.09)', text: '#085041', sub: '#3A6B5B' },
+  amber: { bar: '#BA7517', bg: 'rgba(242,166,32,0.12)', text: '#633806', sub: '#7A5A2A' },
+  red:   { bar: '#A32D2D', bg: 'rgba(226,75,74,0.09)',  text: '#791F1F', sub: '#8A4A4A' },
+  blue:  { bar: '#185FA5', bg: 'rgba(55,138,221,0.09)', text: '#0C447C', sub: '#3A5A7A' },
+  none:  { bar: '',        bg: '',                      text: '#3A3A3A', sub: '#6A6A6A' }
+};
+
+export function headlineBandStyle(band: HeadlineBand): HeadlineBandStyle {
+  return BAND_STYLES[band];
 }

@@ -128,3 +128,53 @@ describe('formatHeadlineDate', () => {
   it('null → empty string',                    () => expect(formatHeadlineDate(null, FROZEN_NOW)).toBe(''));
   it('invalid → empty string',                 () => expect(formatHeadlineDate('not-a-date', FROZEN_NOW)).toBe(''));
 });
+
+// CC-38-27: status band — blue awaiting, red overdue, amber due-soon/undated,
+// green on-track (> AMBER_WINDOW_DAYS out), none for neutral states.
+describe('computeHeadline band', () => {
+  it('awaiting approval → blue', () => {
+    const cycle = baseCycle({
+      gate_records: [{ gate_name: 'brief_review', gate_status: 'awaiting_approval' }]
+    } as Partial<DeliveryCycle>);
+    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('blue');
+  });
+
+  it('overdue gate → red', () => {
+    const cycle = baseCycle({
+      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-09', actual_date: null }]
+    } as Partial<DeliveryCycle>);
+    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('red');
+  });
+
+  it('next gate inside 7-day window → amber', () => {
+    const cycle = baseCycle({
+      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-18', actual_date: null }]
+    } as Partial<DeliveryCycle>);
+    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('amber');
+  });
+
+  it('next gate undated → amber', () => {
+    const cycle = baseCycle({});
+    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('amber');
+  });
+
+  it('next gate beyond 7 days → green', () => {
+    const cycle = baseCycle({
+      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-25', actual_date: null }]
+    } as Partial<DeliveryCycle>);
+    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('green');
+  });
+
+  it('post-deploy with dates → none', () => {
+    const cycle = baseCycle({
+      current_lifecycle_stage: 'PILOT',
+      milestone_dates: [{ gate_name: 'go_to_deploy', target_date: null, actual_date: '2026-06-01' }],
+      gate_records: [
+        { gate_name: 'brief_review', gate_status: 'approved' },
+        { gate_name: 'go_to_build', gate_status: 'approved' },
+        { gate_name: 'go_to_deploy', gate_status: 'approved' }
+      ]
+    } as Partial<DeliveryCycle>);
+    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('none');
+  });
+});

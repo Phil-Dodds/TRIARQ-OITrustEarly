@@ -88,6 +88,7 @@ async function list_delivery_cycles(params, caller_user_id) {
       assigned_dol_user_id,
       jira_epic_key,
       roadmap_theme_id,
+      latest_status_update_id,
       created_at,
       updated_at
     `)
@@ -258,6 +259,25 @@ async function list_delivery_cycles(params, caller_user_id) {
     }
   }
 
+  // ── CC-38-26: latest status digest for the banded Headline cell.
+  // delivery_cycles.latest_status_update_id already points at the newest
+  // update — one batched fetch, no per-cycle scan.
+  const statusIdSet = new Set(cycles.map(c => c.latest_status_update_id).filter(Boolean));
+  let latestStatusMap = {};
+  if (statusIdSet.size > 0) {
+    const { data: statusRows } = await supabase
+      .from('initiative_status_updates')
+      .select('id, accomplished_last_cycle, plan_next_cycle, created_at')
+      .in('id', Array.from(statusIdSet));
+    (statusRows || []).forEach(s => {
+      latestStatusMap[s.id] = {
+        accomplished_last_cycle: s.accomplished_last_cycle ?? null,
+        plan_next_cycle:         s.plan_next_cycle ?? null,
+        status_created_at:       s.created_at
+      };
+    });
+  }
+
   // ── D-487/D-488: resolve Roadmap Theme names for the name-cell prefix,
   // EPO Deploy sub-grouping, and Theme filters.
   const themeIdSet = new Set(cycles.map(c => c.roadmap_theme_id).filter(Boolean));
@@ -280,6 +300,9 @@ async function list_delivery_cycles(params, caller_user_id) {
     display_name_short:  c.division_id ? (divisionMap[c.division_id]?.display_name_short ?? null) : null,
     milestone_dates:     milestoneMap[c.delivery_cycle_id] || [],
     gate_records:        gateRecordsMap[c.delivery_cycle_id] || [],
+    latest_status:       c.latest_status_update_id
+                           ? (latestStatusMap[c.latest_status_update_id] ?? null)
+                           : null,
     ...(include_event_log === true
       ? { target_date_change_events: targetChangeMap[c.delivery_cycle_id] || [] }
       : {})

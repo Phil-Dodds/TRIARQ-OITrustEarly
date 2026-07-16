@@ -315,6 +315,13 @@ export interface DeliveryCycle {
   // WS3.2 (D-203): Division short display name from list_delivery_cycles. ≤10 chars;
   // null when the Division has no short name configured (fall back to division_name).
   display_name_short?:     string | null;
+  // CC-38-26: latest status digest joined by list_delivery_cycles for the
+  // banded headline cell. null when no status update exists yet.
+  latest_status?: {
+    accomplished_last_cycle: string | null;
+    plan_next_cycle:         string | null;
+    status_created_at:       string;
+  } | null;
   owner_display_name?:     string;
   assigned_dcs_display_name?: string;
   assigned_epo_display_name?: string;

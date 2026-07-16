@@ -33,6 +33,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-16',
+    builtAt:       '17:15 UTC',
+    contractLabel: 'Contract 38 follow-on — Initiatives grid headline upgrade',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiatives grid',
+        description: 'The Headline cell now carries a color band for the next gate\'s state — green on track, amber due soon, red overdue, blue awaiting approval — with darker, easier-to-read text, and a second line showing the latest status update\'s Done and Next. The Tier chip is gone; tier still lives in Filters and the detail view.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-16',
     builtAt:       '16:30 UTC',
     contractLabel: 'Contract 38 follow-on — Home screen organized',
     items: [
