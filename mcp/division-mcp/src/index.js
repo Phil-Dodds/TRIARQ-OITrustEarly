@@ -109,6 +109,7 @@ app.post('/tools/:toolName', async (req, res) => {
     find_egg:              easterEggs.find_egg,
     get_my_egg_basket:     easterEggs.get_my_egg_basket,
     get_recent_egg_finds:  easterEggs.get_recent_egg_finds,
+    get_egg_leaderboard:   easterEggs.get_egg_leaderboard,
     list_easter_eggs:      easterEggs.list_easter_eggs,
     upsert_easter_egg:     easterEggs.upsert_easter_egg,
     set_easter_egg_active: easterEggs.set_easter_egg_active
@@ -191,6 +192,7 @@ app.get('/tools', (req, res) => {
       { name: 'find_egg',                     method: 'POST', path: '/tools/find_egg' },
       { name: 'get_my_egg_basket',            method: 'POST', path: '/tools/get_my_egg_basket' },
       { name: 'get_recent_egg_finds',         method: 'POST', path: '/tools/get_recent_egg_finds' },
+      { name: 'get_egg_leaderboard',          method: 'POST', path: '/tools/get_egg_leaderboard' },
       { name: 'list_easter_eggs',             method: 'POST', path: '/tools/list_easter_eggs' },
       { name: 'upsert_easter_egg',            method: 'POST', path: '/tools/upsert_easter_egg' },
       { name: 'set_easter_egg_active',        method: 'POST', path: '/tools/set_easter_egg_active' }

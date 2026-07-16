@@ -102,6 +102,14 @@ const ADMIN_CARDS: AdminCard[] = [
     who:         'Phil and Admin',
     route:       'sprint-calendars',
     icon:        '▦'
+  },
+  // Easter Egg Hunt leaderboard.
+  {
+    title:       'Easter Egg Leaderboard',
+    description: 'A read-only view of the Easter Egg Hunt: every user ranked by eggs found, with a progress bar toward all ten. See how the hunt is going across the team.',
+    who:         'Phil and Admin',
+    route:       'easter-eggs',
+    icon:        '🥚'
   }
 ];
 

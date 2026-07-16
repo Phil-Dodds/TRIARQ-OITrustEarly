@@ -30,7 +30,9 @@ import { IonicModule }  from '@ionic/angular';
       // Tracks Phase A: shared Team Meeting section list.
       { path: 'meeting-sections', loadComponent: () => import('./meeting-sections/meeting-sections.component').then(c => c.MeetingSectionsComponent) },
       // Contract 37 (D-549): Sprint Calendars admin screen.
-      { path: 'sprint-calendars', loadComponent: () => import('./sprint-calendars/sprint-calendars.component').then(c => c.SprintCalendarsComponent) }
+      { path: 'sprint-calendars', loadComponent: () => import('./sprint-calendars/sprint-calendars.component').then(c => c.SprintCalendarsComponent) },
+      // Easter Egg Hunt leaderboard (admin).
+      { path: 'easter-eggs', loadComponent: () => import('./easter-egg-leaderboard/easter-egg-leaderboard.component').then(c => c.EasterEggLeaderboardComponent) }
     ])
   ]
 })

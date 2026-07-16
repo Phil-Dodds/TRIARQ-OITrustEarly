@@ -115,13 +115,21 @@ describe('find_egg', () => {
 });
 
 describe('get_my_egg_basket', () => {
-  test('reveals names only for found eggs (EE-01)', async () => {
+  test('reveals names only for found eggs (EE-01) and returns the leader', async () => {
     queue = [
       { data: [
-        { id: 'e1', egg_name: 'Home', asset_ref: 'egg-01', sort_order: 1 },
-        { id: 'e2', egg_name: 'About', asset_ref: 'egg-08', sort_order: 2 }
-      ], error: null },
-      { data: [{ egg_id: 'e1', found_at: '2026-07-15T00:00:00Z' }], error: null }
+        { id: 'e1', egg_name: 'Home', asset_ref: 'egg-01', sort_order: 1, placement_key: 'home.landing.footer' },
+        { id: 'e2', egg_name: 'About', asset_ref: 'egg-08', sort_order: 2, placement_key: 'shell.about.footer' }
+      ], error: null },                                              // active eggs
+      { data: [{ egg_id: 'e1', found_at: '2026-07-15T00:00:00Z' }], error: null }, // my finds
+      // computeLeaderboard: countActiveEggs, users, all finds
+      { count: 2 },
+      { data: [{ id: USER, display_name: 'You' }, { id: 'other', display_name: 'Maya' }], error: null },
+      { data: [
+        { user_id: 'other', found_at: '2026-07-14T00:00:00Z', easter_eggs: { asset_ref: 'egg-03' } },
+        { user_id: 'other', found_at: '2026-07-16T00:00:00Z', easter_eggs: { asset_ref: 'egg-05' } },
+        { user_id: USER, found_at: '2026-07-15T00:00:00Z', easter_eggs: { asset_ref: 'egg-01' } }
+      ], error: null }
     ];
     const r = await ee.get_my_egg_basket({}, USER);
     assert.equal(r.success, true);
@@ -131,6 +139,44 @@ describe('get_my_egg_basket', () => {
     const unfound = r.data.basket.find(b => b.egg_id === 'e2');
     assert.equal(found.egg_name, 'Home');
     assert.equal(unfound.egg_name, null, 'unfound egg name hidden');
+    // Maya (2) leads You (1); leader shows her most-recent egg (egg-05).
+    assert.equal(r.data.leader.display_name, 'Maya');
+    assert.equal(r.data.leader.found_count, 2);
+    assert.equal(r.data.leader.last_asset_ref, 'egg-05');
+    assert.equal(r.data.leader.is_me, false);
+  });
+});
+
+describe('get_egg_leaderboard', () => {
+  test('rejects non-admin', async () => {
+    queue = [ADMIN_NO];
+    const r = await ee.get_egg_leaderboard({}, USER);
+    assert.equal(r.success, false);
+  });
+
+  test('orders by count desc, tie broken by most recent last egg', async () => {
+    queue = [
+      ADMIN_OK,
+      { count: 10 },                                       // countActiveEggs
+      { data: [
+        { id: 'a', display_name: 'Ann' },
+        { id: 'b', display_name: 'Bob' },
+        { id: 'c', display_name: 'Cy' }                    // zero finds
+      ], error: null },
+      { data: [
+        { user_id: 'a', found_at: '2026-07-10T00:00:00Z', easter_eggs: { asset_ref: 'egg-01' } },
+        { user_id: 'a', found_at: '2026-07-11T00:00:00Z', easter_eggs: { asset_ref: 'egg-02' } },
+        { user_id: 'b', found_at: '2026-07-12T00:00:00Z', easter_eggs: { asset_ref: 'egg-03' } },
+        { user_id: 'b', found_at: '2026-07-15T00:00:00Z', easter_eggs: { asset_ref: 'egg-04' } }
+      ], error: null }
+    ];
+    const r = await ee.get_egg_leaderboard({}, USER);
+    assert.equal(r.success, true);
+    assert.equal(r.data.total_eggs, 10);
+    // Ann & Bob tie at 2; Bob's last egg (07-15) is more recent → Bob first.
+    assert.deepEqual(r.data.rows.map(x => x.display_name), ['Bob', 'Ann', 'Cy']);
+    assert.equal(r.data.rows[0].last_asset_ref, 'egg-04');
+    assert.equal(r.data.rows[2].found_count, 0);
   });
 });
 

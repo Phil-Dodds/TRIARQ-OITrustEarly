@@ -40,6 +40,48 @@ async function countUserFinds(user_id) {
   return count ?? 0;
 }
 
+// Leaderboard aggregation shared by get_egg_leaderboard (full list) and
+// get_my_egg_basket (leader summary). One row per ACTIVE user, including users
+// with zero finds. Sort: most eggs first; ties broken by whoever added their
+// most recent egg last (last_found_at desc); then name.
+async function computeLeaderboard() {
+  const total_eggs = await countActiveEggs();
+
+  const { data: users } = await supabase
+    .from('users').select('id, display_name').is('deleted_at', null);
+
+  const { data: finds } = await supabase
+    .from('user_egg_finds')
+    .select('user_id, found_at, easter_eggs(asset_ref)')
+    .is('deleted_at', null);
+
+  const byUser = new Map();
+  for (const u of users || []) {
+    byUser.set(u.id, {
+      user_id: u.id, display_name: u.display_name,
+      found_count: 0, last_found_at: null, last_asset_ref: null
+    });
+  }
+  for (const f of finds || []) {
+    const row = byUser.get(f.user_id);
+    if (!row) continue; // find by a since-deleted user — skip
+    row.found_count += 1;
+    if (!row.last_found_at || f.found_at > row.last_found_at) {
+      row.last_found_at = f.found_at;
+      row.last_asset_ref = f.easter_eggs?.asset_ref ?? row.last_asset_ref;
+    }
+  }
+
+  const rows = [...byUser.values()].sort((a, b) => {
+    if (b.found_count !== a.found_count) return b.found_count - a.found_count;
+    const al = a.last_found_at || '', bl = b.last_found_at || '';
+    if (al !== bl) return al > bl ? -1 : 1; // most recent last-egg wins the tie
+    return (a.display_name || '').localeCompare(b.display_name || '');
+  });
+
+  return { rows, total_eggs };
+}
+
 // ── find_egg ─────────────────────────────────────────────────────────────────
 // Idempotent (EE-06). On the 10th distinct find → achievement + congrats email.
 async function find_egg(params, caller_user_id) {
@@ -212,10 +254,31 @@ async function get_my_egg_basket(params, caller_user_id) {
   }));
 
   const total_found = basket.filter(b => b.found).length;
+
+  // Current leader summary for the Home card (any user may see who's ahead).
+  const { rows } = await computeLeaderboard();
+  const top = (rows || []).find(r => r.found_count > 0) || null;
+  const leader = top ? {
+    display_name: top.display_name,
+    found_count: top.found_count,
+    last_asset_ref: top.last_asset_ref,
+    is_me: top.user_id === caller_user_id
+  } : null;
+
   return { success: true, data: {
     basket, total_found, total_eggs: activeEggs.length,
-    completed: activeEggs.length > 0 && total_found >= activeEggs.length
+    completed: activeEggs.length > 0 && total_found >= activeEggs.length,
+    leader
   }};
+}
+
+// ── get_egg_leaderboard (admin) ──────────────────────────────────────────────
+async function get_egg_leaderboard(params, caller_user_id) {
+  if (!(await isAdmin(caller_user_id))) {
+    return { success: false, error: 'The Easter Egg leaderboard is Admin-only.' };
+  }
+  const { rows, total_eggs } = await computeLeaderboard();
+  return { success: true, data: { rows, total_eggs } };
 }
 
 // ── get_recent_egg_finds ─────────────────────────────────────────────────────
@@ -313,6 +376,6 @@ async function set_easter_egg_active(params, caller_user_id) {
 }
 
 module.exports = {
-  find_egg, get_my_egg_basket, get_recent_egg_finds,
+  find_egg, get_my_egg_basket, get_recent_egg_finds, get_egg_leaderboard,
   list_easter_eggs, upsert_easter_egg, set_easter_egg_active
 };

@@ -18,6 +18,21 @@ export interface EggBasketRow {
   found_at: string | null;
 }
 
+export interface EggLeader {
+  display_name: string;
+  found_count: number;
+  last_asset_ref: string | null;
+  is_me: boolean;
+}
+
+export interface EggLeaderboardRow {
+  user_id: string;
+  display_name: string;
+  found_count: number;
+  last_found_at: string | null;
+  last_asset_ref: string | null;
+}
+
 export interface EggBasketState {
   rows: EggBasketRow[];
   totalFound: number;
@@ -25,6 +40,7 @@ export interface EggBasketState {
   completed: boolean;
   activeKeys: Set<string>;
   foundKeys: Set<string>;
+  leader: EggLeader | null;
 }
 
 export interface EggFindResult {
@@ -63,7 +79,7 @@ export class EasterEggService {
   }
 
   reload(): void {
-    this.mcp.call<{ basket: EggBasketRow[]; total_found: number; total_eggs: number; completed: boolean }>(
+    this.mcp.call<{ basket: EggBasketRow[]; total_found: number; total_eggs: number; completed: boolean; leader: EggLeader | null }>(
       'division', 'get_my_egg_basket', {}
     ).subscribe({
       next: (res) => {
@@ -73,7 +89,7 @@ export class EasterEggService {
     });
   }
 
-  private publish(data: { basket: EggBasketRow[]; total_found: number; total_eggs: number; completed: boolean }): void {
+  private publish(data: { basket: EggBasketRow[]; total_found: number; total_eggs: number; completed: boolean; leader?: EggLeader | null }): void {
     const rows = data.basket ?? [];
     this.state$.next({
       rows,
@@ -81,7 +97,18 @@ export class EasterEggService {
       totalEggs: data.total_eggs ?? 0,
       completed: !!data.completed,
       activeKeys: new Set(rows.map(r => r.placement_key)),
-      foundKeys: new Set(rows.filter(r => r.found).map(r => r.placement_key))
+      foundKeys: new Set(rows.filter(r => r.found).map(r => r.placement_key)),
+      leader: data.leader ?? null
+    });
+  }
+
+  /** Admin-only full leaderboard (all users, most eggs first). */
+  getLeaderboard(): Observable<{ rows: EggLeaderboardRow[]; total_eggs: number }> {
+    return new Observable(sub => {
+      this.mcp.call<{ rows: EggLeaderboardRow[]; total_eggs: number }>('division', 'get_egg_leaderboard', {}).subscribe({
+        next: (res) => { sub.next(res.success && res.data ? res.data : { rows: [], total_eggs: 10 }); sub.complete(); },
+        error: () => { sub.next({ rows: [], total_eggs: 10 }); sub.complete(); }
+      });
     });
   }
 
