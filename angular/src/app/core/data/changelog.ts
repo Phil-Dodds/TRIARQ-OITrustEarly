@@ -33,6 +33,23 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-16',
+    builtAt:       '13:00 UTC',
+    contractLabel: 'Contract 38 — Meeting presence + leader-name sections',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Team Meeting screen',
+        description: 'See who else is on the meeting with you. A "Here now" avatar stack sits by the series name, and a small colored chip appears on whichever section each person is working in — moving as they move.'
+      },
+      {
+        audience:    'All',
+        surface:     'Series sections',
+        description: 'New meeting series no longer default to "Phil" section names — the escalation and communications sections now carry the series leader\'s own first name.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-16',
     builtAt:       '18:00 UTC',
     contractLabel: 'News banner reactions',
     items: [
