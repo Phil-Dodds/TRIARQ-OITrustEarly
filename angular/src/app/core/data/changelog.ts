@@ -32,6 +32,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-16',
+    builtAt:       '03:00 UTC',
+    contractLabel: 'Activity banner + Easter Egg leaderboard',
+    items: [
+      {
+        audience:    'All',
+        surface:     'News banner',
+        description: 'A slim banner now scrolls along the bottom of every screen, celebrating recent good news — gates passed, new meetings, eggs found, and new people joining. Hover to pause it.'
+      },
+      {
+        audience:    'All',
+        surface:     'My Easter Eggs',
+        description: 'The card now shows the current hunt leader — their name, egg count, and most recent egg.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Easter Egg Leaderboard',
+        description: 'A new Admin screen ranks everyone by eggs found with a progress bar toward all ten — a quick read on how the hunt is going.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-15',
     builtAt:       '12:00 UTC',
     contractLabel: 'Easter Egg Hunt',

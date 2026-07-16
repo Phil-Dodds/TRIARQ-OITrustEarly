@@ -51,6 +51,9 @@ import { Observable }             from 'rxjs';
 
       <!-- Easter Egg Hunt — completion celebration, fires on any screen -->
       <app-egg-celebration-overlay></app-egg-celebration-overlay>
+
+      <!-- Bottom news banner — positive activity, all screens when signed in -->
+      <app-news-banner *ngIf="showSidebar$ | async"></app-news-banner>
     </div>
   `,
   styles: [`
@@ -101,6 +104,9 @@ import { Observable }             from 'rxjs';
       0%   { background-position: -50% 0; }
       100% { background-position: 150% 0; }
     }
+    /* Reserve space for the fixed bottom news banner so it never covers content
+       (including the Easter egg spots placed at screen bottoms). */
+    .oi-main-content { padding-bottom: 38px; }
   `]
 })
 export class AppComponent implements OnInit {

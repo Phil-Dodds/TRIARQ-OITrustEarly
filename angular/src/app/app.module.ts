@@ -22,6 +22,7 @@ import { SidebarComponent }          from './shared/components/sidebar/sidebar.c
 import { BlockedActionComponent }    from './shared/components/blocked-action/blocked-action.component';
 import { AboutPanelComponent }       from './shared/components/about-panel/about-panel.component';
 import { EggCelebrationOverlayComponent } from './features/easter-eggs/egg-celebration-overlay.component';
+import { NewsBannerComponent }         from './features/news-banner/news-banner.component';
 
 @NgModule({
   declarations: [
@@ -38,7 +39,8 @@ import { EggCelebrationOverlayComponent } from './features/easter-eggs/egg-celeb
     BlockedActionComponent,     // standalone — imported, not declared
     LoginComponent,             // standalone — imported, not declared
     AboutPanelComponent,        // standalone — D-426 About Panel
-    EggCelebrationOverlayComponent  // standalone — Easter Egg Hunt completion overlay
+    EggCelebrationOverlayComponent, // standalone — Easter Egg Hunt completion overlay
+    NewsBannerComponent         // standalone — bottom news banner
   ],
   bootstrap: [AppComponent]
 })
