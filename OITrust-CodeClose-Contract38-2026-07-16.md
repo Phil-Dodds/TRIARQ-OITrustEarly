@@ -354,6 +354,40 @@ next-contract candidate if the sidebar grows again.
 4. User with ≥1 egg (you): teaser never appears. Pass/Fail.
 5. Find your first egg while teaser eligible — teaser stops for good. Pass/Fail.
 
+---
+
+# Follow-on 4 — Home Screen Standard Height + Value-First Order + Live Statuses (same session)
+
+Phil: standard card height, move purposeless cards down, organize for EPO/DCS
+value, advance nav statuses past pilot. Deployed SHA: e9da20f (gh-pages
+5c3466d). Angular-only.
+
+- **CC-38-21** — Standard Home card height: 340px, content scrolls inside.
+  Chosen so the tallest natural content (egg grid, activity feed) fits without
+  scroll while empty cards stop reading as holes. Scoped
+  `.oi-home-screen .oi-card-grid .oi-card` in styles.scss — hub screens keep
+  natural heights.
+- **CC-38-22** — Home card order (spec deviation, Rule 7 — supersedes
+  D-425/D-429 append-after-Notifications ordering on Phil's instruction):
+  My Initiatives (D-423 lead preserved) → My Action Queue → My Activity →
+  My Completed Gates → egg cards → Divisions/User Management/System Health
+  (admin) → Notifications, OI Library, OI Assistant (placeholder value, bottom).
+- **CC-38-23** — devStatus pilot → live: Home, My Actions, Team Meetings.
+  Phil's explicit instruction (Initiative Tracking already live). S-020
+  advancement confirmation satisfied by the instruction itself.
+
+**Verification deltas:** template reorder + global CSS + constant edits — no
+logic; build green; S-035 changelog entry in deploy commit e9da20f; no new
+files. Stage check (S-020): statuses advanced this contract at Phil's
+direction — no further flags.
+
+**Addendum UAT:**
+1. Home: all cards equal height (340px); long content (activity feed, egg grid, division list) scrolls inside its card. Pass/Fail.
+2. Card order: Initiatives, Action Queue, Activity, Completed Gates first; eggs next; admin cards after; Notifications / OI Library / OI Assistant last. Pass/Fail.
+3. Non-admin (Shirish): same order minus admin cards. Pass/Fail.
+4. Sidebar: Home, My Actions, Team Meetings, Initiative Tracking all show "Live". Pass/Fail.
+5. Hub screens (Delivery hub, Admin hub): card heights unchanged. Pass/Fail.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
