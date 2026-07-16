@@ -51,14 +51,21 @@ describe('get_news_ticker', () => {
       // 3. egg finds
       { data: [{ found_at: '2026-07-15T00:00:00Z', users: { display_name: 'Maya' }, easter_eggs: { asset_ref: 'egg-05' } }], error: null },
       // 4. new users
-      { data: [{ display_name: 'Tom', created_at: '2026-07-12T00:00:00Z' }], error: null }
+      { data: [{ display_name: 'Tom', created_at: '2026-07-12T00:00:00Z' }], error: null },
+      // 5. status updates (+ title fetch)
+      { data: [{ initiative_id: 'c1', saved_at: '2026-07-17T00:00:00Z', users: { display_name: 'Ana' } }], error: null },
+      { data: [{ delivery_cycle_id: 'c1', cycle_title: 'Referral Mgmt' }], error: null },
+      // 6. acknowledgements
+      { data: [{ acknowledged_at: '2026-07-11T00:00:00Z', users: { display_name: 'Bo' } }], error: null }
     ];
     const r = await get_news_ticker({}, USER);
     assert.equal(r.success, true);
-    // newest first: meeting (07-16) → egg (07-15) → user (07-12) → gate (07-10)
-    assert.deepEqual(r.data.items.map(i => i.kind), ['meeting', 'egg', 'user', 'gate']);
-    assert.match(r.data.items[0].text, /Sarah created a new meeting/);
-    assert.equal(r.data.items[1].asset_ref, 'egg-05');
-    assert.match(r.data.items[3].text, /Referral Mgmt passed its Go to Build gate/);
+    // newest first: status (07-17) → meeting (07-16) → egg (07-15) → user (07-12) → ack (07-11) → gate (07-10)
+    assert.deepEqual(r.data.items.map(i => i.kind), ['status', 'meeting', 'egg', 'user', 'ack', 'gate']);
+    assert.match(r.data.items[0].text, /Ana posted a status update on Referral Mgmt/);
+    assert.match(r.data.items[1].text, /Sarah created a new meeting/);
+    assert.equal(r.data.items[2].asset_ref, 'egg-05');
+    assert.match(r.data.items[4].text, /Bo acknowledged a status update/);
+    assert.match(r.data.items[5].text, /Referral Mgmt passed its Go to Build gate/);
   });
 });

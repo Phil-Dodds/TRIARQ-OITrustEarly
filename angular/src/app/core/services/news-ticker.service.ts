@@ -7,7 +7,7 @@ import { Observable } from 'rxjs';
 import { McpService } from './mcp.service';
 
 export interface NewsTickerItem {
-  kind: 'gate' | 'meeting' | 'egg' | 'user';
+  kind: 'gate' | 'meeting' | 'egg' | 'user' | 'status' | 'ack';
   text: string;
   asset_ref?: string | null;
   occurred_at: string;
