@@ -23,8 +23,14 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, EggIconComponent],
   template: `
-    <div class="nb" *ngIf="items.length > 0" aria-label="Recent activity" (mouseleave)="closePicker()">
-      <span class="nb-tag">OI Trust</span>
+    <!-- Full banner — shown when not hidden and there's something to show -->
+    <div class="nb" *ngIf="!hidden && items.length > 0" aria-label="Recent activity" (mouseleave)="onLeave()">
+      <div class="nb-tagwrap">
+        <button type="button" class="nb-tag" (click)="toggleMenu()" aria-label="News banner menu">OI Trust</button>
+        <div class="nb-menu" *ngIf="menuOpen">
+          <button type="button" (click)="setHidden(true)">Hide news banner</button>
+        </div>
+      </div>
       <div class="nb-viewport">
         <div class="nb-track" [style.animation-duration.s]="durationSec">
           <span class="nb-item" *ngFor="let it of loopItems; let i = index">
@@ -56,6 +62,14 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
       </div>
     </div>
 
+    <!-- Collapsed handle — always available to bring the banner back -->
+    <div class="nb-handle" *ngIf="hidden">
+      <button type="button" class="nb-tag nb-tag-handle" (click)="toggleMenu()" aria-label="News banner menu">OI Trust ▸</button>
+      <div class="nb-menu nb-menu-handle" *ngIf="menuOpen">
+        <button type="button" (click)="setHidden(false)">Show news banner</button>
+      </div>
+    </div>
+
     <!-- reaction glyph: heart/clap unicode, triarq = mini Q emblem -->
     <ng-template #glyph let-emoji let-size="size">
       <span *ngIf="emoji === 'heart'" class="nb-g">❤️</span>
@@ -73,11 +87,28 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
       display: flex; align-items: center; gap: 10px;
       background: var(--triarq-color-deep-navy, #12274A); color: #fff; font-size: 12.5px;
     }
+    .nb-tagwrap { position: relative; flex-shrink: 0; height: 100%; }
     .nb-tag {
       flex-shrink: 0; padding: 0 12px; height: 100%; display: flex; align-items: center;
-      background: var(--triarq-color-primary, #257099); font-weight: 500;
-      letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px;
+      background: var(--triarq-color-primary, #257099); color: #fff; border: none; cursor: pointer;
+      font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px;
     }
+    .nb-menu {
+      position: absolute; bottom: 100%; left: 0; margin-bottom: 4px; z-index: 901;
+      background: #fff; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); overflow: hidden;
+    }
+    .nb-menu button {
+      display: block; width: 100%; text-align: left; white-space: nowrap;
+      background: none; border: none; cursor: pointer; padding: 8px 14px;
+      font-size: 12px; color: var(--triarq-color-text-primary, #1a1a1a);
+    }
+    .nb-menu button:hover { background: var(--triarq-color-fog, #F1EFE8); }
+    .nb-handle { position: fixed; left: 0; bottom: 0; z-index: 900; }
+    .nb-tag-handle {
+      height: 24px; border-radius: 0 6px 0 0; opacity: 0.85; font-size: 10px;
+    }
+    .nb-tag-handle:hover { opacity: 1; }
+    .nb-menu-handle { bottom: 24px; }
     .nb-viewport { flex: 1; overflow: hidden; }
     .nb-track {
       display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
@@ -115,12 +146,16 @@ export class NewsBannerComponent implements OnInit, OnDestroy {
   loopItems: NewsTickerItem[] = [];
   durationSec = 60;
   openIndex: number | null = null;
+  hidden = false;
+  menuOpen = false;
   readonly emojis = EMOJIS;
+  private static readonly HIDE_KEY = 'oi.newsBanner.hidden';
   private sub?: Subscription;
 
   constructor(private readonly news: NewsTickerService, private readonly cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
+    try { this.hidden = localStorage.getItem(NewsBannerComponent.HIDE_KEY) === '1'; } catch { /* ignore */ }
     this.sub = timer(0, POLL_MS).pipe(switchMap(() => this.news.getTicker())).subscribe(items => {
       this.items = items;
       this.rebuildLoop();
@@ -138,6 +173,16 @@ export class NewsBannerComponent implements OnInit, OnDestroy {
 
   openPicker(i: number): void { this.openIndex = i; this.cdr.markForCheck(); }
   closePicker(): void { this.openIndex = null; this.cdr.markForCheck(); }
+  onLeave(): void { this.openIndex = null; this.menuOpen = false; this.cdr.markForCheck(); }
+
+  toggleMenu(): void { this.menuOpen = !this.menuOpen; this.cdr.markForCheck(); }
+
+  setHidden(hidden: boolean): void {
+    this.hidden = hidden;
+    this.menuOpen = false;
+    try { localStorage.setItem(NewsBannerComponent.HIDE_KEY, hidden ? '1' : '0'); } catch { /* ignore */ }
+    this.cdr.markForCheck();
+  }
 
   hasMine(item: NewsTickerItem, emoji: ReactionEmoji): boolean {
     return !!item.reactions.find(r => r.emoji === emoji && r.mine);
