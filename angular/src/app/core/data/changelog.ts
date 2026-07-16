@@ -38,6 +38,11 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       {
         audience:    'All',
+        surface:     'Sidebar',
+        description: 'All coming-soon items now live under one collapsible "Coming Soon …" menu below Contact an Admin — the sidebar shows only what works today.'
+      },
+      {
+        audience:    'All',
         surface:     'Home screen',
         description: 'Home cards now share one standard height with content scrolling inside, and the order puts your working cards first — Initiatives, Action Queue, Activity, Completed Gates — with coming-soon cards moved to the bottom.'
       },

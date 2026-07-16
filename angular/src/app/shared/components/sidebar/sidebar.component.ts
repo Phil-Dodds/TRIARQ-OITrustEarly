@@ -47,22 +47,20 @@ const NAV_ITEMS: NavItem[] = [
   // Users without a series can create one (if permitted) or join a public series.
   // Badge = number of series the user participates in.
   { label: 'Team Meetings', route: '/team-meetings', devStatus: 'live' },
-  { label: 'To Dos',                                         devStatus: 'not-started' },
-  { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
-    children: [
-      { label: 'Skills Management',                          devStatus: 'not-started' },
-      { label: 'Context',                                    devStatus: 'not-started' },
-      { label: 'Artifact',                                   devStatus: 'not-started' },
-    ] },
-  { label: 'Chat',                 route: '/chat',           devStatus: 'not-started' },
-  // Lowered below Chat (Phil).
-  { label: 'AI Governance Boards',                           devStatus: 'not-started',
-    children: [
-      { label: 'AI Inventory',                               devStatus: 'not-started' },
-      { label: 'Meeting Archives',                           devStatus: 'not-started' },
-    ] },
-  { label: 'Policy Committee',                               devStatus: 'not-started' },
   { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'live'        },
+  // Phil 2026-07-16 (CC-38-24): all coming-soon items collapse under one
+  // "Coming Soon …" parent below Contact an Admin. The sidebar nests one
+  // level, so the former OI Library / AI Governance grandchildren (Skills
+  // Management, Context, Artifact, AI Inventory, Meeting Archives) return
+  // when those features are built.
+  { label: 'Coming Soon …',                                  devStatus: 'not-started',
+    children: [
+      { label: 'To Dos',                                     devStatus: 'not-started' },
+      { label: 'OI Library',       route: '/library',        devStatus: 'not-started' },
+      { label: 'Chat',             route: '/chat',           devStatus: 'not-started' },
+      { label: 'AI Governance Boards',                       devStatus: 'not-started' },
+      { label: 'Policy Committee',                           devStatus: 'not-started' },
+    ] },
   { label: 'Admin',                route: '/admin',          requiresFlag: 'is_admin', devStatus: 'live' },
 ];
 
@@ -117,7 +115,9 @@ const NAV_ITEMS: NavItem[] = [
                   type="button" class="oi-nav-chevron"
                   [attr.aria-label]="(isExpanded(item.label) ? 'Collapse ' : 'Expand ') + item.label"
                   (click)="$event.preventDefault(); $event.stopPropagation(); toggle(item.label)">{{ isExpanded(item.label) ? '▾' : '▸' }}</button>
-          <span class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
+          <!-- Status chip hidden on grouping parents and Coming Soon children —
+               the group label already carries the message (CC-38-24). -->
+          <span *ngIf="!item.children?.length && !sub" class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
             {{ statusLabel(item.devStatus) }}
           </span>
         </a>
@@ -129,7 +129,7 @@ const NAV_ITEMS: NavItem[] = [
               (click)="item.children?.length && toggle(item.label)">
           <span class="oi-nav-label">{{ item.label }}</span>
           <span *ngIf="item.children?.length" class="oi-nav-chevron">{{ isExpanded(item.label) ? '▾' : '▸' }}</span>
-          <span class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
+          <span *ngIf="!item.children?.length && !sub" class="oi-dev-status" [ngClass]="'status-' + item.devStatus">
             {{ statusLabel(item.devStatus) }}
           </span>
         </span>
