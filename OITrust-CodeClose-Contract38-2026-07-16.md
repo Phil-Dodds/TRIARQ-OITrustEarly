@@ -531,8 +531,19 @@ refined in discussion to two-tone (his suggestion). Deployed SHA: 7c2b385
 resolver branch removal); build green; no MCP surface; S-035 changelog in
 deploy commit 7c2b385; no new files.
 
+**Render fix (same follow-on, deployed dc3f40b / gh-pages ea69af6):** Phil's
+screenshot review caught two cosmetic defects — grid halos clipped into
+crescents by ancestor overflow, and the full-mode halo colliding with gate
+labels ("Go to Deploy" → "Go to"). Fixed: condensed track gains internal
+padding (offset by negative margin — row footprint unchanged) so the ring
+paints inside the component box; haloed diamonds take z-index 1 so connectors
+never slice the ring; full-mode diamonds gain 7px label clearance; rings
+tightened one notch both modes. Screenshot review also CONFIRMED working:
+two-tone submitted render (green-in-purple on On-Demand Formulary), ⚠ overdue
+conflict on Passive/Active Engagement, grid↔panel color agreement.
+
 **Addendum UAT:**
-1. Grid: exactly one haloed diamond per unfinished row, on the next unapproved gate; none on finished rows. Pass/Fail.
+1. Grid: exactly one haloed diamond per unfinished row, on the next unapproved gate; none on finished rows. Full ring — no crescent clipping. Pass/Fail.
 2. Halo ring matches the diamond's status color (green/amber/red/blue); grey no-status diamonds get a navy ring. Pass/Fail.
 3. Submit a gate → diamond KEEPS your status color, ring turns purple in grid and panel. Approve → halo moves to the following gate. Pass/Fail.
 4. Rows don't jump or resize as halos render (paint-only check). Pass/Fail.
