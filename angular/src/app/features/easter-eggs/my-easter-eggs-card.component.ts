@@ -19,7 +19,9 @@ import { EggCelebrationComponent } from './egg-celebration.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, EggIconComponent, EggBasketComponent, EggCelebrationComponent],
   template: `
-    <div class="oi-card" style="height:100%; box-sizing:border-box;" *ngIf="state as s">
+    <!-- No height:100% — the card sizes to its content instead of stretching
+         to the tallest card in the Home grid row (Phil 2026-07-16). -->
+    <div class="oi-card" style="box-sizing:border-box;" *ngIf="state as s">
 
       <ng-container *ngIf="!s.completed; else done">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">

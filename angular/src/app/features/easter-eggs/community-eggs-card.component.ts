@@ -17,7 +17,9 @@ import { EggIconComponent, EggAssetRef } from './egg-icon.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, EggIconComponent],
   template: `
-    <div class="oi-card" style="height:100%; box-sizing:border-box;">
+    <!-- Sizes to content; the find feed scrolls inside a capped region so the
+         card stops stretching the whole Home grid row (Phil 2026-07-16). -->
+    <div class="oi-card" style="box-sizing:border-box;">
       <div style="font-weight:500; margin-bottom:12px;">Egg hunt — community</div>
 
       <!-- Current hunt leader (spec: name X of 10 + their most recent egg;
@@ -31,7 +33,7 @@ import { EggIconComponent, EggAssetRef } from './egg-icon.component';
         <span style="font-size:12px; color:var(--triarq-color-text-secondary,#5A5A5A);">{{ ld.found_count }} of {{ basket?.totalEggs }}</span>
       </div>
 
-      <div *ngIf="feed as f">
+      <div *ngIf="feed as f" style="max-height:280px; overflow-y:auto;">
         <div *ngFor="let a of f.achievements"
              style="display:flex; align-items:center; gap:8px; padding:7px 10px; margin-bottom:8px;
                     background:rgba(245,166,35,0.10); border-radius:5px;">

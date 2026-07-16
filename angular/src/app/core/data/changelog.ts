@@ -33,6 +33,23 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-16',
+    builtAt:       '15:45 UTC',
+    contractLabel: 'Contract 38 follow-on — compact egg cards + a curious egg',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Home egg cards',
+        description: 'My Easter Eggs and the community card now size to their content — the community feed scrolls inside the card instead of stretching the whole row.'
+      },
+      {
+        audience:    'All',
+        surface:     'Sidebar',
+        description: 'Haven\'t found a single egg yet? Keep an eye on the Home menu — something might dance by now and then. (Just a nudge — the real eggs are hidden in the app.)'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-16',
     builtAt:       '14:30 UTC',
     contractLabel: 'Contract 38 follow-on — egg hunt leader moved',
     items: [

@@ -5,6 +5,8 @@
 
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { UserProfileService } from '../../../core/services/user-profile.service';
+import { EasterEggService }   from '../../../core/services/easter-egg.service';
+import { EggAssetRef, EGG_ASSET_REFS } from '../../../features/easter-eggs/egg-icon.component';
 import { AuthService }        from '../../../core/services/auth.service';
 import { DeliveryService }    from '../../../core/services/delivery.service';
 import { TeamMeetingsService } from '../../../features/team-meetings/team-meetings.service';
@@ -96,6 +98,13 @@ const NAV_ITEMS: NavItem[] = [
            [class.oi-nav-subitem]="sub"
            [attr.aria-label]="item.label">
           <span class="oi-nav-label">{{ item.label }}</span>
+          <!-- Dancing-egg teaser — Home only, zero-egg users only, appears
+               occasionally to spark curiosity. Decorative: not clickable, no
+               hunt credit (Phil 2026-07-16). -->
+          <span *ngIf="item.route === '/home' && eggTeaserVisible"
+                class="oi-egg-teaser" aria-hidden="true">
+            <app-egg-icon [assetRef]="eggTeaserAsset" [size]="18"></app-egg-icon>
+          </span>
           <!-- D-472 (WS1.1): pending-action badge on My Actions only. -->
           <span *ngIf="item.route === '/actions' && actionBadge > 0"
                 class="oi-nav-badge"
@@ -181,6 +190,17 @@ const NAV_ITEMS: NavItem[] = [
       line-height: 1.4;
     }
 
+    /* Dancing-egg teaser — decorative, never intercepts clicks on the nav item. */
+    .oi-egg-teaser { flex-shrink: 0; pointer-events: none; display: inline-flex;
+                     animation: oi-egg-dance 0.9s ease-in-out infinite;
+                     transform-origin: 50% 90%; }
+    @keyframes oi-egg-dance {
+      0%, 100% { transform: rotate(-14deg); }
+      25%      { transform: rotate(10deg) translateY(-2px); }
+      50%      { transform: rotate(-8deg); }
+      75%      { transform: rotate(14deg) translateY(-2px); }
+    }
+
     /* Status colors */
     .status-new         { color: #6fcf97; }
     .status-uat         { color: var(--triarq-color-sunray, #f5a623); }
@@ -218,6 +238,14 @@ export class SidebarComponent implements OnInit, OnDestroy {
   actionBadge = 0;
   /** Tracks Phase A: number of meeting series the user participates in. */
   trackBadge  = 0;
+
+  /** Dancing-egg teaser (Phil 2026-07-16): shows briefly at random intervals on
+   *  the Home nav item, only while the caller has found ZERO eggs. Decorative
+   *  only — no hunt credit, not clickable. Stops permanently on first find. */
+  eggTeaserVisible = false;
+  eggTeaserAsset: EggAssetRef = 'egg-01';
+  private eggTeaserEligible = false;
+  private eggTeaserTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingCount = 0;
   private dueCount = 0;
   private ackCount = 0;
@@ -229,6 +257,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     private readonly auth:           AuthService,
     private readonly delivery:       DeliveryService,
     private readonly teamMeetings:   TeamMeetingsService,
+    private readonly eggs:           EasterEggService,
     private readonly router:         Router,
     private readonly cdr:            ChangeDetectorRef
   ) {}
@@ -246,6 +275,46 @@ export class SidebarComponent implements OnInit, OnDestroy {
     );
     this.loadActionBadge();
     this.loadTrackBadge();
+
+    // Dancing-egg teaser eligibility follows the shared basket state.
+    this.eggs.ensureLoaded();
+    this.sub.add(
+      this.eggs.basket$.subscribe(s => {
+        const eligible = !!s && s.totalFound === 0;
+        if (eligible && !this.eggTeaserEligible) {
+          this.eggTeaserEligible = true;
+          this.scheduleEggTeaser(true);
+        } else if (!eligible && this.eggTeaserEligible) {
+          this.eggTeaserEligible = false;
+          this.stopEggTeaser();
+        }
+      })
+    );
+  }
+
+  /** Random show/hide loop: first appearance 30–90s after load, then every
+   *  4–9 minutes, visible ~7s each time. */
+  private scheduleEggTeaser(first: boolean): void {
+    if (!this.eggTeaserEligible) return;
+    const delayMs = first
+      ? 30000 + Math.random() * 60000
+      : 240000 + Math.random() * 300000;
+    this.eggTeaserTimer = setTimeout(() => {
+      if (!this.eggTeaserEligible) return;
+      this.eggTeaserAsset = EGG_ASSET_REFS[Math.floor(Math.random() * EGG_ASSET_REFS.length)];
+      this.eggTeaserVisible = true;
+      this.cdr.markForCheck();
+      this.eggTeaserTimer = setTimeout(() => {
+        this.eggTeaserVisible = false;
+        this.cdr.markForCheck();
+        this.scheduleEggTeaser(false);
+      }, 7000);
+    }, delayMs);
+  }
+
+  private stopEggTeaser(): void {
+    if (this.eggTeaserTimer) { clearTimeout(this.eggTeaserTimer); this.eggTeaserTimer = null; }
+    if (this.eggTeaserVisible) { this.eggTeaserVisible = false; this.cdr.markForCheck(); }
   }
 
   /** Tracks Phase A: series-participation count for the Team Meetings badge. */
@@ -297,6 +366,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.sub.unsubscribe();
+    this.stopEggTeaser();
   }
 
   statusLabel(status: DevStatus): string {
