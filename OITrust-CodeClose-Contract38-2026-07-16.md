@@ -210,3 +210,90 @@ Team Meetings is `pilot`. Presence + leader-naming extend the pilot surface; no 
 3. UAT checklist above (needs a second user for presence steps).
 4. Acknowledge untested-item list in Verification (3) per D-442.
 5. Hand CC-38 decisions to Design for D-number assignment.
+
+---
+
+# Follow-on Addendum — News Banner Blocking Fix (same session, 2026-07-16)
+
+Phil report: bottom news banner sometimes blocks key controls; new users don't
+know it can be hidden. Analysis approved, "go" given. Deployed SHA: ac41d12
+(gh-pages 600b1ce). Angular-only — no MCP, no migration, no Render action.
+
+## Root cause
+Banner was `position:fixed; bottom:0; z-index:900`. Pre-existing reservation
+(`.oi-main-content { padding-bottom: 38px }`) was (a) unconditional — never
+reclaimed when hidden, (b) main content only — sidebar Sign out still covered,
+(c) irrelevant to fixed panels (z 100–210 < 900) whose bottom strip the banner
+overrode, and to inner `height:100vh` columns. Hide control buried in the tag
+click-menu; collapsed handle sat on the sidebar's Sign out corner.
+
+## Addendum CC-Decisions
+
+- **CC-38-12** — Space reservation via `--nb-space` CSS custom property on
+  `.oi-app-root` (0px default; `38px + env(safe-area-inset-bottom)` when the
+  strip actually renders). `NewsTickerService` gains `bannerVisible$`
+  (BehaviorSubject) which the banner component reports (visible = not hidden
+  AND items.length > 0; false on destroy). `.oi-app-shell` consumes the var —
+  sidebar now included. Replaces the unconditional main-content padding.
+  Space reclaims immediately on hide and when the ticker is empty.
+- **CC-38-13** — Banner z-index 900 → 80 (menus 901 → 81): above in-page
+  sticky headers (40) and pickers (50), below slide-in panels and scrims
+  (100–210). A modal always beats the banner; panel footer controls
+  (Save/Cancel) can no longer be covered.
+- **CC-38-14** — Always-visible `×` dismiss on the banner's right edge
+  (aria-labelled; no busy state — local hide, no MCP call). Collapsed handle
+  moved bottom-left → bottom-right, off the sidebar Sign out corner; menu
+  anchors right.
+- **CC-38-15** — The eight `position:sticky; height:100vh` dashboard side
+  columns were left unchanged this pass: they are scrollable lists with no
+  bottom-pinned controls, and were equally covered before this fix (no
+  regression). They may consume `var(--nb-space)` for full clearance —
+  next-contract candidate.
+- **CC-38-16** — `env(safe-area-inset-bottom)` added to banner height and the
+  reservation so iOS home bars don't eat the strip.
+
+Sequence check: CC-38-01 … CC-38-16, no gaps.
+
+## Addendum Verification (Rule 29 deltas)
+
+1. **Spec coverage** — no spec doc; against Phil-approved analysis: reserve
+   space (PASS — CC-38-12), reclaim on hide (PASS — Phil's explicit question,
+   confirmed by binding to `bannerVisible$`), modal precedence (PASS —
+   CC-38-13), visible dismiss + handle relocation (PASS — CC-38-14).
+2. **Regression check** — banner render/scroll/reactions untouched; hide
+   persistence unchanged (localStorage). App shell padding change is
+   presentation-only. Build green.
+3. **Test ratchet** — view/layout-only template + CSS changes (exempt class);
+   `bannerVisible$` push logic is trivially observable in UAT.
+   Untested: service subject wiring (no Angular test harness runs on this
+   setup — `ng test` pre-existing broken). Phil: acknowledge per D-442.
+4. **Pattern sweep** — no shared pattern modified. `--nb-space` is a NEW
+   shared mechanism; documented in app.component comment.
+5. **Standards** — Arch-2 kept (state in service, components render);
+   busy-guard N/A (× makes no server call); S-035 changelog entry in deploy
+   commit ac41d12 — PASS.
+6. **CC-decisions** — 12–16 sequential — PASS.
+7. **Structural health** — news-ticker.service.ts 63 lines, app.component.ts
+   ~185, news-banner.component.ts ~260 — all under thresholds.
+8. **Deployment** — commit → build (Rule 35) → gh-pages 600b1ce;
+   version.json ac41d12 = master HEAD. No MCP surface — Render untouched.
+9. **Repo cleanliness** — no new files; not applicable.
+
+## Addendum UAT Checklist
+
+### News banner behavior
+1. Open any long screen (e.g. Initiative Tracking). Scroll to bottom — last row/footer fully visible ABOVE the banner, not under it. Pass/Fail.
+2. Sidebar Sign out button fully visible and clickable with banner showing. Pass/Fail.
+3. Open any Edit/Create slide-in panel — panel bottom (Save/Cancel area) draws OVER the banner; nothing blocked. Pass/Fail.
+4. Click the × at the banner's right edge — banner hides, page content drops down to use the freed space immediately (no reload). Pass/Fail.
+5. Collapsed "◂ OI Trust" handle appears bottom-RIGHT; click → "Show news banner" → banner returns and space is re-reserved. Pass/Fail.
+6. Refresh after hiding — banner stays hidden (persistence). Pass/Fail.
+7. "OI Trust" tag menu still offers Hide/Show as before. Pass/Fail.
+
+## Addendum CLAUDE.md Candidate
+4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
+   (a) reserve layout space via a root CSS var bound to actual render state,
+   (b) sit below the modal layer (z < 100). Pattern: `--nb-space` /
+   `bannerVisible$` from CC-38-12/13."
+   **Why:** second bottom-chrome element would repeat the same blocking bug.
+   **Trigger:** Phil's report that banner covered key controls.
