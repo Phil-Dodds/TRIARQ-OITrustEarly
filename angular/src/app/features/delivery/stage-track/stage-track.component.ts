@@ -130,14 +130,17 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
                          max-width:56px;line-height:1.1;word-break:break-word;margin-bottom:2px;">
               {{ node.label }}
             </span>
+            <!-- 7px top margin = clearance so the halo ring never overlaps the label. -->
             <div
               [style.background]="gateColor(node.id)"
               [style.border]="gateBorder(node.id)"
               [style.transform]="gateTransform(node.id)"
               [style.box-shadow]="gateHaloShadow(node.id)"
+              [style.position]="gateZIndex(node.id) ? 'relative' : null"
+              [style.z-index]="gateZIndex(node.id)"
               [attr.title]="gateTitle(node.id)"
               (click)="onGateClick(node.id)"
-              style="width:24px;height:24px;border-radius:4px;
+              style="width:24px;height:24px;border-radius:4px;margin-top:7px;
                      cursor:pointer;transition:opacity 0.15s;box-sizing:border-box;"
             ></div>
           </div>
@@ -154,8 +157,9 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
     <div *ngIf="displayMode === 'condensed'"
          style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
 
-      <!-- 5 gate diamonds, no labels on diamonds, non-interactive -->
-      <div style="display:flex;align-items:center;gap:3px;">
+      <!-- 5 gate diamonds, no labels on diamonds, non-interactive.
+           7px padding = paint room for the halo ring (clip fix, follow-on 8). -->
+      <div style="display:flex;align-items:center;gap:3px;padding:7px 7px 5px 7px;margin:-4px 0 -3px -7px;">
         <ng-container *ngFor="let gate of gateNodes; let i = index">
           <div *ngIf="i > 0"
                [style.background]="condensedConnectorBg(gate.id, i)"
@@ -165,6 +169,8 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
             [style.border]="gateBorder(gate.id)"
             [style.transform]="gateTransform(gate.id)"
             [style.box-shadow]="gateHaloShadow(gate.id)"
+            [style.position]="gateZIndex(gate.id) ? 'relative' : null"
+            [style.z-index]="gateZIndex(gate.id)"
             [attr.title]="condensedGateTooltip(gate.id, gate.label)"
             style="width:10px;height:10px;border-radius:2px;
                    flex-shrink:0;box-sizing:border-box;"
@@ -365,9 +371,11 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
     return this.gateColor(gateId);
   }
 
-  /** Paint-only emphasis — transform + shadow never shift row layout. */
+  /** Paint-only emphasis — transform + shadow never shift row layout.
+   *  Ring sizes fit inside the track's own padding so ancestor overflow
+   *  never clips the halo into a crescent. */
   gateTransform(gateId: string): string {
-    const scale = this.displayMode === 'condensed' ? 1.35 : 1.25;
+    const scale = this.displayMode === 'condensed' ? 1.3 : 1.2;
     return this.isHaloGate(gateId) ? `rotate(45deg) scale(${scale})` : 'rotate(45deg)';
   }
 
@@ -375,8 +383,13 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
     if (!this.isHaloGate(gateId)) { return 'none'; }
     const ring = this.haloRingColor(gateId);
     return this.displayMode === 'condensed'
-      ? `0 0 0 2.5px #fff, 0 0 0 4.5px ${ring}`
-      : `0 0 0 3px #fff, 0 0 0 6px ${ring}`;
+      ? `0 0 0 2px #fff, 0 0 0 4px ${ring}`
+      : `0 0 0 2.5px #fff, 0 0 0 5px ${ring}`;
+  }
+
+  /** Haloed diamond paints above its siblings so connectors never slice the ring. */
+  gateZIndex(gateId: string): string | null {
+    return this.isHaloGate(gateId) ? '1' : null;
   }
 
   /** Human tooltip label — 'Next gate' prefix on the halo gate; underscores out. */
