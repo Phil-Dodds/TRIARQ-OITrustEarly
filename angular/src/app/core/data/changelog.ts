@@ -33,6 +33,23 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-16',
+    builtAt:       '16:30 UTC',
+    contractLabel: 'Contract 38 follow-on — Home screen organized',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Home screen',
+        description: 'Home cards now share one standard height with content scrolling inside, and the order puts your working cards first — Initiatives, Action Queue, Activity, Completed Gates — with coming-soon cards moved to the bottom.'
+      },
+      {
+        audience:    'All',
+        surface:     'Sidebar',
+        description: 'Home, My Actions, and Team Meetings graduate from Pilot to Live.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-16',
     builtAt:       '15:45 UTC',
     contractLabel: 'Contract 38 follow-on — compact egg cards + a curious egg',
     items: [

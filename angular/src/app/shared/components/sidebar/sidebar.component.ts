@@ -34,11 +34,11 @@ interface NavItem {
 // devStatus reflects current build stage. Update when a feature advances.
 // Coming-soon items with no route are placeholders for not-yet-built surfaces.
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Home',                 route: '/home',           devStatus: 'pilot'       },
+  { label: 'Home',                 route: '/home',           devStatus: 'live'        },
   // Contract 30 / D-472 + Contract 32 / D-484: My Actions — gate actions +
   // initiative status tabs (Updates Due, Needs Acknowledgment). Badge sums all
   // three actionable tabs. (Standalone "My Initiative Status" nav item removed.)
-  { label: 'My Actions',           route: '/actions',        devStatus: 'pilot'       },
+  { label: 'My Actions',           route: '/actions',        devStatus: 'live'        },
   // Raised above OI Library (Phil).
   // Contract 32 / D-485: Initiative Status Dashboard is now a card on this hub
   // (not a standalone nav item).
@@ -46,7 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   // Contract 33 / D-490 + Tracks Phase A: Team Meetings — visible to ALL users.
   // Users without a series can create one (if permitted) or join a public series.
   // Badge = number of series the user participates in.
-  { label: 'Team Meetings', route: '/team-meetings', devStatus: 'pilot' },
+  { label: 'Team Meetings', route: '/team-meetings', devStatus: 'live' },
   { label: 'To Dos',                                         devStatus: 'not-started' },
   { label: 'OI Library',           route: '/library',        devStatus: 'not-started',
     children: [

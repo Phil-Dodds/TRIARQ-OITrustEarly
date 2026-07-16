@@ -286,6 +286,16 @@ h4 { font-size: var(--triarq-text-h4); line-height: var(--triarq-line-height-hea
   gap:                   var(--triarq-space-md);
 }
 
+// Home screen standard card height (Phil 2026-07-16, CC-38-21): every Home
+// card is exactly 340px tall; longer content scrolls inside the card. Keeps
+// grid rows aligned and stops sparse cards from stretching to their neighbors.
+// Scoped to the Home screen — hub screens keep natural card heights.
+.oi-home-screen .oi-card-grid .oi-card {
+  height:     340px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
 // ── Side panel pattern (S-010 filter panel, S-018/S-019/S-016 right detail) ──
 // Shared across screens that adopt the standard grid+filter+view+edit pattern.
 // Contract 21 (D-410, D-413): User Management, Division Management.

@@ -1,6 +1,12 @@
 <!-- home.component.html — Pathways OI Trust
      Role-aware home screen (D-150). Presentation only.
-     No logic beyond simple conditionals — all role decisions are in the component. -->
+     No logic beyond simple conditionals — all role decisions are in the component.
+
+     Card order (Phil 2026-07-16, CC-38-22): working cards for EPO/DCS first
+     (Initiatives, Action Queue, Activity, Completed Gates), engagement next
+     (egg hunt), admin cards after, and not-yet-valuable placeholders last
+     (Notifications, OI Library, OI Assistant). Supersedes the D-425/D-429
+     append-after-Notifications ordering. -->
 
 <div class="oi-home-screen">
 
@@ -25,35 +31,21 @@
       [userId]="profile?.id ?? ''">
     </app-my-delivery-cycles-card>
 
-    <!-- Universal cards — all roles -->
     <app-my-action-queue-card
       [userId]="profile?.id ?? ''">
     </app-my-action-queue-card>
 
-    <app-my-notifications-card
-      [userId]="profile?.id ?? ''">
-    </app-my-notifications-card>
-
-    <!-- D-429 / Contract 23 Item 6.1: My Activity card after My Notifications -->
     <app-my-activity-card
       [userId]="profile?.id ?? ''">
     </app-my-activity-card>
 
-    <!-- D-430 / Contract 24 Workstream 6: My Completed Gates card.
-         Appended per D-425 — new cards land after the prior universal cards. -->
     <app-my-completed-gates-card
       [userId]="profile?.id ?? ''">
     </app-my-completed-gates-card>
 
-    <!-- Phil only -->
-    <app-system-health-card
-      *ngIf="showSystemHealth">
-    </app-system-health-card>
-
-    <!-- All roles -->
-    <app-oi-library-card
-      [userId]="profile?.id ?? ''">
-    </app-oi-library-card>
+    <!-- Easter Egg Hunt — all roles (spec §9) -->
+    <app-my-easter-eggs-card></app-my-easter-eggs-card>
+    <app-community-eggs-card></app-community-eggs-card>
 
     <!-- Phil + Admin -->
     <app-divisions-card
@@ -65,13 +57,23 @@
       *ngIf="showUserManagement">
     </app-user-management-card>
 
+    <!-- Phil only -->
+    <app-system-health-card
+      *ngIf="showSystemHealth">
+    </app-system-health-card>
+
+    <!-- Placeholder-value cards — bottom until they carry real content. -->
+    <app-my-notifications-card
+      [userId]="profile?.id ?? ''">
+    </app-my-notifications-card>
+
+    <app-oi-library-card
+      [userId]="profile?.id ?? ''">
+    </app-oi-library-card>
+
     <!-- All roles — Chat stub only in Build A (Session 2026-03-29-A) -->
     <app-embedded-chat-card>
     </app-embedded-chat-card>
-
-    <!-- Easter Egg Hunt — all roles (spec §9) -->
-    <app-my-easter-eggs-card></app-my-easter-eggs-card>
-    <app-community-eggs-card></app-community-eggs-card>
 
   </div>
 
