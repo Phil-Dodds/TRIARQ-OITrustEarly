@@ -346,9 +346,15 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
   gateColor(gateId: string): string {
     switch (this.gateDisplayState(gateId)) {
       case 'complete':           return 'var(--triarq-color-primary)';
-      case 'pending':            return 'var(--triarq-color-sunray, #f5a623)';
-      case 'awaiting_approval':  return 'var(--triarq-color-sunray, #f5a623)';
+      // CC-38-29: submissions are purple — blue "almost done" + red "stopped
+      // at the gate". Replaces the old sunray treatment (sunray now = at_risk).
+      case 'pending':            return '#7E57C2';
+      case 'awaiting_approval':  return '#7E57C2';
       case 'blocked':            return 'var(--triarq-color-error, #d32f2f)';
+      // CC-38-28: user D-205 status colors on unsubmitted gates (user wins).
+      case 'on_track':           return '#2E7D32';
+      case 'at_risk':            return '#F2A620';
+      case 'behind':             return '#D32F2F';
       case 'not_started':        return 'var(--triarq-color-fog, #e0e0e0)';
       // D-447 / D-469: hollow Oravive — transparent fill + stroke via gateBorder().
       case 'skipped':            return 'transparent';

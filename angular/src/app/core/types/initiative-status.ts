@@ -9,6 +9,10 @@ export type StatusConfidence = Extract<DateStatus,
   'not_started' | 'on_track' | 'at_risk' | 'behind' | 'complete'>;
 
 export interface InitiativeStatusUpdate {
+  // CC-38-30 snapshot — next gate + its visual status when this update was
+  // posted (migration 073). null on older rows.
+  next_gate_name?:         string | null;
+  next_gate_status_token?: string | null;
   id:                          string;
   initiative_id:               string;
   accomplished_last_cycle:     string | null;

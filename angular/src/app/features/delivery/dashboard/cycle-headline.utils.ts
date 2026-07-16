@@ -36,19 +36,31 @@ export const POST_DEPLOY_STAGES: LifecycleStage[] = ['PILOT', 'RELEASE', 'OUTCOM
 
 export type HeadlineColor = 'default' | 'sunray' | 'oravive';
 
-/** Status band for the headline cell (Phil 2026-07-16, CC-38-27):
- *  blue = awaiting approval · red = gate overdue · amber = next gate due soon
- *  (≤ AMBER_WINDOW_DAYS) or undated · green = next gate on track · none = neutral. */
-export type HeadlineBand = 'green' | 'amber' | 'red' | 'blue' | 'none';
-
-/** "Due soon" threshold for the amber band. D-482's window is meeting-anchored
- *  and not applicable to gate proximity, so this is its own constant. */
-export const AMBER_WINDOW_DAYS = 7;
+/** Status band for the headline cell (CC-38-27, remapped CC-38-28..31):
+ *  the band IS the next gate's canonical color — purple = submitted/awaiting,
+ *  then the user's D-205 status (green on_track · amber at_risk · red behind ·
+ *  green for user-complete) · none = not_started/neutral. User wins; date math
+ *  never recolors — conflicts surface as a ⚠ (see `conflict`). */
+export type HeadlineBand = 'green' | 'amber' | 'red' | 'purple' | 'none';
 
 export interface HeadlineResult {
   text:  string;
   color: HeadlineColor;
   band:  HeadlineBand;
+  /** ⚠ principle: true when the next gate's target date has passed but the
+   *  user's status doesn't say behind (and the gate isn't in approval). */
+  conflict: boolean;
+}
+
+/** Next-gate user status → band. */
+function bandFromDateStatus(dateStatus: string | null | undefined): HeadlineBand {
+  switch (dateStatus) {
+    case 'on_track': return 'green';
+    case 'at_risk':  return 'amber';
+    case 'behind':   return 'red';
+    case 'complete': return 'green';
+    default:         return 'none';
+  }
 }
 
 // Module-local date helpers. No central date utility exists in the codebase;
@@ -88,11 +100,11 @@ export function formatHeadlineDate(iso: string | null | undefined, now: Date = n
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(iso));
 }
 
-interface MilestoneLite { gate_name: GateName; target_date?: string | null; actual_date?: string | null; }
+interface MilestoneLite { gate_name: GateName; target_date?: string | null; actual_date?: string | null; date_status?: string | null; }
 interface GateRecordLite { gate_name: GateName; gate_status: string; }
 
 /** First gate in GATE_SEQUENCE that is not yet approved. null when all five are approved. */
-function nextUnapprovedGate(records: GateRecordLite[] | undefined): GateName | null {
+export function nextUnapprovedGate(records: GateRecordLite[] | undefined): GateName | null {
   const byName = new Map<GateName, string>();
   (records ?? []).forEach(r => { byName.set(r.gate_name, r.gate_status); });
   for (const g of GATE_SEQUENCE) {
@@ -118,7 +130,7 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
   const gates      = cycle.gate_records   as GateRecordLite[] | undefined;
   const today      = todayIso(now);
 
-  // Rule 1 — Any gate awaiting_approval
+  // Rule 1 — Any gate awaiting_approval → submission purple (CC-38-29).
   const awaiting = (gates ?? []).find(g => g.gate_status === 'awaiting_approval');
   if (awaiting) {
     const ms   = milestoneFor(awaiting.gate_name, milestones);
@@ -126,12 +138,15 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
     return {
       text:  `Awaiting ${GATE_DISPLAY_NAMES[awaiting.gate_name]} approval${date ? ` · ${date}` : ''}`,
       color: 'default',
-      band:  'blue'
+      band:  'purple',
+      conflict: false
     };
   }
 
-  // Rule 2 — Any gate overdue (target_date < today, not approved)
+  // Rule 2 — Any gate overdue (target_date < today, not approved).
   // D-447: skipped gates are terminal; they cannot be "overdue".
+  // CC-38-31: band stays the USER's status color — a passed date never
+  // recolors; when the user isn't saying behind, the ⚠ conflict flags it.
   for (const g of GATE_SEQUENCE) {
     const ms = milestoneFor(g, milestones);
     if (!ms?.target_date || ms.actual_date) { continue; }
@@ -141,10 +156,12 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
     if (ms.target_date < today) {
       const d = daysFromToday(ms.target_date, now) ?? 0;
       const days = Math.abs(d);
+      const band = bandFromDateStatus(ms.date_status);
       return {
         text:  `${GATE_DISPLAY_NAMES[g]} approval overdue · ${days} ${days === 1 ? 'day' : 'days'}`,
         color: 'oravive',
-        band:  'red'
+        band,
+        conflict: band !== 'red'
       };
     }
   }
@@ -158,11 +175,8 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
   const isPreDeploy  = PRE_DEPLOY_STAGES.includes(stage);
   const isPostDeploy = POST_DEPLOY_STAGES.includes(stage);
 
-  // Band for on-track vs due-soon: next gate undated or within the window → amber;
-  // dated beyond the window → green.
-  const nextGateDays = nextMs?.target_date ? daysFromToday(nextMs.target_date, now) : null;
-  const preDeployBand: HeadlineBand =
-    (nextGateDays === null || nextGateDays <= AMBER_WINDOW_DAYS) ? 'amber' : 'green';
+  // CC-38-28: band = the user's D-205 status on the next gate. No date math.
+  const preDeployBand: HeadlineBand = bandFromDateStatus(nextMs?.date_status);
 
   // Rule 3 — Pre-deploy AND Go to Deploy target set
   if (isPreDeploy && deployMs?.target_date && nextGate) {
@@ -170,7 +184,8 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
     return {
       text:  `Next: ${nextLabel}${nextDateStr ? ` ${nextDateStr}` : ''} · Deploy ${deployStr}`,
       color: 'sunray',
-      band:  preDeployBand
+      band:  preDeployBand,
+      conflict: false
     };
   }
 
@@ -179,7 +194,8 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
     return {
       text:  `Next: ${nextLabel}${nextDateStr ? ` ${nextDateStr}` : ''}`,
       color: 'sunray',
-      band:  preDeployBand
+      band:  preDeployBand,
+      conflict: false
     };
   }
 
@@ -196,21 +212,23 @@ export function computeHeadline(cycle: DeliveryCycle, now: Date = new Date()): H
       return {
         text:  `In ${STAGE_DISPLAY_NAMES[stage] ?? stage}${nextLabel ? ` · Next: ${nextLabel}` : ''}`,
         color: 'default',
-        band:  'none'
+        band:  'none',
+        conflict: false
       };
     }
-    return { text: parts.join(' · '), color: 'default', band: 'none' };
+    return { text: parts.join(' · '), color: 'default', band: 'none', conflict: false };
   }
 
   // Rule 5 — Default: "In [Stage] · Next: [next gate] [date]"
   const stageLabel = STAGE_DISPLAY_NAMES[stage] ?? stage;
   if (!nextGate) {
-    return { text: `In ${stageLabel}`, color: 'default', band: 'none' };
+    return { text: `In ${stageLabel}`, color: 'default', band: 'none', conflict: false };
   }
   return {
     text:  `In ${stageLabel} · Next: ${nextLabel}${nextDateStr ? ` ${nextDateStr}` : ''}`,
     color: 'sunray',
-    band:  preDeployBand
+    band:  preDeployBand,
+    conflict: false
   };
 }
 
@@ -234,11 +252,11 @@ export interface HeadlineBandStyle {
 }
 
 const BAND_STYLES: Record<HeadlineBand, HeadlineBandStyle> = {
-  green: { bar: '#1D9E75', bg: 'rgba(29,158,117,0.09)', text: '#085041', sub: '#3A6B5B' },
-  amber: { bar: '#BA7517', bg: 'rgba(242,166,32,0.12)', text: '#633806', sub: '#7A5A2A' },
-  red:   { bar: '#A32D2D', bg: 'rgba(226,75,74,0.09)',  text: '#791F1F', sub: '#8A4A4A' },
-  blue:  { bar: '#185FA5', bg: 'rgba(55,138,221,0.09)', text: '#0C447C', sub: '#3A5A7A' },
-  none:  { bar: '',        bg: '',                      text: '#3A3A3A', sub: '#6A6A6A' }
+  green:  { bar: '#2E7D32', bg: 'rgba(46,125,50,0.09)',  text: '#1B4D1E', sub: '#3A6B3D' },
+  amber:  { bar: '#BA7517', bg: 'rgba(242,166,32,0.12)', text: '#633806', sub: '#7A5A2A' },
+  red:    { bar: '#A32D2D', bg: 'rgba(211,47,47,0.09)',  text: '#791F1F', sub: '#8A4A4A' },
+  purple: { bar: '#7E57C2', bg: 'rgba(126,87,194,0.10)', text: '#4A2F80', sub: '#65538A' },
+  none:   { bar: '',        bg: '',                      text: '#3A3A3A', sub: '#6A6A6A' }
 };
 
 export function headlineBandStyle(band: HeadlineBand): HeadlineBandStyle {

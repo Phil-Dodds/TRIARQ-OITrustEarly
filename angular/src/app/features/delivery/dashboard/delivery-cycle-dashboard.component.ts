@@ -68,8 +68,10 @@ import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-s
 // Contract 23 Item 2.2 / D-267: pure computeHeadline utility — 6-rule priority order.
 // Replaces inline headline()/headlineColor() logic; extracted for unit-testability.
 import {
-  computeHeadline, HeadlineResult, HeadlineBand, headlineBandStyle, formatHeadlineDate
+  computeHeadline, HeadlineResult, HeadlineBand, headlineBandStyle, formatHeadlineDate,
+  GATE_DISPLAY_NAMES, nextUnapprovedGate
 } from './cycle-headline.utils';
+import { buildUnifiedGateStateMap } from '../gate-visual.utils';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -741,14 +743,18 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                    [style.color]="headlineColor(cycle)"
                    title="{{ headlineText(cycle) }}">
                 {{ headlineText(cycle) }}
+                <!-- ⚠ principle (CC-38-31): system disagreement flags, never recolors. -->
+                <span *ngIf="headlineConflict(cycle)"
+                      style="cursor:default;"
+                      title="Target date has passed, but the gate status is set by the team (D-205). Consider updating the gate status or the date.">⚠</span>
               </div>
               <div *ngIf="statusDigest(cycle) as digest"
                    style="font-size:11px;margin-top:2px;
                           display:-webkit-box;-webkit-line-clamp:2;
                           -webkit-box-orient:vertical;overflow:hidden;"
-                   [style.color]="headlineSubColor(cycle)"
+                   [style.color]="statusDigestColor(cycle)"
                    title="{{ digest }}">
-                {{ digest }}<span style="opacity:0.6;"> · {{ statusDigestAge(cycle) }}</span>
+                {{ digest }}<span style="opacity:0.6;"> · {{ statusDigestAge(cycle) }}{{ statusDigestAsOf(cycle) }}</span>
               </div>
             </div>
           </div>
@@ -2148,8 +2154,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return headlineBandStyle(this.headlineFor(cycle).band).text;
   }
 
-  headlineSubColor(cycle: DeliveryCycle): string {
-    return headlineBandStyle(this.headlineFor(cycle).band).sub;
+  headlineConflict(cycle: DeliveryCycle): boolean {
+    return this.headlineFor(cycle).conflict;
   }
 
   /** "Done: … · Next: …" from the latest status update; null hides the line. */
@@ -2166,6 +2172,31 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return formatHeadlineDate(cycle.latest_status?.status_created_at ?? null);
   }
 
+  /** CC-38-30: digest line colored by the gate status SNAPSHOTTED when the
+   *  update was posted — a stale green under a red section A tells the story.
+   *  Neutral for pre-migration updates with no snapshot. */
+  statusDigestColor(cycle: DeliveryCycle): string {
+    const token = cycle.latest_status?.next_gate_status_token;
+    const band: HeadlineBand =
+      token === 'submitted' ? 'purple'
+      : token === 'on_track' || token === 'complete' ? 'green'
+      : token === 'at_risk' ? 'amber'
+      : token === 'behind' ? 'red'
+      : 'none';
+    return headlineBandStyle(band).sub;
+  }
+
+  /** " · as of Brief Review" when the initiative has moved past the gate that
+   *  was next when the status was posted — stale status starts to look bad. */
+  statusDigestAsOf(cycle: DeliveryCycle): string {
+    const snapGate = cycle.latest_status?.next_gate_name;
+    if (!snapGate) { return ''; }
+    const currentNext = nextUnapprovedGate(cycle.gate_records as { gate_name: GateName; gate_status: string }[] | undefined);
+    if (!currentNext || currentNext === snapGate) { return ''; }
+    const label = GATE_DISPLAY_NAMES[snapGate as GateName] ?? snapGate;
+    return ` · as of ${label}`;
+  }
+
   /**
    * Build gate display state map per Contract 23 Item 2.1 mapping:
    *   approved          → complete
@@ -2179,29 +2210,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
    * because the case was missing, leaving the gate diamond fog-colored after submission.
    * Contract 23 fixes that. The overdue → blocked branch is new in Contract 23 (Item 2.1).
    */
+  /** CC-38-28: delegates to the shared resolver — grid diamonds now show the
+   *  user's D-205 status (workflow overrides: approved blue, submitted purple).
+   *  Overdue no longer forces red here — the ⚠ principle flags date conflicts
+   *  without overriding the user's color. Identical to the panel track. */
   buildGateStateMap(cycle: DeliveryCycle): GateStateMap {
-    const gates: GateName[] = ['brief_review','go_to_build','go_to_deploy','go_to_release','close_review'];
-    const today = new Date().toISOString().slice(0, 10);
-    const map: Partial<GateStateMap> = {};
-    for (const gate of gates) {
-      const record = cycle.gate_records?.find(g => g.gate_name === gate);
-      const milestone = cycle.milestone_dates?.find(m => m.gate_name === gate);
-      const isApproved = record?.gate_status === 'approved';
-      const isOverdue  = !!milestone?.target_date
-                      && !milestone.actual_date
-                      && !isApproved
-                      && milestone.target_date < today;
-
-      if (isApproved)                            { map[gate] = 'complete';          continue; }
-      if (record?.gate_status === 'blocked')     { map[gate] = 'blocked';           continue; }
-      if (isOverdue)                             { map[gate] = 'blocked';           continue; }
-      if (record?.gate_status === 'awaiting_approval') { map[gate] = 'awaiting_approval'; continue; }
-      // D-469 (WS2.2): returned — hollow Oravive diamond, distinct from skipped by tooltip.
-      if (record?.gate_status === 'returned')          { map[gate] = 'returned';          continue; }
-      if (record?.gate_status === 'pending')           { map[gate] = 'pending';           continue; }
-      map[gate] = 'upcoming';
-    }
-    return map as GateStateMap;
+    return buildUnifiedGateStateMap(cycle.gate_records, cycle.milestone_dates);
   }
 
   /**

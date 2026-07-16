@@ -50,6 +50,7 @@ import { InitiativeStatusUpdatePanelComponent }  from '../status-panel/initiativ
 import { InitiativeStatusHistoryPanelComponent } from '../status-panel/initiative-status-history-panel.component';
 import { LatestInitiativeStatus } from '../../../core/types/initiative-status';
 import { GATE_DATE_SEMANTICS } from '../../../shared/constants/gate-coaching.constants';
+import { buildUnifiedGateStateMap, gateDateConflict, nextGateInOrder } from '../gate-visual.utils';
 import {
   GateRecordModalComponent,
   GateRecordModalData,
@@ -584,6 +585,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <div style="font-size:12px;color:var(--triarq-color-text-secondary);margin-bottom:8px;">
               Last updated: {{ latestStatus!.saved_by_name || 'Unknown' }} · {{ formatStatusDateTime(u.saved_at) }}
             </div>
+            <!-- CC-38-30: staleness nudge — this status predates the current next gate. -->
+            <div *ngIf="statusAsOfNote(u)"
+                 style="font-size:11px;font-style:italic;color:var(--triarq-color-sunray,#B87700);margin-bottom:8px;">
+              ⚠ {{ statusAsOfNote(u) }}
+            </div>
             <div style="margin-bottom:6px;"><span style="font-weight:500;">Accomplished Last Cycle:</span>
               {{ truncate(u.accomplished_last_cycle) }}</div>
             <div style="margin-bottom:6px;"><span style="font-weight:500;">Plan for Next Cycle:</span>
@@ -1110,6 +1116,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   <span *ngIf="m.date_status === 'behind' && !m.target_date"
                         style="font-size:11px;color:var(--triarq-color-sunray,#f5a623);"
                         title="Behind is set but no target date exists">⚠</span>
+                  <!-- CC-38-31 ⚠ principle: date passed but status disagrees — flag, never recolor. -->
+                  <span *ngIf="gateStatusDateConflict(m)"
+                        style="font-size:11px;color:var(--triarq-color-sunray,#f5a623);"
+                        title="Target date has passed, but the status is set by the team (D-205). Consider updating the status or the date.">⚠</span>
                 </div>
               </ng-template>
             </div>
@@ -2148,24 +2158,10 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   // ── Computed properties ────────────────────────────────────────────────────
 
+  /** CC-38-28: shared resolver — panel track now matches the grid track
+   *  exactly (user D-205 status colors; approved blue; submitted purple). */
   get gateStateMap(): GateStateMap {
-    const gates: GateName[] = ['brief_review','go_to_build','go_to_deploy','go_to_release','close_review'];
-    const map: Partial<GateStateMap> = {};
-    for (const gate of gates) {
-      const record = this.cycle?.gate_records?.find(g => g.gate_name === gate);
-      if (!record)                                     { map[gate] = 'upcoming';          continue; }
-      if (record.gate_status === 'approved')           { map[gate] = 'complete';          continue; }
-      if (record.gate_status === 'blocked')            { map[gate] = 'blocked';           continue; }
-      if (record.gate_status === 'awaiting_approval')  { map[gate] = 'awaiting_approval'; continue; }
-      if (record.gate_status === 'not_started')        { map[gate] = 'not_started';       continue; }
-      // D-447: skipped — hollow Oravive diamond. System-only state set by confirm_gate_skip.
-      if (record.gate_status === 'skipped')            { map[gate] = 'skipped';           continue; }
-      // D-469 (WS2.2): returned — hollow Oravive diamond, distinct from skipped by tooltip.
-      if (record.gate_status === 'returned')           { map[gate] = 'returned';          continue; }
-      // 'pending' (legacy) surfaces as pending (sunray).
-      map[gate] = 'pending';
-    }
-    return map as GateStateMap;
+    return buildUnifiedGateStateMap(this.cycle?.gate_records, this.cycle?.milestone_dates);
   }
 
   /** D-447 tooltip data — ISO timestamp per skipped gate, read from the event
@@ -2322,6 +2318,26 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   // Source: D-205, Contract 9.
   effectiveDateStatus(m: { target_date?: string | null; date_status: DateStatus }): DateStatus {
     return m.date_status;
+  }
+
+  /** CC-38-31 ⚠ principle: target date passed but neither the user status nor
+   *  the workflow reflects it. Flags — never recolors the user's choice. */
+  gateStatusDateConflict(m: { gate_name: GateName; target_date?: string | null; actual_date?: string | null }): boolean {
+    const rec = this.cycle?.gate_records?.find(g => g.gate_name === m.gate_name);
+    return gateDateConflict(rec?.gate_status, this.effectiveDateStatus(m as never), m.target_date, m.actual_date);
+  }
+
+  /** CC-38-30: "as of [gate]" staleness note on the Current Status section —
+   *  shown when the initiative has moved past the gate that was next when the
+   *  status was posted. Empty string hides the note. */
+  statusAsOfNote(u: { next_gate_name?: string | null }): string {
+    const snapGate = u.next_gate_name;
+    if (!snapGate) { return ''; }
+    const currentNext = nextGateInOrder(this.cycle?.gate_records);
+    if (!currentNext || currentNext === snapGate) { return ''; }
+    const label   = LIFECYCLE_TRACK.find(n => n.id === snapGate)?.label ?? snapGate;
+    const current = LIFECYCLE_TRACK.find(n => n.id === currentNext)?.label ?? currentNext;
+    return `Status given while ${label} was the next gate — the Initiative has since moved to ${current}. Consider a fresh update.`;
   }
 
   // D-244: Milestone Status 5-color dot — maps date_status to color token.

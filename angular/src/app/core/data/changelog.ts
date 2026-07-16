@@ -33,6 +33,23 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-16',
+    builtAt:       '18:15 UTC',
+    contractLabel: 'Contract 38 follow-on — one gate color language',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiatives grid + Initiative panel',
+        description: 'Gate diamonds everywhere now show YOUR gate status colors — green on track, amber at risk, red behind, blue only when a gate is approved, and a new purple whenever a gate is submitted for approval. The grid track and the panel track finally match. When a date has passed but the status says otherwise, a small ⚠ appears instead of changing your color.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiatives grid headline',
+        description: 'The headline band follows the next gate\'s status color, and the status digest is colored by the gate status at the time it was written — with an "as of [gate]" note once the Initiative moves on, so stale statuses show their age.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-16',
     builtAt:       '17:15 UTC',
     contractLabel: 'Contract 38 follow-on — Initiatives grid headline upgrade',
     items: [

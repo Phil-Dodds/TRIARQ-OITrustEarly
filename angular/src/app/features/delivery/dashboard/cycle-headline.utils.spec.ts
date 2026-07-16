@@ -129,40 +129,52 @@ describe('formatHeadlineDate', () => {
   it('invalid → empty string',                 () => expect(formatHeadlineDate('not-a-date', FROZEN_NOW)).toBe(''));
 });
 
-// CC-38-27: status band — blue awaiting, red overdue, amber due-soon/undated,
-// green on-track (> AMBER_WINDOW_DAYS out), none for neutral states.
+// CC-38-28..31: band = next gate's canonical color. Purple = submitted,
+// otherwise the USER's D-205 date_status (user wins — date math never
+// recolors; conflicts surface via the `conflict` flag instead).
 describe('computeHeadline band', () => {
-  it('awaiting approval → blue', () => {
+  it('awaiting approval → purple', () => {
     const cycle = baseCycle({
       gate_records: [{ gate_name: 'brief_review', gate_status: 'awaiting_approval' }]
     } as Partial<DeliveryCycle>);
-    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('blue');
+    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('purple');
   });
 
-  it('overdue gate → red', () => {
+  it('overdue + user says behind → red, no conflict', () => {
     const cycle = baseCycle({
-      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-09', actual_date: null }]
+      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-09', actual_date: null, date_status: 'behind' }]
     } as Partial<DeliveryCycle>);
-    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('red');
+    const r = computeHeadline(cycle, FROZEN_NOW);
+    expect(r.band).toBe('red');
+    expect(r.conflict).toBe(false);
   });
 
-  it('next gate inside 7-day window → amber', () => {
+  it('overdue + user says on_track → green band + conflict ⚠', () => {
     const cycle = baseCycle({
-      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-18', actual_date: null }]
+      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-09', actual_date: null, date_status: 'on_track' }]
+    } as Partial<DeliveryCycle>);
+    const r = computeHeadline(cycle, FROZEN_NOW);
+    expect(r.band).toBe('green');
+    expect(r.conflict).toBe(true);
+  });
+
+  it('next gate at_risk → amber', () => {
+    const cycle = baseCycle({
+      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-25', actual_date: null, date_status: 'at_risk' }]
     } as Partial<DeliveryCycle>);
     expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('amber');
   });
 
-  it('next gate undated → amber', () => {
-    const cycle = baseCycle({});
-    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('amber');
-  });
-
-  it('next gate beyond 7 days → green', () => {
+  it('next gate on_track → green', () => {
     const cycle = baseCycle({
-      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-25', actual_date: null }]
+      milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-25', actual_date: null, date_status: 'on_track' }]
     } as Partial<DeliveryCycle>);
     expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('green');
+  });
+
+  it('next gate with no user status → none', () => {
+    const cycle = baseCycle({});
+    expect(computeHeadline(cycle, FROZEN_NOW).band).toBe('none');
   });
 
   it('post-deploy with dates → none', () => {

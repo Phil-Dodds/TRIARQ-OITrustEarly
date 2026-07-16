@@ -267,13 +267,16 @@ async function list_delivery_cycles(params, caller_user_id) {
   if (statusIdSet.size > 0) {
     const { data: statusRows } = await supabase
       .from('initiative_status_updates')
-      .select('id, accomplished_last_cycle, plan_next_cycle, created_at')
+      .select('id, accomplished_last_cycle, plan_next_cycle, created_at, next_gate_name, next_gate_status_token')
       .in('id', Array.from(statusIdSet));
     (statusRows || []).forEach(s => {
       latestStatusMap[s.id] = {
         accomplished_last_cycle: s.accomplished_last_cycle ?? null,
         plan_next_cycle:         s.plan_next_cycle ?? null,
-        status_created_at:       s.created_at
+        status_created_at:       s.created_at,
+        // CC-38-30 snapshot — null on updates saved before migration 073.
+        next_gate_name:          s.next_gate_name ?? null,
+        next_gate_status_token:  s.next_gate_status_token ?? null
       };
     });
   }

@@ -255,7 +255,10 @@ export type JiraSyncStatus      = 'unsynced' | 'synced' | 'error';
 // 'returned' = hollow Oravive diamond — approver returned the gate for revision (D-469, WS2.2).
 //              Same visual treatment as 'skipped'; distinguished only by tooltip.
 // Source: D-345, gate-submission-flow-spec §2, D-447, D-469.
-export type GateDisplayState    = 'not_started' | 'pending' | 'awaiting_approval' | 'blocked' | 'complete' | 'upcoming' | 'skipped' | 'returned';
+// CC-38-28: user D-205 statuses join the vocabulary — diamonds now carry the
+// user's gate status (on_track green / at_risk amber / behind red) unless a
+// workflow state overrides (approved blue, submitted purple, skipped/returned hollow).
+export type GateDisplayState    = 'not_started' | 'pending' | 'awaiting_approval' | 'blocked' | 'complete' | 'upcoming' | 'skipped' | 'returned' | 'on_track' | 'at_risk' | 'behind';
 
 export interface DeliveryWorkstream {
   workstream_id:           string;
@@ -321,6 +324,10 @@ export interface DeliveryCycle {
     accomplished_last_cycle: string | null;
     plan_next_cycle:         string | null;
     status_created_at:       string;
+    // CC-38-30 snapshot: next gate + its visual status when the update was
+    // posted. null on updates saved before migration 073.
+    next_gate_name:          string | null;
+    next_gate_status_token:  string | null;
   } | null;
   owner_display_name?:     string;
   assigned_dcs_display_name?: string;

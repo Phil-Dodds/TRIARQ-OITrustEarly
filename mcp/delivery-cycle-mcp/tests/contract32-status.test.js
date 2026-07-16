@@ -152,6 +152,8 @@ describe('save_initiative_status_update', () => {
       { data: { is_admin: false }, error: null },                                        // caller (trio → no membership query)
       { data: [{ gate_name: 'go_to_deploy', date_status: 'on_track' },
                { gate_name: 'close_review', date_status: 'not_started' }], error: null }, // milestones
+      { data: [{ gate_name: 'brief_review', gate_status: 'approved' },
+               { gate_name: 'go_to_build', gate_status: 'awaiting_approval' }], error: null }, // gate_records (CC-38-30 snapshot)
       { data: { id: UPD, saved_at: '2026-06-30T12:00:00Z' }, error: null },              // insert
       { data: [], error: null }                                                          // cycle update
     ];
@@ -174,6 +176,7 @@ describe('save_initiative_status_update', () => {
       { data: [{ id: UPD, supersedes_update_id: null, saved_at: recent }], error: null }, // chain root walk
       { data: { id: UPD, saved_by: DOL }, error: null },                                 // edit target
       { data: [{ gate_name: 'go_to_deploy', date_status: 'on_track' }], error: null },   // milestones
+      { data: [{ gate_name: 'brief_review', gate_status: 'approved' }], error: null },   // gate_records (CC-38-30 snapshot)
       { data: { id: 'update-2', saved_at: recent }, error: null },                       // insert
       { data: [], error: null }                                                          // cycle update (head only)
     ];

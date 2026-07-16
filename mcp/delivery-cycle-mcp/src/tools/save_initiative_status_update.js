@@ -158,9 +158,37 @@ async function save_initiative_status_update(params, caller_user_id) {
   const pilotApplicable = !bothComplete && !reached;
   const closeApplicable = !bothComplete && reached;
 
+  // ── CC-38-30: snapshot the next gate + its visual status at save time.
+  // Next gate = first in sequence not approved/skipped. Token: 'submitted'
+  // when awaiting approval (purple everywhere), else the user's D-205
+  // date_status. Drives the headline digest color and "as of [gate]"
+  // staleness indicator once the initiative moves past this gate.
+  const GATE_WALK = ['brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review'];
+  const { data: gateRows } = await supabase
+    .from('gate_records')
+    .select('gate_name, gate_status')
+    .eq('delivery_cycle_id', initiative_id)
+    .is('deleted_at', null);
+  const gateStatusByName = {};
+  for (const g of (gateRows || [])) { gateStatusByName[g.gate_name] = g.gate_status; }
+
+  let snapshot_gate_name = null;
+  let snapshot_gate_token = null;
+  for (const gateName of GATE_WALK) {
+    const ws = gateStatusByName[gateName];
+    if (ws === 'approved' || ws === 'skipped') { continue; }
+    snapshot_gate_name = gateName;
+    snapshot_gate_token = (ws === 'awaiting_approval' || ws === 'pending')
+      ? 'submitted'
+      : (statusByGate[gateName] || 'not_started');
+    break;
+  }
+
   // ── Insert the immutable status update row (D-476; supersede per D-507) ───
   const insertRow = {
     initiative_id,
+    next_gate_name:          snapshot_gate_name,
+    next_gate_status_token:  snapshot_gate_token,
     accomplished_last_cycle: accomplished_last_cycle || null,
     plan_next_cycle:         plan_next_cycle || null,
     blockers:                blockers || null,
