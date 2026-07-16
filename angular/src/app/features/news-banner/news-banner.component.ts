@@ -37,10 +37,13 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
             <app-egg-icon *ngIf="it.kind === 'egg'" [assetRef]="asset(it.asset_ref)" [size]="16"></app-egg-icon>
             <span class="nb-text">{{ it.text }}</span>
 
-            <!-- reaction chips (results) -->
+            <!-- reaction chips (results): 1 → one icon, no number; 2–3 → that many
+                 icons; 4+ → one icon + a count. -->
             <span class="nb-chip" *ngFor="let r of it.reactions" [class.nb-chip-mine]="r.mine">
-              <ng-container [ngTemplateOutlet]="glyph" [ngTemplateOutletContext]="{ $implicit: r.emoji, size: 12 }"></ng-container>
-              <span class="nb-chip-n">{{ r.count }}</span>
+              <ng-container *ngFor="let _ of iconSlots(r.count)">
+                <ng-container [ngTemplateOutlet]="glyph" [ngTemplateOutletContext]="{ $implicit: r.emoji, size: 12 }"></ng-container>
+              </ng-container>
+              <span class="nb-chip-n" *ngIf="r.count > 3">{{ r.count }}</span>
             </span>
 
             <!-- inline picker (choices) — only for the open item -->
@@ -74,11 +77,14 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
     <ng-template #glyph let-emoji let-size="size">
       <span *ngIf="emoji === 'heart'" class="nb-g">❤️</span>
       <span *ngIf="emoji === 'clap'" class="nb-g">👏</span>
-      <svg *ngIf="emoji === 'triarq'" [attr.width]="size" [attr.height]="size" viewBox="304 14 84 80" aria-label="TRIARQ">
-        <path fill="#12274A" d="M364.5,27.5c-5.5-3.8-12.2-6.1-19.5-5.9C325.6,22,310.2,38,310.2,56.9c0,7.4,2.5,14.2,6.5,19.6c-6.2-6.2-10.1-14.8-10.1-24.3c0-18.9,15.3-34.2,34.2-34.2C350,18,358.3,21.6,364.5,27.5z"/>
-        <path fill="#E96127" d="M383.4,90l-12.7-12c4.7-6,7.9-13.8,8.1-23c0.3-11.1-5.4-21.4-14.3-27.5c6.5,6.2,10.6,15,10.6,24.7c0,18.9-15.3,34.2-34.2,34.2c-9.4,0-18-3.8-24.1-10C323,85,333.3,90.3,344,90c7.6-0.3,14.7-2.2,20.9-8.3l1.3,1.3c0,0,0,0,0,0l7.8,7L383.4,90z"/>
-        <circle fill="#E96127" cx="358.6" cy="70.5" r="6.1"/>
-      </svg>
+      <!-- TRIARQ Q on a white disc so the navy arc reads against the dark banner -->
+      <span *ngIf="emoji === 'triarq'" class="nb-q">
+        <svg [attr.width]="size" [attr.height]="size" viewBox="304 14 84 80" aria-label="TRIARQ">
+          <path fill="#12274A" d="M364.5,27.5c-5.5-3.8-12.2-6.1-19.5-5.9C325.6,22,310.2,38,310.2,56.9c0,7.4,2.5,14.2,6.5,19.6c-6.2-6.2-10.1-14.8-10.1-24.3c0-18.9,15.3-34.2,34.2-34.2C350,18,358.3,21.6,364.5,27.5z"/>
+          <path fill="#E96127" d="M383.4,90l-12.7-12c4.7-6,7.9-13.8,8.1-23c0.3-11.1-5.4-21.4-14.3-27.5c6.5,6.2,10.6,15,10.6,24.7c0,18.9-15.3,34.2-34.2,34.2c-9.4,0-18-3.8-24.1-10C323,85,333.3,90.3,344,90c7.6-0.3,14.7-2.2,20.9-8.3l1.3,1.3c0,0,0,0,0,0l7.8,7L383.4,90z"/>
+          <circle fill="#E96127" cx="358.6" cy="70.5" r="6.1"/>
+        </svg>
+      </span>
     </ng-template>
   `,
   styles: [`
@@ -118,6 +124,8 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
     .nb-item { display: inline-flex; align-items: center; gap: 6px; padding-right: 4px; }
     .nb-text { opacity: 0.95; }
     .nb-g { font-size: 12px; line-height: 1; }
+    .nb-q { display: inline-flex; align-items: center; justify-content: center;
+            background: #fff; border-radius: 50%; padding: 1px; line-height: 0; }
     .nb-chip {
       display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px;
       background: rgba(255,255,255,0.12); border-radius: 999px; font-size: 11px;
@@ -186,6 +194,11 @@ export class NewsBannerComponent implements OnInit, OnDestroy {
 
   hasMine(item: NewsTickerItem, emoji: ReactionEmoji): boolean {
     return !!item.reactions.find(r => r.emoji === emoji && r.mine);
+  }
+
+  /** 1–3 → that many icon slots (no number); 4+ → one slot (number shown). */
+  iconSlots(count: number): number[] {
+    return Array.from({ length: count <= 3 ? Math.max(count, 1) : 1 }, (_, i) => i);
   }
 
   react(item: NewsTickerItem, emoji: ReactionEmoji): void {
