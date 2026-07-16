@@ -66,11 +66,16 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
           </span>
         </div>
       </div>
+      <!-- Always-visible dismiss — the tag menu also works, but new users need
+           an affordance that reads as "this can go away". -->
+      <button type="button" class="nb-close" (click)="setHidden(true)"
+              title="Hide news banner" aria-label="Hide news banner">×</button>
     </div>
 
-    <!-- Collapsed handle — always available to bring the banner back -->
+    <!-- Collapsed handle — always available to bring the banner back.
+         Bottom-right so it stays off the sidebar's Sign out corner. -->
     <div class="nb-handle" *ngIf="hidden">
-      <button type="button" class="nb-tag nb-tag-handle" (click)="toggleMenu($event)" aria-label="News banner menu">OI Trust ▸</button>
+      <button type="button" class="nb-tag nb-tag-handle" (click)="toggleMenu($event)" aria-label="News banner menu">◂ OI Trust</button>
       <div class="nb-menu nb-menu-handle" *ngIf="menuOpen" (click)="$event.stopPropagation()">
         <button type="button" (click)="setHidden(false)">Show news banner</button>
       </div>
@@ -91,8 +96,13 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
     </ng-template>
   `,
   styles: [`
+    /* z-index 80: above in-page sticky headers (40) and pickers (50), BELOW
+       slide-in panels and scrims (100–210) — a modal always beats the banner.
+       Bottom inset clears iOS home bars (safe-area). */
     .nb {
-      position: fixed; left: 0; right: 0; bottom: 0; height: 30px; z-index: 900;
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+      height: calc(30px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box;
       display: flex; align-items: center; gap: 10px;
       background: var(--triarq-color-deep-navy, #12274A); color: #fff; font-size: 12.5px;
     }
@@ -103,7 +113,7 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
       font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px;
     }
     .nb-menu {
-      position: absolute; bottom: 100%; left: 0; margin-bottom: 4px; z-index: 901;
+      position: absolute; bottom: 100%; left: 0; margin-bottom: 4px; z-index: 81;
       background: #fff; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); overflow: hidden;
     }
     .nb-menu button {
@@ -112,12 +122,17 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
       font-size: 12px; color: var(--triarq-color-text-primary, #1a1a1a);
     }
     .nb-menu button:hover { background: var(--triarq-color-fog, #F1EFE8); }
-    .nb-handle { position: fixed; left: 0; bottom: 0; z-index: 900; }
+    .nb-handle { position: fixed; right: 0; bottom: 0; z-index: 80; }
     .nb-tag-handle {
-      height: 24px; border-radius: 0 6px 0 0; opacity: 0.85; font-size: 10px;
+      height: 24px; border-radius: 6px 0 0 0; opacity: 0.85; font-size: 10px;
     }
     .nb-tag-handle:hover { opacity: 1; }
-    .nb-menu-handle { bottom: 24px; }
+    .nb-menu-handle { bottom: 24px; left: auto; right: 0; }
+    .nb-close {
+      flex-shrink: 0; align-self: stretch; background: none; border: none;
+      color: #fff; opacity: 0.65; cursor: pointer; font-size: 16px; padding: 0 12px;
+    }
+    .nb-close:hover { opacity: 1; }
     .nb-viewport { flex: 1; overflow: hidden; }
     .nb-track {
       display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
@@ -176,11 +191,21 @@ export class NewsBannerComponent implements OnInit, OnDestroy {
       this.rebuildLoop();
       this.durationSec = Math.max(30, items.length * SECONDS_PER_ITEM);
       this.openIndex = null;
+      this.reportVisibility();
       this.cdr.markForCheck();
     });
+    this.reportVisibility();
   }
 
-  ngOnDestroy(): void { this.sub?.unsubscribe(); }
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+    this.news.setBannerVisible(false);
+  }
+
+  /** App shell reserves bottom space only while the strip actually renders. */
+  private reportVisibility(): void {
+    this.news.setBannerVisible(!this.hidden && this.items.length > 0);
+  }
 
   private rebuildLoop(): void { this.loopItems = [...this.items, ...this.items]; }
 
@@ -198,6 +223,7 @@ export class NewsBannerComponent implements OnInit, OnDestroy {
     this.hidden = hidden;
     this.menuOpen = false;
     try { localStorage.setItem(NewsBannerComponent.HIDE_KEY, hidden ? '1' : '0'); } catch { /* ignore */ }
+    this.reportVisibility();
     this.cdr.markForCheck();
   }
 

@@ -14,6 +14,7 @@ import { AuthService }            from './core/services/auth.service';
 import { UserProfileService }     from './core/services/user-profile.service';
 import { VersionCheckService }    from './core/services/version-check.service';
 import { BusyService }            from './core/services/busy.service';
+import { NewsTickerService }      from './core/services/news-ticker.service';
 import { filter, map }            from 'rxjs/operators';
 import { Observable }             from 'rxjs';
 
@@ -21,7 +22,7 @@ import { Observable }             from 'rxjs';
   selector:        'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="oi-app-root">
+    <div class="oi-app-root" [class.oi-nb-open]="bannerVisible$ | async">
 
       <!-- Global activity bar — visible while any mutating MCP call is in
            flight (Processing Feedback standard, 2026-07-12). Pairs with the
@@ -104,22 +105,29 @@ import { Observable }             from 'rxjs';
       0%   { background-position: -50% 0; }
       100% { background-position: 150% 0; }
     }
-    /* Reserve space for the fixed bottom news banner so it never covers content
-       (including the Easter egg spots placed at screen bottoms). */
-    .oi-main-content { padding-bottom: 38px; }
+    /* News-banner space reservation. --nb-space is 0 until the banner strip
+       actually renders (not hidden AND has items) — then the whole shell,
+       sidebar included, ends above the banner. Hiding the banner reclaims the
+       space immediately. Components with viewport-height columns may consume
+       var(--nb-space) to stay clear as well. */
+    .oi-app-root { --nb-space: 0px; }
+    .oi-app-root.oi-nb-open { --nb-space: calc(38px + env(safe-area-inset-bottom, 0px)); }
+    .oi-app-shell { padding-bottom: var(--nb-space); transition: padding-bottom .15s ease; }
   `]
 })
 export class AppComponent implements OnInit {
   showSidebar$!:     Observable<boolean>;
   updateAvailable$!: Observable<boolean>;
   busy$!:            Observable<boolean>;
+  bannerVisible$!:   Observable<boolean>;
 
   constructor(
     private readonly router:         Router,
     private readonly auth:           AuthService,
     private readonly profileService: UserProfileService,
     private readonly versionCheck:   VersionCheckService,
-    private readonly busy:           BusyService
+    private readonly busy:           BusyService,
+    private readonly newsTicker:     NewsTickerService
   ) {}
 
   ngOnInit(): void {
@@ -138,6 +146,9 @@ export class AppComponent implements OnInit {
 
     // Processing Feedback standard: activity bar mirrors BusyService.
     this.busy$ = this.busy.busy$;
+
+    // News-banner space reservation — shell padding follows actual banner render state.
+    this.bannerVisible$ = this.newsTicker.bannerVisible$;
 
     // Load profile at app startup so sidebar role-filtering works on any
     // first-landing route, not just /home. HomeComponent also calls

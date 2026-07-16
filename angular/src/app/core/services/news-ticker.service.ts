@@ -3,7 +3,7 @@
 // components subscribe; no logic here beyond the call.
 
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { McpService } from './mcp.service';
 
 export type ReactionEmoji = 'heart' | 'clap' | 'triarq';
@@ -25,7 +25,18 @@ export interface NewsTickerItem {
 
 @Injectable({ providedIn: 'root' })
 export class NewsTickerService {
+  // Whether the banner strip is actually rendered (not hidden AND has items).
+  // The banner component reports it; the app shell reserves/reclaims the
+  // bottom 38px accordingly — content never sits under the banner, and the
+  // space comes back the moment the banner hides.
+  private readonly bannerVisibleSubject = new BehaviorSubject<boolean>(false);
+  readonly bannerVisible$: Observable<boolean> = this.bannerVisibleSubject.asObservable();
+
   constructor(private readonly mcp: McpService) {}
+
+  setBannerVisible(visible: boolean): void {
+    if (this.bannerVisibleSubject.value !== visible) this.bannerVisibleSubject.next(visible);
+  }
 
   getTicker(): Observable<NewsTickerItem[]> {
     return new Observable<NewsTickerItem[]>(sub => {

@@ -33,6 +33,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-16',
+    builtAt:       '14:00 UTC',
+    contractLabel: 'Contract 38 follow-on — news banner out of the way',
+    items: [
+      {
+        audience:    'All',
+        surface:     'News banner',
+        description: 'The bottom banner no longer covers buttons or content — screens now end above it, panels open over it, and a new × on its right edge hides it in one click (the space comes right back). Bring it back anytime from the small OI Trust tab in the bottom-right corner.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-16',
     builtAt:       '13:00 UTC',
     contractLabel: 'Contract 38 — Meeting presence + leader-name sections',
     items: [
