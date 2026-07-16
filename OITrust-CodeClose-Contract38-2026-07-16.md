@@ -290,6 +290,34 @@ Sequence check: CC-38-01 … CC-38-16, no gaps.
 6. Refresh after hiding — banner stays hidden (persistence). Pass/Fail.
 7. "OI Trust" tag menu still offers Hide/Show as before. Pass/Fail.
 
+---
+
+# Follow-on 2 — Egg Hunt Leader Moved to Community Card (same session)
+
+Phil report: leader display on wrong card. Discussed, "go" given.
+Deployed SHA: d2b6e39 (gh-pages f6e08c4). Angular-only.
+
+- **CC-38-17** — Spec deviation (Rule 7): the Easter Egg leaderboard spec placed
+  the leader strip on My Easter Eggs. **What was built:** leader strip is now a
+  pinned row (fog background) at the top of "Egg hunt — community", above the
+  feed. **What spec said:** leader on My card. **Why better:** hunt standings
+  are community information — on the personal card the row read as a second
+  personal count and literally duplicated "X of 10" when the caller led.
+  Content unchanged per spec (name, X of 10, leader's most recent egg).
+  Implementation: community card reads `leader`/`totalEggs` from the shared
+  `basket$` state it already subscribed to; `ensureLoaded()` added so the strip
+  populates even if the My card hasn't initialized first.
+
+**Verification deltas:** view-only template move, no logic change (test-ratchet
+exempt); build green; S-035 changelog entry in deploy commit d2b6e39; no new
+files (repo cleanliness N/A); deployment gh-pages f6e08c4, version d2b6e39 =
+master HEAD.
+
+**Addendum UAT:**
+1. Home → "Egg hunt — community" shows a pinned Leader row at top (egg icon, name, X of 10). Pass/Fail.
+2. "My Easter Eggs" no longer shows the Leader row; card ends with the "quiet corners" hint. Pass/Fail.
+3. Find an egg (or have another user find one) — leader strip and feed update together. Pass/Fail.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
