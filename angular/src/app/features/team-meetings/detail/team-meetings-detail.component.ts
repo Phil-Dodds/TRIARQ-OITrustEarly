@@ -419,20 +419,12 @@ interface InitiativeSearchResult {
                              padding: 10px 0 10px; margin-top: -10px;
                              box-shadow: 0 6px 8px -6px rgba(0,0,0,0.12); }
     .tmd-back-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    .tmd-back-right { display: flex; align-items: center; gap: 12px; }
-    /* Live presence avatars — colored circle + initials, matching the reference panel */
-    .tmd-presence-stack { display: flex; align-items: center; }
-    .tmd-presence-label { font: italic 11px Roboto; color: #9E9E9E; margin-right: 8px; }
-    .tmd-presence-avatar {
-      width: 24px; height: 24px; border-radius: 50%;
-      color: #fff; font: 500 10px Roboto;
-      display: inline-flex; align-items: center; justify-content: center;
-      border: 2px solid #fff; box-sizing: content-box;
-      flex-shrink: 0; cursor: default;
-    }
-    .tmd-presence-avatar + .tmd-presence-avatar { margin-left: -7px; }
-    .tmd-presence-avatar-sm { width: 20px; height: 20px; font-size: 9px; border-width: 1px; }
-    .tmd-section-header-actions .tmd-presence-avatar-sm + .tmd-presence-avatar-sm { margin-left: -6px; }
+    .tmd-back-right,.tmd-presence-stack { display:flex; align-items:center; }
+    .tmd-back-right { gap:12px; }
+    .tmd-presence-label { font:italic 11px Roboto; color:#9E9E9E; margin-right:8px; }
+    .tmd-presence-avatar { width:24px; height:24px; border-radius:50%; color:#fff; font:500 10px Roboto; display:inline-flex; align-items:center; justify-content:center; border:2px solid #fff; flex-shrink:0; cursor:default; }
+    .tmd-presence-avatar + .tmd-presence-avatar { margin-left:-7px; }
+    .tmd-presence-avatar-sm { width:20px; height:20px; font-size:9px; border-width:1px; }
     .tmd-back-link { font: 13px Roboto; color: var(--triarq-color-primary, #257099); text-decoration: none; }
     .tmd-series-btn { background: none; border: 1px solid #BDBDBD; border-radius: 5px; color: #5A5A5A; font: 500 12px Roboto; padding: 4px 10px; cursor: pointer; }
     .tmd-series-btn:hover { border-color: var(--triarq-color-primary, #257099); color: var(--triarq-color-primary, #257099); }
@@ -485,8 +477,6 @@ interface InitiativeSearchResult {
     }
     .tmd-bullet-note:focus { border-color:var(--triarq-color-primary, #257099); }
     .tmd-bullet-note::placeholder { color:#9FB4C0; }
-    .tmd-bullet-note-readonly { margin:2px 0 0 14px; font:italic 12px Roboto; color:#757575;
-    }
     .tmd-bullet-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     .tmd-bullet-author {
       flex-shrink: 0;
@@ -545,7 +535,6 @@ interface InitiativeSearchResult {
     .tmd-save-done { color: #4CAF50; }
     .tmd-notes-textarea { width:100%; border:1px solid #E0E0E0; border-radius:5px; padding:8px 10px; font:13px Roboto; resize:vertical; outline:none; box-sizing:border-box; }
     .tmd-notes-textarea:focus { border-color:var(--triarq-color-primary,#257099); }
-    .tmd-notes-readonly { font: 13px Roboto; color: #1A1A1A; margin: 0; white-space: pre-wrap; }
 
     /* Pull from last meeting */
     .tmd-pull-row { display:flex; align-items:center; gap:12px; margin-top:6px; flex-wrap:wrap; }
@@ -591,7 +580,6 @@ interface InitiativeSearchResult {
       z-index: 201; overflow-y: auto;
       border-radius: 10px 0 0 10px;
     }
-    .tmd-close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #757575; }
   `]
 })
 export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
