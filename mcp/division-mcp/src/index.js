@@ -47,7 +47,7 @@ const { clear_division_status_config } = require('./tools/clear_division_status_
 // Easter Egg Hunt (spec docs/easter-egg-spec.md).
 const easterEggs                       = require('./tools/easter_eggs');
 // Bottom news banner feed.
-const { get_news_ticker }              = require('./tools/news_ticker');
+const { get_news_ticker, toggle_news_banner_reaction } = require('./tools/news_ticker');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -115,7 +115,8 @@ app.post('/tools/:toolName', async (req, res) => {
     list_easter_eggs:      easterEggs.list_easter_eggs,
     upsert_easter_egg:     easterEggs.upsert_easter_egg,
     set_easter_egg_active: easterEggs.set_easter_egg_active,
-    get_news_ticker
+    get_news_ticker,
+    toggle_news_banner_reaction
   };
 
   if (!tools[toolName]) {
@@ -199,7 +200,8 @@ app.get('/tools', (req, res) => {
       { name: 'list_easter_eggs',             method: 'POST', path: '/tools/list_easter_eggs' },
       { name: 'upsert_easter_egg',            method: 'POST', path: '/tools/upsert_easter_egg' },
       { name: 'set_easter_egg_active',        method: 'POST', path: '/tools/set_easter_egg_active' },
-      { name: 'get_news_ticker',              method: 'POST', path: '/tools/get_news_ticker' }
+      { name: 'get_news_ticker',              method: 'POST', path: '/tools/get_news_ticker' },
+      { name: 'toggle_news_banner_reaction',  method: 'POST', path: '/tools/toggle_news_banner_reaction' }
     ]
   });
 });

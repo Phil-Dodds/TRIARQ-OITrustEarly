@@ -1,18 +1,21 @@
 // news-banner.component.ts — bottom scrolling news banner (all screens).
-// A slim fixed strip that celebrates recent positive activity, scrolling
-// slowly right-to-left and looping. Polls every few minutes. Pauses on hover.
-// Presentation only — data via NewsTickerService → division-mcp.
+// A slim fixed strip celebrating recent positive activity, scrolling slowly
+// and looping. Hover pauses it; hovering an item reveals a ☺﹢ react button
+// that opens an inline emoji picker (❤️ 👏 TRIARQ-Q). Reactions show as chips
+// with counts. Polls every 3 min; own reactions update optimistically, others'
+// appear on the next poll. Presentation only — data via NewsTickerService.
 
 import {
   Component, ChangeDetectionStrategy, ChangeDetectorRef, OnInit, OnDestroy
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription, timer, switchMap } from 'rxjs';
-import { NewsTickerService, NewsTickerItem } from '../../core/services/news-ticker.service';
+import { NewsTickerService, NewsTickerItem, NewsReaction, ReactionEmoji } from '../../core/services/news-ticker.service';
 import { EggIconComponent, EggAssetRef } from '../easter-eggs/egg-icon.component';
 
-const POLL_MS = 180000;        // refresh every 3 minutes
-const SECONDS_PER_ITEM = 6;    // scroll pace — higher = slower
+const POLL_MS = 180000;
+const SECONDS_PER_ITEM = 6;
+const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
 
 @Component({
   selector: 'app-news-banner',
@@ -20,26 +23,55 @@ const SECONDS_PER_ITEM = 6;    // scroll pace — higher = slower
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, EggIconComponent],
   template: `
-    <div class="nb" *ngIf="items.length > 0" aria-label="Recent activity">
+    <div class="nb" *ngIf="items.length > 0" aria-label="Recent activity" (mouseleave)="closePicker()">
       <span class="nb-tag">OI Trust</span>
       <div class="nb-viewport">
         <div class="nb-track" [style.animation-duration.s]="durationSec">
-          <!-- items twice for a seamless loop -->
           <span class="nb-item" *ngFor="let it of loopItems; let i = index">
             <app-egg-icon *ngIf="it.kind === 'egg'" [assetRef]="asset(it.asset_ref)" [size]="16"></app-egg-icon>
             <span class="nb-text">{{ it.text }}</span>
+
+            <!-- reaction chips (results) -->
+            <span class="nb-chip" *ngFor="let r of it.reactions" [class.nb-chip-mine]="r.mine">
+              <ng-container [ngTemplateOutlet]="glyph" [ngTemplateOutletContext]="{ $implicit: r.emoji, size: 12 }"></ng-container>
+              <span class="nb-chip-n">{{ r.count }}</span>
+            </span>
+
+            <!-- inline picker (choices) — only for the open item -->
+            <span class="nb-picker" *ngIf="openIndex === i">
+              <button type="button" class="nb-emoji" *ngFor="let e of emojis"
+                      [class.nb-emoji-on]="hasMine(it, e)" (click)="react(it, e)"
+                      [attr.aria-label]="'React ' + e">
+                <ng-container [ngTemplateOutlet]="glyph" [ngTemplateOutletContext]="{ $implicit: e, size: 16 }"></ng-container>
+              </button>
+            </span>
+
+            <!-- ☺﹢ react affordance — appears on item hover -->
+            <button type="button" class="nb-react-btn" *ngIf="openIndex !== i"
+                    (click)="openPicker(i)" aria-label="Add a reaction">☺﹢</button>
+
             <span class="nb-sep" aria-hidden="true">•</span>
           </span>
         </div>
       </div>
     </div>
+
+    <!-- reaction glyph: heart/clap unicode, triarq = mini Q emblem -->
+    <ng-template #glyph let-emoji let-size="size">
+      <span *ngIf="emoji === 'heart'" class="nb-g">❤️</span>
+      <span *ngIf="emoji === 'clap'" class="nb-g">👏</span>
+      <svg *ngIf="emoji === 'triarq'" [attr.width]="size" [attr.height]="size" viewBox="304 14 84 80" aria-label="TRIARQ">
+        <path fill="#12274A" d="M364.5,27.5c-5.5-3.8-12.2-6.1-19.5-5.9C325.6,22,310.2,38,310.2,56.9c0,7.4,2.5,14.2,6.5,19.6c-6.2-6.2-10.1-14.8-10.1-24.3c0-18.9,15.3-34.2,34.2-34.2C350,18,358.3,21.6,364.5,27.5z"/>
+        <path fill="#E96127" d="M383.4,90l-12.7-12c4.7-6,7.9-13.8,8.1-23c0.3-11.1-5.4-21.4-14.3-27.5c6.5,6.2,10.6,15,10.6,24.7c0,18.9-15.3,34.2-34.2,34.2c-9.4,0-18-3.8-24.1-10C323,85,333.3,90.3,344,90c7.6-0.3,14.7-2.2,20.9-8.3l1.3,1.3c0,0,0,0,0,0l7.8,7L383.4,90z"/>
+        <circle fill="#E96127" cx="358.6" cy="70.5" r="6.1"/>
+      </svg>
+    </ng-template>
   `,
   styles: [`
     .nb {
       position: fixed; left: 0; right: 0; bottom: 0; height: 30px; z-index: 900;
       display: flex; align-items: center; gap: 10px;
-      background: var(--triarq-color-deep-navy, #12274A); color: #fff;
-      overflow: hidden; font-size: 12.5px;
+      background: var(--triarq-color-deep-navy, #12274A); color: #fff; font-size: 12.5px;
     }
     .nb-tag {
       flex-shrink: 0; padding: 0 12px; height: 100%; display: flex; align-items: center;
@@ -48,14 +80,33 @@ const SECONDS_PER_ITEM = 6;    // scroll pace — higher = slower
     }
     .nb-viewport { flex: 1; overflow: hidden; }
     .nb-track {
-      display: inline-flex; align-items: center; white-space: nowrap;
-      will-change: transform; animation-name: nbScroll; animation-timing-function: linear;
-      animation-iteration-count: infinite;
+      display: inline-flex; align-items: center; white-space: nowrap; will-change: transform;
+      animation-name: nbScroll; animation-timing-function: linear; animation-iteration-count: infinite;
     }
     .nb:hover .nb-track { animation-play-state: paused; }
-    .nb-item { display: inline-flex; align-items: center; gap: 8px; padding-right: 4px; }
+    .nb-item { display: inline-flex; align-items: center; gap: 6px; padding-right: 4px; }
     .nb-text { opacity: 0.95; }
-    .nb-sep { opacity: 0.4; padding: 0 14px; }
+    .nb-g { font-size: 12px; line-height: 1; }
+    .nb-chip {
+      display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px;
+      background: rgba(255,255,255,0.12); border-radius: 999px; font-size: 11px;
+    }
+    .nb-chip-mine { background: rgba(233,97,39,0.35); }
+    .nb-chip-n { opacity: 0.9; }
+    .nb-picker { display: inline-flex; align-items: center; gap: 2px; }
+    .nb-emoji {
+      background: rgba(255,255,255,0.1); border: none; border-radius: 999px; cursor: pointer;
+      padding: 2px 6px; display: inline-flex; align-items: center; line-height: 0;
+    }
+    .nb-emoji:hover { background: rgba(255,255,255,0.25); }
+    .nb-emoji-on { background: rgba(233,97,39,0.5); }
+    .nb-react-btn {
+      background: none; border: none; color: #fff; cursor: pointer; font-size: 12px;
+      opacity: 0; padding: 0 2px; transition: opacity .12s;
+    }
+    .nb-item:hover .nb-react-btn { opacity: 0.85; }
+    .nb-react-btn:hover { opacity: 1; }
+    .nb-sep { opacity: 0.4; padding: 0 12px; }
     @keyframes nbScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
   `]
 })
@@ -63,6 +114,8 @@ export class NewsBannerComponent implements OnInit, OnDestroy {
   items: NewsTickerItem[] = [];
   loopItems: NewsTickerItem[] = [];
   durationSec = 60;
+  openIndex: number | null = null;
+  readonly emojis = EMOJIS;
   private sub?: Subscription;
 
   constructor(private readonly news: NewsTickerService, private readonly cdr: ChangeDetectorRef) {}
@@ -70,13 +123,49 @@ export class NewsBannerComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.sub = timer(0, POLL_MS).pipe(switchMap(() => this.news.getTicker())).subscribe(items => {
       this.items = items;
-      this.loopItems = [...items, ...items]; // duplicate for the -50% loop
+      this.rebuildLoop();
       this.durationSec = Math.max(30, items.length * SECONDS_PER_ITEM);
+      this.openIndex = null;
       this.cdr.markForCheck();
     });
   }
 
   ngOnDestroy(): void { this.sub?.unsubscribe(); }
 
+  private rebuildLoop(): void { this.loopItems = [...this.items, ...this.items]; }
+
   asset(ref: string | null | undefined): EggAssetRef { return (ref as EggAssetRef) || 'egg-01'; }
+
+  openPicker(i: number): void { this.openIndex = i; this.cdr.markForCheck(); }
+  closePicker(): void { this.openIndex = null; this.cdr.markForCheck(); }
+
+  hasMine(item: NewsTickerItem, emoji: ReactionEmoji): boolean {
+    return !!item.reactions.find(r => r.emoji === emoji && r.mine);
+  }
+
+  react(item: NewsTickerItem, emoji: ReactionEmoji): void {
+    // Optimistic toggle on every item sharing this key (both loop copies share
+    // the same object refs from this.items, so mutate the underlying items).
+    for (const it of this.items) {
+      if (it.news_item_key !== item.news_item_key) { continue; }
+      it.reactions = applyToggle(it.reactions, emoji);
+    }
+    this.rebuildLoop();
+    this.openIndex = null;
+    this.cdr.markForCheck();
+    this.news.toggleReaction(item.news_item_key, emoji).subscribe(); // fire-and-forget; poll reconciles
+  }
+}
+
+/** Pure optimistic toggle of the caller's reaction on a copy of the array. */
+function applyToggle(reactions: NewsReaction[], emoji: ReactionEmoji): NewsReaction[] {
+  const next = reactions.map(r => ({ ...r }));
+  const existing = next.find(r => r.emoji === emoji);
+  if (existing) {
+    if (existing.mine) { existing.mine = false; existing.count = Math.max(0, existing.count - 1); }
+    else { existing.mine = true; existing.count += 1; }
+    return next.filter(r => r.count > 0);
+  }
+  next.push({ emoji, count: 1, mine: true });
+  return next;
 }

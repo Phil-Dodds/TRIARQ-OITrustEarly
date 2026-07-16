@@ -33,6 +33,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-16',
+    builtAt:       '18:00 UTC',
+    contractLabel: 'News banner reactions',
+    items: [
+      {
+        audience:    'All',
+        surface:     'News banner',
+        description: 'React to good news on the bottom banner. Hover to pause it, hover an item for a ☺﹢ button, and give it a heart, a clap, or a TRIARQ Q. Reactions show as little counts everyone can see.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-16',
     builtAt:       '03:00 UTC',
     contractLabel: 'Activity banner + Easter Egg leaderboard',
     items: [

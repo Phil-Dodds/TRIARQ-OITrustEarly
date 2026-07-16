@@ -24,7 +24,7 @@ const chain = {
 const dbPath = require.resolve('../src/db');
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: { supabase: chain } };
 
-const { get_news_ticker } = require('../src/tools/news_ticker');
+const { get_news_ticker, toggle_news_banner_reaction } = require('../src/tools/news_ticker');
 const USER = 'user-uuid';
 
 beforeEach(() => { queue = []; });
@@ -41,31 +41,63 @@ describe('get_news_ticker', () => {
     assert.deepEqual(r.data.items, []);
   });
 
-  test('merges sources newest-first and normalizes egg items with an asset', async () => {
+  test('merges sources newest-first, stamps stable keys, folds in reactions', async () => {
     queue = [
       // 1. gate approvals
-      { data: [{ delivery_cycle_id: 'c1', event_metadata: { gate_name: 'go_to_build' }, created_at: '2026-07-10T00:00:00Z' }], error: null },
+      { data: [{ id: 'g1', delivery_cycle_id: 'c1', event_metadata: { gate_name: 'go_to_build' }, created_at: '2026-07-10T00:00:00Z' }], error: null },
       { data: [{ delivery_cycle_id: 'c1', cycle_title: 'Referral Mgmt' }], error: null }, // titles
       // 2. meetings
-      { data: [{ title: 'Weekly', created_at: '2026-07-16T00:00:00Z', created_by: 'u2', users: { display_name: 'Sarah' } }], error: null },
+      { data: [{ id: 'm1', title: 'Weekly', created_at: '2026-07-16T00:00:00Z', created_by: 'u2', users: { display_name: 'Sarah' } }], error: null },
       // 3. egg finds
-      { data: [{ found_at: '2026-07-15T00:00:00Z', users: { display_name: 'Maya' }, easter_eggs: { asset_ref: 'egg-05' } }], error: null },
+      { data: [{ id: 'e1', found_at: '2026-07-15T00:00:00Z', users: { display_name: 'Maya' }, easter_eggs: { asset_ref: 'egg-05' } }], error: null },
       // 4. new users
-      { data: [{ display_name: 'Tom', created_at: '2026-07-12T00:00:00Z' }], error: null },
+      { data: [{ id: 'u1', display_name: 'Tom', created_at: '2026-07-12T00:00:00Z' }], error: null },
       // 5. status updates (+ title fetch)
-      { data: [{ initiative_id: 'c1', saved_at: '2026-07-17T00:00:00Z', users: { display_name: 'Ana' } }], error: null },
+      { data: [{ id: 's1', initiative_id: 'c1', saved_at: '2026-07-17T00:00:00Z', users: { display_name: 'Ana' } }], error: null },
       { data: [{ delivery_cycle_id: 'c1', cycle_title: 'Referral Mgmt' }], error: null },
       // 6. acknowledgements
-      { data: [{ acknowledged_at: '2026-07-11T00:00:00Z', users: { display_name: 'Bo' } }], error: null }
+      { data: [{ id: 'a1', acknowledged_at: '2026-07-11T00:00:00Z', users: { display_name: 'Bo' } }], error: null },
+      // reactions fold-in
+      { data: [
+        { news_item_key: 'status:s1', emoji: 'heart', user_id: USER },
+        { news_item_key: 'status:s1', emoji: 'clap',  user_id: 'other' }
+      ], error: null }
     ];
     const r = await get_news_ticker({}, USER);
     assert.equal(r.success, true);
     // newest first: status (07-17) → meeting (07-16) → egg (07-15) → user (07-12) → ack (07-11) → gate (07-10)
     assert.deepEqual(r.data.items.map(i => i.kind), ['status', 'meeting', 'egg', 'user', 'ack', 'gate']);
-    assert.match(r.data.items[0].text, /Ana posted a status update on Referral Mgmt/);
-    assert.match(r.data.items[1].text, /Sarah created a new meeting/);
+    assert.equal(r.data.items[0].news_item_key, 'status:s1');
+    assert.equal(r.data.items[5].news_item_key, 'gate:g1');
     assert.equal(r.data.items[2].asset_ref, 'egg-05');
-    assert.match(r.data.items[4].text, /Bo acknowledged a status update/);
-    assert.match(r.data.items[5].text, /Referral Mgmt passed its Go to Build gate/);
+    // reactions on the status item: heart mine=true, clap mine=false
+    const heart = r.data.items[0].reactions.find(x => x.emoji === 'heart');
+    const clap  = r.data.items[0].reactions.find(x => x.emoji === 'clap');
+    assert.equal(heart.count, 1); assert.equal(heart.mine, true);
+    assert.equal(clap.count, 1);  assert.equal(clap.mine, false);
+    assert.deepEqual(r.data.items[1].reactions, []); // meeting has none
+  });
+});
+
+describe('toggle_news_banner_reaction', () => {
+  test('rejects an invalid emoji', async () => {
+    const r = await toggle_news_banner_reaction({ news_item_key: 'gate:g1', emoji: 'thumbsdown' }, USER);
+    assert.equal(r.success, false);
+  });
+  test('requires a signed-in caller', async () => {
+    const r = await toggle_news_banner_reaction({ news_item_key: 'gate:g1', emoji: 'heart' }, null);
+    assert.equal(r.success, false);
+  });
+  test('adds a reaction when none exists', async () => {
+    queue = [{ data: null, error: null }]; // no existing reaction
+    const r = await toggle_news_banner_reaction({ news_item_key: 'gate:g1', emoji: 'heart' }, USER);
+    assert.equal(r.success, true);
+    assert.equal(r.data.reacted, true);
+  });
+  test('removes a reaction when one exists', async () => {
+    queue = [{ data: { id: 'r1' }, error: null }]; // existing reaction found
+    const r = await toggle_news_banner_reaction({ news_item_key: 'gate:g1', emoji: 'clap' }, USER);
+    assert.equal(r.success, true);
+    assert.equal(r.data.reacted, false);
   });
 });
