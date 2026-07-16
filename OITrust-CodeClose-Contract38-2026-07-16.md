@@ -332,7 +332,9 @@ zero-egg users. Deployed SHA: 1c452cf (gh-pages 25be07e). Angular-only.
   a small animated egg — ONLY while the caller's basket shows zero eggs found
   (shared `basket$` state; stops permanently on first find, including
   mid-session). Cadence: first appearance 30–90s after load, then every 4–9
-  minutes, ~7s visible, random egg art each time. Decorative by design:
+  minutes, ~7s visible, random egg art each time. (Amended same session, Phil
+  suggestion: repeat interval shortened to 1–3 minutes — deployed 6bb82c2.)
+  Decorative by design:
   `pointer-events:none`, `aria-hidden`, no hunt credit — pure curiosity nudge
   toward the Home screen. No persistence, no server calls.
 - **CC-38-20** — `EggIconComponent` (standalone) added to `app.module.ts`
