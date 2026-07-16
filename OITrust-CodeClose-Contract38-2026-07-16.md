@@ -413,6 +413,49 @@ green; S-035 changelog entry folded into the 16:30 deploy entry, deployed
 3. OI Library and Chat sub-items still navigate to their stub routes. Pass/Fail.
 4. No status chips on the group or its children; Live/Pilot chips unchanged on top-level items. Pass/Fail.
 
+---
+
+# Follow-on 6 — Initiatives Grid Headline Upgrade (same session)
+
+Phil (planned + banded-background proposal approved): remove Tier chip, fix
+weak headline color, add latest-status digest, band the headline cell by
+next-gate state. Deployed SHA: 30af8dc (gh-pages 1136edd).
+**Touches delivery-cycle-mcp — Phil must manually redeploy delivery-cycle-mcp
+in Render before the digest line appears.** (Grid works fine against the old
+MCP meanwhile — digest simply absent.)
+
+- **CC-38-25** — Tier chip removed from grid rows; tier remains in the filter
+  panel and detail view. Supersedes the themed-title-era badge re-add; D-264
+  originally removed a tier dot/badge — direction now re-confirmed by Phil.
+- **CC-38-26** — Headline cell second line: latest status digest
+  "Done: «accomplished_last_cycle» · Next: «plan_next_cycle» · age".
+  `list_delivery_cycles` joins the newest update via
+  `delivery_cycles.latest_status_update_id` (one batched query, no scan).
+  Absent when no status exists.
+- **CC-38-27** — Status band on the headline cell (D-200 Pattern-2 treatment:
+  3px left bar + ~9–12% tint + dark same-hue text): blue = awaiting approval,
+  red = gate overdue, amber = next gate due within 7 days OR undated,
+  green = next gate on track, none = neutral (no band, dark neutral text).
+  AMBER_WINDOW_DAYS = 7 is a new constant — D-482's window is meeting-anchored
+  and not applicable to gate proximity. Replaces the weak sunray/oravive
+  headline text colors (Phil's readability complaint).
+
+**Verification deltas:** delivery-cycle-mcp tests 238/238 before and after
+(Rule 11 baseline held). computeHeadline band logic covered by 6 new unit
+specs in cycle-headline.utils.spec.ts (ng test runner pre-existing broken —
+specs maintained per ratchet, currently unexecutable; Phil acknowledgment per
+D-442 applies). Rule 37 N/A (delivery-cycle mock is the FIFO pattern; no new
+tool). S-035 changelog in deploy commit 30af8dc. Repo cleanliness: no new
+files. list_delivery_cycles now 350 lines (service-file threshold applies to
+services; tool file — declared for visibility).
+
+**Addendum UAT (after Render redeploy of delivery-cycle-mcp):**
+1. Initiatives grid: Tier chip gone from every row; Tier filter still works. Pass/Fail.
+2. Headline cells show colored bands: red on the overdue ones (25 overdue gates exist), blue on "Awaiting … approval" rows, amber on near/undated next gates, green on comfortably dated ones, no band on neutral post-deploy rows. Pass/Fail.
+3. Headline text is dark and readable in every band — no pale orange. Pass/Fail.
+4. Rows with a posted status show "Done: … · Next: … · Nd ago" as a second line; tooltip shows full text; rows without status show only line 1. Pass/Fail.
+5. Before Render redeploy: grid renders normally with no digest line (backward compatible). Pass/Fail.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
