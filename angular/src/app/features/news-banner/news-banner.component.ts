@@ -26,8 +26,8 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
     <!-- Full banner — shown when not hidden and there's something to show -->
     <div class="nb" *ngIf="!hidden && items.length > 0" aria-label="Recent activity" (mouseleave)="onLeave()">
       <div class="nb-tagwrap">
-        <button type="button" class="nb-tag" (click)="toggleMenu()" aria-label="News banner menu">OI Trust</button>
-        <div class="nb-menu" *ngIf="menuOpen">
+        <button type="button" class="nb-tag" (click)="toggleMenu($event)" aria-label="News banner menu">OI Trust</button>
+        <div class="nb-menu" *ngIf="menuOpen" (click)="$event.stopPropagation()">
           <button type="button" (click)="setHidden(true)">Hide news banner</button>
         </div>
       </div>
@@ -39,12 +39,15 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
 
             <!-- reaction chips (results): 1 → one icon, no number; 2–3 → that many
                  icons; 4+ → one icon + a count. -->
-            <span class="nb-chip" *ngFor="let r of it.reactions" [class.nb-chip-mine]="r.mine">
+            <button type="button" class="nb-chip" *ngFor="let r of it.reactions" [class.nb-chip-mine]="r.mine"
+                    (click)="react(it, r.emoji); $event.stopPropagation()"
+                    [attr.aria-label]="'Toggle your ' + r.emoji + ' reaction'"
+                    title="Add yours">
               <ng-container *ngFor="let _ of iconSlots(r.count)">
                 <ng-container [ngTemplateOutlet]="glyph" [ngTemplateOutletContext]="{ $implicit: r.emoji, size: 12 }"></ng-container>
               </ng-container>
               <span class="nb-chip-n" *ngIf="r.count > 3">{{ r.count }}</span>
-            </span>
+            </button>
 
             <!-- inline picker (choices) — only for the open item -->
             <span class="nb-picker" *ngIf="openIndex === i">
@@ -67,8 +70,8 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
 
     <!-- Collapsed handle — always available to bring the banner back -->
     <div class="nb-handle" *ngIf="hidden">
-      <button type="button" class="nb-tag nb-tag-handle" (click)="toggleMenu()" aria-label="News banner menu">OI Trust ▸</button>
-      <div class="nb-menu nb-menu-handle" *ngIf="menuOpen">
+      <button type="button" class="nb-tag nb-tag-handle" (click)="toggleMenu($event)" aria-label="News banner menu">OI Trust ▸</button>
+      <div class="nb-menu nb-menu-handle" *ngIf="menuOpen" (click)="$event.stopPropagation()">
         <button type="button" (click)="setHidden(false)">Show news banner</button>
       </div>
     </div>
@@ -128,9 +131,12 @@ const EMOJIS: ReactionEmoji[] = ['heart', 'clap', 'triarq'];
             background: #fff; border-radius: 50%; padding: 1px; line-height: 0; }
     .nb-chip {
       display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px;
-      background: rgba(255,255,255,0.12); border-radius: 999px; font-size: 11px;
+      background: rgba(255,255,255,0.12); border: none; color: #fff; cursor: pointer;
+      border-radius: 999px; font-size: 11px;
     }
+    .nb-chip:hover { background: rgba(255,255,255,0.28); }
     .nb-chip-mine { background: rgba(233,97,39,0.35); }
+    .nb-chip-mine:hover { background: rgba(233,97,39,0.5); }
     .nb-chip-n { opacity: 0.9; }
     .nb-picker { display: inline-flex; align-items: center; gap: 2px; }
     .nb-emoji {
@@ -181,9 +187,11 @@ export class NewsBannerComponent implements OnInit, OnDestroy {
 
   openPicker(i: number): void { this.openIndex = i; this.cdr.markForCheck(); }
   closePicker(): void { this.openIndex = null; this.cdr.markForCheck(); }
-  onLeave(): void { this.openIndex = null; this.menuOpen = false; this.cdr.markForCheck(); }
+  // Hover only affects the reaction picker; the tag menu is a pure click toggle
+  // (stays open until an option or the tag is clicked again).
+  onLeave(): void { this.openIndex = null; this.cdr.markForCheck(); }
 
-  toggleMenu(): void { this.menuOpen = !this.menuOpen; this.cdr.markForCheck(); }
+  toggleMenu(event: Event): void { event.stopPropagation(); this.menuOpen = !this.menuOpen; this.cdr.markForCheck(); }
 
   setHidden(hidden: boolean): void {
     this.hidden = hidden;
