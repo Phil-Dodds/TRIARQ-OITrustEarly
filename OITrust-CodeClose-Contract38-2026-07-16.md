@@ -318,6 +318,40 @@ master HEAD.
 2. "My Easter Eggs" no longer shows the Leader row; card ends with the "quiet corners" hint. Pass/Fail.
 3. Find an egg (or have another user find one) — leader strip and feed update together. Pass/Fail.
 
+---
+
+# Follow-on 3 — Compact Egg Cards + Dancing-Egg Teaser (same session)
+
+Phil: "Shrink the cards down vertically" + dancing egg over Home nav for
+zero-egg users. Deployed SHA: 1c452cf (gh-pages 25be07e). Angular-only.
+
+- **CC-38-18** — Both egg cards drop `height:100%` (were stretching to the
+  tallest card in the Home grid row); community find-feed capped at 280px with
+  internal scroll. Cards now size to content.
+- **CC-38-19** — Dancing-egg teaser: sidebar Home nav item occasionally shows
+  a small animated egg — ONLY while the caller's basket shows zero eggs found
+  (shared `basket$` state; stops permanently on first find, including
+  mid-session). Cadence: first appearance 30–90s after load, then every 4–9
+  minutes, ~7s visible, random egg art each time. Decorative by design:
+  `pointer-events:none`, `aria-hidden`, no hunt credit — pure curiosity nudge
+  toward the Home screen. No persistence, no server calls.
+- **CC-38-20** — `EggIconComponent` (standalone) added to `app.module.ts`
+  imports so the module-declared sidebar can render it.
+
+**Verification deltas:** teaser logic is new (no confirmed behavior modified —
+Rule 11 exempt); timers cleaned in ngOnDestroy; build green; S-035 changelog
+entry in deploy commit 1c452cf; no new files. Sidebar now 431 lines —
+**exceeds 400-line threshold**; single responsibility still "role-aware
+navigation + nav ornaments"; extraction of teaser into a directive is a
+next-contract candidate if the sidebar grows again.
+
+**Addendum UAT:**
+1. Home cards: both egg cards shorter; community feed scrolls inside the card; row no longer stretches to feed length. Pass/Fail.
+2. Zero-egg user (fresh account): within ~90s of sign-in, small egg dances beside "Home" in the sidebar for ~7s, then disappears; reappears within ~10 min. Pass/Fail.
+3. Clicking the dancing egg does nothing beyond normal Home navigation — no hunt credit. Pass/Fail.
+4. User with ≥1 egg (you): teaser never appears. Pass/Fail.
+5. Find your first egg while teaser eligible — teaser stops for good. Pass/Fail.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
