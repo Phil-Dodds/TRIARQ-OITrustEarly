@@ -456,6 +456,59 @@ services; tool file — declared for visibility).
 4. Rows with a posted status show "Done: … · Next: … · Nd ago" as a second line; tooltip shows full text; rows without status show only line 1. Pass/Fail.
 5. Before Render redeploy: grid renders normally with no digest line (backward compatible). Pass/Fail.
 
+---
+
+# Follow-on 7 — One Gate Color Language (same session)
+
+Phil's design goals: blue reserved for approved gates; submissions purple;
+diamonds follow user gate status everywhere; both headline sections colored by
+their gate's status (current vs. at-time-of-update); grid and panel tracks
+must match. Deployed SHA: e4be0d4 (gh-pages 84fc7c1).
+**Requires: Phil runs migration 073, then manually redeploys delivery-cycle-mcp
+in Render** (snapshot save + digest fields). Everything else works pre-redeploy;
+digest color/as-of appear as new updates are posted.
+
+- **CC-38-28** — Canonical resolver `gate-visual.utils.ts`
+  (`resolveGateVisual`/`buildUnifiedGateStateMap`): approved → blue (reserved);
+  submitted/awaiting → purple; otherwise the USER's D-205 `date_status`
+  verbatim (on_track green #2E7D32, at_risk amber #F2A620, behind red #D32F2F,
+  complete blue #257099, not_started grey). Grid and panel `gateStateMap`
+  builders (previously divergent — grid forced overdue→red, panel ignored
+  user status) both delegate to it. `GateDisplayState` union gains
+  on_track/at_risk/behind.
+- **CC-38-29** — Submission purple `#7E57C2` ("almost done" blue + "stopped at
+  the gate" red). Replaces sunray on submitted gates in every surface; sunray
+  now unambiguously = at_risk.
+- **CC-38-30** — Migration 073: `initiative_status_updates` gains
+  `next_gate_name` + `next_gate_status_token`, snapshotted by
+  `save_initiative_status_update` at save (submitted | user date_status).
+  Digest line colors from the snapshot; " · as of [gate]" appears in the grid
+  once the initiative moves past that gate; Initiative panel Current Status
+  shows a staleness nudge line. Pre-073 rows render neutral (accepted ramp-up).
+- **CC-38-31 (PRINCIPLE — for Design registry)** — *User status wins; system
+  disagreement flags, never recolors.* When a rule contradicts the
+  user-selected status (e.g. target date passed, status not behind), surfaces
+  render the user's color plus a small ⚠ with an explanatory tooltip. Applied:
+  grid headline, panel Gates & Milestone STATUS column. Grid diamonds no longer
+  force red on overdue.
+
+**Verification deltas:** delivery-cycle-mcp 238/238 before and after (two
+FIFO-mock queues extended for the new gate_records query — test-only change).
+Headline band specs rewritten to user-status semantics (7 cases incl. conflict
+flag); ng test runner pre-existing broken — D-442 acknowledgment applies.
+Build green. Repo cleanliness: 2 new files (gate-visual.utils.ts, migration
+073) committed with their importers. S-035 changelog in deploy commit e4be0d4.
+AMBER_WINDOW_DAYS (CC-38-27) removed — superseded same session by CC-38-28.
+
+**Addendum UAT (after migration 073 + Render redeploy):**
+1. Grid vs panel: open any Initiative — diamonds in the grid row and the panel Stage Track show identical colors per gate. Pass/Fail.
+2. Set a gate status to At Risk → diamond amber in both places + headline band amber when it's the next gate. Behind → red. On Track → green. Pass/Fail.
+3. Submit a gate for approval → that diamond turns purple in grid + panel; headline reads "Awaiting … approval" on a purple band. Pass/Fail.
+4. Approve a gate → blue diamond. No submission ever shows blue. Pass/Fail.
+5. Initiative with a passed target date and status still On Track → green band + ⚠ in the headline, ⚠ beside the status in the panel gates table; color unchanged. Pass/Fail.
+6. Post a fresh status update → grid digest line takes the next gate's current status color. Approve that gate later → digest shows " · as of [gate]" and the panel Current Status shows the staleness nudge. Pass/Fail.
+7. Pre-migration statuses: digest renders in neutral grey, no as-of note. Pass/Fail.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
