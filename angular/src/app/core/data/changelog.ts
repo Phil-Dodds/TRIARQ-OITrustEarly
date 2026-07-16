@@ -33,6 +33,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-16',
+    builtAt:       '14:30 UTC',
+    contractLabel: 'Contract 38 follow-on — egg hunt leader moved',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Egg hunt — community card',
+        description: 'The hunt leader now shows at the top of the community card — where the standings belong — instead of on your personal My Easter Eggs card.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-16',
     builtAt:       '14:00 UTC',
     contractLabel: 'Contract 38 follow-on — news banner out of the way',
     items: [

@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subscription } from 'rxjs';
-import { EasterEggService, RecentEggFeed } from '../../core/services/easter-egg.service';
+import { EasterEggService, RecentEggFeed, EggBasketState } from '../../core/services/easter-egg.service';
 import { EggIconComponent, EggAssetRef } from './egg-icon.component';
 
 @Component({
@@ -19,6 +19,17 @@ import { EggIconComponent, EggAssetRef } from './egg-icon.component';
   template: `
     <div class="oi-card" style="height:100%; box-sizing:border-box;">
       <div style="font-weight:500; margin-bottom:12px;">Egg hunt — community</div>
+
+      <!-- Current hunt leader (spec: name X of 10 + their most recent egg;
+           moved here from My Easter Eggs, CC-38-17) — pinned above the feed. -->
+      <div *ngIf="basket?.leader as ld"
+           style="display:flex; align-items:center; gap:8px; margin-bottom:12px; padding:7px 10px;
+                  background:var(--triarq-color-fog,#F1EFE8); border-radius:5px;">
+        <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#9E9E9E;">Leader</span>
+        <app-egg-icon [assetRef]="asset(ld.last_asset_ref || 'egg-01')" [size]="22"></app-egg-icon>
+        <span style="font-size:13px; font-weight:500;">{{ ld.is_me ? 'You' : ld.display_name }}</span>
+        <span style="font-size:12px; color:var(--triarq-color-text-secondary,#5A5A5A);">{{ ld.found_count }} of {{ basket?.totalEggs }}</span>
+      </div>
 
       <div *ngIf="feed as f">
         <div *ngFor="let a of f.achievements"
@@ -51,14 +62,19 @@ import { EggIconComponent, EggAssetRef } from './egg-icon.component';
 })
 export class CommunityEggsCardComponent implements OnInit, OnDestroy {
   feed: RecentEggFeed | null = null;
+  basket: EggBasketState | null = null;
   private subs = new Subscription();
 
   constructor(private readonly eggs: EasterEggService, private readonly cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
+    this.eggs.ensureLoaded();
     this.subs.add(this.eggs.getRecentFinds(15).subscribe(f => { this.feed = f; this.cdr.markForCheck(); }));
-    // Refresh the community feed when the caller's own basket changes.
-    this.subs.add(this.eggs.basket$.subscribe(() => {
+    // Leader strip reads the shared basket state; also refresh the community
+    // feed when the caller's own basket changes.
+    this.subs.add(this.eggs.basket$.subscribe(s => {
+      this.basket = s;
+      this.cdr.markForCheck();
       this.subs.add(this.eggs.getRecentFinds(15).subscribe(f => { this.feed = f; this.cdr.markForCheck(); }));
     }));
   }

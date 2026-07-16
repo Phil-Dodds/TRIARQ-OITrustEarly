@@ -47,16 +47,8 @@ import { EggCelebrationComponent } from './egg-celebration.component';
         <div style="font-size:11px; font-style:italic; color:#9E9E9E; margin-top:10px;">
           Eggs are tucked in quiet corners across OI Trust. Keep exploring.
         </div>
-
-        <!-- Current leader (spec: name X of 10 + their most recent egg) -->
-        <div *ngIf="s.leader as ld"
-             style="display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:10px;
-                    border-top:1px solid var(--triarq-color-border,#E0E0E0);">
-          <span style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:#9E9E9E;">Leader</span>
-          <app-egg-icon [assetRef]="asset(ld.last_asset_ref || 'egg-01')" [size]="22"></app-egg-icon>
-          <span style="font-size:13px; font-weight:500;">{{ ld.is_me ? 'You' : ld.display_name }}</span>
-          <span style="font-size:12px; color:var(--triarq-color-text-secondary,#5A5A5A);">{{ ld.found_count }} of {{ s.totalEggs }}</span>
-        </div>
+        <!-- Leader strip moved to the community card (CC-38-17) — hunt
+             standings are community information, not personal progress. -->
       </ng-container>
 
       <ng-template #done>
