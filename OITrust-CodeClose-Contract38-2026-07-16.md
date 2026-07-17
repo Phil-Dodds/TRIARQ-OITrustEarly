@@ -571,6 +571,63 @@ All Angular-only, each deployed on its own commit:
 its column; header labels centered; egg community card shows newest activity
 first with old trophies sinking.
 
+---
+
+# Follow-on 10 — Undated Gates, Next Gates, Banded Warnings, Cancelled (big batch)
+
+Deployed SHA: 3d77048 (gh-pages 86815cf). Touches delivery-cycle-mcp
+(auto-deploys) and **team-meetings-mcp — Phil manual Render redeploy needed**.
+No migrations.
+
+- **CC-38-36** — Undated next gate → dashed RED halo ring (outline, paint-only)
+  in both track modes; beats every ring color including purple. Fill keeps user
+  status; tooltip: "Next gate (…, no target date set)".
+- **CC-38-37** — needs-review reason 6: "No Deploy target date" — Brief Review
+  approved/skipped, Go to Deploy unresolved, Deploy milestone undated. Shared
+  computation fetches gate_records; dashboard + panel + entry all inherit.
+- **CC-38-38** — team-meetings-mcp bug fix: `.neq('current_lifecycle_stage',
+  'closed')` matched nothing ('closed' isn't a stage) — reference panels showed
+  cancelled/complete initiatives. Now excludes COMPLETE + CANCELLED (3 sites).
+- **CC-38-39** — Initiative panel: D-200 Pattern 2 amber band atop Gates &
+  Milestone Dates when the next gate is undated, naming the gate and pointing
+  at Set date; that row's Set date cell renders amber-emphasized.
+- **CC-38-40** — "Next Gates" (renamed from EPO Gate Schedule; hub card too):
+  EPO | DOL | DCS segmented switch, choice persisted per user in the existing
+  `INITIATIVES_EPO_SCHEDULE` screen key; third "No target date" bucket with
+  amber subtotal + banner count; Unassigned group at bottom (DOL view exempts
+  divisions with dol_required = false — Phil rule); CANCELLED/COMPLETE/ON_HOLD
+  excluded; dashboard accepts dol/dcs drill-down query params.
+- **CC-38-41** — Initiatives grid: cancelled excluded by default; S-009
+  "Include cancelled" checkbox beside Filters (off every load, session-local);
+  stage filter CANCELLED reveals too but is stripped from persisted state so
+  the reveal can never stick. Home My Initiatives card audited: already
+  compliant (TERMINAL exclusion) — earlier audit note corrected.
+- **CC-38-42** — Needs-review warnings restyled from red pills to the grid
+  headline's banded grammar (3px bar + tint + dark same-hue text) on the
+  Initiative Status Dashboard, Initiative panel Current Status, and status
+  panel. Red reasons (Escalation, Status overdue, No target date, No Deploy
+  target date) dominate the band; slips/at-risk amber; mixed lists keep
+  per-line colors.
+- **CC-38-43 (decision)** — Review warnings ALWAYS reflect the current moment,
+  on every surface including the status entry form (live banner at top of the
+  form). No frozen warnings on history rows — the CC-38-30 gate snapshot is
+  the historical channel. Audit-trail snapshot of reasons deferred to Design.
+
+**Verification:** delivery-cycle-mcp 238/238; team-meetings-mcp pass set
+unchanged; Angular build green. Structural: epo-schedule.component now ~560
+lines (>300, single responsibility "role-grouped gate urgency view" —
+declared). Untested (D-442): reason-6 happy path (FIFO queue tolerates the
+extra query — validation-covered), role-switch grouping, cancelled toggle —
+UAT below.
+
+**UAT (after team-meetings-mcp Render redeploy):**
+1. Grid/panel: undated next gate shows dashed red ring; dated ones keep solid status-colored rings. Pass/Fail.
+2. Panel: undated next gate → amber band names the gate; its Set date cell is amber. Set a date → band and dashed ring clear. Pass/Fail.
+3. Next Gates: renamed everywhere; EPO/DOL/DCS switch regroups; choice survives reload; No-date subtotal + section list correct; Unassigned at bottom; DOL view hides no-DOL initiatives from divisions not requiring DOL. Pass/Fail.
+4. Click a DOL/DCS name → dashboard filters to them. Pass/Fail.
+5. Status dashboard + panel + entry form: warnings render as red/amber bands; entry form shows live warnings while typing. An initiative past Brief Review with undated Deploy shows "No Deploy target date". Pass/Fail.
+6. Grid: cancelled rows hidden; "Include cancelled" reveals; reload → hidden again. Team meeting ref panels no longer list completed/cancelled initiatives. Pass/Fail.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
