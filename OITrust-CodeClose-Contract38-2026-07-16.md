@@ -652,6 +652,36 @@ line; an initiative with a passed, unapproved gate date shows **Gate Overdue**;
 a pushed-out date within cadence shows **Gate Date Moved +N days**; same
 wording in the panel and live in the status entry form.
 
+---
+
+# Follow-on 12 — Deploy by Quarter Role-Generalized (CC-38-45)
+
+Deployed SHA: 8ad0408 (gh-pages 78ad587). delivery-cycle-mcp auto-deploys
+(get_delivery_summary gains `deploys_this_quarter`). No migrations.
+
+- **CC-38-45** — "Deploy by Quarter" (renamed from EPO Deploy by Quarter;
+  route unchanged) gains the EPO | DOL | DCS switch, persisted in its
+  existing screen key. Second consumer triggered the S-031 extraction:
+  NEW shared `role-grouping.utils.ts` (PersonRole, ROLE_FIELDS,
+  UNASSIGNED_ID, personFor, isPersonRole) + NEW standalone
+  `RoleSwitchComponent`; Next Gates refactored onto both. Quarter sections,
+  prior-miss detection, D-446 baselines (role-agnostic — cycle-keyed), and
+  theme filters unchanged per group. Behavior gain: Unassigned group at the
+  bottom (screen previously dropped ownerless initiatives silently), DOL view
+  exempts dol_required=false divisions; role-aware dashboard drill-down.
+  Hub card renamed; headline now role-neutral per Phil-approved #5:
+  "N Initiatives with a deploy this quarter" (amber when zero).
+
+**Verification:** delivery-cycle-mcp 238/238; build green; 2 new files
+committed with importers. Workstream-pivot Deploy Schedule screen: same
+pattern, flagged as a next-contract candidate (not built).
+
+**UAT:** hub shows "Deploy by Quarter" with the new count headline; screen
+switches EPO/DOL/DCS and remembers the choice; Unassigned group appears at
+bottom (absent for DOL where the division doesn't require one); baselines and
+quarter pivot behave identically in all three views; name click filters the
+dashboard by the chosen role.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
