@@ -66,6 +66,10 @@ export interface GateRecordModalData {
   allUsers:             User[];
   callerCanSubmitGates: boolean;
   checklist:            { label: string; met: boolean }[];
+  // CC-38 follow-on 13: unmet hard requirements for THIS gate. Non-empty →
+  // Submit disabled with a D-140 explanation. Mirrors the server-side ladder
+  // in submit_gate_for_approval (double enforcement).
+  hardStops:            string[];
 }
 
 export type GateRecordModalResult =
@@ -285,6 +289,11 @@ const GATE_LABELS: Record<GateName, string> = {
 
           <!-- pending / not_started — Submit for Approval (DS/CB) -->
           <ng-container *ngIf="canShowSubmit">
+            <!-- CC-38 f13: hard stops — D-140 blocked-action UX. -->
+            <div *ngIf="data.hardStops.length > 0" class="grm-hardstops">
+              <div class="grm-hardstops-title">This gate cannot be submitted yet</div>
+              <div *ngFor="let stop of data.hardStops" class="grm-hardstops-row">• {{ stop }}</div>
+            </div>
             <!-- D-489: submission justification — encouraged, not required -->
             <div class="grm-note-field">
               <label class="grm-label" for="grm-submission-note">Why is this gate ready?</label>
@@ -297,7 +306,7 @@ const GATE_LABELS: Record<GateName, string> = {
             </div>
             <button class="grm-btn-primary"
                     type="button"
-                    [disabled]="processing"
+                    [disabled]="processing || data.hardStops.length > 0"
                     (click)="onSubmit()">
               {{ processing && processingAction === 'submit'
                   ? (resubmitMode ? 'Re-submitting…' : 'Submitting…')
@@ -678,6 +687,14 @@ const GATE_LABELS: Record<GateName, string> = {
       display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 12px;
     }
     .grm-checklist-icon { flex-shrink: 0; font-weight: 700; }
+    /* CC-38 f13: hard-stop block — red banded warning grammar. */
+    .grm-hardstops {
+      border-left: 3px solid #D32F2F; background: rgba(211,47,47,0.08);
+      border-radius: 0 5px 5px 0; padding: 8px 10px; margin-bottom: 8px;
+      font-size: 12px; color: #8E1B1B;
+    }
+    .grm-hardstops-title { font-weight: 600; margin-bottom: 4px; }
+    .grm-hardstops-row { margin-top: 2px; line-height: 1.4; }
     .grm-review-notes {
       background: var(--triarq-color-background-subtle); border-radius: 6px;
       padding: 8px 12px; font-size: 12px;

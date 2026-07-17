@@ -33,8 +33,17 @@ const MUTABLE_FIELD_LABELS = {
   jira_epic_key:           'Jira Epic Link',
   roadmap_theme_id:        'Roadmap Theme',   // D-487: nullable — clearing removes the tag
   other_consulted_user_ids: 'Other Consulted',
-  other_informed_user_ids:  'Other Informed'
+  other_informed_user_ids:  'Other Informed',
+  // Contract 38 follow-on 13 — AI Production Governance profile (migration 075).
+  ai_functionality:        'Includes AI Functionality',
+  ai_delivery_form:        'AI Delivery Form',
+  ai_audience:             'AI Audience',
+  ai_board_approved:       'AI Prod Board Approval'
 };
+
+const VALID_AI_FUNCTIONALITY = ['yes', 'no', 'unknown'];
+const VALID_AI_DELIVERY_FORM = ['product_embedded', 'analytics_outputs'];
+const VALID_AI_AUDIENCE      = ['external', 'internal'];
 
 // D-458: uuid[] fields. Handled distinctly from scalar fields — full-array
 // replace, never null, JSON change-detection, per-element user validation.
@@ -88,6 +97,23 @@ async function update_delivery_cycle(params, caller_user_id) {
     }
   }
 
+  // ── Contract 38 follow-on 13: AI governance field validation ──────────────
+  if (fields.ai_functionality !== undefined && fields.ai_functionality !== null &&
+      !VALID_AI_FUNCTIONALITY.includes(fields.ai_functionality)) {
+    return { success: false, error: 'ai_functionality must be one of: yes, no, unknown — or null to clear.' };
+  }
+  if (fields.ai_delivery_form !== undefined && fields.ai_delivery_form !== null &&
+      !VALID_AI_DELIVERY_FORM.includes(fields.ai_delivery_form)) {
+    return { success: false, error: 'ai_delivery_form must be one of: product_embedded, analytics_outputs — or null to clear.' };
+  }
+  if (fields.ai_audience !== undefined && fields.ai_audience !== null &&
+      !VALID_AI_AUDIENCE.includes(fields.ai_audience)) {
+    return { success: false, error: 'ai_audience must be one of: external, internal — or null to clear.' };
+  }
+  if (fields.ai_board_approved !== undefined && typeof fields.ai_board_approved !== 'boolean') {
+    return { success: false, error: 'ai_board_approved must be a boolean.' };
+  }
+
   // ── D-458: validate uuid[] participant fields (must be arrays of valid users) ─
   for (const arrField of ARRAY_USER_FIELDS) {
     if (fields[arrField] === undefined) { continue; }
@@ -129,7 +155,7 @@ async function update_delivery_cycle(params, caller_user_id) {
   // ── Fetch current Initiative record ────────────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, cycle_status, division_id, workstream_id, tier_classification, outcome_statement, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, jira_epic_key, other_consulted_user_ids, other_informed_user_ids')
+    .select('delivery_cycle_id, cycle_title, cycle_status, division_id, workstream_id, tier_classification, outcome_statement, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, jira_epic_key, other_consulted_user_ids, other_informed_user_ids, ai_functionality, ai_delivery_form, ai_audience, ai_board_approved')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -209,6 +235,19 @@ async function update_delivery_cycle(params, caller_user_id) {
   }
   if (updatePayload.jira_epic_key) {
     updatePayload.jira_epic_key = String(updatePayload.jira_epic_key).trim() || null;
+  }
+
+  // ── AI Prod Board approval audit stamps (Contract 38 follow-on 13) ────────
+  // Flipping to true stamps approved_at/by; flipping to false clears them.
+  if ('ai_board_approved' in updatePayload) {
+    if (updatePayload.ai_board_approved === true && cycle.ai_board_approved !== true) {
+      updatePayload.ai_board_approved_at = new Date().toISOString();
+      updatePayload.ai_board_approved_by = caller_user_id;
+    } else if (updatePayload.ai_board_approved !== true) {
+      updatePayload.ai_board_approved     = false;   // never write null to boolean NOT NULL
+      updatePayload.ai_board_approved_at  = null;
+      updatePayload.ai_board_approved_by  = null;
+    }
   }
 
   // ── Perform update ─────────────────────────────────────────────────────────

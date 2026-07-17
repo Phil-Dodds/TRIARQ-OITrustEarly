@@ -203,6 +203,11 @@ export class DeliveryService {
     assigned_dol_user_id?:   string | null;
     jira_epic_key?:          string | null;
     roadmap_theme_id?:       string | null;   // D-487: null clears the tag
+    // CC-38 f13 (migration 075): AI Production Governance profile.
+    ai_functionality?:       'yes' | 'no' | 'unknown' | null;
+    ai_delivery_form?:       'product_embedded' | 'analytics_outputs' | null;
+    ai_audience?:            'external' | 'internal' | null;
+    ai_board_approved?:      boolean;
     // Contract 29 / D-458 (WS1): full-array replace; [] clears.
     other_consulted_user_ids?: string[];
     other_informed_user_ids?:  string[];

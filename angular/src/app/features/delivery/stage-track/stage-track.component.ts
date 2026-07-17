@@ -131,20 +131,33 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
               {{ node.label }}
             </span>
             <!-- 7px top margin = clearance so the halo ring never overlaps the label. -->
-            <div
-              [style.background]="gateColor(node.id)"
-              [style.border]="gateBorder(node.id)"
-              [style.transform]="gateTransform(node.id)"
-              [style.box-shadow]="gateHaloShadow(node.id)"
-              [style.outline]="gateHaloOutline(node.id)"
-              [style.outline-offset]="gateHaloOutlineOffset(node.id)"
-              [style.position]="gateZIndex(node.id) ? 'relative' : null"
-              [style.z-index]="gateZIndex(node.id)"
-              [attr.title]="gateTitle(node.id)"
-              (click)="onGateClick(node.id)"
-              style="width:24px;height:24px;border-radius:4px;margin-top:7px;
-                     cursor:pointer;transition:opacity 0.15s;box-sizing:border-box;"
-            ></div>
+            <div style="position:relative;">
+              <!-- CC-38 f13: AI Production Board marker — half-diamond (triangle)
+                   at the LEFT flank of the Board gate. Amber = AI Prod Board
+                   approval required, not yet received; blue = received. Never
+                   grey, never requirement semantics (Phil 2026-07-17). -->
+              <span *ngIf="boardGateId === node.id"
+                    [style.border-left-color]="boardApproved ? '#257099' : '#F2A620'"
+                    [attr.title]="boardMarkerTooltip()"
+                    style="position:absolute;left:-13px;top:50%;margin-top:2px;
+                           transform:translateY(-50%);width:0;height:0;z-index:2;
+                           border-top:6px solid transparent;border-bottom:6px solid transparent;
+                           border-left:8px solid #F2A620;cursor:help;"></span>
+              <div
+                [style.background]="gateColor(node.id)"
+                [style.border]="gateBorder(node.id)"
+                [style.transform]="gateTransform(node.id)"
+                [style.box-shadow]="gateHaloShadow(node.id)"
+                [style.outline]="gateHaloOutline(node.id)"
+                [style.outline-offset]="gateHaloOutlineOffset(node.id)"
+                [style.position]="gateZIndex(node.id) ? 'relative' : null"
+                [style.z-index]="gateZIndex(node.id)"
+                [attr.title]="gateTitle(node.id)"
+                (click)="onGateClick(node.id)"
+                style="width:24px;height:24px;border-radius:4px;margin-top:7px;
+                       cursor:pointer;transition:opacity 0.15s;box-sizing:border-box;"
+              ></div>
+            </div>
           </div>
 
         </ng-container>
@@ -208,6 +221,12 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
   /** CC-38-36: undated next gate → dashed RED ring (beats every other ring
    *  color, including submission purple). Fill still shows user status. */
   @Input() nextGateUndated = false;
+  /** CC-38 f13: gate carrying the AI Production Board half-diamond marker.
+   *  Derived by the parent from the AI profile (embedded+external →
+   *  go_to_deploy; internal AI → go_to_release; null = no marker). Full mode
+   *  only — condensed diamonds are too small for a legible flank marker. */
+  @Input() boardGateId: GateName | null = null;
+  @Input() boardApproved = false;
 
   @Output() gateClicked = new EventEmitter<GateName>();
   /** D-360 Surface 3: emitted when the user clicks the next free stage circle.
@@ -418,16 +437,27 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
   /** Human tooltip label — 'Next gate' prefix on the halo gate; underscores out. */
   condensedGateTooltip(gateId: string, label: string): string | null {
     const state = this.gateDisplayState(gateId);
-    if (state === 'skipped') { return null; }
-    const stateLabel = String(state).replace(/_/g, ' ');
-    let prefix = '';
-    if (this.isHaloGate(gateId)) {
-      const notes: string[] = [];
-      if (this.nextGateSubmitted) { notes.push('awaiting approval'); }
-      if (this.nextGateUndated)   { notes.push('no target date set'); }
-      prefix = notes.length ? `Next gate (${notes.join(', ')}) — ` : 'Next gate — ';
-    }
-    return `${prefix}${label}: ${stateLabel}`;
+    // CC-38 f13 tooltip audit: skipped/returned no longer silent.
+    if (state === 'skipped')  { return `${label}: skipped — resolved outside this flow`; }
+    if (state === 'returned') { return `${label}: returned for revision`; }
+    return `${this.haloPrefix(gateId)}${label}: ${String(state).replace(/_/g, ' ')}`;
+  }
+
+  /** Shared halo-vocabulary prefix — used by BOTH condensed and full tooltips
+   *  (CC-38 f13 tooltip audit: full mode previously never described the ring). */
+  private haloPrefix(gateId: string): string {
+    if (!this.isHaloGate(gateId)) { return ''; }
+    const notes: string[] = [];
+    if (this.nextGateSubmitted) { notes.push('awaiting approval'); }
+    if (this.nextGateUndated)   { notes.push('no target date set'); }
+    return notes.length ? `Next gate (${notes.join(', ')}) — ` : 'Next gate — ';
+  }
+
+  /** CC-38 f13: AI Production Board marker tooltip — both color states. */
+  boardMarkerTooltip(): string {
+    return this.boardApproved
+      ? 'AI Production Board approval received'
+      : 'AI Production Board approval required at this gate — not yet received';
   }
 
   gateColor(gateId: string): string {
@@ -474,14 +504,20 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
         ? `${node?.label ?? gateId} — Skipped — ${formatted}`
         : `${node?.label ?? gateId} — Skipped`;
     }
+    // CC-38 f13 tooltip audit: user D-205 status fills described explicitly;
+    // halo vocabulary (next gate / awaiting approval / no target date) added
+    // via the shared prefix so full mode matches condensed.
     const hint   = state === 'blocked'           ? ' — workstream inactive, gate blocked'
                  : state === 'awaiting_approval' ? ' — awaiting approver decision'
                  : state === 'returned'          ? ' — returned for revision'
                  : state === 'pending'           ? ' — awaiting approval'
                  : state === 'complete'          ? ' — cleared'
+                 : state === 'on_track'          ? ' — on track (status set by team)'
+                 : state === 'at_risk'           ? ' — at risk (status set by team)'
+                 : state === 'behind'            ? ' — behind (status set by team)'
                  : state === 'not_started'       ? ' — not yet submitted'
                  : ' — not yet reached';
-    return `${node?.label ?? gateId}${hint}`;
+    return `${this.haloPrefix(gateId)}${node?.label ?? gateId}${hint}`;
   }
 
   /** D-447 tooltip date format: "MMM D, YYYY" (e.g. "Jun 17, 2026"). */

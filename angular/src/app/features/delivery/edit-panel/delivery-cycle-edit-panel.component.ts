@@ -335,6 +335,55 @@ function epAvatarColorFromName(name: string): string {
               <div class="ep-hint">Optional. Groups this Initiative on the roadmap. Themes are managed per Division in Admin → Divisions.</div>
             </div>
 
+            <!-- 11. AI Governance — CC-38 follow-on 13 (migration 075).
+                 Progressive 3-question profile + AI Prod Board approval.
+                 Blank allowed through Brief Review; answered by Go to Build;
+                 Yes/No (with follow-ups) by Go to Deploy. -->
+            <div class="ep-field">
+              <label class="ep-label">Includes AI functionality</label>
+              <select class="ep-input" [ngModel]="aiFunctionality" [ngModelOptions]="{standalone: true}"
+                      (ngModelChange)="onAiFunctionalityChange($event)">
+                <option value="">— Not answered —</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+                <option value="unknown">I do not know</option>
+              </select>
+              <div class="ep-hint">Must be answered before Go to Build; must be Yes or No before Go to Deploy.</div>
+            </div>
+
+            <ng-container *ngIf="aiFunctionality === 'yes'">
+              <div class="ep-field">
+                <label class="ep-label">AI delivery form</label>
+                <select class="ep-input" [ngModel]="aiDeliveryForm" [ngModelOptions]="{standalone: true}"
+                        (ngModelChange)="aiDeliveryForm = $event">
+                  <option value="">— Not set —</option>
+                  <option value="product_embedded">Embedded in the product</option>
+                  <option value="analytics_outputs">Analytics / intelligence outputs</option>
+                </select>
+              </div>
+              <div class="ep-field">
+                <label class="ep-label">AI audience</label>
+                <select class="ep-input" [ngModel]="aiAudience" [ngModelOptions]="{standalone: true}"
+                        (ngModelChange)="aiAudience = $event">
+                  <option value="">— Not set —</option>
+                  <option value="external">External user-facing</option>
+                  <option value="internal">Internal</option>
+                </select>
+              </div>
+              <!-- Consequence line — always visible once the profile resolves. -->
+              <div *ngIf="aiConsequenceLine" class="ep-amber-note">{{ aiConsequenceLine }}</div>
+              <div class="ep-field" *ngIf="aiBoardApprovalApplies">
+                <label class="ep-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="checkbox" [ngModel]="aiBoardApproved" [ngModelOptions]="{standalone: true}"
+                         (ngModelChange)="aiBoardApproved = $event" />
+                  Has AI Prod Board Approval
+                </label>
+                <div class="ep-hint" *ngIf="cycle.ai_board_approved && cycle.ai_board_approved_at">
+                  Recorded {{ cycle.ai_board_approved_at | date:'mediumDate' }}
+                </div>
+              </div>
+            </ng-container>
+
             <!-- Save error (D-200 Pattern 3) -->
             <div *ngIf="saveError" class="ep-save-error" role="alert">
               {{ saveError }}
@@ -718,6 +767,12 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       jira_epic_key:       [this.cycle.jira_epic_key        ?? '']
     });
 
+    // CC-38 f13: AI Governance profile — seed from cycle. '' = blank/not set.
+    this.aiFunctionality = this.cycle.ai_functionality ?? '';
+    this.aiDeliveryForm  = this.cycle.ai_delivery_form ?? '';
+    this.aiAudience      = this.cycle.ai_audience ?? '';
+    this.aiBoardApproved = this.cycle.ai_board_approved === true;
+
     // D-487: Roadmap Theme — seed from cycle, load the Division's active themes.
     // Follows the currently selected Division: changing Division reloads the
     // list and clears a theme that no longer belongs (themes are Division-scoped).
@@ -1081,6 +1136,24 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       payload.roadmap_theme_id = newThemeId;
     }
 
+    // CC-38 f13: AI Governance profile — changed fields only. '' → null.
+    const newAiFunc = this.aiFunctionality || null;
+    if (newAiFunc !== (this.cycle.ai_functionality ?? null)) {
+      payload.ai_functionality = newAiFunc as ('yes' | 'no' | 'unknown' | null);
+    }
+    const newAiForm = (this.aiFunctionality === 'yes' ? this.aiDeliveryForm : '') || null;
+    if (newAiForm !== (this.cycle.ai_delivery_form ?? null)) {
+      payload.ai_delivery_form = newAiForm as ('product_embedded' | 'analytics_outputs' | null);
+    }
+    const newAiAud = (this.aiFunctionality === 'yes' ? this.aiAudience : '') || null;
+    if (newAiAud !== (this.cycle.ai_audience ?? null)) {
+      payload.ai_audience = newAiAud as ('external' | 'internal' | null);
+    }
+    const newBoard = this.aiFunctionality === 'yes' && this.aiBoardApproved;
+    if (newBoard !== (this.cycle.ai_board_approved === true)) {
+      payload.ai_board_approved = newBoard;
+    }
+
     // D-458: Other Consulted / Other Informed — full-array replace, empty clears.
     // Only included when the id set differs from the originally loaded set.
     const newConsultedIds = this.otherConsulted.map(u => u.id);
@@ -1119,6 +1192,40 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
         this.cdr.markForCheck();
       }
     });
+  }
+
+  // ── CC-38 f13: AI Governance profile state ─────────────────────────────────
+  aiFunctionality = '';   // '' | 'yes' | 'no' | 'unknown'
+  aiDeliveryForm  = '';   // '' | 'product_embedded' | 'analytics_outputs'
+  aiAudience      = '';   // '' | 'external' | 'internal'
+  aiBoardApproved = false;
+
+  onAiFunctionalityChange(v: string): void {
+    this.aiFunctionality = v;
+    if (v !== 'yes') { this.aiDeliveryForm = ''; this.aiAudience = ''; this.aiBoardApproved = false; }
+  }
+
+  /** AI Prod Board approval applies to every Yes profile except analytics+external (Track 2). */
+  get aiBoardApprovalApplies(): boolean {
+    if (this.aiFunctionality !== 'yes') { return false; }
+    return !(this.aiDeliveryForm === 'analytics_outputs' && this.aiAudience === 'external');
+  }
+
+  /** Consequence line — states where the AI Prod Board stop lands for this profile. */
+  get aiConsequenceLine(): string {
+    if (this.aiFunctionality !== 'yes' || !this.aiDeliveryForm || !this.aiAudience) { return ''; }
+    if (this.aiDeliveryForm === 'product_embedded' && this.aiAudience === 'external') {
+      return this.aiBoardApproved
+        ? 'AI Production Board approval recorded — Go to Deploy is clear of the AI stop.'
+        : 'AI Production Board approval is required before Go to Deploy (pilot). Engage the AI Prod Board early.';
+    }
+    if (this.aiAudience === 'internal') {
+      return this.aiBoardApproved
+        ? 'AI Production Board approval recorded — Go to Release is clear of the AI stop.'
+        : 'AI Production Board approval is required before Go to Release. Engage the AI Prod Board early.';
+    }
+    // analytics_outputs + external — Track 2, no Board stop.
+    return 'No AI Production Board stop for delivered analytics outputs — attach the AI Delivery Requirements Record (data lineage, reproducibility, AI disclosure) before Go to Deploy.';
   }
 
   /** D-458: order-independent id-set equality for the multi-user fields. */
@@ -1173,6 +1280,11 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       (this.selectedDol?.id ?? null) !== (this.cycle.assigned_dol_user_id ?? null) ||
       // D-487: Roadmap Theme changed.
       (this.selectedThemeId || null) !== (this.cycle.roadmap_theme_id ?? null) ||
+      // CC-38 f13: AI Governance profile changed.
+      (this.aiFunctionality || null) !== (this.cycle.ai_functionality ?? null) ||
+      ((this.aiFunctionality === 'yes' ? this.aiDeliveryForm : '') || null) !== (this.cycle.ai_delivery_form ?? null) ||
+      ((this.aiFunctionality === 'yes' ? this.aiAudience : '') || null) !== (this.cycle.ai_audience ?? null) ||
+      (this.aiFunctionality === 'yes' && this.aiBoardApproved) !== (this.cycle.ai_board_approved === true) ||
       // D-458: multi-user fields differ from the originally loaded id sets.
       !this.sameIdSet(this.otherConsulted.map(u => u.id),
                       (this.cycle.other_consulted_users ?? []).map(u => u.id)) ||

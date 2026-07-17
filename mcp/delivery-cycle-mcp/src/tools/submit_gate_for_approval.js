@@ -100,7 +100,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   // D-424 / Contract 23 Item 3.6: division_id added — used to look up dol_required.
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, workstream_id, division_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, other_consulted_user_ids')
+    .select('delivery_cycle_id, cycle_title, workstream_id, division_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, other_consulted_user_ids, jira_epic_key, ai_functionality, ai_delivery_form, ai_audience, ai_board_approved')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -280,6 +280,110 @@ async function submit_gate_for_approval(params, caller_user_id) {
              `An EPO must be named before this Initiative enters the BUILD phase. ` +
              `An Admin or Phil can assign an EPO using the Initiative's edit panel.`
     };
+  }
+
+  // ── Contract 38 follow-on 13: hard-stop ladder (server-side twin of the UI
+  // enforcement — MCP requests that skip the UI still hit these rules).
+  // Shared blocker: logs a gate_blocked event and returns the D-140 message.
+  const blockGate = async (reason, message) => {
+    await supabase
+      .from('cycle_event_log')
+      .insert({
+        delivery_cycle_id,
+        event_type:        'gate_blocked',
+        event_description: `Gate '${gate_name}' blocked: ${reason}.`,
+        actor_user_id:     caller_user_id,
+        event_metadata:    { gate_name, reason }
+      });
+    return { success: false, error: message };
+  };
+
+  if (gate_name === 'go_to_build') {
+    // Context Brief attached — hard stop (Phil 2026-07-17).
+    const { data: cbType } = await supabase
+      .from('cycle_artifact_types')
+      .select('artifact_type_id')
+      .eq('artifact_type_name', 'Context Brief')
+      .single();
+    if (cbType) {
+      const { data: cbArtifacts } = await supabase
+        .from('cycle_artifacts')
+        .select('cycle_artifact_id')
+        .eq('delivery_cycle_id', delivery_cycle_id)
+        .eq('artifact_type_id', cbType.artifact_type_id)
+        .is('deleted_at', null)
+        .limit(1);
+      if (!cbArtifacts || cbArtifacts.length === 0) {
+        return blockGate('no_context_brief',
+          'Cannot submit Go to Build — no Context Brief is attached to this Initiative. ' +
+          'Attach the Context Brief document in the Artifacts section, then submit again.');
+      }
+    }
+
+    // Jira epic linked — hard stop unless the Division is configured with
+    // jira_epic_required = false (migration 074).
+    if (!cycle.jira_epic_key) {
+      let jiraRequired = true;
+      if (cycle.division_id) {
+        const { data: divRow } = await supabase
+          .from('divisions')
+          .select('jira_epic_required')
+          .eq('id', cycle.division_id)
+          .is('deleted_at', null)
+          .single();
+        if (divRow && divRow.jira_epic_required === false) { jiraRequired = false; }
+      }
+      if (jiraRequired) {
+        return blockGate('no_jira_epic',
+          'Cannot submit Go to Build — no Jira epic is linked to this Initiative. ' +
+          'Link the Jira epic in the Initiative edit panel, or ask an Admin to mark ' +
+          'this Division as exempt from the Jira requirement.');
+      }
+    }
+
+    // AI question answered (any of Yes / No / I do not know) — hard stop.
+    if (!cycle.ai_functionality) {
+      return blockGate('ai_functionality_unanswered',
+        'Cannot submit Go to Build — the "Includes AI functionality" question has not been ' +
+        'answered. Set it in the Initiative edit panel (Yes, No, or I do not know) before this gate.');
+    }
+  }
+
+  if (gate_name === 'go_to_deploy') {
+    // AI question must be resolved to Yes or No by Go to Deploy.
+    if (cycle.ai_functionality !== 'yes' && cycle.ai_functionality !== 'no') {
+      return blockGate('ai_functionality_unresolved',
+        'Cannot submit Go to Deploy — the "Includes AI functionality" question must be resolved ' +
+        'to Yes or No before deployment. Update it in the Initiative edit panel.');
+    }
+    if (cycle.ai_functionality === 'yes') {
+      if (!cycle.ai_delivery_form || !cycle.ai_audience) {
+        return blockGate('ai_profile_incomplete',
+          'Cannot submit Go to Deploy — this Initiative includes AI but the AI profile is ' +
+          'incomplete. Set the delivery form (product-embedded or analytics outputs) and the ' +
+          'audience (external or internal) in the Initiative edit panel.');
+      }
+      // Embedded + external → AI Production Board approval before pilot.
+      if (cycle.ai_delivery_form === 'product_embedded' &&
+          cycle.ai_audience === 'external' &&
+          cycle.ai_board_approved !== true) {
+        return blockGate('ai_prod_board_approval_missing',
+          'Cannot submit Go to Deploy — external user-facing AI requires AI Production Board ' +
+          'approval before pilot. Obtain AI Prod Board approval and record it on the Initiative, ' +
+          'then submit again.');
+      }
+    }
+  }
+
+  if (gate_name === 'go_to_release' &&
+      cycle.ai_functionality === 'yes' &&
+      cycle.ai_audience === 'internal' &&
+      cycle.ai_board_approved !== true) {
+    // Internal AI (embedded or analytics) → Board approval before release.
+    return blockGate('ai_prod_board_approval_missing',
+      'Cannot submit Go to Release — internal AI functionality requires AI Production Board ' +
+      'approval before production release. Obtain AI Prod Board approval and record it on the ' +
+      'Initiative, then submit again.');
   }
 
   // ── Fetch workstream (only when assigned — Contract 19 Part 3b) ────────────

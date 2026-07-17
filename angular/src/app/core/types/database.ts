@@ -62,6 +62,9 @@ export interface Division {
   // the DOL null pre-check for Initiatives in this Division. DCS / Workstream
   // pre-checks unchanged. Default true at DB level.
   dol_required?:      boolean;
+  // Contract 38 follow-on 13 (migration 074): when false, Go to Build gate
+  // submission skips the Jira-epic hard stop for Initiatives in this Division.
+  jira_epic_required?: boolean;
   // Contract 37 (D-550) Migration 066: direct Sprint Calendar assignment.
   // NULL = inherit via ancestor walk. sprint_calendar_none TRUE = explicit
   // opt-out truncating the walk (Date mode only for the subtree).
@@ -306,6 +309,15 @@ export interface DeliveryCycle {
   other_informed_user_ids?:  string[];
   pre_hold_lifecycle_stage: LifecycleStage | null;  // Stores stage before ON_HOLD — migration 024
   jira_epic_key:           string | null;
+  // Contract 38 follow-on 13 (migration 075): AI Production Governance profile.
+  // ai_functionality: null = blank (allowed through Brief Review); must be
+  // answered by Go to Build; 'yes'|'no' only by Go to Deploy.
+  ai_functionality?:       'yes' | 'no' | 'unknown' | null;
+  ai_delivery_form?:       'product_embedded' | 'analytics_outputs' | null;
+  ai_audience?:            'external' | 'internal' | null;
+  ai_board_approved?:      boolean;
+  ai_board_approved_at?:   string | null;
+  ai_board_approved_by?:   string | null;
   // D-487: optional Division-scoped Roadmap Theme tag.
   roadmap_theme_id?:       string | null;
   roadmap_theme_name?:     string | null;   // joined by get/list

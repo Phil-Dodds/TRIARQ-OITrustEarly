@@ -17,7 +17,7 @@ const { supabase } = require('../db');
 
 const DIVISION_SELECT =
   'id, division_name, display_name_short, division_level, division_type_label, ' +
-  'owner_user_id, parent_division_id, active_status, dol_required, created_at, updated_at, ' +
+  'owner_user_id, parent_division_id, active_status, dol_required, jira_epic_required, created_at, updated_at, ' +
   // Contract 37 (D-550, migration 066): sprint calendar assignment columns —
   // the Divisions admin selector seeds from these.
   'sprint_calendar_id, sprint_calendar_none';

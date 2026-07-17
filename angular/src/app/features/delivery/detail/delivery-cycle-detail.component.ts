@@ -42,6 +42,7 @@ import {
 import { IonicModule }         from '@ionic/angular';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DeliveryService }         from '../../../core/services/delivery.service';
+import { McpService }              from '../../../core/services/mcp.service';
 import { UserProfileService }      from '../../../core/services/user-profile.service';
 import { StageTrackComponent, LIFECYCLE_TRACK } from '../stage-track/stage-track.component';
 import { LoadingOverlayComponent }          from '../../../shared/components/loading-overlay/loading-overlay.component';
@@ -62,6 +63,7 @@ import {
   CycleMilestoneDate,
   CycleArtifact,
   CycleEventLogEntry,
+  Division,
   JiraLink,
   GateName,
   GateStatus,
@@ -486,6 +488,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           [nextGateSubmitted]="haloNextGateSubmitted"
           [nextGateUndated]="haloNextGateUndated"
           [gateSkippedAtMap]="gateSkippedAtMap"
+          [boardGateId]="aiBoardGateId"
+          [boardApproved]="cycle.ai_board_approved === true"
           displayMode="full"
           (gateClicked)="openGatePanel($event)"
           (stageAdvanceRequested)="requestStageAdvance($event)"
@@ -792,6 +796,25 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </span>
           </div>
 
+          <!-- AI Governance — CC-38 f13. Chip when the Initiative includes AI;
+               AI Prod Board status inline. Hidden when No/blank/unknown. -->
+          <div *ngIf="cycle.ai_functionality === 'yes'">
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">AI Governance</div>
+            <span style="display:inline-block;border-radius:4px;padding:3px 8px;font-size:12px;
+                         font-weight:500;background:rgba(126,87,194,0.10);color:#4A2F80;"
+                  [attr.title]="aiChipTooltip">
+              {{ cycle.ai_delivery_form === 'analytics_outputs' ? 'AI · Analytics' : 'AI' }}
+              <ng-container *ngIf="cycle.ai_audience"> · {{ cycle.ai_audience === 'external' ? 'External' : 'Internal' }}</ng-container>
+            </span>
+            <span *ngIf="aiBoardGateId"
+                  [style.background]="cycle.ai_board_approved ? 'rgba(37,112,153,0.08)' : 'rgba(242,166,32,0.12)'"
+                  [style.color]="cycle.ai_board_approved ? '#257099' : '#8a5b00'"
+                  style="display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;margin-left:6px;">
+              {{ cycle.ai_board_approved ? 'AI Prod Board: Approved' : 'AI Prod Board: Approval pending' }}
+            </span>
+          </div>
+
           <!-- Jira Epic Link -->
           <div>
             <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
@@ -862,13 +885,17 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
              [style.padding-left]="'8px'"
              style="border-bottom:1px solid var(--triarq-color-border);">
 
+          <!-- CC-38 follow-on 13: full-row click REMOVED — approval dialogs were
+               firing from accidental row clicks. Modal opens only from the
+               diamond + gate name (col 1), the big track diamond, or Submit. -->
           <div style="display:grid;grid-template-columns:2fr 1fr 1fr 120px;
                       gap:var(--triarq-space-sm);padding:10px 0;
-                      font-size:var(--triarq-text-small);align-items:center;cursor:pointer;"
-               (click)="openGatePanel(m.gate_name)">
+                      font-size:var(--triarq-text-small);align-items:center;">
 
-            <!-- Col 1: Gate diamond + name + approval narrative -->
-            <div style="display:flex;align-items:flex-start;gap:8px;">
+            <!-- Col 1: Gate diamond + name + approval narrative — opens gate panel -->
+            <div style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;"
+                 title="Open gate record"
+                 (click)="openGatePanel(m.gate_name)">
               <!-- Gate diamond icon -->
               <span style="display:inline-flex;align-items:center;justify-content:center;
                            flex-shrink:0;margin-top:1px;">
@@ -1949,6 +1976,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     private readonly route:          ActivatedRoute,
     private readonly router:         Router,
     private readonly delivery:       DeliveryService,
+    private readonly mcp:            McpService,
     private readonly profileService: UserProfileService,
     private readonly fb:             FormBuilder,
     private readonly cdr:            ChangeDetectorRef,
@@ -2031,6 +2059,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           this.loadEvents(cycleId);
           this.loadLatestStatus(cycleId); // Contract 32 (WS2): Current Status section
           this.loadEffectiveSprintCalendar(res.data.division_id); // Contract 37 (D-550)
+          this.loadDivisionRequirements(res.data.division_id);    // CC-38 f13: DOL/Jira gate exemptions
           // B-69: Stage Track scrollIntoView (B-61) and panel mount sometimes leave
           // an ambient text selection on Gate Record content. Clear it once on load.
           if (typeof window !== 'undefined') {
@@ -2053,6 +2082,29 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
         this.loading   = false;
         this.cdr.markForCheck();
       }
+    });
+  }
+
+  // CC-38 follow-on 13: per-Division gate exemptions (dol_required D-424,
+  // jira_epic_required migration 074) feed gateHardStops(). null = unknown
+  // (treat as required — the server is authoritative either way).
+  divisionDolRequired:  boolean | null = null;
+  divisionJiraRequired: boolean | null = null;
+
+  private loadDivisionRequirements(divisionId: string | null): void {
+    this.divisionDolRequired  = null;
+    this.divisionJiraRequired = null;
+    if (!divisionId) { return; }
+    this.mcp.call<Division[]>('division', 'list_divisions', {}).subscribe({
+      next: (res) => {
+        const div = (res.data ?? []).find(d => d.id === divisionId);
+        if (div) {
+          this.divisionDolRequired  = div.dol_required !== false;
+          this.divisionJiraRequired = div.jira_epic_required !== false;
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => { /* exemptions unknown — hard stops default to required; server enforces */ }
     });
   }
 
@@ -2186,6 +2238,29 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
   /** CC-38-32 halo marker inputs. */
   get haloNextGateId(): GateName | null { return nextGateInOrder(this.cycle?.gate_records); }
+
+  /** CC-38 f13: AI chip tooltip — where the AI Production Board stop lands. */
+  get aiChipTooltip(): string {
+    const g = this.aiBoardGateId;
+    if (!g) {
+      return 'Delivered analytics outputs (Track 2) — no AI Production Board stop; AI Delivery Requirements Record expected before Go to Deploy.';
+    }
+    const label = g === 'go_to_deploy' ? 'Go to Deploy' : 'Go to Release';
+    return this.cycle?.ai_board_approved
+      ? `AI Production Board approval received (applies at ${label}).`
+      : `AI Production Board approval required before ${label}.`;
+  }
+
+  /** CC-38 f13: gate carrying the AI Production Board half-diamond marker.
+   *  embedded+external → go_to_deploy; internal AI (either form) →
+   *  go_to_release; analytics+external (Track 2) and non-AI → none. */
+  get aiBoardGateId(): GateName | null {
+    const c = this.cycle;
+    if (!c || c.ai_functionality !== 'yes' || !c.ai_delivery_form || !c.ai_audience) { return null; }
+    if (c.ai_delivery_form === 'product_embedded' && c.ai_audience === 'external') { return 'go_to_deploy'; }
+    if (c.ai_audience === 'internal') { return 'go_to_release'; }
+    return null;
+  }
   get haloNextGateSubmitted(): boolean  { return nextGateIsSubmitted(this.cycle?.gate_records); }
   get haloNextGateUndated(): boolean    { return nextGateUndated(this.cycle?.gate_records, this.cycle?.milestone_dates); }
   /** CC-38-42: banded warnings — red reasons dominate; slips/at-risk amber. */
@@ -2990,7 +3065,10 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       gateName:             gate,
       allUsers:             this.allUsers,
       callerCanSubmitGates: this.callerCanSubmitGates,
-      checklist:            this.gateChecklist(gate)
+      checklist:            this.gateChecklist(gate),
+      // CC-38 f13: unmet hard requirements — modal disables Submit and lists
+      // them; server re-enforces in submit_gate_for_approval.
+      hardStops:            this.gateHardStops(gate)
     };
 
     this.gateModalOpen = true;
@@ -3736,54 +3814,104 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
 
     const isTier3 = c.tier_classification === 'tier_3';
 
+    // CC-38 follow-on 13 (Phil 2026-07-17): checklist = advisory ambers only.
+    // Everything mandatory moved to gateHardStops() + server enforcement in
+    // submit_gate_for_approval. Tech Spec and MCP scope items removed from
+    // Go to Build (MCP scope removal deferred to Design for a future policy).
+    // isTier3 retired with the removed Tier-3 items — void reference keeps
+    // strict mode quiet without deleting the classification context above.
+    void isTier3; void specArts; void buildArts; void outcomeArts; void pilotArts;
+
+    const aiYes = c.ai_functionality === 'yes';
     switch (gate) {
       case 'brief_review':
         return [
-          { label: 'Context Package attached (at least one Brief Artifact)',      met: briefArts.length > 0 },
+          { label: 'Scenario document attached',                                   met: hasName(briefArts, 'scenario') },
           { label: 'Outcome Statement set',                                        met: !!c.outcome_statement },
           { label: 'Tier classification set',                                      met: !!c.tier_classification },
-          { label: 'Assigned Domain Capability Strategist set',                   met: !!c.assigned_dcs_user_id },
-          { label: 'Assigned Domain Outcome Lead set',                            met: !!c.assigned_dol_user_id },
-        ];
-      case 'go_to_build':
-        return [
-          { label: 'Context Package attached',                                     met: briefArts.length > 0 },
-          { label: 'Outcome Statement set',                                        met: !!c.outcome_statement },
-          { label: 'Technical Specification complete',                             met: hasName(specArts, 'technical spec') },
-          { label: 'Tier classification set',                                      met: !!c.tier_classification },
-          { label: 'Jira epic linked',                                             met: !!(c.jira_links?.[0]?.jira_epic_key) },
-          { label: 'MCP scope declared (Cursor Prompt or Agent Registry)',         met: hasName(specArts, 'cursor prompt', 'agent registry', 'mcp scope') },
-          { label: 'Assigned Engineering Product Owner set',                       met: !!c.assigned_epo_user_id },
         ];
       case 'go_to_deploy':
         return [
-          { label: 'Initiative Build Report attached',                             met: hasName(buildArts, 'build report') },
-          { label: 'UAT sign-off record attached',                                 met: hasName(uatArts, 'uat sign') },
-          ...(isTier3 ? [
-            { label: '7-step governance checklist attached (Tier 3)',              met: hasName(uatArts, '7-step', 'governance checklist') },
-            { label: 'HITRUST/GRICS checklist attached (Tier 3)',                  met: hasName(uatArts, 'hitrust', 'grics') },
+          ...(aiYes && c.ai_delivery_form === 'product_embedded' && c.ai_audience === 'external' ? [
+            { label: 'AI Production Governance Report attached',                   met: hasName(uatArts, 'ai production governance') },
+          ] : []),
+          ...(aiYes && c.ai_delivery_form === 'analytics_outputs' && c.ai_audience === 'external' ? [
+            { label: 'AI Delivery Requirements Record attached (data lineage, reproducibility, AI disclosure)',
+              met: hasName(uatArts, 'ai delivery requirements') },
           ] : []),
         ];
       case 'go_to_release':
         return [
-          { label: 'Pilot observations log attached',                              met: hasName(pilotArts, 'pilot observ') },
-          ...(isTier3 ? [
-            { label: 'AI Production Governance Board compliance check (Tier 3)',   met: false },
+          ...(aiYes && c.ai_audience === 'internal' ? [
+            { label: 'AI Production Governance Report attached',                   met: hasName(byGate('go_to_deploy'), 'ai production governance') },
           ] : []),
         ];
-      case 'close_review': {
-        const closeReviewRecord = c.gate_records?.find(r => r.gate_name === 'close_review');
-        return [
-          { label: 'Outcome measurement record attached',                          met: hasName(outcomeArts, 'outcome measurement') },
-          { label: 'Outcome Statement matches demonstrated result (confirm in notes)', met: !!closeReviewRecord?.approver_notes },
-          ...(isTier3 ? [
-            { label: 'Wiz continuous monitoring baseline attached (Tier 3)',       met: hasName(outcomeArts, 'wiz') },
-          ] : []),
-        ];
-      }
+      // go_to_build and close_review: no advisory items (Phil 2026-07-17).
       default:
         return [];
     }
+  }
+
+  /**
+   * CC-38 follow-on 13: client-side twin of the submit_gate_for_approval
+   * hard-stop ladder. Unmet items disable Submit in the gate modal with a
+   * D-140 explanation; the server re-enforces the same rules for any request
+   * that skips the UI (double-enforcement approach, Phil 2026-07-17).
+   */
+  gateHardStops(gate: GateName): string[] {
+    if (!this.cycle) { return []; }
+    const c = this.cycle;
+    const stops: string[] = [];
+
+    const typeIdToGate: Record<string, GateName | null> = {};
+    (c.artifact_types ?? []).forEach(t => {
+      typeIdToGate[t.artifact_type_id] = (t.primary_gate ?? null) as (GateName | null);
+    });
+    const hasContextBrief = (c.artifacts ?? []).some(a =>
+      (a.artifact_type_name ?? '').toLowerCase().includes('context brief') && a.external_url);
+
+    if (gate === 'brief_review') {
+      if (!c.assigned_dcs_user_id) {
+        stops.push('No Domain Capability Strategist is assigned. Assign a DCS in the Initiative edit panel.');
+      }
+      if (!c.assigned_dol_user_id && this.divisionDolRequired !== false) {
+        stops.push('No Domain Outcome Lead is assigned. Assign a DOL in the Initiative edit panel.');
+      }
+    }
+
+    if (gate === 'go_to_build') {
+      if (!hasContextBrief) {
+        stops.push('No Context Brief is attached. Attach it in the Artifacts section.');
+      }
+      if (!c.jira_epic_key && this.divisionJiraRequired !== false) {
+        stops.push('No Jira epic is linked. Link it in the Initiative edit panel (or ask an Admin to exempt this Division).');
+      }
+      if (!c.assigned_epo_user_id) {
+        stops.push('No Engineering Product Owner is assigned. Assign an EPO in the Initiative edit panel.');
+      }
+      if (!c.ai_functionality) {
+        stops.push('The "Includes AI functionality" question is unanswered. Answer it (Yes, No, or I do not know) in the Initiative edit panel.');
+      }
+    }
+
+    if (gate === 'go_to_deploy') {
+      if (c.ai_functionality !== 'yes' && c.ai_functionality !== 'no') {
+        stops.push('The "Includes AI functionality" question must be resolved to Yes or No before deployment. Update it in the Initiative edit panel.');
+      } else if (c.ai_functionality === 'yes') {
+        if (!c.ai_delivery_form || !c.ai_audience) {
+          stops.push('The AI profile is incomplete. Set the delivery form and audience in the Initiative edit panel.');
+        } else if (c.ai_delivery_form === 'product_embedded' && c.ai_audience === 'external' && !c.ai_board_approved) {
+          stops.push('External user-facing AI requires AI Production Board approval before pilot. Record AI Prod Board approval on the Initiative.');
+        }
+      }
+    }
+
+    if (gate === 'go_to_release' &&
+        c.ai_functionality === 'yes' && c.ai_audience === 'internal' && !c.ai_board_approved) {
+      stops.push('Internal AI requires AI Production Board approval before production release. Record AI Prod Board approval on the Initiative.');
+    }
+
+    return stops;
   }
 
   /** Short tier label for gate sub-panel breadcrumb — "1", "2", or "3" */

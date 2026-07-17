@@ -33,6 +33,37 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-17',
+    contractLabel: 'Contract 38 follow-on — Gate submission triggers, checklist rework, AI Production Governance',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'Initiative panel — Gates & Milestone Dates',
+        description: 'Gate approval dialog no longer opens from a click anywhere on a gate row — only the gate diamond and name open it. Date and status edits never trigger the dialog.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Gate record modal',
+        description: 'Checklist reworked: advisory ambers trimmed per gate; mandatory items now hard-stop Submit with an explanation of what unblocks it (also enforced server-side).'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Initiative edit panel — AI Governance',
+        description: 'New AI profile questions (Includes AI functionality, delivery form, audience) with a consequence line showing where the AI Production Board stop lands, plus a Has AI Prod Board Approval control.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Initiative panel — Stage Track',
+        description: 'AI Production Board half-diamond marker at the Board gate: amber = approval required, blue = received. Gate tooltips now describe every color and ring state.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Admin — Divisions',
+        description: 'New "Require Jira epic on Initiatives" toggle — Divisions can be exempted from the Go to Build Jira requirement.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-17',
     builtAt:       '04:00 UTC',
     contractLabel: 'Contract 38 follow-on — Deploy by Quarter for every role',
     items: [

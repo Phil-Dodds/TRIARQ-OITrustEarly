@@ -395,6 +395,11 @@ const LEVEL_LABELS: Record<number, string> = {
                   <span class="oi-field-label">DOL Required</span>
                   <span>{{ selectedDivision.dol_required === false ? 'No' : 'Yes' }}</span>
                 </div>
+                <!-- CC-38 f13: Jira governance setting (read-only in View). -->
+                <div class="oi-field-row">
+                  <span class="oi-field-label">Jira Epic Required</span>
+                  <span>{{ selectedDivision.jira_epic_required === false ? 'No' : 'Yes' }}</span>
+                </div>
                 <div class="oi-zone-explain" *ngIf="selectedDivision.active_status === false">
                   No new Initiatives or user assignments permitted while inactive.
                 </div>
@@ -554,6 +559,18 @@ const LEVEL_LABELS: Record<number, string> = {
                     </span>
                   </label>
                 </div>
+                <!-- CC-38 f13 (migration 074): Jira Epic Required toggle — Go to Build exemption. -->
+                <div class="oi-field-row">
+                  <label class="oi-field-label">Require Jira epic on Initiatives</label>
+                  <label class="oi-picker-row" style="cursor:pointer;display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox"
+                           [checked]="editJiraRequiredValue"
+                           (change)="setEditJiraRequired($any($event.target).checked)" />
+                    <span style="font-size:12px;color:var(--triarq-color-text-secondary);">
+                      When off, Go to Build gate submission skips the Jira-epic requirement for Initiatives in this Division.
+                    </span>
+                  </label>
+                </div>
                 <!-- WS4 (D-471): Division Leader — Phil-only edit (is_super_admin);
                      non-Phil sees it read-only. UserPicker: single, nullable, clearable.
                      Backing field divisions.owner_user_id (no schema change). -->
@@ -697,6 +714,7 @@ export class DivisionsComponent implements OnInit {
   createError = '';
   // D-424 / Contract 23 Item 3.4: DOL Required edit state. Initialized from selected Division on startEdit().
   editDolRequiredValue: boolean = true;
+  editJiraRequiredValue: boolean = true;   // CC-38 f13 (migration 074)
   saving         = false;
   editError      = '';
   showDeactivateConfirm = false;
@@ -1097,6 +1115,8 @@ export class DivisionsComponent implements OnInit {
     // D-424 / Contract 23 Item 3.4: dol_required defaults to true at DB level, but undefined
     // on a Division loaded before Migration 038 ran. Treat undefined as true.
     this.editDolRequiredValue = d.dol_required !== false;
+    // CC-38 f13: same undefined-as-true treatment for jira_epic_required (migration 074).
+    this.editJiraRequiredValue = d.jira_epic_required !== false;
     // WS4 (D-471): seed Division Leader edit state from the selected Division.
     this.editOwnerUserId      = d.owner_user_id ?? null;
     this.editOwnerDisplayName = d.owner_display_name ?? null;
@@ -1154,6 +1174,12 @@ export class DivisionsComponent implements OnInit {
   /** D-424 / Contract 23 Item 3.4: DOL Required toggle setter. */
   setEditDolRequired(value: boolean): void {
     this.editDolRequiredValue = value;
+    this.cdr.markForCheck();
+  }
+
+  /** CC-38 f13: Jira Epic Required toggle setter (migration 074). */
+  setEditJiraRequired(value: boolean): void {
+    this.editJiraRequiredValue = value;
     this.cdr.markForCheck();
   }
 
@@ -1220,6 +1246,10 @@ export class DivisionsComponent implements OnInit {
     // D-424 / Contract 23 Item 3.4: include dol_required only when it changed.
     if (this.selectedDivision && this.editDolRequiredValue !== (this.selectedDivision.dol_required !== false)) {
       updates['dol_required'] = this.editDolRequiredValue;
+    }
+    // CC-38 f13: include jira_epic_required only when it changed.
+    if (this.selectedDivision && this.editJiraRequiredValue !== (this.selectedDivision.jira_epic_required !== false)) {
+      updates['jira_epic_required'] = this.editJiraRequiredValue;
     }
     // WS4 (D-471): Phil-only — include owner_user_id only when Phil changed it.
     // null clears the Division Leader. Non-Phil users never send this field.
