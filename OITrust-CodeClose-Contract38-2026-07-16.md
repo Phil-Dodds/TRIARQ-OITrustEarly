@@ -628,6 +628,30 @@ UAT below.
 5. Status dashboard + panel + entry form: warnings render as red/amber bands; entry form shows live warnings while typing. An initiative past Brief Review with undated Deploy shows "No Deploy target date". Pass/Fail.
 6. Grid: cancelled rows hidden; "Include cancelled" reveals; reload → hidden again. Team meeting ref panels no longer list completed/cancelled initiatives. Pass/Fail.
 
+---
+
+# Follow-on 11 — Review Reason Rewording + Gate Overdue (CC-38-44)
+
+Deployed SHA: b084c5d (gh-pages 80acaae). delivery-cycle-mcp auto-deploys.
+
+- **CC-38-44** — Reason vocabulary reworded server-side (single definition
+  flows to dashboard, panel, and entry form): **Escalation** · **Status Update
+  Overdue** · **Gate Date Moved +N days** (aggregated push-out across the
+  cadence window, replaces per-gate "Gate date slipped: X" — Phil confirmed
+  slip ≠ overdue) · **At Risk** (bare, deduped) · **Missing Target Date** ·
+  **Missing Deploy Date** · NEW **Gate Overdue** (any unresolved gate past its
+  target date — previously not a review reason at all). No gate names in any
+  reason; the row's Next Gate/Target Date columns and the panel gates table
+  carry the detail. Display: header sentence removed on dashboard + panel
+  bands; one bolded • bullet per reason; Gate Overdue joins the red set,
+  Gate Date Moved stays amber. Entry-form banner keeps its context sentence
+  (only anchor above an empty form). Tests updated for wording — 238/238.
+
+**UAT:** dashboard reasons render as bolded bullets with no "Needs review · N"
+line; an initiative with a passed, unapproved gate date shows **Gate Overdue**;
+a pushed-out date within cadence shows **Gate Date Moved +N days**; same
+wording in the panel and live in the status entry form.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
