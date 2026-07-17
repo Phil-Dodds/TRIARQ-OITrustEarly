@@ -750,6 +750,8 @@ export interface EpoSummaryItem {
 
 /** Full summary response from get_delivery_summary MCP tool. */
 export interface DeliverySummary {
+  // CC-38-45: role-neutral Deploy by Quarter hub headline count.
+  deploys_this_quarter?: number;
   workstream_summaries: WorkstreamSummaryItem[];
   epo_summaries:        EpoSummaryItem[];
   gate_summaries:       GateSummaryItem[];

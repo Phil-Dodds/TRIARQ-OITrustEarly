@@ -40,6 +40,10 @@ import {
   SCREEN_KEYS
 } from '../../../core/services/screen-state.service';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
+import { RoleSwitchComponent } from '../role-switch/role-switch.component';
+import {
+  PersonRole, ROLE_FIELDS, UNASSIGNED_ID, isPersonRole
+} from '../role-grouping.utils';
 import {
   DeliveryCycle,
   GateName,
@@ -71,16 +75,6 @@ const GATE_DISPLAY: Record<GateName, string> = {
 /** Terminal/parked stages never appear on a planning screen (S-009). */
 const EXCLUDED_STAGES: LifecycleStage[] = ['CANCELLED', 'COMPLETE', 'ON_HOLD'];
 
-export type NextGatesRole = 'epo' | 'dol' | 'dcs';
-
-const ROLE_FIELDS: Record<NextGatesRole, { id: keyof DeliveryCycle; name: keyof DeliveryCycle; label: string }> = {
-  epo: { id: 'assigned_epo_user_id', name: 'assigned_epo_display_name', label: 'EPO' },
-  dol: { id: 'assigned_dol_user_id', name: 'assigned_dol_display_name', label: 'DOL' },
-  dcs: { id: 'assigned_dcs_user_id', name: 'assigned_dcs_display_name', label: 'DCS' }
-};
-
-const UNASSIGNED_ID = '__unassigned__';
-
 interface PersonGroup {
   user_id:      string;
   display_name: string;
@@ -95,7 +89,7 @@ interface PersonGroup {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, RouterModule, FormsModule, IonicModule,
-    DeliveryCycleDetailComponent
+    DeliveryCycleDetailComponent, RoleSwitchComponent
   ],
   template: `
     <div style="display:flex;min-height:calc(100vh - 56px);">
@@ -115,16 +109,9 @@ interface PersonGroup {
         </p>
       </div>
 
-      <!-- CC-38-40: role switch — persists per user like filters. -->
-      <div class="esch-role-switch" role="tablist" aria-label="Group by role">
-        <button *ngFor="let r of roles" type="button" role="tab"
-                class="esch-role-btn"
-                [class.esch-role-active]="role === r"
-                [attr.aria-selected]="role === r"
-                (click)="setRole(r)">
-          {{ roleLabel(r) }}
-        </button>
-      </div>
+      <!-- CC-38-40/45: shared role switch — persists per user like filters. -->
+      <app-role-switch style="display:block;margin-bottom:var(--triarq-space-md);"
+                       [role]="role" (roleChange)="setRole($event)"></app-role-switch>
 
       <!-- D-200 Pattern 2 overdue banner -->
       <div *ngIf="(overdueTotal > 0 || nodateTotal > 0) && !loading" class="esch-banner-overdue">
@@ -289,10 +276,6 @@ interface PersonGroup {
     .esch-new-cycle { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; }
     .esch-new-cycle:hover { background: #1d5a7a; }
     .esch-subtitle { margin: 4px 0 12px 0; font-size: 11px; font-style: italic; color: #5A5A5A; max-width: 720px; line-height: 1.6; }
-    .esch-role-switch { display: inline-flex; border: 1px solid var(--triarq-color-primary, #257099); border-radius: 6px; overflow: hidden; margin-bottom: var(--triarq-space-md); }
-    .esch-role-btn { background: #fff; border: none; padding: 6px 18px; font-size: 13px; font-weight: 500; color: var(--triarq-color-primary, #257099); cursor: pointer; }
-    .esch-role-btn + .esch-role-btn { border-left: 1px solid var(--triarq-color-primary, #257099); }
-    .esch-role-active { background: var(--triarq-color-primary, #257099); color: #fff; }
     .esch-banner-overdue { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(245,166,35,0.08); border-left: 3px solid var(--triarq-color-sunray, #f5a623); border-radius: 5px; margin-bottom: var(--triarq-space-md); font-size: var(--triarq-text-small); }
     .esch-banner-icon { color: var(--triarq-color-sunray, #f5a623); font-size: 16px; }
     .esch-toggle { display: flex; align-items: center; gap: 8px; font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); margin-bottom: var(--triarq-space-md); cursor: pointer; }
@@ -335,8 +318,7 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
   canCreateCycle       = false;
 
   /** CC-38-40: grouping role — persisted per user like filters. */
-  role: NextGatesRole = 'epo';
-  readonly roles: NextGatesRole[] = ['epo', 'dol', 'dcs'];
+  role: PersonRole = 'epo';
   readonly UNASSIGNED_ID = UNASSIGNED_ID;
 
   cycles: DeliveryCycle[] = [];
@@ -383,9 +365,7 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
           this.showMyDivisionsOnly = saved.filter_state['showMyDivisionsOnly'] as boolean;
         }
         const savedRole = saved?.filter_state?.['role'];
-        if (savedRole === 'epo' || savedRole === 'dol' || savedRole === 'dcs') {
-          this.role = savedRole;
-        }
+        if (isPersonRole(savedRole)) { this.role = savedRole; }
 
         if (!this.isPrivileged) {
           await this.loadUserDivisions(userId);
@@ -461,7 +441,7 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
     this.loadCycles();
   }
 
-  setRole(r: NextGatesRole): void {
+  setRole(r: PersonRole): void {
     if (this.role === r) { return; }
     this.role = r;
     this.expanded.clear();
@@ -469,7 +449,7 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  roleLabel(r: NextGatesRole): string { return ROLE_FIELDS[r].label; }
+  roleLabel(r: PersonRole): string { return ROLE_FIELDS[r].label; }
 
   private persistState(): void {
     this.screenState.save(

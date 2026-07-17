@@ -281,13 +281,30 @@ async function get_delivery_summary(params, caller_id) {
   // the workstream_summaries 'No EPO assigned' lens (not built this contract).
   const epo_summaries = await buildEpoSummaries(cycles ?? []);
 
+  // CC-38-45: role-neutral hub headline for Deploy by Quarter — count of
+  // Initiatives whose Go to Deploy actual or target date lands in the current
+  // calendar quarter. (Query excludes COMPLETE/CANCELLED, so this is
+  // active-scope; completed deploys age out of the count.)
+  const now = new Date();
+  const qStart = new Date(Date.UTC(now.getUTCFullYear(), Math.floor(now.getUTCMonth() / 3) * 3, 1))
+    .toISOString().slice(0, 10);
+  const qEnd = new Date(Date.UTC(now.getUTCFullYear(), Math.floor(now.getUTCMonth() / 3) * 3 + 3, 0))
+    .toISOString().slice(0, 10);
+  const inQ = (d) => !!d && d >= qStart && d <= qEnd;
+  const deploys_this_quarter = (cycles ?? []).filter(c =>
+    (c.milestone_dates || []).some(m =>
+      m.gate_name === 'go_to_deploy' && (inQ(m.actual_date) || (!m.actual_date && inQ(m.target_date)))
+    )
+  ).length;
+
   return {
     success: true,
     data: {
       workstream_summaries,
       epo_summaries,
       gate_summaries,
-      division_summaries
+      division_summaries,
+      deploys_this_quarter
     }
   };
 }

@@ -107,7 +107,7 @@ const HUB_CARDS: HubCard[] = [
   },
   {
     id:          'epo-deploy',
-    title:       'EPO Deploy by Quarter',
+    title:       'Deploy by Quarter',
     route:       '/initiatives/epo-deploy',
     icon:        '◒',
     description: 'Deploy gate cadence per EPO across the prior quarter, current ' +
@@ -468,9 +468,11 @@ export class DeliveryHubComponent implements OnInit {
 
     // CC-20-06: simplified deploy headline — full prior-quarter-miss count
     // requires per-cycle deploy-gate date check, deferred to a follow-on.
-    this.headlines['epo-deploy'] = epoCount === 0
-      ? { text: 'No EPOs with active Initiatives', tone: 'green' }
-      : { text: `${epoCount} EPOs · Deploy cadence loaded`, tone: 'green' };
+    // CC-38-45: role-neutral headline — stable across the EPO/DOL/DCS views.
+    const deploysQ = summary.deploys_this_quarter ?? 0;
+    this.headlines['epo-deploy'] = deploysQ === 0
+      ? { text: 'No deploys scheduled this quarter', tone: 'amber' }
+      : { text: `${deploysQ} Initiative${deploysQ === 1 ? '' : 's'} with a deploy this quarter`, tone: 'green' };
   }
 
   /** Template helper — gate the headline strip to ids we configure here. */

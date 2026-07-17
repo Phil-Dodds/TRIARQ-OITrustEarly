@@ -57,6 +57,10 @@ import {
   SCREEN_KEYS
 } from '../../../core/services/screen-state.service';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
+import { RoleSwitchComponent } from '../role-switch/role-switch.component';
+import {
+  PersonRole, UNASSIGNED_ID, isPersonRole, personFor
+} from '../role-grouping.utils';
 import {
   DeliveryCycle,
   Division,
@@ -99,7 +103,7 @@ interface EpoGroup {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule, RouterModule, FormsModule, IonicModule,
-    DeliveryCycleDetailComponent
+    DeliveryCycleDetailComponent, RoleSwitchComponent
   ],
   template: `
     <!-- D-308 / S-018: flex container — list left, detail panel right. -->
@@ -110,7 +114,7 @@ interface EpoGroup {
       <div class="edp-header">
         <a routerLink="/initiatives" class="edp-back-link">← Initiative Tracking</a>
         <div class="edp-header-row">
-          <h3 class="edp-title">EPO Deploy by Quarter</h3>
+          <h3 class="edp-title">Deploy by Quarter</h3>
 
           <!-- D-445: Quarter Pivot Control — non-persistent, resets on every load. -->
           <div class="rpd-pivot" *ngIf="referenceQuarter">
@@ -121,6 +125,10 @@ interface EpoGroup {
 
           <button *ngIf="canCreateCycle" class="edp-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
         </div>
+
+        <!-- CC-38-45: shared role switch — persists per user like filters. -->
+        <app-role-switch style="display:block;margin:8px 0;"
+                         [role]="role" (roleChange)="setRole($event)"></app-role-switch>
 
         <!-- D-446: Baseline selector — non-persistent. -->
         <div class="rpd-baseline-row">
@@ -176,7 +184,7 @@ interface EpoGroup {
       </div>
 
       <div *ngIf="loadError && !loading" class="edp-error">
-        <div class="edp-error-primary">EPO Deploy by Quarter could not load.</div>
+        <div class="edp-error-primary">Deploy by Quarter could not load.</div>
         <div class="edp-error-secondary">{{ loadError }}</div>
       </div>
 
@@ -468,6 +476,12 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
 
   private readonly profileSub = new Subscription();
 
+  /** CC-38-45: grouping role — persisted per user like filters. */
+  role: PersonRole = 'epo';
+  readonly UNASSIGNED_ID = UNASSIGNED_ID;
+  /** division_id → dol_required (default true when unknown). */
+  private dolRequiredByDivision = new Map<string, boolean>();
+
   constructor(
     private readonly delivery:    DeliveryService,
     private readonly mcp:         McpService,
@@ -476,6 +490,29 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
     private readonly screenState: ScreenStateService,
     private readonly cdr:         ChangeDetectorRef
   ) {}
+
+  setRole(r: PersonRole): void {
+    if (this.role === r) { return; }
+    this.role = r;
+    this.expanded.clear();
+    this.saveEpoDeployState();
+    this.cdr.markForCheck();
+  }
+
+  /** DOL-view Unassigned exemption: divisions with dol_required = false. */
+  private loadDivisionRequirements(): void {
+    this.mcp.call<Division[]>('division', 'list_divisions', {}).subscribe({
+      next: res => {
+        if (res.success && res.data) {
+          this.dolRequiredByDivision = new Map(
+            res.data.map(d => [d.id, d.dol_required !== false])
+          );
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => { /* map stays empty — default requires DOL */ }
+    });
+  }
 
   ngOnInit(): void {
     // D-445: pivot resets to actual current quarter on every load.
@@ -503,6 +540,8 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
         if (saved?.filter_state && typeof saved.filter_state['showMyDivisionsOnly'] === 'boolean') {
           this.showMyDivisionsOnly = saved.filter_state['showMyDivisionsOnly'] as boolean;
         }
+        const savedRole = saved?.filter_state?.['role'];
+        if (isPersonRole(savedRole)) { this.role = savedRole; }
         // D-488: theme multi-select persists per D-171.
         if (Array.isArray(saved?.filter_state?.['selectedThemeIds'])) {
           this.selectedThemeIds = (saved!.filter_state['selectedThemeIds'] as unknown[])
@@ -518,6 +557,7 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
         if (!this.isPrivileged) {
           await this.loadUserDivisions(userId);
         }
+        this.loadDivisionRequirements();
         this.loadFreezeDates();
         this.loadCycles();
       })
@@ -797,7 +837,7 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
   private saveEpoDeployState(): void {
     this.screenState.save(
       SCREEN_KEYS.INITIATIVES_EPO_DEPLOY,
-      { showMyDivisionsOnly: this.showMyDivisionsOnly, selectedThemeIds: this.selectedThemeIds },
+      { showMyDivisionsOnly: this.showMyDivisionsOnly, selectedThemeIds: this.selectedThemeIds, role: this.role },
       {}
     );
   }
@@ -809,14 +849,24 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
   }
 
   get epoGroups(): EpoGroup[] {
+    // CC-38-45: pivot by the selected role. Unassigned groups at the bottom;
+    // the DOL view exempts Divisions with dol_required = false (Phil rule).
     const byEpo = new Map<string, { display_name: string; cycles: DeliveryCycle[] }>();
     for (const c of this.cycles) {
       if (!this.themeMatches(c)) continue;   // D-488 theme filter
-      if (!c.assigned_epo_user_id) continue;
-      let entry = byEpo.get(c.assigned_epo_user_id);
+      const person = personFor(c, this.role);
+      let personId   = person.id;
+      let personName = person.name;
+      if (!personId) {
+        if (this.role === 'dol' &&
+            this.dolRequiredByDivision.get(c.division_id) === false) { continue; }
+        personId   = UNASSIGNED_ID;
+        personName = 'Unassigned';
+      }
+      let entry = byEpo.get(personId);
       if (!entry) {
-        entry = { display_name: c.assigned_epo_display_name ?? 'EPO', cycles: [] };
-        byEpo.set(c.assigned_epo_user_id, entry);
+        entry = { display_name: personName ?? 'Unassigned', cycles: [] };
+        byEpo.set(personId, entry);
       }
       entry.cycles.push(c);
     }
@@ -891,11 +941,13 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
       });
     }
 
-    return groups.sort((a, b) =>
-      (b.prior.length + b.current.length + b.nextQ1.length + b.nextQ2.length + b.unscheduled.length) -
-      (a.prior.length + a.current.length + a.nextQ1.length + a.nextQ2.length + a.unscheduled.length) ||
-      a.display_name.localeCompare(b.display_name)
-    );
+    return groups.sort((a, b) => {
+      if (a.user_id === UNASSIGNED_ID) return 1;
+      if (b.user_id === UNASSIGNED_ID) return -1;
+      return (b.prior.length + b.current.length + b.nextQ1.length + b.nextQ2.length + b.unscheduled.length) -
+             (a.prior.length + a.current.length + a.nextQ1.length + a.nextQ2.length + a.unscheduled.length) ||
+             a.display_name.localeCompare(b.display_name);
+    });
   }
 
   // ── Expansion ─────────────────────────────────────────────────────────────
@@ -950,8 +1002,9 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  drillDown(epoUserId: string): void {
-    this.router.navigate(['/initiatives/list'], { queryParams: { epo: epoUserId } });
+  drillDown(personUserId: string): void {
+    if (personUserId === UNASSIGNED_ID) { return; }
+    this.router.navigate(['/initiatives/list'], { queryParams: { [this.role]: personUserId } });
   }
 
   onNewCycle(): void {

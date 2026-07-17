@@ -33,6 +33,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-17',
+    builtAt:       '04:00 UTC',
+    contractLabel: 'Contract 38 follow-on — Deploy by Quarter for every role',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'Deploy by Quarter (was EPO Deploy by Quarter)',
+        description: 'Renamed, and now switchable between EPO, DOL, and DCS views like Next Gates — your choice is remembered. Initiatives without an owner now surface in an Unassigned group (DOL view skips divisions that don\'t require one), and the hub card headline counts Initiatives deploying this quarter.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-17',
     builtAt:       '03:15 UTC',
     contractLabel: 'Contract 38 follow-on — review reasons, plain and bold',
     items: [
