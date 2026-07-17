@@ -77,7 +77,7 @@ describe('needs-review helper', () => {
       { event_metadata: { gate_name: 'close_review', old_target_date: null, new_target_date: '2026-07-01' }, created_at: new Date().toISOString() }
     ], error: null }];
     const labels = await nr.computeSlippedGateLabels(chain, CYC, 7);
-    assert.deepEqual(labels, ['Go to Deploy']);
+    assert.deepEqual(labels, ['Gate Date Moved +19 days']);   // CC-38-44: aggregated push-out
   });
 
   test('computeSlippedGateLabels: no interval → no query, empty', async () => {
@@ -98,9 +98,9 @@ describe('needs-review helper', () => {
       { escalation_needed: true, pilot_confidence_applicable: false, close_confidence_applicable: false },
       [{ gate_name: 'go_to_build', date_status: 'behind' }]
     );
-    assert.ok(reasons.includes('Escalation flagged'));
-    assert.ok(reasons.includes('Status overdue'));
-    assert.ok(reasons.includes('At risk: Go to Build'));
+    assert.ok(reasons.includes('Escalation'));
+    assert.ok(reasons.includes('Status Update Overdue'));
+    assert.ok(reasons.includes('At Risk'));
   });
 
   test('computeNeedsReviewReasons: flag false → no status reason', async () => {
@@ -236,9 +236,9 @@ describe('get_latest_initiative_status', () => {
     const dol = r.data.acknowledgments.find(a => a.user_id === DOL);
     assert.equal(dcs.acknowledged, true);
     assert.equal(dol.acknowledged, false);
-    assert.ok(r.data.needs_review_reasons.includes('Escalation flagged'));
+    assert.ok(r.data.needs_review_reasons.includes('Escalation'));
     // Contract 36 UAT addition: next gate without a target date needs review.
-    assert.ok(r.data.needs_review_reasons.includes('No target date: Go to Build'));
+    assert.ok(r.data.needs_review_reasons.includes('Missing Target Date'));
   });
 });
 
@@ -442,9 +442,9 @@ describe('get_initiative_status_dashboard', () => {
     // Canonical gate name — 'Build Start' (milestone_label) must never surface.
     assert.equal(r.data[0].next_gate_label, 'Go to Build');
     assert.equal(r.data[0].next_gate_pending_approval, true);
-    assert.ok(r.data[0].needs_review_reasons.includes('Escalation flagged'));
-    assert.ok(r.data[0].needs_review_reasons.includes('Status overdue'));
-    assert.ok(r.data[0].needs_review_reasons.includes('No target date: Go to Build'));
+    assert.ok(r.data[0].needs_review_reasons.includes('Escalation'));
+    assert.ok(r.data[0].needs_review_reasons.includes('Status Update Overdue'));
+    assert.ok(r.data[0].needs_review_reasons.includes('Missing Target Date'));
   });
 
   test('non-admin with no memberships returns empty', async () => {

@@ -177,14 +177,14 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
               <td>
                 <span *ngIf="r.needs_review_reasons.length === 0">—</span>
                 <!-- CC-38-42: banded block — same grammar as the grid headline. -->
+                <!-- CC-38-44: no title line; one bolded bullet per reason. -->
                 <div *ngIf="r.needs_review_reasons.length > 0"
                      class="isd-reason-band"
                      [class.isd-band-red]="reasonBandRed(r.needs_review_reasons)"
                      [class.isd-band-amber]="!reasonBandRed(r.needs_review_reasons)">
-                  <div class="isd-reason-title">Needs review · {{ r.needs_review_reasons.length }} reason{{ r.needs_review_reasons.length === 1 ? '' : 's' }}</div>
                   <div *ngFor="let reason of r.needs_review_reasons"
                        class="isd-reason-line"
-                       [style.color]="reasonIsRed(reason) ? '#791F1F' : '#7A5A2A'">{{ reason }}</div>
+                       [style.color]="reasonIsRed(reason) ? '#791F1F' : '#7A5A2A'">• <strong>{{ reason }}</strong></div>
                 </div>
               </td>
               <td><button class="oi-btn-secondary isd-sm" (click)="openStatus(r.initiative_id, r.cycle_title)">View Status</button></td>
@@ -296,7 +296,8 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
     .isd-reason-band .isd-reason-title { font-size:12px; font-weight:500; }
     .isd-band-red .isd-reason-title    { color:#791F1F; }
     .isd-band-amber .isd-reason-title  { color:#633806; }
-    .isd-reason-line { font-size:11.5px; margin-top:1px; }
+    .isd-reason-line { font-size:11.5px; margin-top:1px; white-space:nowrap; }
+    .isd-reason-line strong { font-weight:600; }
     .isd-empty { padding:16px; color:#5A5A5A; font-style:italic; }
     .isd-foot { padding:8px; font-size:12px; color:var(--triarq-color-text-secondary); }
     .isd-check { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; }
@@ -664,7 +665,7 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
   }
 
   /** CC-38-42: red reasons dominate the band; slips/at-risk are amber. */
-  private static readonly RED_REASON_PREFIXES = ['Escalation', 'Status overdue', 'No target date', 'No Deploy target date'];
+  private static readonly RED_REASON_PREFIXES = ['Escalation', 'Status Update Overdue', 'Missing Target Date', 'Missing Deploy Date', 'Gate Overdue'];
 
   reasonIsRed(reason: string): boolean {
     return InitiativeStatusDashboardComponent.RED_REASON_PREFIXES.some(p => reason.startsWith(p));

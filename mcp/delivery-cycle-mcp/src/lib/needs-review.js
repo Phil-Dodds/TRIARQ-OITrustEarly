@@ -64,7 +64,9 @@ async function computeSlippedGateLabels(supabase, delivery_cycle_id, cadenceInte
 
   if (error || !events) { return []; }
 
-  const labels = new Set();
+  // CC-38-44 wording: one aggregated line, no gate names — total days the
+  // target dates were pushed out within the cadence window.
+  let movedDays = 0;
   for (const ev of events) {
     const m = ev.event_metadata || {};
     const oldD = m.old_target_date;
@@ -72,10 +74,12 @@ async function computeSlippedGateLabels(supabase, delivery_cycle_id, cadenceInte
     // slip = a later date than before (push-out). Null old (first set) is not a
     // slip; null new (D-501 clear) is not a slip either — both excluded here.
     if (oldD && newD && new Date(newD) > new Date(oldD)) {
-      labels.add(GATE_LABELS[m.gate_name] || m.gate_name);
+      movedDays += Math.round((new Date(newD) - new Date(oldD)) / 86400000);
     }
   }
-  return Array.from(labels);
+  return movedDays > 0
+    ? [`Gate Date Moved +${movedDays} day${movedDays === 1 ? '' : 's'}`]
+    : [];
 }
 
 /**
@@ -92,7 +96,7 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
 
   // 1) Escalation flagged
   if (latestUpdate && latestUpdate.escalation_needed === true) {
-    reasons.push('Escalation flagged');
+    reasons.push('Escalation');
   }
 
   // 2) Status overdue — D-482 final (migration 064): the flag means the chain
@@ -101,14 +105,14 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
   // through and past the meeting until anyone saves (save clears the flag;
   // the cron re-evaluates daily). An update made today is never red today.
   if (cycle.status_overdue === true) {
-    reasons.push('Status overdue');
+    reasons.push('Status Update Overdue');
   }
 
   // 3) Gate date slipped within cadence period (D-486)
   const intervalDays = await resolveCadenceIntervalDays(supabase, cycle.division_id);
   const slipped = await computeSlippedGateLabels(supabase, cycle.delivery_cycle_id, intervalDays);
-  for (const label of slipped) {
-    reasons.push(`Gate date slipped: ${label}`);
+  for (const line of slipped) {
+    reasons.push(line);   // 'Gate Date Moved +N days' (CC-38-44)
   }
 
   // 4) At risk — confidence values and/or gate date_status at_risk/behind.
@@ -118,37 +122,31 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
   const statusByGate = {};
   for (const m of (milestones || [])) { statusByGate[m.gate_name] = m.date_status; }
 
-  const atRiskLabels = new Set();
+  let anyAtRisk = false;
   if (latestUpdate) {
     if (latestUpdate.pilot_confidence_applicable &&
         AT_RISK_STATES.includes(latestUpdate.pilot_confidence) &&
-        statusByGate.go_to_deploy !== 'complete') {
-      atRiskLabels.add(GATE_LABELS.go_to_deploy);
-    }
+        statusByGate.go_to_deploy !== 'complete') { anyAtRisk = true; }
     if (latestUpdate.close_confidence_applicable &&
         AT_RISK_STATES.includes(latestUpdate.close_confidence) &&
-        statusByGate.close_review !== 'complete') {
-      atRiskLabels.add(GATE_LABELS.close_review);
-    }
+        statusByGate.close_review !== 'complete') { anyAtRisk = true; }
   }
   for (const m of (milestones || [])) {
-    if (AT_RISK_STATES.includes(m.date_status)) {
-      atRiskLabels.add(GATE_LABELS[m.gate_name] || m.gate_name);
-    }
+    if (AT_RISK_STATES.includes(m.date_status)) { anyAtRisk = true; }
   }
-  for (const label of atRiskLabels) {
-    reasons.push(`At risk: ${label}`);
-  }
+  // CC-38-44 wording: one bare 'At Risk' line — the gate detail lives in the
+  // panel's gates table, not the reason list.
+  if (anyAtRisk) { reasons.push('At Risk'); }
 
   // 5) Next gate has no target date — nothing to track against, so the row
   // can never surface as slipped or at-risk on dates. Callers must include
   // target_date in the milestones they pass.
   const nextGate = resolveNextGate(milestones || []);
   if (nextGate && !nextGate.target_date) {
-    reasons.push(`No target date: ${nextGate.label}`);
+    reasons.push('Missing Target Date');
   }
 
-  // 6) No Deploy target date mid-flight (Phil 2026-07-16, CC-38-37): Brief
+  // 6) Missing Deploy Date mid-flight (Phil 2026-07-16, CC-38-37): Brief
   // Review passed, Go to Deploy not yet resolved, and the Deploy milestone has
   // neither a target nor an actual date — the initiative is in motion with no
   // deploy commitment. Distinct from (5), which only watches the NEXT gate.
@@ -164,8 +162,18 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
   const deployMs     = (milestones || []).find(m => m.gate_name === 'go_to_deploy');
   const deployUndated = !deployMs?.target_date && !deployMs?.actual_date;
   if (briefPassed && deployOpen && deployUndated) {
-    reasons.push('No Deploy target date');
+    reasons.push('Missing Deploy Date');
   }
+
+  // 7) Gate Overdue (CC-38-44): any unresolved gate whose target date has
+  // passed. One bare line, no gate name — the row's Next Gate/Target Date
+  // columns and the panel carry the detail.
+  const today = new Date().toISOString().slice(0, 10);
+  const anyOverdue = (milestones || []).some(m =>
+    m.target_date && !m.actual_date && m.target_date < today &&
+    gs[m.gate_name] !== 'approved' && gs[m.gate_name] !== 'skipped'
+  );
+  if (anyOverdue) { reasons.push('Gate Overdue'); }
 
   return reasons;
 }

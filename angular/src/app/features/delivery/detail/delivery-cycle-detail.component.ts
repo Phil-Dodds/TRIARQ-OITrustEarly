@@ -646,13 +646,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                  style="margin-top:6px;padding:6px 10px;max-width:420px;"
                  [style.border-left]="reasonBandRed(latestStatus!.needs_review_reasons) ? '3px solid #A32D2D' : '3px solid #BA7517'"
                  [style.background]="reasonBandRed(latestStatus!.needs_review_reasons) ? 'rgba(211,47,47,0.09)' : 'rgba(242,166,32,0.12)'">
-              <div style="font-size:12px;font-weight:500;"
-                   [style.color]="reasonBandRed(latestStatus!.needs_review_reasons) ? '#791F1F' : '#633806'">
-                Needs review · {{ latestStatus!.needs_review_reasons.length }} reason{{ latestStatus!.needs_review_reasons.length === 1 ? '' : 's' }}
-              </div>
+              <!-- CC-38-44: no title line; bolded bullets. -->
               <div *ngFor="let r of latestStatus!.needs_review_reasons"
-                   style="font-size:11.5px;margin-top:1px;"
-                   [style.color]="reasonIsRed(r) ? '#791F1F' : '#7A5A2A'">{{ r }}</div>
+                   style="font-size:11.5px;margin-top:1px;font-weight:600;"
+                   [style.color]="reasonIsRed(r) ? '#791F1F' : '#7A5A2A'">• {{ r }}</div>
             </div>
 
             <button *ngIf="statusHasLongText"
@@ -2192,7 +2189,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   get haloNextGateSubmitted(): boolean  { return nextGateIsSubmitted(this.cycle?.gate_records); }
   get haloNextGateUndated(): boolean    { return nextGateUndated(this.cycle?.gate_records, this.cycle?.milestone_dates); }
   /** CC-38-42: banded warnings — red reasons dominate; slips/at-risk amber. */
-  private static readonly RED_REASONS = ['Escalation', 'Status overdue', 'No target date', 'No Deploy target date'];
+  private static readonly RED_REASONS = ['Escalation', 'Status Update Overdue', 'Missing Target Date', 'Missing Deploy Date', 'Gate Overdue'];
   reasonIsRed(reason: string): boolean {
     return DeliveryCycleDetailComponent.RED_REASONS.some(p => reason.startsWith(p));
   }

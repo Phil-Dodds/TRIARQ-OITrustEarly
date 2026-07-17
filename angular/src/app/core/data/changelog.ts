@@ -33,6 +33,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-17',
+    builtAt:       '03:15 UTC',
+    contractLabel: 'Contract 38 follow-on — review reasons, plain and bold',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Review warnings (dashboard + panels)',
+        description: 'Shorter, bolder reasons: Escalation · Status Update Overdue · Gate Date Moved +N days · At Risk · Missing Target Date · Missing Deploy Date · and a new Gate Overdue. One bulleted line each, no header sentence, no gate-name clutter.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-17',
     builtAt:       '02:30 UTC',
     contractLabel: 'Contract 38 follow-on — dates, Next Gates, and cleaner warnings',
     items: [

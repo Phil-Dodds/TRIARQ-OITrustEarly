@@ -86,7 +86,7 @@ const CADENCE_PHRASE: Record<string, string> = {
                [class.isp-band-amber]="!reasonBandRed(latest!.needs_review_reasons)">
             <div class="isp-band-title">This Initiative currently needs review</div>
             <div *ngFor="let r of latest!.needs_review_reasons" class="isp-band-line"
-                 [style.color]="reasonIsRed(r) ? '#791F1F' : '#7A5A2A'">{{ r }}</div>
+                 [style.color]="reasonIsRed(r) ? '#791F1F' : '#7A5A2A'">• <strong>{{ r }}</strong></div>
           </div>
           <div *ngIf="editingUpdateId" class="isp-edit-note">
             Editing the latest update — the original save time still governs due dates.
@@ -214,7 +214,7 @@ const CADENCE_PHRASE: Record<string, string> = {
                      [class.isp-band-red]="reasonBandRed(latest!.needs_review_reasons)"
                      [class.isp-band-amber]="!reasonBandRed(latest!.needs_review_reasons)">
                   <div *ngFor="let r of latest!.needs_review_reasons" class="isp-band-line"
-                       [style.color]="reasonIsRed(r) ? '#791F1F' : '#7A5A2A'">{{ r }}</div>
+                       [style.color]="reasonIsRed(r) ? '#791F1F' : '#7A5A2A'">• <strong>{{ r }}</strong></div>
                 </div>
               </div>
 
@@ -271,6 +271,7 @@ const CADENCE_PHRASE: Record<string, string> = {
     .isp-band-red .isp-band-title   { color:#791F1F; }
     .isp-band-amber .isp-band-title { color:#633806; }
     .isp-band-line { font-size:11.5px; margin-top:1px; }
+    .isp-band-line strong { font-weight:600; }
     .isp-link { color:var(--triarq-color-primary, #257099); cursor:pointer; font-size:13px; }
   `]
 })
@@ -564,7 +565,7 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit, OnChanges {
   }
 
   /** CC-38-42/43: banded warnings — red reasons dominate; slips/at-risk amber. */
-  private static readonly RED_REASONS = ['Escalation', 'Status overdue', 'No target date', 'No Deploy target date'];
+  private static readonly RED_REASONS = ['Escalation', 'Status Update Overdue', 'Missing Target Date', 'Missing Deploy Date', 'Gate Overdue'];
   reasonIsRed(reason: string): boolean {
     return InitiativeStatusUpdatePanelComponent.RED_REASONS.some(p => reason.startsWith(p));
   }
