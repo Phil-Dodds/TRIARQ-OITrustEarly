@@ -371,12 +371,12 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
     return this.gateColor(gateId);
   }
 
-  /** Paint-only emphasis — transform + shadow never shift row layout.
-   *  Ring sizes fit inside the track's own padding so ancestor overflow
-   *  never clips the halo into a crescent. */
+  /** Halo diamond stays the SAME SIZE as its siblings (Phil review 2026-07-16
+   *  — scaled diamonds read too large); the ring alone is the marker.
+   *  Paint-only shadow, sized inside the track's padding so ancestor overflow
+   *  never clips it. */
   gateTransform(gateId: string): string {
-    const scale = this.displayMode === 'condensed' ? 1.3 : 1.2;
-    return this.isHaloGate(gateId) ? `rotate(45deg) scale(${scale})` : 'rotate(45deg)';
+    return 'rotate(45deg)';
   }
 
   gateHaloShadow(gateId: string): string {
@@ -384,7 +384,7 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
     const ring = this.haloRingColor(gateId);
     return this.displayMode === 'condensed'
       ? `0 0 0 2px #fff, 0 0 0 4px ${ring}`
-      : `0 0 0 2.5px #fff, 0 0 0 5px ${ring}`;
+      : `0 0 0 2.5px #fff, 0 0 0 5.5px ${ring}`;
   }
 
   /** Haloed diamond paints above its siblings so connectors never slice the ring. */
