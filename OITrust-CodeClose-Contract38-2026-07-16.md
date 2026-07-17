@@ -553,6 +553,24 @@ conflict on Passive/Active Engagement, grid↔panel color agreement.
 5. Panel full track shows the same halo on the same gate as the grid row. Pass/Fail.
 6. Hover a haloed diamond in the grid → tooltip starts "Next gate —" (or "Next gate (awaiting approval) —"). Pass/Fail.
 
+---
+
+# Follow-on 9 — Polish Batch (same session, Phil-directed tweaks)
+
+All Angular-only, each deployed on its own commit:
+- **CC-38-33** — Ring-only halo: scale-up removed, haloed diamond same size as
+  siblings (432ad8b).
+- **CC-38-34** — Initiatives grid: gate track centered + lowered in its cell;
+  stage label centered under the diamonds; all six column header labels
+  centered (0a42259).
+- **CC-38-35** — Egg community feed: completions and finds interleave in one
+  reverse-chronological stream, so "collected all ten eggs" banners sink as new
+  finds arrive; leader strip stays pinned (0c418dd, gh-pages a88b1f9).
+
+**UAT:** grid halo is a ring at normal diamond size; track sits centered in
+its column; header labels centered; egg community card shows newest activity
+first with old trophies sinking.
+
 ## Addendum CLAUDE.md Candidate
 4. **Candidate:** "Fixed viewport-edge chrome (banners, tickers, docks) must
    (a) reserve layout space via a root CSS var bound to actual render state,
