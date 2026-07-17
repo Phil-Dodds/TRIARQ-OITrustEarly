@@ -538,7 +538,10 @@ labels ("Go to Deploy" → "Go to"). Fixed: condensed track gains internal
 padding (offset by negative margin — row footprint unchanged) so the ring
 paints inside the component box; haloed diamonds take z-index 1 so connectors
 never slice the ring; full-mode diamonds gain 7px label clearance; rings
-tightened one notch both modes. Screenshot review also CONFIRMED working:
+tightened one notch both modes. Second review pass (deployed 432ad8b /
+gh-pages b345417): scale-up removed entirely — the haloed diamond is the same
+size as its siblings; the ring alone is the marker. Screenshot review also
+CONFIRMED working:
 two-tone submitted render (green-in-purple on On-Demand Formulary), ⚠ overdue
 conflict on Passive/Active Engagement, grid↔panel color agreement.
 
