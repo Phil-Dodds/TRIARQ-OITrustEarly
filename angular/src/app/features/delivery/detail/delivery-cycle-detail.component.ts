@@ -50,7 +50,7 @@ import { InitiativeStatusUpdatePanelComponent }  from '../status-panel/initiativ
 import { InitiativeStatusHistoryPanelComponent } from '../status-panel/initiative-status-history-panel.component';
 import { LatestInitiativeStatus } from '../../../core/types/initiative-status';
 import { GATE_DATE_SEMANTICS } from '../../../shared/constants/gate-coaching.constants';
-import { buildUnifiedGateStateMap, gateDateConflict, nextGateInOrder, nextGateIsSubmitted } from '../gate-visual.utils';
+import { buildUnifiedGateStateMap, gateDateConflict, nextGateInOrder, nextGateIsSubmitted, nextGateUndated } from '../gate-visual.utils';
 import {
   GateRecordModalComponent,
   GateRecordModalData,
@@ -484,6 +484,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           [gateStateMap]="gateStateMap"
           [nextGateId]="haloNextGateId"
           [nextGateSubmitted]="haloNextGateSubmitted"
+          [nextGateUndated]="haloNextGateUndated"
           [gateSkippedAtMap]="gateSkippedAtMap"
           displayMode="full"
           (gateClicked)="openGatePanel($event)"
@@ -640,10 +641,18 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               </ng-container>
             </div>
 
+            <!-- CC-38-42: banded needs-review block (was pills) — grid grammar. -->
             <div *ngIf="latestStatus!.needs_review_reasons.length"
-                 style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
-              <span *ngFor="let r of latestStatus!.needs_review_reasons"
-                    style="background:var(--triarq-color-error,#E96127);color:#fff;border-radius:999px;padding:2px 10px;font-size:11px;">{{ r }}</span>
+                 style="margin-top:6px;padding:6px 10px;max-width:420px;"
+                 [style.border-left]="reasonBandRed(latestStatus!.needs_review_reasons) ? '3px solid #A32D2D' : '3px solid #BA7517'"
+                 [style.background]="reasonBandRed(latestStatus!.needs_review_reasons) ? 'rgba(211,47,47,0.09)' : 'rgba(242,166,32,0.12)'">
+              <div style="font-size:12px;font-weight:500;"
+                   [style.color]="reasonBandRed(latestStatus!.needs_review_reasons) ? '#791F1F' : '#633806'">
+                Needs review · {{ latestStatus!.needs_review_reasons.length }} reason{{ latestStatus!.needs_review_reasons.length === 1 ? '' : 's' }}
+              </div>
+              <div *ngFor="let r of latestStatus!.needs_review_reasons"
+                   style="font-size:11.5px;margin-top:1px;"
+                   [style.color]="reasonIsRed(r) ? '#791F1F' : '#7A5A2A'">{{ r }}</div>
             </div>
 
             <button *ngIf="statusHasLongText"
@@ -826,6 +835,16 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
         <div style="font-weight:500;margin-bottom:var(--triarq-space-sm);">Gates &amp; Milestone Dates</div>
 
+        <!-- CC-38-39: undated next gate — D-200 Pattern 2 amber band pointing at the fix. -->
+        <div *ngIf="haloNextGateUndated"
+             style="border-left:3px solid var(--triarq-color-sunray,#F2A620);
+                    background:rgba(242,166,32,0.08);padding:8px 12px;
+                    margin-bottom:var(--triarq-space-sm);font-size:12.5px;color:#1A1A1A;">
+          ⚠ <strong style="font-weight:500;">{{ haloNextGateLabel }}</strong> is the next gate but has no
+          target date — overdue tracking and the Next Gates schedule can't see it.
+          Click <em>Set date</em> on that row below to fix it.
+        </div>
+
         <!-- Table header row -->
         <div style="display:grid;grid-template-columns:2fr 1fr 1fr 120px;
                     gap:var(--triarq-space-sm);padding:6px 0;
@@ -988,8 +1007,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 </span>
                 <span *ngIf="!m.target_date"
                       (click)="startMilestoneEdit(m)"
-                      style="font-style:italic;color:#9E9E9E;cursor:pointer;
-                             border-bottom:1px dashed #C0C0C0;"
+                      [style.color]="setDateEmphasis(m) ? '#B87700' : '#9E9E9E'"
+                      [style.font-weight]="setDateEmphasis(m) ? '500' : null"
+                      [style.border-bottom]="setDateEmphasis(m) ? '1px dashed #B87700' : '1px dashed #C0C0C0'"
+                      style="font-style:italic;cursor:pointer;"
                       title="Click to set target date">
                   Set date
                 </span>
@@ -2169,6 +2190,23 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   /** CC-38-32 halo marker inputs. */
   get haloNextGateId(): GateName | null { return nextGateInOrder(this.cycle?.gate_records); }
   get haloNextGateSubmitted(): boolean  { return nextGateIsSubmitted(this.cycle?.gate_records); }
+  get haloNextGateUndated(): boolean    { return nextGateUndated(this.cycle?.gate_records, this.cycle?.milestone_dates); }
+  /** CC-38-42: banded warnings — red reasons dominate; slips/at-risk amber. */
+  private static readonly RED_REASONS = ['Escalation', 'Status overdue', 'No target date', 'No Deploy target date'];
+  reasonIsRed(reason: string): boolean {
+    return DeliveryCycleDetailComponent.RED_REASONS.some(p => reason.startsWith(p));
+  }
+  reasonBandRed(reasons: string[]): boolean { return reasons.some(r => this.reasonIsRed(r)); }
+
+  /** CC-38-39: amber emphasis on the undated NEXT gate's Set date cell. */
+  setDateEmphasis(m: { gate_name: GateName }): boolean {
+    return this.haloNextGateUndated && nextGateInOrder(this.cycle?.gate_records) === m.gate_name;
+  }
+
+  get haloNextGateLabel(): string {
+    const g = nextGateInOrder(this.cycle?.gate_records);
+    return g ? (LIFECYCLE_TRACK.find(n => n.id === g)?.label ?? g) : '';
+  }
 
   /** D-447 tooltip data — ISO timestamp per skipped gate, read from the event
    *  log. Surfaced to StageTrackComponent via [gateSkippedAtMap] so the

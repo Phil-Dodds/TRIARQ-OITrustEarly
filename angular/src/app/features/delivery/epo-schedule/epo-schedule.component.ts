@@ -1,23 +1,23 @@
-// epo-schedule.component.ts — EpoScheduleComponent
-// Route: /initiatives/epo-schedule (D-398, Contract 20 Session 2)
+// epo-schedule.component.ts — Next Gates (formerly EPO Gate Schedule)
+// Route: /initiatives/epo-schedule (D-398, Contract 20 Session 2; renamed
+// Contract 38 follow-on 10, CC-38-40).
 //
-// EPO-organized gate urgency view. Parallel to the workstream Gate Schedule
-// view but pivot dimension is EPO. Top-level: every EPO with at least one
-// overdue or upcoming gate as a row with inline counts + expand chevron.
-// Multiple rows expandable simultaneously (no accordion). Each expansion
-// shows two section groups:
+// Gate urgency view organized by an accountable person. Role switch (EPO |
+// DOL | DCS) regroups the same Initiative set by that role's assignment;
+// choice persists per user via the filter-memory pattern. Each person row
+// expands to three section groups:
 //
-//   1. Overdue                — Initiatives whose next gate target_date is
-//                                in the past, no actual_date.
-//   2. Upcoming (next 7 days) — Initiatives whose next gate target_date is
-//                                within the next 7 days, no actual_date.
+//   1. Overdue                 — next gate target_date in the past, no actual.
+//   2. Upcoming (next 7 days)  — next gate target_date within 7 days.
+//   3. No target date          — next gate has neither target nor actual date
+//                                (CC-38-40: unplannable work made visible).
 //
-// D-200 Pattern 2 banner at top of view persists until overall overdue
-// count = 0. Window is fixed at 7 days per D-DeliveryHub-GateSummary.
+// Unassigned bucket: Initiatives lacking the chosen role group under
+// "Unassigned" — except in the DOL view for Divisions with dol_required =
+// false, where having no DOL is correct, not a gap (Phil 2026-07-16).
+// CANCELLED / COMPLETE / ON_HOLD Initiatives are excluded entirely (S-009).
 //
-// CC-20-05 expansion shipped: the in-place expanded EPO row with two
-// section groups + embedded Initiative grid was the deferred spec
-// behaviour. Row click opens a right-panel detail per D-308 / S-018.
+// D-200 Pattern 2 banner at top persists until overdue count = 0.
 
 import {
   Component,
@@ -68,11 +68,25 @@ const GATE_DISPLAY: Record<GateName, string> = {
   close_review:  'Close Review'
 };
 
-interface EpoGroup {
+/** Terminal/parked stages never appear on a planning screen (S-009). */
+const EXCLUDED_STAGES: LifecycleStage[] = ['CANCELLED', 'COMPLETE', 'ON_HOLD'];
+
+export type NextGatesRole = 'epo' | 'dol' | 'dcs';
+
+const ROLE_FIELDS: Record<NextGatesRole, { id: keyof DeliveryCycle; name: keyof DeliveryCycle; label: string }> = {
+  epo: { id: 'assigned_epo_user_id', name: 'assigned_epo_display_name', label: 'EPO' },
+  dol: { id: 'assigned_dol_user_id', name: 'assigned_dol_display_name', label: 'DOL' },
+  dcs: { id: 'assigned_dcs_user_id', name: 'assigned_dcs_display_name', label: 'DCS' }
+};
+
+const UNASSIGNED_ID = '__unassigned__';
+
+interface PersonGroup {
   user_id:      string;
   display_name: string;
   overdue:      DeliveryCycle[];
   upcoming:     DeliveryCycle[];
+  nodate:       DeliveryCycle[];
 }
 
 @Component({
@@ -91,22 +105,36 @@ interface EpoGroup {
       <div class="esch-header">
         <a routerLink="/initiatives" class="esch-back-link">← Initiative Tracking</a>
         <div class="esch-header-row">
-          <h3 class="esch-title">EPO Gate Schedule</h3>
+          <h3 class="esch-title">Next Gates</h3>
           <button *ngIf="canCreateCycle" class="esch-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
         </div>
         <p class="esch-subtitle">
-          Initiatives with gates due in the next 7 days or already overdue,
-          organized by EPO. Click an EPO row to expand. Click an EPO name to
-          filter the full dashboard to their Initiatives.
+          Initiatives with gates overdue, due in the next 7 days, or missing a
+          target date — grouped by the person accountable. Click a row to
+          expand; click a name to filter the full dashboard to their Initiatives.
         </p>
       </div>
 
+      <!-- CC-38-40: role switch — persists per user like filters. -->
+      <div class="esch-role-switch" role="tablist" aria-label="Group by role">
+        <button *ngFor="let r of roles" type="button" role="tab"
+                class="esch-role-btn"
+                [class.esch-role-active]="role === r"
+                [attr.aria-selected]="role === r"
+                (click)="setRole(r)">
+          {{ roleLabel(r) }}
+        </button>
+      </div>
+
       <!-- D-200 Pattern 2 overdue banner -->
-      <div *ngIf="overdueTotal > 0 && !loading" class="esch-banner-overdue">
+      <div *ngIf="(overdueTotal > 0 || nodateTotal > 0) && !loading" class="esch-banner-overdue">
         <span class="esch-banner-icon">⚠</span>
         <span>
-          <strong>{{ overdueTotal }} Initiative{{ overdueTotal === 1 ? '' : 's' }} overdue.</strong>
-          Approval or rescheduling required.
+          <strong *ngIf="overdueTotal > 0">{{ overdueTotal }} Initiative{{ overdueTotal === 1 ? '' : 's' }} overdue.</strong>
+          <ng-container *ngIf="overdueTotal > 0"> Approval or rescheduling required.</ng-container>
+          <ng-container *ngIf="nodateTotal > 0">
+            <strong> {{ nodateTotal }}</strong> missing a next-gate target date.
+          </ng-container>
         </span>
       </div>
 
@@ -123,18 +151,19 @@ interface EpoGroup {
       </div>
 
       <div *ngIf="loadError && !loading" class="esch-error">
-        <div class="esch-error-primary">EPO Gate Schedule could not load.</div>
+        <div class="esch-error-primary">Next Gates could not load.</div>
         <div class="esch-error-secondary">{{ loadError }}</div>
       </div>
 
       <ng-container *ngIf="!loading && !loadError">
 
-        <div *ngFor="let group of epoGroups; trackBy: trackByUserId">
+        <div *ngFor="let group of personGroups; trackBy: trackByUserId">
 
           <button class="esch-row" type="button" (click)="toggle(group.user_id)">
             <span class="esch-chevron"
                   [style.transform]="isExpanded(group.user_id) ? 'rotate(0)' : 'rotate(-90deg)'">▼</span>
             <span class="esch-epo-name"
+                  [class.esch-name-unassigned]="group.user_id === UNASSIGNED_ID"
                   (click)="$event.stopPropagation(); drillDown(group.user_id)">
               {{ group.display_name }}
             </span>
@@ -143,10 +172,11 @@ interface EpoGroup {
                 Overdue: {{ group.overdue.length }}
               </span>
               · Upcoming: {{ group.upcoming.length }}
+              · <span [class.esch-nodate]="group.nodate.length > 0">No date: {{ group.nodate.length }}</span>
             </span>
           </button>
 
-          <!-- Expanded body — two sections -->
+          <!-- Expanded body — three sections -->
           <div *ngIf="isExpanded(group.user_id)" class="esch-body">
 
             <section class="esch-section">
@@ -195,11 +225,35 @@ interface EpoGroup {
               </ng-template>
             </section>
 
+            <!-- CC-38-40: unplannable work — next gate has no date at all. -->
+            <section class="esch-section">
+              <div class="esch-section-header esch-section-nodate">No target date</div>
+              <div class="esch-grid esch-grid-header">
+                <span>Initiative</span>
+                <span>Stage</span>
+                <span>Next Gate</span>
+                <span>Target Date</span>
+              </div>
+              <ng-container *ngIf="group.nodate.length > 0; else nodateEmpty">
+                <div *ngFor="let c of group.nodate; trackBy: trackByCycleId"
+                     class="esch-grid esch-grid-row"
+                     (click)="openCycle(c.delivery_cycle_id)">
+                  <span class="esch-cycle-title">{{ c.cycle_title }}</span>
+                  <span class="esch-meta">{{ c.current_lifecycle_stage }}</span>
+                  <span>{{ nextGateLabel(c) }}</span>
+                  <span class="esch-nodate">Set date →</span>
+                </div>
+              </ng-container>
+              <ng-template #nodateEmpty>
+                <div class="esch-row-empty">Every next gate has a target date.</div>
+              </ng-template>
+            </section>
+
           </div>
         </div>
 
-        <div *ngIf="epoGroups.length === 0" class="esch-empty">
-          No EPOs with overdue or upcoming gates in scope.
+        <div *ngIf="personGroups.length === 0" class="esch-empty">
+          No {{ roleLabel(role) }}s with overdue, upcoming, or undated gates in scope.
         </div>
 
       </ng-container>
@@ -235,6 +289,10 @@ interface EpoGroup {
     .esch-new-cycle { background: var(--triarq-color-primary, #257099); color: #fff; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; }
     .esch-new-cycle:hover { background: #1d5a7a; }
     .esch-subtitle { margin: 4px 0 12px 0; font-size: 11px; font-style: italic; color: #5A5A5A; max-width: 720px; line-height: 1.6; }
+    .esch-role-switch { display: inline-flex; border: 1px solid var(--triarq-color-primary, #257099); border-radius: 6px; overflow: hidden; margin-bottom: var(--triarq-space-md); }
+    .esch-role-btn { background: #fff; border: none; padding: 6px 18px; font-size: 13px; font-weight: 500; color: var(--triarq-color-primary, #257099); cursor: pointer; }
+    .esch-role-btn + .esch-role-btn { border-left: 1px solid var(--triarq-color-primary, #257099); }
+    .esch-role-active { background: var(--triarq-color-primary, #257099); color: #fff; }
     .esch-banner-overdue { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(245,166,35,0.08); border-left: 3px solid var(--triarq-color-sunray, #f5a623); border-radius: 5px; margin-bottom: var(--triarq-space-md); font-size: var(--triarq-text-small); }
     .esch-banner-icon { color: var(--triarq-color-sunray, #f5a623); font-size: 16px; }
     .esch-toggle { display: flex; align-items: center; gap: 8px; font-size: var(--triarq-text-small); color: var(--triarq-color-text-secondary); margin-bottom: var(--triarq-space-md); cursor: pointer; }
@@ -243,12 +301,16 @@ interface EpoGroup {
     .esch-chevron { font-size: 11px; color: var(--triarq-color-text-secondary); transition: transform 0.15s; flex-shrink: 0; }
     .esch-epo-name { font-weight: 600; color: var(--triarq-color-primary); cursor: pointer; flex: 1; text-align: left; }
     .esch-epo-name:hover { text-decoration: underline; }
+    .esch-name-unassigned { color: #9E9E9E; font-style: italic; cursor: default; }
+    .esch-name-unassigned:hover { text-decoration: none; }
     .esch-counts { font-size: 12px; color: var(--triarq-color-text-secondary); }
     .esch-over { color: #D32F2F; font-weight: 600; }
+    .esch-nodate { color: #B87700; font-weight: 600; }
     .esch-body { padding: 0 12px var(--triarq-space-md) 12px; }
     .esch-section { margin-top: var(--triarq-space-md); }
     .esch-section-header { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 4px; background: rgba(37,112,153,0.06); color: var(--triarq-color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
     .esch-section-overdue { background: rgba(211,47,47,0.08); color: #D32F2F; }
+    .esch-section-nodate { background: rgba(242,166,32,0.12); color: #8A5A00; }
     .esch-grid { display: grid; grid-template-columns: 3fr 1fr 1.4fr 1.4fr; gap: var(--triarq-space-sm); padding: 8px 12px; align-items: center; font-size: var(--triarq-text-small); }
     .esch-grid-header { font-weight: 500; color: var(--triarq-color-text-secondary); border-bottom: 2px solid var(--triarq-color-border); }
     .esch-grid-row { border-bottom: 1px solid var(--triarq-color-border); cursor: pointer; }
@@ -272,7 +334,14 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
   userDivisionIds:     string[] = [];
   canCreateCycle       = false;
 
+  /** CC-38-40: grouping role — persisted per user like filters. */
+  role: NextGatesRole = 'epo';
+  readonly roles: NextGatesRole[] = ['epo', 'dol', 'dcs'];
+  readonly UNASSIGNED_ID = UNASSIGNED_ID;
+
   cycles: DeliveryCycle[] = [];
+  /** division_id → dol_required (default true when unknown). */
+  private dolRequiredByDivision = new Map<string, boolean>();
 
   // Expansion state.
   expanded: Set<string> = new Set();
@@ -313,10 +382,15 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
         if (saved?.filter_state && typeof saved.filter_state['showMyDivisionsOnly'] === 'boolean') {
           this.showMyDivisionsOnly = saved.filter_state['showMyDivisionsOnly'] as boolean;
         }
+        const savedRole = saved?.filter_state?.['role'];
+        if (savedRole === 'epo' || savedRole === 'dol' || savedRole === 'dcs') {
+          this.role = savedRole;
+        }
 
         if (!this.isPrivileged) {
           await this.loadUserDivisions(userId);
         }
+        this.loadDivisionRequirements();
         this.loadCycles();
       })
     );
@@ -336,6 +410,21 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
     } catch {
       this.userDivisionIds = [];
     }
+  }
+
+  /** DOL-view Unassigned exemption: divisions with dol_required = false. */
+  private loadDivisionRequirements(): void {
+    this.mcp.call<Division[]>('division', 'list_divisions', {}).subscribe({
+      next: res => {
+        if (res.success && res.data) {
+          this.dolRequiredByDivision = new Map(
+            res.data.map(d => [d.id, d.dol_required !== false])
+          );
+          this.cdr.markForCheck();
+        }
+      },
+      error: () => { /* map stays empty — default requires DOL */ }
+    });
   }
 
   private loadCycles(): void {
@@ -368,12 +457,26 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
   }
 
   onToggleChange(): void {
+    this.persistState();
+    this.loadCycles();
+  }
+
+  setRole(r: NextGatesRole): void {
+    if (this.role === r) { return; }
+    this.role = r;
+    this.expanded.clear();
+    this.persistState();
+    this.cdr.markForCheck();
+  }
+
+  roleLabel(r: NextGatesRole): string { return ROLE_FIELDS[r].label; }
+
+  private persistState(): void {
     this.screenState.save(
       SCREEN_KEYS.INITIATIVES_EPO_SCHEDULE,
-      { showMyDivisionsOnly: this.showMyDivisionsOnly },
+      { showMyDivisionsOnly: this.showMyDivisionsOnly, role: this.role },
       {}
     );
-    this.loadCycles();
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -399,44 +502,69 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
 
   // ── Grouping ──────────────────────────────────────────────────────────────
 
-  get epoGroups(): EpoGroup[] {
+  get personGroups(): PersonGroup[] {
     const today   = new Date().toISOString().slice(0, 10);
     const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const fields  = ROLE_FIELDS[this.role];
 
-    const byEpo = new Map<string, EpoGroup>();
+    const byPerson = new Map<string, PersonGroup>();
 
     for (const c of this.cycles) {
-      if (!c.assigned_epo_user_id) continue;
-      const m = this.nextMilestone(c);
-      if (!m?.target_date || m.actual_date) continue;
+      if (EXCLUDED_STAGES.includes(c.current_lifecycle_stage)) continue;
+      const g = this.nextGate(c);
+      if (!g) continue;
 
-      let bucket: 'overdue' | 'upcoming' | null = null;
-      if (m.target_date < today) bucket = 'overdue';
-      else if (m.target_date <= in7Days) bucket = 'upcoming';
+      const m = this.nextMilestone(c);
+      let bucket: 'overdue' | 'upcoming' | 'nodate' | null = null;
+      if (!m?.target_date && !m?.actual_date) {
+        bucket = 'nodate';
+      } else if (m?.target_date && !m.actual_date) {
+        if (m.target_date < today) bucket = 'overdue';
+        else if (m.target_date <= in7Days) bucket = 'upcoming';
+      }
       if (!bucket) continue;
 
-      let group = byEpo.get(c.assigned_epo_user_id);
+      let personId   = (c[fields.id]   as string | null) ?? null;
+      let personName = (c[fields.name] as string | null) ?? null;
+      if (!personId) {
+        // DOL exemption: no DOL in a Division that doesn't require one is
+        // correct — the initiative simply doesn't appear in the DOL view.
+        if (this.role === 'dol' &&
+            this.dolRequiredByDivision.get(c.division_id) === false) { continue; }
+        personId   = UNASSIGNED_ID;
+        personName = 'Unassigned';
+      }
+
+      let group = byPerson.get(personId);
       if (!group) {
         group = {
-          user_id:      c.assigned_epo_user_id,
-          display_name: c.assigned_epo_display_name ?? 'EPO',
+          user_id:      personId,
+          display_name: personName ?? fields.label,
           overdue:      [],
-          upcoming:     []
+          upcoming:     [],
+          nodate:       []
         };
-        byEpo.set(c.assigned_epo_user_id, group);
+        byPerson.set(personId, group);
       }
       group[bucket].push(c);
     }
 
-    return Array.from(byEpo.values()).sort((a, b) =>
-      (b.overdue.length + b.upcoming.length) -
-      (a.overdue.length + a.upcoming.length) ||
-      a.display_name.localeCompare(b.display_name)
-    );
+    return Array.from(byPerson.values()).sort((a, b) => {
+      // Unassigned sinks to the bottom.
+      if (a.user_id === UNASSIGNED_ID) return 1;
+      if (b.user_id === UNASSIGNED_ID) return -1;
+      return (b.overdue.length + b.upcoming.length + b.nodate.length) -
+             (a.overdue.length + a.upcoming.length + a.nodate.length) ||
+             a.display_name.localeCompare(b.display_name);
+    });
   }
 
   get overdueTotal(): number {
-    return this.epoGroups.reduce((sum, g) => sum + g.overdue.length, 0);
+    return this.personGroups.reduce((sum, g) => sum + g.overdue.length, 0);
+  }
+
+  get nodateTotal(): number {
+    return this.personGroups.reduce((sum, g) => sum + g.nodate.length, 0);
   }
 
   // ── Expansion ─────────────────────────────────────────────────────────────
@@ -465,7 +593,7 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
   closePanel(): void {
     this.selectedCycleId = null;
     this.showEditScrim   = false;
-    // S-008 Parent Refresh on Return — re-query so EPO row totals + sections
+    // S-008 Parent Refresh on Return — re-query so row totals + sections
     // reflect milestone-date / stage edits made inside the detail panel.
     this.loadCycles();
     this.cdr.markForCheck();
@@ -487,14 +615,15 @@ export class EpoScheduleComponent implements OnInit, OnDestroy {
     this.cdr.markForCheck();
   }
 
-  drillDown(epoUserId: string): void {
-    this.router.navigate(['/initiatives/list'], { queryParams: { epo: epoUserId } });
+  drillDown(personUserId: string): void {
+    if (personUserId === UNASSIGNED_ID) { return; }
+    this.router.navigate(['/initiatives/list'], { queryParams: { [this.role]: personUserId } });
   }
 
   onNewCycle(): void {
     this.router.navigate(['/initiatives/list'], { queryParams: { new: 'true' } });
   }
 
-  trackByUserId(_: number, g: EpoGroup): string { return g.user_id; }
+  trackByUserId(_: number, g: PersonGroup): string { return g.user_id; }
   trackByCycleId(_: number, c: DeliveryCycle): string { return c.delivery_cycle_id; }
 }

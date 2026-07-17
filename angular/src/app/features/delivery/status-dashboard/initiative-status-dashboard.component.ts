@@ -176,7 +176,16 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
               </td>
               <td>
                 <span *ngIf="r.needs_review_reasons.length === 0">—</span>
-                <span *ngFor="let reason of r.needs_review_reasons" class="isd-reason">{{ reason }}</span>
+                <!-- CC-38-42: banded block — same grammar as the grid headline. -->
+                <div *ngIf="r.needs_review_reasons.length > 0"
+                     class="isd-reason-band"
+                     [class.isd-band-red]="reasonBandRed(r.needs_review_reasons)"
+                     [class.isd-band-amber]="!reasonBandRed(r.needs_review_reasons)">
+                  <div class="isd-reason-title">Needs review · {{ r.needs_review_reasons.length }} reason{{ r.needs_review_reasons.length === 1 ? '' : 's' }}</div>
+                  <div *ngFor="let reason of r.needs_review_reasons"
+                       class="isd-reason-line"
+                       [style.color]="reasonIsRed(reason) ? '#791F1F' : '#7A5A2A'">{{ reason }}</div>
+                </div>
               </td>
               <td><button class="oi-btn-secondary isd-sm" (click)="openStatus(r.initiative_id, r.cycle_title)">View Status</button></td>
             </tr>
@@ -281,7 +290,13 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
     .isd-link { color:var(--triarq-color-primary,#257099); cursor:pointer; }
     .isd-esc { background:var(--triarq-color-error,#E96127); color:#fff; border-radius:999px; padding:1px 8px; font-size:11px; }
     .isd-dot { display:inline-block; width:10px; height:10px; border-radius:50%; vertical-align:middle; }
-    .isd-reason { display:inline-block; background:var(--triarq-color-error,#E96127); color:#fff; border-radius:999px; padding:1px 8px; font-size:11px; margin:0 4px 4px 0; }
+    .isd-reason-band { padding:6px 10px; max-width:340px; }
+    .isd-band-red   { border-left:3px solid #A32D2D; background:rgba(211,47,47,0.09); }
+    .isd-band-amber { border-left:3px solid #BA7517; background:rgba(242,166,32,0.12); }
+    .isd-reason-band .isd-reason-title { font-size:12px; font-weight:500; }
+    .isd-band-red .isd-reason-title    { color:#791F1F; }
+    .isd-band-amber .isd-reason-title  { color:#633806; }
+    .isd-reason-line { font-size:11.5px; margin-top:1px; }
     .isd-empty { padding:16px; color:#5A5A5A; font-style:italic; }
     .isd-foot { padding:8px; font-size:12px; color:var(--triarq-color-text-secondary); }
     .isd-check { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; }
@@ -646,5 +661,16 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
     if (!y || !m || !d) { return iso; }
     const base = `${MONTHS[m - 1]} ${d}`;
     return y === new Date().getFullYear() ? base : `${base}, ${y}`;
+  }
+
+  /** CC-38-42: red reasons dominate the band; slips/at-risk are amber. */
+  private static readonly RED_REASON_PREFIXES = ['Escalation', 'Status overdue', 'No target date', 'No Deploy target date'];
+
+  reasonIsRed(reason: string): boolean {
+    return InitiativeStatusDashboardComponent.RED_REASON_PREFIXES.some(p => reason.startsWith(p));
+  }
+
+  reasonBandRed(reasons: string[]): boolean {
+    return reasons.some(r => this.reasonIsRed(r));
   }
 }

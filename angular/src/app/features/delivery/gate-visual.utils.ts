@@ -77,6 +77,19 @@ export function nextGateInOrder(gateRecords: GateRecordLite[] | undefined): Gate
   return null;
 }
 
+/** True when the walkback next gate has neither a target nor an actual date —
+ *  drives the dashed-red halo (CC-38-36: an undated working gate is a problem,
+ *  and the dash+red beats every other ring treatment, including purple). */
+export function nextGateUndated(
+  gateRecords: GateRecordLite[] | undefined,
+  milestones: MilestoneLite[] | undefined
+): boolean {
+  const next = nextGateInOrder(gateRecords);
+  if (!next) { return false; }
+  const ms = (milestones ?? []).find(m => m.gate_name === next);
+  return !ms?.target_date && !ms?.actual_date;
+}
+
 /** True when the walkback next gate is sitting with an approver — drives the
  *  purple halo (CC-38-32). */
 export function nextGateIsSubmitted(gateRecords: GateRecordLite[] | undefined): boolean {

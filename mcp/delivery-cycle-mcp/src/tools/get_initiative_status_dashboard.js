@@ -100,7 +100,7 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
   // milestone_label + target_date added for the shared Next Gate resolution.
   const { data: allMilestones } = await supabase
     .from('cycle_milestone_dates')
-    .select('delivery_cycle_id, gate_name, date_status, milestone_label, target_date')
+    .select('delivery_cycle_id, gate_name, date_status, milestone_label, target_date, actual_date')
     .in('delivery_cycle_id', cycles.map(c => c.delivery_cycle_id))
     .is('deleted_at', null);
   const milestonesByCycle = {};

@@ -71,7 +71,7 @@ import {
   computeHeadline, HeadlineResult, HeadlineBand, headlineBandStyle, formatHeadlineDate,
   GATE_DISPLAY_NAMES, nextUnapprovedGate
 } from './cycle-headline.utils';
-import { buildUnifiedGateStateMap, nextGateInOrder, nextGateIsSubmitted } from '../gate-visual.utils';
+import { buildUnifiedGateStateMap, nextGateInOrder, nextGateIsSubmitted, nextGateUndated } from '../gate-visual.utils';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -213,6 +213,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
         <!-- Right: Filters + New Cycle — flex-shrink:0, never wraps. Source: D-298. -->
         <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-end;">
+          <!-- CC-38-41 / S-009: cancelled reveal — off on every load, never persisted. -->
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;
+                        color:#5A5A5A;cursor:pointer;padding-bottom:9px;white-space:nowrap;">
+            <input type="checkbox" [(ngModel)]="includeCancelled" (ngModelChange)="applyFilters(false)" />
+            Include cancelled
+          </label>
           <!-- Filters button: badge overlapping corner per D-298 -->
           <button (click)="toggleFilterPanel()"
                   style="position:relative;background:#257099;color:#fff;
@@ -729,6 +735,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               [gateStateMap]="gateStateMapsCache.get(cycle.delivery_cycle_id) ?? EMPTY_GATE_STATE_MAP"
               [nextGateId]="nextGateIdFor(cycle)"
               [nextGateSubmitted]="nextGateSubmittedFor(cycle)"
+              [nextGateUndated]="nextGateUndatedFor(cycle)"
               [displayMode]="'condensed'">
             </app-stage-track>
           </div>
@@ -1065,6 +1072,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // Not private — Angular template compilation requires non-private for template binding access.
   gateStateMapsCache = new Map<string, GateStateMap>();
 
+  /** CC-38-41 / S-009: cancelled reveal — session-local, never persisted. */
+  includeCancelled = false;
+
   // D-253 memoization: person list and workstream list caches — stable array references for template *ngFor.
   // Getters that return new objects on every call cause OnPush CD to loop → page freeze.
   // All four caches rebuilt in rebuildFilterCaches(), called at end of applyFilters() and after data loads.
@@ -1094,6 +1104,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (qp['division_id'])   { this.filterDivision   = qp['division_id']   as string; this.drillDownFromQp = true; }
     // Contract 20 Session 2: drill-down from EPO Summary view sets the EPO filter.
     if (qp['epo'])           { this.filterEpo        = qp['epo']           as string; this.drillDownFromQp = true; }
+    // CC-38-40: Next Gates role views drill down by DOL / DCS too.
+    if (qp['dol'])           { this.filterDol        = qp['dol']           as string; this.drillDownFromQp = true; }
+    if (qp['dcs'])           { this.filterDcs        = qp['dcs']           as string; this.drillDownFromQp = true; }
     // Contract 22 (D-423): drill-down from Home → My Initiatives "View all" footer.
     //   Filters the dashboard to Initiatives where the caller is DCS, EPO, or DOL
     //   (assigned_to_current_user MCP scope). Maps to the same `Me` terminal option
@@ -1611,7 +1624,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.screenState.save(
       SCREEN_KEYS.DELIVERY_CYCLES,
       {
-        filterStage:           this.filterStage,
+        filterStage:           this.filterStage === 'CANCELLED' ? '' : this.filterStage,   // S-009
         filterTier:            this.filterTier,
         filterWorkstream:      this.filterWorkstream,
         filterDivision:        this.filterDivision,
@@ -1682,6 +1695,10 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // persist=false used by count card shortcuts — set filter without writing to memory. Source: D-HubCounts-2026-04-06.
   applyFilters(persist: boolean = true): void {
     let result = this.cycles.filter(c => {
+      // CC-38-41 / S-009: cancelled excluded by default; revealed by the toggle
+      // or an explicit stage filter of CANCELLED. Reveal never persists.
+      if (c.current_lifecycle_stage === 'CANCELLED' &&
+          !this.includeCancelled && this.filterStage !== 'CANCELLED') { return false; }
       if (this.filterStage && c.current_lifecycle_stage !== this.filterStage) { return false; }
       if (this.filterTier  && c.tier_classification    !== this.filterTier)  { return false; }
 
@@ -2220,6 +2237,10 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   nextGateSubmittedFor(cycle: DeliveryCycle): boolean {
     return nextGateIsSubmitted(cycle.gate_records);
+  }
+
+  nextGateUndatedFor(cycle: DeliveryCycle): boolean {
+    return nextGateUndated(cycle.gate_records, cycle.milestone_dates);
   }
 
   /** CC-38-28: delegates to the shared resolver — grid diamonds now show the

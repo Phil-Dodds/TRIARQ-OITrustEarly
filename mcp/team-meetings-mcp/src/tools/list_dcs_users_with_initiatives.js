@@ -71,7 +71,7 @@ async function list_dcs_users_with_initiatives(params, caller_user_id) {
     .from('delivery_cycles')
     .select(`delivery_cycle_id, cycle_title, current_lifecycle_stage, ${personType.column}, division_id`)
     .in(personType.column, userIds)
-    .neq('current_lifecycle_stage', 'closed')
+    .not('current_lifecycle_stage', 'in', '("COMPLETE","CANCELLED")')
     .is('deleted_at', null)
     .order('cycle_title', { ascending: true });
 

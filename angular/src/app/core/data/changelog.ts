@@ -32,6 +32,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-17',
+    builtAt:       '02:30 UTC',
+    contractLabel: 'Contract 38 follow-on — dates, Next Gates, and cleaner warnings',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'Next Gates (was EPO Gate Schedule)',
+        description: 'Renamed, and now switchable between EPO, DOL, and DCS views (your choice is remembered). A new "No target date" section and subtotal surfaces unplannable work, and an Unassigned group catches initiatives without an owner — except DOL in divisions that don\'t require one.'
+      },
+      {
+        audience:    'All',
+        surface:     'Gate tracks + Initiative panel',
+        description: 'A next gate with no target date now wears a dashed red halo, and the panel shows an amber pointer to the exact Set date cell. Review warnings everywhere trade the red pills for the same clean banded style as the grid headline, and appear live while you\'re writing a status update.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiatives grid',
+        description: 'Cancelled initiatives are hidden by default — reveal them with the new "Include cancelled" checkbox (resets each visit). Team meeting reference panels stop showing completed and cancelled initiatives too.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-16',
     builtAt:       '19:50 UTC',
     contractLabel: 'Contract 38 follow-on — halo marks the working gate',

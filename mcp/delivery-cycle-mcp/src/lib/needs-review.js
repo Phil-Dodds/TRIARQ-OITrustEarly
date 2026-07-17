@@ -148,6 +148,25 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
     reasons.push(`No target date: ${nextGate.label}`);
   }
 
+  // 6) No Deploy target date mid-flight (Phil 2026-07-16, CC-38-37): Brief
+  // Review passed, Go to Deploy not yet resolved, and the Deploy milestone has
+  // neither a target nor an actual date — the initiative is in motion with no
+  // deploy commitment. Distinct from (5), which only watches the NEXT gate.
+  const { data: gateRows } = await supabase
+    .from('gate_records')
+    .select('gate_name, gate_status')
+    .eq('delivery_cycle_id', cycle.delivery_cycle_id)
+    .is('deleted_at', null);
+  const gs = {};
+  for (const g of (gateRows || [])) { gs[g.gate_name] = g.gate_status; }
+  const briefPassed  = gs.brief_review === 'approved' || gs.brief_review === 'skipped';
+  const deployOpen   = gs.go_to_deploy !== 'approved' && gs.go_to_deploy !== 'skipped';
+  const deployMs     = (milestones || []).find(m => m.gate_name === 'go_to_deploy');
+  const deployUndated = !deployMs?.target_date && !deployMs?.actual_date;
+  if (briefPassed && deployOpen && deployUndated) {
+    reasons.push('No Deploy target date');
+  }
+
   return reasons;
 }
 

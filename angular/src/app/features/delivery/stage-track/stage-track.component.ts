@@ -136,6 +136,8 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
               [style.border]="gateBorder(node.id)"
               [style.transform]="gateTransform(node.id)"
               [style.box-shadow]="gateHaloShadow(node.id)"
+              [style.outline]="gateHaloOutline(node.id)"
+              [style.outline-offset]="gateHaloOutlineOffset(node.id)"
               [style.position]="gateZIndex(node.id) ? 'relative' : null"
               [style.z-index]="gateZIndex(node.id)"
               [attr.title]="gateTitle(node.id)"
@@ -170,6 +172,8 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
             [style.border]="gateBorder(gate.id)"
             [style.transform]="gateTransform(gate.id)"
             [style.box-shadow]="gateHaloShadow(gate.id)"
+            [style.outline]="gateHaloOutline(gate.id)"
+            [style.outline-offset]="gateHaloOutlineOffset(gate.id)"
             [style.position]="gateZIndex(gate.id) ? 'relative' : null"
             [style.z-index]="gateZIndex(gate.id)"
             [attr.title]="condensedGateTooltip(gate.id, gate.label)"
@@ -201,6 +205,9 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
    *  (all gates resolved — done goes quiet). */
   @Input() nextGateId: GateName | null = null;
   @Input() nextGateSubmitted = false;
+  /** CC-38-36: undated next gate → dashed RED ring (beats every other ring
+   *  color, including submission purple). Fill still shows user status. */
+  @Input() nextGateUndated = false;
 
   @Output() gateClicked = new EventEmitter<GateName>();
   /** D-360 Surface 3: emitted when the user clicks the next free stage circle.
@@ -382,10 +389,25 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
 
   gateHaloShadow(gateId: string): string {
     if (!this.isHaloGate(gateId)) { return 'none'; }
+    // Undated: white gap only — the dashed red ring renders via outline.
+    if (this.nextGateUndated) {
+      return this.displayMode === 'condensed' ? '0 0 0 2px #fff' : '0 0 0 2.5px #fff';
+    }
     const ring = this.haloRingColor(gateId);
     return this.displayMode === 'condensed'
       ? `0 0 0 2px #fff, 0 0 0 4px ${ring}`
       : `0 0 0 2.5px #fff, 0 0 0 5.5px ${ring}`;
+  }
+
+  /** Dashed red outline for the undated next gate — box-shadow can't dash. */
+  gateHaloOutline(gateId: string): string {
+    return this.isHaloGate(gateId) && this.nextGateUndated ? '2px dashed #D32F2F' : 'none';
+  }
+
+  gateHaloOutlineOffset(gateId: string): string | null {
+    return this.isHaloGate(gateId) && this.nextGateUndated
+      ? (this.displayMode === 'condensed' ? '2px' : '2.5px')
+      : null;
   }
 
   /** Haloed diamond paints above its siblings so connectors never slice the ring. */
@@ -398,9 +420,13 @@ export class StageTrackComponent implements AfterViewInit, OnChanges {
     const state = this.gateDisplayState(gateId);
     if (state === 'skipped') { return null; }
     const stateLabel = String(state).replace(/_/g, ' ');
-    const prefix = this.isHaloGate(gateId)
-      ? (this.nextGateSubmitted ? 'Next gate (awaiting approval) — ' : 'Next gate — ')
-      : '';
+    let prefix = '';
+    if (this.isHaloGate(gateId)) {
+      const notes: string[] = [];
+      if (this.nextGateSubmitted) { notes.push('awaiting approval'); }
+      if (this.nextGateUndated)   { notes.push('no target date set'); }
+      prefix = notes.length ? `Next gate (${notes.join(', ')}) — ` : 'Next gate — ';
+    }
     return `${prefix}${label}: ${stateLabel}`;
   }
 

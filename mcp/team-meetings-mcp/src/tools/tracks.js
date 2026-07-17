@@ -1387,7 +1387,7 @@ async function list_track_initiative_reference(params, caller_user_id) {
       .from('delivery_cycles')
       .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, assigned_dcs_user_id, assigned_dol_user_id, assigned_epo_user_id, division_id')
       .or(REF_ALL_COLUMNS.map(c => `${c}.in.(${idList})`).join(','))
-      .neq('current_lifecycle_stage', 'closed')
+      .not('current_lifecycle_stage', 'in', '("COMPLETE","CANCELLED")')
       .is('deleted_at', null)
       .order('cycle_title', { ascending: true });
     if (accessible_division_ids !== null) q = q.in('division_id', accessible_division_ids);
@@ -1403,7 +1403,7 @@ async function list_track_initiative_reference(params, caller_user_id) {
       .from('delivery_cycles')
       .select(`delivery_cycle_id, cycle_title, current_lifecycle_stage, ${personType.column}, division_id`)
       .in(personType.column, otherIds)
-      .neq('current_lifecycle_stage', 'closed')
+      .not('current_lifecycle_stage', 'in', '("COMPLETE","CANCELLED")')
       .is('deleted_at', null)
       .order('cycle_title', { ascending: true });
     if (accessible_division_ids !== null) q = q.in('division_id', accessible_division_ids);

@@ -98,12 +98,12 @@ const HUB_CARDS: HubCard[] = [
   },
   {
     id:          'epo-schedule',
-    title:       'EPO Gate Schedule',
+    title:       'Next Gates',
     route:       '/initiatives/epo-schedule',
     icon:        '◑',
-    description: 'Overdue and upcoming gates organized by EPO. Use this to balance ' +
-                 'approval workload across owners and identify which EPO needs ' +
-                 'attention this week.'
+    description: 'Gates overdue, due soon, or missing a target date — grouped by ' +
+                 'EPO, DOL, or DCS. Use this to balance approval workload and spot ' +
+                 'unplannable work.'
   },
   {
     id:          'epo-deploy',

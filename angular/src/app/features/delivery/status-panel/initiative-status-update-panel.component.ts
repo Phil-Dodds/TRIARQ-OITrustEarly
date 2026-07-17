@@ -78,6 +78,16 @@ const CADENCE_PHRASE: Record<string, string> = {
 
         <!-- ============ EDIT MODE ============ -->
         <form *ngIf="activeMode === 'edit'" [formGroup]="form">
+          <!-- CC-38-43: live review warnings while entering — what the review
+               meeting will see right now, addressable before saving. -->
+          <div *ngIf="latest?.needs_review_reasons?.length"
+               class="isp-band"
+               [class.isp-band-red]="reasonBandRed(latest!.needs_review_reasons)"
+               [class.isp-band-amber]="!reasonBandRed(latest!.needs_review_reasons)">
+            <div class="isp-band-title">This Initiative currently needs review</div>
+            <div *ngFor="let r of latest!.needs_review_reasons" class="isp-band-line"
+                 [style.color]="reasonIsRed(r) ? '#791F1F' : '#7A5A2A'">{{ r }}</div>
+          </div>
           <div *ngIf="editingUpdateId" class="isp-edit-note">
             Editing the latest update — the original save time still governs due dates.
           </div>
@@ -197,11 +207,14 @@ const CADENCE_PHRASE: Record<string, string> = {
                 </div>
               </div>
 
-              <!-- Needs Review pills -->
+              <!-- Needs Review — banded block (CC-38-42, matches grid grammar). -->
               <div class="oi-zone" *ngIf="latest!.needs_review_reasons.length">
                 <div class="oi-zone-title">Needs Review</div>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;">
-                  <span class="isp-pill" *ngFor="let r of latest!.needs_review_reasons">{{ r }}</span>
+                <div class="isp-band"
+                     [class.isp-band-red]="reasonBandRed(latest!.needs_review_reasons)"
+                     [class.isp-band-amber]="!reasonBandRed(latest!.needs_review_reasons)">
+                  <div *ngFor="let r of latest!.needs_review_reasons" class="isp-band-line"
+                       [style.color]="reasonIsRed(r) ? '#791F1F' : '#7A5A2A'">{{ r }}</div>
                 </div>
               </div>
 
@@ -251,6 +264,13 @@ const CADENCE_PHRASE: Record<string, string> = {
       background:var(--triarq-color-error, #E96127); color:#fff;
       border-radius:var(--radius-pill, 999px); padding:2px 10px; font-size:11px;
     }
+    .isp-band { padding:6px 10px; margin-bottom:10px; }
+    .isp-band-red   { border-left:3px solid #A32D2D; background:rgba(211,47,47,0.09); }
+    .isp-band-amber { border-left:3px solid #BA7517; background:rgba(242,166,32,0.12); }
+    .isp-band-title { font-size:12px; font-weight:500; }
+    .isp-band-red .isp-band-title   { color:#791F1F; }
+    .isp-band-amber .isp-band-title { color:#633806; }
+    .isp-band-line { font-size:11.5px; margin-top:1px; }
     .isp-link { color:var(--triarq-color-primary, #257099); cursor:pointer; font-size:13px; }
   `]
 })
@@ -542,4 +562,11 @@ export class InitiativeStatusUpdatePanelComponent implements OnInit, OnChanges {
       month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
     });
   }
+
+  /** CC-38-42/43: banded warnings — red reasons dominate; slips/at-risk amber. */
+  private static readonly RED_REASONS = ['Escalation', 'Status overdue', 'No target date', 'No Deploy target date'];
+  reasonIsRed(reason: string): boolean {
+    return InitiativeStatusUpdatePanelComponent.RED_REASONS.some(p => reason.startsWith(p));
+  }
+  reasonBandRed(reasons: string[]): boolean { return reasons.some(r => this.reasonIsRed(r)); }
 }
