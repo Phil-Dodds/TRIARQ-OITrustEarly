@@ -638,7 +638,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   gap:8px;padding:8px 16px;
                   font-size:13px;font-weight:500;color:#fff;text-transform:uppercase;
                   background:#12274A;border-radius:6px 6px 0 0;letter-spacing:0.3px;
-                  position:sticky;top:0;z-index:3;margin-top:10px;">
+                  position:sticky;top:0;z-index:3;margin-top:10px;text-align:center;">
         <span>Division</span>
         <span class="oi-sort-th"
               [class.oi-sort-active]="sortField === 'cycle_title'"
@@ -722,7 +722,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                solid badge — that CC-decision is superseded by Section H Contract 23.
                gateStateMapsCache (CC-Decision-2026-04-11-A freeze fix) provides stable
                object references so OnPush does not re-render every CD cycle. -->
-          <div style="overflow:hidden;min-width:140px;">
+          <!-- Centered + lowered in the cell (Phil 2026-07-16). -->
+          <div style="overflow:hidden;min-width:140px;display:flex;justify-content:center;padding-top:10px;">
             <app-stage-track
               [currentStageId]="cycle.current_lifecycle_stage"
               [gateStateMap]="gateStateMapsCache.get(cycle.delivery_cycle_id) ?? EMPTY_GATE_STATE_MAP"

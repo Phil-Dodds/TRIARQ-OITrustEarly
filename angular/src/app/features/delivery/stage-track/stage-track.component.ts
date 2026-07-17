@@ -154,12 +154,13 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
          per S-015: 11px italic Stone (#5A5A5A). Diamonds are non-interactive in condensed
          mode — gate interaction is detail-panel only. Supersedes ARCH-25 spec 5.1
          "adjacent text" placement (locked by D-267 + Section H Item 2.1). -->
+    <!-- Centered: diamonds and the stage label align to the track's midline. -->
     <div *ngIf="displayMode === 'condensed'"
-         style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;">
+         style="display:flex;flex-direction:column;align-items:center;gap:4px;">
 
       <!-- 5 gate diamonds, no labels on diamonds, non-interactive.
            7px padding = paint room for the halo ring (clip fix, follow-on 8). -->
-      <div style="display:flex;align-items:center;gap:3px;padding:7px 7px 5px 7px;margin:-4px 0 -3px -7px;">
+      <div style="display:flex;align-items:center;gap:3px;padding:7px 7px 5px 7px;margin-bottom:-3px;">
         <ng-container *ngFor="let gate of gateNodes; let i = index">
           <div *ngIf="i > 0"
                [style.background]="condensedConnectorBg(gate.id, i)"
