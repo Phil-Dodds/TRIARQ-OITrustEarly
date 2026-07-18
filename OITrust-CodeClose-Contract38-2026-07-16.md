@@ -689,3 +689,145 @@ dashboard by the chosen role.
    `bannerVisible$` from CC-38-12/13."
    **Why:** second bottom-chrome element would repeat the same blocking bug.
    **Trigger:** Phil's report that banner covered key controls.
+
+
+---
+
+# Follow-on 13 — Gate submission triggers, checklist rework, AI Production Governance (2026-07-17)
+
+Commits: `d1c813a` (build), `7d100bd` (migration 076 v2). gh-pages `374dd3e`.
+Migrations 074/075/076 executed by Phil 2026-07-17 (076 required a v2 — see CC-38-54).
+
+## CC-decisions
+
+- **CC-38-46** — Gate approval dialog entry points reduced to three: big
+  diamond on the Stage Track, Submit button at the top, diamond + gate name in
+  the Gates & Milestone Dates table (col 1). Full-row click handler REMOVED —
+  accidental clicks anywhere on a gate row were opening approval dialogs.
+  Date/status editors keep their existing stopPropagation wrappers.
+- **CC-38-47** — Gate checklist reworked to advisory ambers ONLY. Brief
+  Review: Scenario document / Outcome Statement / Tier. Go to Build and Close
+  Review: empty. Go to Deploy / Go to Release: AI-profile-conditional artifact
+  ambers (AI Production Governance Report; AI Delivery Requirements Record for
+  Track 2 external analytics). Technical Specification and MCP-scope items
+  removed. **Design deferral: MCP-scope declaration policy** — removed from
+  checklist pending a Design decision on where MCP scope is governed.
+- **CC-38-48** — Mandatory items are hard stops enforced TWICE: gate modal
+  (red D-140 block, Submit disabled) AND server-side ladder in
+  submit_gate_for_approval (Context Brief attached, Jira-unless-Division-
+  exempt, EPO, DCS/DOL per D-389/D-391/D-424, AI ladder). **Design deferral:
+  org-wide audit of the double-enforcement approach across all tools** (Phil:
+  one day MCP requests will skip the UI; rules must hold at the server).
+- **CC-38-49** — AI Governance model: three orthogonal fields on
+  delivery_cycles (migration 075): ai_functionality (NULL/yes/no/unknown),
+  ai_delivery_form (product_embedded/analytics_outputs), ai_audience
+  (external/internal), plus ai_board_approved(+at/by audit stamps).
+  Progression ladder: blank OK through Brief Review; answered by Go to Build;
+  yes/no (with follow-ups when yes) by Go to Deploy. AI Production Board
+  stops: embedded+external → before Go to Deploy (pilot); internal (either
+  form) → before Go to Release; analytics+external (Track 2) → no Board stop,
+  advisory AI Delivery Requirements Record instead.
+- **CC-38-50** — AI Production Board half-diamond marker (right-pointing
+  triangle at the left flank of the Board gate diamond, full-mode track only):
+  amber = approval required, not yet received (from the moment the profile
+  determines it); blue = received. No grey state; no generalization to gate
+  requirements (Phil 2026-07-17 — marker is AI Prod Board only; requirements
+  surface at submission). NAMING RULE: never bare "board" in user-visible
+  text — always "AI Production Board" or "AI Prod Board".
+- **CC-38-51** — divisions.jira_epic_required (migration 074, default true).
+  Admin → Divisions edit gains "Require Jira epic on Initiatives" toggle;
+  Go to Build Jira hard stop skipped when false. Mirrors dol_required (D-424).
+- **CC-38-52** — (Rule 30 autonomous) AI Governance fields NOT added to the
+  create panel. Blank is compliant through Brief Review; the edit panel is the
+  canonical entry. Keeps create lightweight; create tool untouched.
+- **CC-38-53** — Tooltip unification on StageTrack: full-mode tooltips gain
+  the halo vocabulary (Next gate / awaiting approval / no target date) via a
+  shared prefix; user D-205 status fills now described ("on track (status set
+  by team)" etc. — previously fell to "not yet reached"); condensed
+  skipped/returned tooltips added (previously silent); AI Prod Board marker
+  tooltip covers both color states.
+- **CC-38-54** — Migration 076 v2: original failed (42703) because
+  cycle_artifact_types.lifecycle_stage was dropped by migration 041; column
+  list was verified against the 021 seed migration instead of the live shape.
+  **Rule 34 violation logged** — the check target should have been
+  types/database.ts (CycleArtifactType had the correct shape).
+
+## CodeClose Verification
+
+1. **Spec coverage:** Phil-directed batch (no written spec). All rulings from
+   the 2026-07-17 design dialogue implemented — trigger fix, per-gate
+   checklist rulings, double enforcement, AI model incl. 4-state +
+   analytics distinction, Board marker colors (amber/blue, no grey),
+   AI Production Board naming, Jira Division exemption, tooltip audit. PASS.
+2. **Regression check:** delivery-cycle-mcp 247/247 (238 pre-existing + 9
+   new); division-mcp 98/98; ng build green. Gate modal open/submit/skip
+   flows unchanged except entry points and the new hard-stop block.
+3. **Test ratchet:** new server logic covered by
+   tests/contract38-ai-governance.test.js (6 hard-stop paths, 2 validation
+   paths, Board audit-stamp flip both directions). UNTESTED: Angular-side
+   gateHardStops mirror, edit-panel AI section, Board marker rendering,
+   tooltip text (ng test pre-existing broken — UAT covers; Phil
+   acknowledgment requested per D-442).
+4. **Pattern sweep:** shared pattern modified: StageTrack (new inputs,
+   tooltip builder). Consumers searched: detail panel (full mode — bound),
+   dashboard grid + status dashboard (condensed — new inputs default off, no
+   behavior change). PASS.
+5. **Standards conformance:** busy guard — Submit already guarded by
+   `processing`; hard-stop disable added. Optimistic reversion — none added.
+   D-140 — hard-stop block states blocked action + unblock path. PASS.
+6. **CC-decision completeness:** CC-38-46..54 sequential, no gaps.
+7. **Structural health:** delivery-cycle-detail 4245 lines (over threshold,
+   long-standing); gate-record-modal 1392; edit-panel 1322; divisions
+   1462; stage-track 541 — all over 300, all pre-existing overs grown
+   modestly this follow-on. Extraction candidates unchanged.
+8. **Deployment:** migrations 074/075/076 run by Phil → master pushed
+   (delivery-cycle-mcp auto-deploys) → ng build after commit (version.json =
+   7d100bd) → gh-pages 374dd3e with 404.html + .nojekyll. **Phil action:
+   manually redeploy division-mcp in Render** (list_divisions now selects
+   jira_epic_required; update_division accepts the toggle). Delivery-cycle
+   auto-deploy: confirm it completed in the Render dashboard.
+9. **Repo cleanliness:** 4 new files (3 migrations + 1 test) — all committed
+   before push. Clean.
+
+## UAT Checklist — Follow-on 13
+
+**A. Gate row triggers (Initiative panel → Gates & Milestone Dates)**
+1. Click empty space on a gate row → nothing opens. PASS/FAIL
+2. Click the gate diamond or name → gate modal opens. PASS/FAIL
+3. Edit a target date / actual date / status → no modal at any point. PASS/FAIL
+
+**B. Gate modal hard stops**
+4. Initiative w/o Context Brief: open Go to Build modal → red "cannot be
+   submitted yet" block lists Context Brief; Submit disabled. PASS/FAIL
+5. Attach Context Brief + Jira + EPO + answer AI question → Submit enables. PASS/FAIL
+6. Division with Jira toggle OFF: Jira line absent from the block. PASS/FAIL
+
+**C. AI Governance (Initiative edit panel)**
+7. "Includes AI functionality" dropdown: blank/Yes/No/I do not know saves. PASS/FAIL
+8. Yes → delivery form + audience appear; consequence line states the correct
+   Board gate; embedded+external shows Deploy, internal shows Release,
+   analytics+external shows the Track-2 line. PASS/FAIL
+9. Check "Has AI Prod Board Approval" → save → reopen shows recorded date. PASS/FAIL
+
+**D. Board marker + chips (Initiative view panel)**
+10. AI-yes Initiative: amber triangle at left of the Board gate diamond;
+    tooltip names AI Production Board. PASS/FAIL
+11. Record Board approval → triangle turns blue; "AI Prod Board: Approved"
+    pill in identity zone. PASS/FAIL
+12. Gate tooltips describe status colors and Next-gate ring in full mode. PASS/FAIL
+
+**E. Server enforcement (spot check)**
+13. Attempt a blocked submit on a non-compliant Initiative (e.g. via a stale
+    tab): error text explains the block + fix. PASS/FAIL
+
+**F. Admin → Divisions**
+14. Edit a Division: "Require Jira epic on Initiatives" toggle saves; View
+    shows Jira Epic Required Yes/No. PASS/FAIL
+
+## CLAUDE.md Candidates — Follow-on 13
+
+5. **Candidate:** "Rule 34 check target: verify columns against
+   types/database.ts AND the latest ALTER migrations for the table — never
+   against the table's original CREATE/seed migration."
+   **Why:** migration 076 v1 failed on a column dropped by migration 041.
+   **Trigger:** Phil's 42703 screenshot, 2026-07-17.
