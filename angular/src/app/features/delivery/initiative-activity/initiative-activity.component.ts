@@ -707,9 +707,15 @@ export class InitiativeActivityComponent implements OnInit {
     });
   }
 
-  /** CC-38 f18: filter options tree-ordered, children indented. */
+  /** CC-38 f18: filter options tree-ordered, children indented.
+   *  Memoized on the source array reference — fresh-array getters feeding
+   *  *ngFor with form controls cause a change-detection render loop. */
+  private divTreeCache: { src: Division[]; out: DivisionTreeOption[] } | null = null;
   get divisionOptionsTree(): DivisionTreeOption[] {
-    return orderDivisionsAsTree(this.divisions);
+    if (this.divTreeCache?.src !== this.divisions) {
+      this.divTreeCache = { src: this.divisions, out: orderDivisionsAsTree(this.divisions) };
+    }
+    return this.divTreeCache.out;
   }
 
   private ensureUsersLoaded(): void {

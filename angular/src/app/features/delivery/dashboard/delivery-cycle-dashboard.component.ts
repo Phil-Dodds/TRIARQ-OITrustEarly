@@ -1231,9 +1231,18 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return this.userDivisions;
   }
 
-  /** CC-38 f18: same list, tree-ordered with depth for indentation. */
+  /** CC-38 f18: same list, tree-ordered with depth for indentation.
+   *  MEMOIZED on the source array reference — a getter returning a fresh
+   *  array each change-detection pass makes *ngFor rebuild the ngModel rows
+   *  every cycle, which schedules another cycle → render loop → page hang
+   *  (Phil's Page Unresponsive report, 2026-07-18). */
+  private divTreeCache: { src: Division[]; out: DivisionTreeOption[] } | null = null;
   get filterDivisionOptionsTree(): DivisionTreeOption[] {
-    return orderDivisionsAsTree(this.filterDivisionOptions);
+    const src = this.filterDivisionOptions;
+    if (this.divTreeCache?.src !== src) {
+      this.divTreeCache = { src, out: orderDivisionsAsTree(src) };
+    }
+    return this.divTreeCache.out;
   }
 
   // ── S7: Hub summary card computed getters ─────────────────────────────────
