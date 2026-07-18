@@ -1158,3 +1158,13 @@ Commit `cd2baf6`; gh-pages `0febbce`. No migrations, no MCP changes.
 ## CLAUDE.md Candidates — Follow-on 18
 
 No candidates this session segment.
+
+### Follow-on 18 hotfix (CC-38-65, commit c913e04, gh-pages hotfix deploy)
+- **CC-38-65** — Page Unresponsive on the grid with the Filters panel open,
+  minutes after f18 shipped: the new tree getters returned a FRESH array on
+  every change-detection pass, so *ngFor destroyed and rebuilt the
+  ngModel-bearing option rows each cycle, each rebuild scheduling another
+  cycle — a render loop. Fixed by memoizing both getters on the source array
+  reference. **CLAUDE.md candidate 7:** "Template-bound getters must never
+  return a freshly-allocated array/object per call when consumed by *ngFor
+  containing form directives — memoize on the source reference."
