@@ -1697,8 +1697,16 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (typeof sort['sortDir'] === 'string') {
       this.sortDir = sort['sortDir'] as 'asc' | 'desc';
     }
-    // Apply restored state to the view
-    this.applyFilters(false);
+    // Apply restored state to the view.
+    // CC-38 f17 fix: the Division filter is SERVER-side — restoring it after
+    // the initial (unfiltered) loadCycles() left the chip showing a Division
+    // while the grid held all rows, and Apply saw divisionChanged=false so it
+    // never reloaded. A restored Division must re-query the server.
+    if (this.filterDivision) {
+      this.loadCycles();
+    } else {
+      this.applyFilters(false);
+    }
     this.cdr.markForCheck();
   }
 
