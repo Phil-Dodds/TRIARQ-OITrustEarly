@@ -33,6 +33,22 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-17',
+    contractLabel: 'Contract 38 follow-on — AI Production Governance surfaces',
+    items: [
+      {
+        audience:    'All',
+        surface:     'AI Production Governance screen',
+        description: 'New view (card on Initiative Tracking): Initiatives needing AI Production Board approval sorted by Board gate date, plus the approved register — active and closed.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiatives grid',
+        description: 'AI Production Board half-diamond marker now shows on the grid gate track (amber = approval needed, blue = received). Include-cancelled moved into the Filters panel.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-17',
     contractLabel: 'Contract 38 follow-on — Create-form completions + Trio theme management',
     items: [
       {

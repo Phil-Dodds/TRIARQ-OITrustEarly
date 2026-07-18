@@ -51,7 +51,7 @@ import { InitiativeStatusUpdatePanelComponent }  from '../status-panel/initiativ
 import { InitiativeStatusHistoryPanelComponent } from '../status-panel/initiative-status-history-panel.component';
 import { LatestInitiativeStatus } from '../../../core/types/initiative-status';
 import { GATE_DATE_SEMANTICS } from '../../../shared/constants/gate-coaching.constants';
-import { buildUnifiedGateStateMap, gateDateConflict, nextGateInOrder, nextGateIsSubmitted, nextGateUndated } from '../gate-visual.utils';
+import { buildUnifiedGateStateMap, gateDateConflict, nextGateInOrder, nextGateIsSubmitted, nextGateUndated, aiBoardGateFor } from '../gate-visual.utils';
 import {
   GateRecordModalComponent,
   GateRecordModalData,
@@ -2254,13 +2254,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   /** CC-38 f13: gate carrying the AI Production Board half-diamond marker.
    *  embedded+external → go_to_deploy; internal AI (either form) →
    *  go_to_release; analytics+external (Track 2) and non-AI → none. */
-  get aiBoardGateId(): GateName | null {
-    const c = this.cycle;
-    if (!c || c.ai_functionality !== 'yes' || !c.ai_delivery_form || !c.ai_audience) { return null; }
-    if (c.ai_delivery_form === 'product_embedded' && c.ai_audience === 'external') { return 'go_to_deploy'; }
-    if (c.ai_audience === 'internal') { return 'go_to_release'; }
-    return null;
-  }
+  get aiBoardGateId(): GateName | null { return aiBoardGateFor(this.cycle); }
   get haloNextGateSubmitted(): boolean  { return nextGateIsSubmitted(this.cycle?.gate_records); }
   get haloNextGateUndated(): boolean    { return nextGateUndated(this.cycle?.gate_records, this.cycle?.milestone_dates); }
   /** CC-38-42: banded warnings — red reasons dominate; slips/at-risk amber. */

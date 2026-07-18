@@ -38,7 +38,8 @@ interface HubCard {
   /** Optional id; required for cards that surface an async headline (D-396 / spec §4). */
   id?:         'all-initiatives' | 'epo-summary' | 'epo-schedule' | 'epo-deploy'
             |  'workstream-summary' | 'gate-schedule' | 'deploy-schedule'
-            |  'initiative-activity' | 'gates-approved' | 'status-dashboard';
+            |  'initiative-activity' | 'gates-approved' | 'status-dashboard'
+            |  'ai-governance';
 }
 
 /** Spec §4 headline color semantics. */
@@ -113,6 +114,16 @@ const HUB_CARDS: HubCard[] = [
     description: 'Deploy gate cadence per EPO across the prior quarter, current ' +
                  'quarter, and other active Initiatives. Use this to track each ' +
                  'EPO’s commitment against target dates.'
+  },
+  // CC-38 f15: AI Production Governance discovery surface.
+  {
+    id:          'ai-governance',
+    title:       'AI Production Governance',
+    route:       '/initiatives/ai-governance',
+    icon:        '◈',
+    description: 'Initiatives whose AI profile requires AI Production Board approval — ' +
+                 'pending approvals sorted by Board gate date, plus the register of ' +
+                 'approvals already recorded, active and closed.'
   },
   // Workstream-organized views — secondary (behind "More views") until
   // workstreams are in effect.

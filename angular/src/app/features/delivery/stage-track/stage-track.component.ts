@@ -180,19 +180,30 @@ const STAGE_ORDER = ['BRIEF','DESIGN','SPEC','BUILD','VALIDATE','UAT','PILOT','R
           <div *ngIf="i > 0"
                [style.background]="condensedConnectorBg(gate.id, i)"
                style="height:1px;width:6px;flex-shrink:0;"></div>
-          <div
-            [style.background]="gateColor(gate.id)"
-            [style.border]="gateBorder(gate.id)"
-            [style.transform]="gateTransform(gate.id)"
-            [style.box-shadow]="gateHaloShadow(gate.id)"
-            [style.outline]="gateHaloOutline(gate.id)"
-            [style.outline-offset]="gateHaloOutlineOffset(gate.id)"
-            [style.position]="gateZIndex(gate.id) ? 'relative' : null"
-            [style.z-index]="gateZIndex(gate.id)"
-            [attr.title]="condensedGateTooltip(gate.id, gate.label)"
-            style="width:10px;height:10px;border-radius:2px;
-                   flex-shrink:0;box-sizing:border-box;"
-          ></div>
+          <div style="position:relative;flex-shrink:0;display:flex;">
+            <!-- CC-38 f15: AI Production Board marker — condensed-size triangle
+                 at the Board gate's left flank. Amber pending / blue received. -->
+            <span *ngIf="boardGateId === gate.id"
+                  [style.border-left-color]="boardApproved ? '#257099' : '#F2A620'"
+                  [attr.title]="boardMarkerTooltip()"
+                  style="position:absolute;left:-7px;top:50%;transform:translateY(-50%);
+                         width:0;height:0;z-index:2;
+                         border-top:3.5px solid transparent;border-bottom:3.5px solid transparent;
+                         border-left:5px solid #F2A620;"></span>
+            <div
+              [style.background]="gateColor(gate.id)"
+              [style.border]="gateBorder(gate.id)"
+              [style.transform]="gateTransform(gate.id)"
+              [style.box-shadow]="gateHaloShadow(gate.id)"
+              [style.outline]="gateHaloOutline(gate.id)"
+              [style.outline-offset]="gateHaloOutlineOffset(gate.id)"
+              [style.position]="gateZIndex(gate.id) ? 'relative' : null"
+              [style.z-index]="gateZIndex(gate.id)"
+              [attr.title]="condensedGateTooltip(gate.id, gate.label)"
+              style="width:10px;height:10px;border-radius:2px;
+                     flex-shrink:0;box-sizing:border-box;"
+            ></div>
+          </div>
         </ng-container>
       </div>
 

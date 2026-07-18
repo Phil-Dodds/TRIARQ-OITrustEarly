@@ -72,6 +72,13 @@ import { IonicModule }  from '@ionic/angular';
           import('./epo-deploy/epo-deploy.component')
             .then(c => c.EpoDeployComponent)
       },
+      // CC-38 f15: AI Production Governance — Board approval discovery surface.
+      {
+        path: 'ai-governance',
+        loadComponent: () =>
+          import('./ai-governance/ai-governance.component')
+            .then(c => c.AiGovernanceComponent)
+      },
       // ── Full Initiative list (D-188 / D-392: 'cycles' renamed to 'list') ──
       {
         path: 'list',

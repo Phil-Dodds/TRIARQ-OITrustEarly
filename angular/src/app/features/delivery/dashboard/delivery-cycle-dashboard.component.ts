@@ -71,7 +71,7 @@ import {
   computeHeadline, HeadlineResult, HeadlineBand, headlineBandStyle, formatHeadlineDate,
   GATE_DISPLAY_NAMES, nextUnapprovedGate
 } from './cycle-headline.utils';
-import { buildUnifiedGateStateMap, nextGateInOrder, nextGateIsSubmitted, nextGateUndated } from '../gate-visual.utils';
+import { buildUnifiedGateStateMap, nextGateInOrder, nextGateIsSubmitted, nextGateUndated, aiBoardGateFor } from '../gate-visual.utils';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -744,6 +744,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               [nextGateId]="nextGateIdFor(cycle)"
               [nextGateSubmitted]="nextGateSubmittedFor(cycle)"
               [nextGateUndated]="nextGateUndatedFor(cycle)"
+              [boardGateId]="aiBoardGateFor(cycle)"
+              [boardApproved]="cycle.ai_board_approved === true"
               [displayMode]="'condensed'">
             </app-stage-track>
           </div>
@@ -2239,6 +2241,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
    * Contract 23 fixes that. The overdue → blocked branch is new in Contract 23 (Item 2.1).
    */
   /** CC-38-32 halo marker inputs — primitives, so OnPush stays stable. */
+  /** CC-38 f15: AI Production Board marker on the grid's condensed track. */
+  readonly aiBoardGateFor = aiBoardGateFor;
+
   nextGateIdFor(cycle: DeliveryCycle): GateName | null {
     return nextGateInOrder(cycle.gate_records);
   }

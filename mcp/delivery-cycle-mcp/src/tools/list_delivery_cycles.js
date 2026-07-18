@@ -91,6 +91,7 @@ async function list_delivery_cycles(params, caller_user_id) {
       ai_delivery_form,
       ai_audience,
       ai_board_approved,
+      ai_board_approved_at,
       roadmap_theme_id,
       latest_status_update_id,
       created_at,

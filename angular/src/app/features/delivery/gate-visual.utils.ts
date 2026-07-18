@@ -19,6 +19,24 @@ export const GATE_ORDER: GateName[] = [
 /** Submission purple — sits between completion blue and stop red. */
 export const GATE_SUBMITTED_PURPLE = '#7E57C2';
 
+/**
+ * CC-38 f15: gate carrying the AI Production Board half-diamond marker,
+ * derived from the AI profile. embedded+external → go_to_deploy (Board before
+ * pilot); internal AI (either form) → go_to_release; analytics+external
+ * (Track 2) and non-AI → none. Shared by the Initiative panel track, the
+ * Initiatives grid condensed track, and the AI Production Governance screen.
+ */
+export function aiBoardGateFor(c: {
+  ai_functionality?: string | null;
+  ai_delivery_form?: string | null;
+  ai_audience?: string | null;
+} | null | undefined): GateName | null {
+  if (!c || c.ai_functionality !== 'yes' || !c.ai_delivery_form || !c.ai_audience) { return null; }
+  if (c.ai_delivery_form === 'product_embedded' && c.ai_audience === 'external') { return 'go_to_deploy'; }
+  if (c.ai_audience === 'internal') { return 'go_to_release'; }
+  return null;
+}
+
 /** D-244 user-status palette, single source. */
 export const DATE_STATUS_COLORS: Record<string, string> = {
   not_started: '#9E9E9E',
