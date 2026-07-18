@@ -72,6 +72,7 @@ import {
   GATE_DISPLAY_NAMES, nextUnapprovedGate
 } from './cycle-headline.utils';
 import { buildUnifiedGateStateMap, nextGateInOrder, nextGateIsSubmitted, nextGateUndated, aiBoardGateFor } from '../gate-visual.utils';
+import { orderDivisionsAsTree, DivisionTreeOption } from '../../../core/utils/division-tree.utils';
 
 const GATE_LABELS: Record<GateName, string> = {
   brief_review:  'Brief Review',
@@ -325,10 +326,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   <input type="radio" value="" [(ngModel)]="stagedDivision" />
                   My Divisions (default)
                 </label>
-                <label *ngFor="let d of filterDivisionOptions"
+                <!-- CC-38 f18: tree order — children indented under parents present in the list. -->
+                <label *ngFor="let opt of filterDivisionOptionsTree"
+                       [style.padding-left.px]="opt.depth * 18"
                        style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" [value]="d.id" [(ngModel)]="stagedDivision" />
-                  {{ d.division_name }}
+                  <input type="radio" [value]="opt.division.id" [(ngModel)]="stagedDivision" />
+                  {{ opt.division.division_name }}
                 </label>
               </div>
               <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;color:#5A5A5A;cursor:pointer;">
@@ -1226,6 +1229,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       return this.divisions;
     }
     return this.userDivisions;
+  }
+
+  /** CC-38 f18: same list, tree-ordered with depth for indentation. */
+  get filterDivisionOptionsTree(): DivisionTreeOption[] {
+    return orderDivisionsAsTree(this.filterDivisionOptions);
   }
 
   // ── S7: Hub summary card computed getters ─────────────────────────────────

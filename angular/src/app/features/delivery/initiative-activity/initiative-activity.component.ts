@@ -42,6 +42,7 @@ import { IonicModule }  from '@ionic/angular';
 
 import { DeliveryService }    from '../../../core/services/delivery.service';
 import { UserProfileService } from '../../../core/services/user-profile.service';
+import { orderDivisionsAsTree, DivisionTreeOption } from '../../../core/utils/division-tree.utils';
 import { McpService }         from '../../../core/services/mcp.service';
 import {
   ScreenStateService,
@@ -246,11 +247,13 @@ const DEFAULT_FILTERS: AppliedFilters = {
               <ng-container *ngIf="divisions.length === 0">
                 <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
               </ng-container>
-              <label *ngFor="let d of divisions" class="ia-check">
+              <!-- CC-38 f18: tree order, children indented under parents in the list. -->
+              <label *ngFor="let opt of divisionOptionsTree" class="ia-check"
+                     [style.padding-left.px]="opt.depth * 16">
                 <input type="checkbox"
-                       [checked]="pending.divisionIds.includes(d.id)"
-                       (change)="toggleDivision(d.id)" />
-                {{ d.display_name_short || d.division_name }}
+                       [checked]="pending.divisionIds.includes(opt.division.id)"
+                       (change)="toggleDivision(opt.division.id)" />
+                {{ opt.division.display_name_short || opt.division.division_name }}
               </label>
             </div>
           </div>
@@ -675,18 +678,38 @@ export class InitiativeActivityComponent implements OnInit {
 
   private ensureDivisionsLoaded(): void {
     if (this.divisionsLoaded) return;
-    this.mcp.call<Division[]>('division', 'list_divisions', { include_inactive: false }).subscribe({
+    // CC-38 f18: non-admins see only Divisions they are linked to — offering
+    // every Division to filter on data they can't see only confused (Phil
+    // 2026-07-18). Admins keep the full list.
+    const isAdmin = this.profile.getCurrentProfile()?.is_admin === true;
+    if (isAdmin) {
+      this.mcp.call<Division[]>('division', 'list_divisions', { include_inactive: false }).subscribe({
+        next: res => {
+          if (res.success && Array.isArray(res.data)) { this.divisions = res.data; }
+          this.divisionsLoaded = true;
+          this.cdr.markForCheck();
+        },
+        error: () => { this.divisionsLoaded = true; this.cdr.markForCheck(); }
+      });
+      return;
+    }
+    this.mcp.call<{ directly_assigned_divisions: Division[] }>(
+      'division', 'get_user_divisions', { user_id: this.currentUserId }
+    ).subscribe({
       next: res => {
-        if (res.success && Array.isArray(res.data)) {
-          this.divisions = [...res.data].sort((a, b) =>
-            (a.display_name_short || a.division_name).localeCompare(b.display_name_short || b.division_name)
-          );
+        if (res.success && res.data) {
+          this.divisions = res.data.directly_assigned_divisions ?? [];
         }
         this.divisionsLoaded = true;
         this.cdr.markForCheck();
       },
       error: () => { this.divisionsLoaded = true; this.cdr.markForCheck(); }
     });
+  }
+
+  /** CC-38 f18: filter options tree-ordered, children indented. */
+  get divisionOptionsTree(): DivisionTreeOption[] {
+    return orderDivisionsAsTree(this.divisions);
   }
 
   private ensureUsersLoaded(): void {

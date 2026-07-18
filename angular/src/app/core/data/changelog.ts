@@ -32,6 +32,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-18',
+    contractLabel: 'Contract 38 follow-on — Division filter hierarchy',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiatives grid + Initiative Activity filters',
+        description: 'Division filter lists now show child Divisions indented under their parents; Initiative Activity offers only Divisions you are linked to (admins still see all).'
+      }
+    ]
+  },
+  {
     date:          '2026-07-17',
     contractLabel: 'Contract 38 follow-on — AI delivery form: internal service agents',
     items: [
