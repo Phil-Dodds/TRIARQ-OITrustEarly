@@ -831,3 +831,83 @@ Migrations 074/075/076 executed by Phil 2026-07-17 (076 required a v2 — see CC
    against the table's original CREATE/seed migration."
    **Why:** migration 076 v1 failed on a column dropped by migration 041.
    **Trigger:** Phil's 42703 screenshot, 2026-07-17.
+
+
+---
+
+# Follow-on 14 — Create-form completions + Trio theme management (2026-07-17)
+
+Commit `1acc563`; gh-pages `d404036`. No migrations.
+
+## CC-decisions
+
+- **CC-38-55** — New Initiative form gains Roadmap Theme (Division-scoped
+  dropdown; the create tool already accepted roadmap_theme_id — UI never sent
+  it) and the AI Governance questions (functionality / delivery form /
+  audience + consequence line). Supersedes CC-38-52. Board approval checkbox
+  intentionally NOT on create — recorded later in Edit once received.
+  create_delivery_cycle now accepts the three ai fields with the same enum
+  validation as update; follow-ups nulled unless functionality = yes.
+- **CC-38-56** — Roadmap Theme management access widened from Admin-only to
+  Admin OR member of the theme's Division (division_memberships). Supersedes
+  the interim Admin-only rule (which was itself a Design-flagged CC-decision:
+  D-487's Division Leader role does not exist). update_roadmap_theme gains
+  `active` (boolean) — reactivation path Trios can drive.
+- **CC-38-57** — "Manage Themes" inline panel on Deploy by Quarter (link
+  beside the Theme filter pills; separate zero-theme entry point): Division
+  select scoped to manageable Divisions, add / rename / deactivate /
+  reactivate, inactive themes listed italic-grey, busy guards on all
+  mutations, filter pills + grouping refresh immediately after each change.
+  D-437 semantics unchanged: deactivated themes keep displaying on tagged
+  Initiatives.
+
+## CodeClose Verification
+
+1. **Spec coverage:** Phil rulings 2026-07-17 (create-form gaps proposal
+   approved; Trio theme management with add/edit/deactivate/activate scoped
+   to accessible Divisions). All implemented. PASS.
+2. **Regression check:** delivery-cycle-mcp 250/250; ng build green. Existing
+   theme admin surface (Admin → Divisions) untouched and still works — admins
+   pass the new access check trivially.
+3. **Test ratchet:** +3 tests (create ai enum validation; theme access denied
+   for non-member; member reactivation writes active:true). UNTESTED
+   (Angular): create-panel theme/AI section, Manage Themes panel — UAT covers
+   (ng test pre-existing broken; D-442 acknowledgment requested).
+4. **Pattern sweep:** no shared pattern modified this follow-on.
+5. **Standards conformance:** busy guard — all four theme mutations disable
+   controls via mgrBusy; create submit unchanged. D-140 — access-denied error
+   names the requirement (Division membership or Admin). PASS.
+6. **CC-decision completeness:** CC-38-55..57 sequential, no gaps.
+7. **Structural health:** epo-deploy.component.ts now ~1190 lines (was 1016)
+   — theme manager is an extraction candidate if it grows further;
+   create-panel ~940 lines. Both over 300, pre-existing overs.
+8. **Deployment:** no migrations → master pushed (delivery-cycle-mcp
+   auto-deploys — REQUIRED for theme access + create AI fields; confirm in
+   Render) → build after commit (version.json = 1acc563) → gh-pages d404036.
+   Reminder: division-mcp manual redeploy from follow-on 13 still pending if
+   not yet done.
+9. **Repo cleanliness:** no new files this follow-on. Not applicable.
+
+## UAT Checklist — Follow-on 14
+
+**A. New Initiative form**
+1. Pick a Division → Roadmap Theme dropdown populates with that Division's
+   themes; changing Division resets it. PASS/FAIL
+2. Answer "Includes AI functionality" = Yes → form + audience appear;
+   consequence line matches the profile. Create → open Edit → values match. PASS/FAIL
+3. Create with theme picked → grid/panel show the theme tag. PASS/FAIL
+
+**B. Deploy by Quarter — Manage Themes**
+4. Click "Manage Themes" → panel opens; Division list = your Divisions
+   (admin sees all). PASS/FAIL
+5. Add a theme → appears in the panel AND in the filter pills without a page
+   reload. PASS/FAIL
+6. Rename a theme → pill text updates. PASS/FAIL
+7. Deactivate → theme leaves the pills; still displays on already-tagged
+   Initiatives; shows "(inactive)" in the panel. PASS/FAIL
+8. Reactivate → returns to pills and pickers. PASS/FAIL
+9. Non-member (no Division access): panel shows the no-Divisions guidance. PASS/FAIL
+
+## CLAUDE.md Candidates — Follow-on 14
+
+No candidates this session segment.
