@@ -123,7 +123,14 @@ interface EpoGroup {
             <button type="button" class="rpd-pivot-btn" (click)="onShiftQuarter(1)"  aria-label="Next quarter">›</button>
           </div>
 
-          <button *ngIf="canCreateCycle" class="edp-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
+          <!-- CC-38 f14 rev: Manage Themes stacked under + New Initiative,
+               same styling (Phil 2026-07-17 — out of the main highway). -->
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:stretch;">
+            <button *ngIf="canCreateCycle" class="edp-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
+            <button class="edp-new-cycle" (click)="toggleThemeMgr()">
+              {{ themeMgrOpen ? 'Close Themes' : 'Manage Themes' }}
+            </button>
+          </div>
         </div>
 
         <!-- CC-38-45: shared role switch — persists per user like filters. -->
@@ -174,15 +181,6 @@ interface EpoGroup {
                 (click)="toggleThemeFilter('__none__')">Unthemed</button>
         <button *ngIf="selectedThemeIds.length" type="button" class="edp-theme-clear"
                 (click)="selectedThemeIds = []; saveEpoDeployStatePublic()">Clear</button>
-        <button type="button" class="edp-theme-clear" (click)="toggleThemeMgr()">
-          {{ themeMgrOpen ? 'Close theme manager' : 'Manage Themes' }}
-        </button>
-      </div>
-      <!-- Zero-theme entry point: filter row above hides when no themes exist. -->
-      <div *ngIf="!allThemes.length" style="margin:8px 0 12px;">
-        <button type="button" class="edp-theme-clear" (click)="toggleThemeMgr()">
-          {{ themeMgrOpen ? 'Close theme manager' : 'Manage Themes' }}
-        </button>
       </div>
 
       <!-- CC-38 f14: inline Roadmap Theme manager. Trios manage themes for
