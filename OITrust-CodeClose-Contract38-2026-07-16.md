@@ -1104,3 +1104,57 @@ Commit `e279ea6`; gh-pages `4462b4b`. No migrations, no MCP changes.
    filters."
    **Why:** the Division filter silently showed a chip over unfiltered data.
    **Trigger:** Phil's screenshot, 2026-07-17.
+
+
+---
+
+# Follow-on 18 — Division filter hierarchy + Activity scoping (2026-07-18)
+
+Commit `cd2baf6`; gh-pages `0febbce`. No migrations, no MCP changes.
+
+## CC-decisions
+
+- **CC-38-63** — Division filter option lists render as a tree: children
+  indented under parents that are also in the list (NEW shared
+  `core/utils/division-tree.utils.ts` — `orderDivisionsAsTree`). A child
+  whose parent isn't in the user's list shows un-indented at top level.
+  Applied to the Initiatives grid Filters panel and Initiative Activity.
+- **CC-38-64** — Initiative Activity's Division filter scoped: non-admins see
+  only their linked Divisions (get_user_divisions), admins keep the full
+  list. This was the one surface offering every Division to every user.
+  Rows-derived option lists (Status Dashboard, Gates Approved, My Actions)
+  intentionally left unchanged per Phil — inherently access-scoped, flat
+  short-name lists.
+
+## CodeClose Verification
+
+1. **Spec coverage:** Phil's two rulings (scope non-linked divisions out;
+   indent children under parents) implemented on the two Division-record
+   lists; rows-derived lists left as-is per instruction. PASS.
+2. **Regression check:** ng build green. Grid: same option set, new order +
+   indent only. Activity: admins unchanged; non-admins see fewer (correct)
+   options — server access scoping already limited their data.
+3. **Test ratchet:** orderDivisionsAsTree is pure logic — untested (ng test
+   pre-existing broken); trivially UAT-verifiable. D-442 acknowledgment
+   requested.
+4. **Pattern sweep:** new shared util; two consumers wired. Future Division
+   option lists should consume it.
+5. **Standards conformance:** presentation-only change. PASS.
+6. **CC-decision completeness:** CC-38-63..64 sequential, no gaps.
+7. **Structural health:** new util 44 lines; no thresholds crossed.
+8. **Deployment:** Angular-only → build after commit (version.json =
+   cd2baf6) → gh-pages 0febbce. MCP not touched.
+9. **Repo cleanliness:** 1 new util file committed with its importers. Clean.
+
+## UAT Checklist — Follow-on 18
+
+1. Initiatives grid → Filters → Division: GRICS children (Compliance/IT & IS)
+   and Practice Services children (QSuite & Pathways Clinical, RCM) indent
+   under their parents. PASS/FAIL
+2. As a non-admin linked to parent+child: both appear, child indented. PASS/FAIL
+3. Initiative Activity → Division filter: non-admin sees only linked
+   Divisions; admin sees all, tree-ordered. PASS/FAIL
+
+## CLAUDE.md Candidates — Follow-on 18
+
+No candidates this session segment.
