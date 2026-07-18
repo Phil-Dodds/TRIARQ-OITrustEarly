@@ -40,6 +40,8 @@ require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: {
 
 const { submit_gate_for_approval } = require('../src/tools/submit_gate_for_approval');
 const { update_delivery_cycle }    = require('../src/tools/update_delivery_cycle');
+const { create_delivery_cycle }    = require('../src/tools/create_delivery_cycle');
+const { create_roadmap_theme, update_roadmap_theme } = require('../src/tools/roadmap_themes');
 
 const CALLER = 'user-1';
 const baseCycle = {
@@ -176,5 +178,44 @@ describe('update_delivery_cycle — CC-38 f13 AI fields', () => {
     assert.equal(p2.ai_board_approved, false);
     assert.equal(p2.ai_board_approved_at, null);
     assert.equal(p2.ai_board_approved_by, null);
+  });
+});
+
+describe('create_delivery_cycle — CC-38 f14 AI fields at creation', () => {
+  beforeEach(() => { queue = []; capturedUpdates = []; });
+
+  test('rejects invalid ai_functionality', async () => {
+    const res = await create_delivery_cycle(
+      { cycle_title: 'T', division_id: 'd1', tier_classification: 'tier_1', ai_functionality: 'maybe' },
+      CALLER
+    );
+    assert.equal(res.success, false);
+    assert.match(res.error, /yes, no, unknown/);
+  });
+});
+
+describe('roadmap themes — CC-38 f14 Division-member access', () => {
+  beforeEach(() => { queue = []; capturedUpdates = []; });
+
+  test('create denied for non-admin non-member', async () => {
+    queue = [
+      { data: { is_admin: false }, error: null },   // caller lookup
+      { data: [], error: null }                     // no membership rows
+    ];
+    const res = await create_roadmap_theme({ division_id: 'd1', name: 'Growth' }, CALLER);
+    assert.equal(res.success, false);
+    assert.match(res.error, /Division membership or an Admin role/);
+  });
+
+  test('update allows reactivation via active:true for a Division member', async () => {
+    queue = [
+      { data: { division_id: 'd1' }, error: null },        // themeDivisionId
+      { data: { is_admin: false }, error: null },          // caller lookup
+      { data: [{ division_id: 'd1' }], error: null },      // membership row
+      { data: { id: 't1', active: true }, error: null }    // update .single
+    ];
+    const res = await update_roadmap_theme({ theme_id: 't1', active: true }, CALLER);
+    assert.equal(res.success, true);
+    assert.equal(capturedUpdates[0].active, true);
   });
 });

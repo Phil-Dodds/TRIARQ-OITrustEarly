@@ -27,7 +27,7 @@ import {
   ChangeDetectionStrategy, ChangeDetectorRef
 } from '@angular/core';
 import {
-  FormBuilder, FormGroup, Validators, ReactiveFormsModule
+  FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule
 } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
@@ -40,7 +40,7 @@ import { LoadingOverlayComponent }   from '../../../shared/components/loading-ov
 import { WorkstreamPickerComponent }         from '../../../shared/pickers/workstream-picker/workstream-picker.component';
 import { UserPickerComponent }               from '../../../shared/pickers/user-picker/user-picker.component';
 import { DivisionAssignmentPickerComponent } from '../../../shared/pickers/division-assignment-picker/division-assignment-picker.component';
-import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User } from '../../../core/types/database';
+import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User, RoadmapTheme } from '../../../core/types/database';
 import {
   DivisionTrustGroup,
   groupDivisionsByTrust
@@ -51,7 +51,7 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CommonModule, ReactiveFormsModule, IonicModule,
+    CommonModule, ReactiveFormsModule, FormsModule, IonicModule,
     LoadingOverlayComponent, WorkstreamPickerComponent, UserPickerComponent,
     DivisionAssignmentPickerComponent
   ],
@@ -237,6 +237,55 @@ import {
                    type="text" placeholder="e.g. PS-2026-041" />
             <div class="cp-gate-note">Required before Go to Build Gate.</div>
           </div>
+
+          <!-- 10. Roadmap Theme — D-487 / CC-38 f14: create-time tagging.
+               Division-scoped; reloads when Division changes. -->
+          <div class="cp-field">
+            <label class="cp-label">Roadmap Theme</label>
+            <select class="cp-input" [ngModel]="selectedThemeId" [ngModelOptions]="{standalone: true}"
+                    (ngModelChange)="selectedThemeId = $event"
+                    [disabled]="!f['division_id'].value">
+              <option value="">— No Theme —</option>
+              <option *ngFor="let t of divisionThemes" [value]="t.id">{{ t.name }}</option>
+            </select>
+            <div class="cp-gate-note">Optional. Themes are Division-scoped — pick the Division first.</div>
+          </div>
+
+          <!-- 11. AI Governance — CC-38 f14 (supersedes CC-38-52). Same
+               progressive questions as the edit panel; Board approval is
+               recorded later in Edit once received. -->
+          <div class="cp-field">
+            <label class="cp-label">Includes AI functionality</label>
+            <select class="cp-input" [ngModel]="aiFunctionality" [ngModelOptions]="{standalone: true}"
+                    (ngModelChange)="onAiFunctionalityChange($event)">
+              <option value="">— Not answered —</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+              <option value="unknown">I do not know</option>
+            </select>
+            <div class="cp-gate-note">Must be answered before Go to Build; Yes or No before Go to Deploy.</div>
+          </div>
+          <ng-container *ngIf="aiFunctionality === 'yes'">
+            <div class="cp-field">
+              <label class="cp-label">AI delivery form</label>
+              <select class="cp-input" [ngModel]="aiDeliveryForm" [ngModelOptions]="{standalone: true}"
+                      (ngModelChange)="aiDeliveryForm = $event">
+                <option value="">— Not set —</option>
+                <option value="product_embedded">Embedded in the product</option>
+                <option value="analytics_outputs">Analytics / intelligence outputs</option>
+              </select>
+            </div>
+            <div class="cp-field">
+              <label class="cp-label">AI audience</label>
+              <select class="cp-input" [ngModel]="aiAudience" [ngModelOptions]="{standalone: true}"
+                      (ngModelChange)="aiAudience = $event">
+                <option value="">— Not set —</option>
+                <option value="external">External user-facing</option>
+                <option value="internal">Internal</option>
+              </select>
+            </div>
+            <div *ngIf="aiConsequenceLine" class="cp-gate-note" style="color:#8a5b00;">{{ aiConsequenceLine }}</div>
+          </ng-container>
 
           <!-- Submission error -->
           <div *ngIf="submitError" class="cp-submit-error" role="alert">
@@ -626,7 +675,44 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
     // Clear workstream selection when Division changes — scope changes per CC-002
     this.selectedWorkstream = null;
     this.noDivisionWarning  = false;
+    // CC-38 f14: themes are Division-scoped — reload list, drop stale pick.
+    this.selectedThemeId = '';
+    this.divisionThemes  = [];
+    const divId = this.form.get('division_id')?.value;
+    if (divId) {
+      this.delivery.listRoadmapThemes(divId).subscribe({
+        next: res => {
+          this.divisionThemes = res.success ? (res.data ?? []) : [];
+          this.cdr.markForCheck();
+        },
+        error: () => { this.divisionThemes = []; this.cdr.markForCheck(); }
+      });
+    }
     this.cdr.markForCheck();
+  }
+
+  // ── CC-38 f14: Roadmap Theme + AI Governance create-time state ─────────────
+  divisionThemes: RoadmapTheme[] = [];
+  selectedThemeId = '';
+  aiFunctionality = '';   // '' | 'yes' | 'no' | 'unknown'
+  aiDeliveryForm  = '';   // '' | 'product_embedded' | 'analytics_outputs'
+  aiAudience      = '';   // '' | 'external' | 'internal'
+
+  onAiFunctionalityChange(v: string): void {
+    this.aiFunctionality = v;
+    if (v !== 'yes') { this.aiDeliveryForm = ''; this.aiAudience = ''; }
+  }
+
+  /** Consequence line — where the AI Production Board stop lands for this profile. */
+  get aiConsequenceLine(): string {
+    if (this.aiFunctionality !== 'yes' || !this.aiDeliveryForm || !this.aiAudience) { return ''; }
+    if (this.aiDeliveryForm === 'product_embedded' && this.aiAudience === 'external') {
+      return 'AI Production Board approval will be required before Go to Deploy (pilot). Engage the AI Prod Board early.';
+    }
+    if (this.aiAudience === 'internal') {
+      return 'AI Production Board approval will be required before Go to Release. Engage the AI Prod Board early.';
+    }
+    return 'No AI Production Board stop for delivered analytics outputs — attach the AI Delivery Requirements Record (data lineage, reproducibility, AI disclosure) before Go to Deploy.';
   }
 
   // ── Division Assignment Picker (D-436, Contract 24) ──────────────────────────
@@ -786,7 +872,14 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
       ...(this.selectedDol ? { assigned_dol_user_id: this.selectedDol.id } : {}),
       // Optional fields — only send if non-empty
       ...(v.outcome_statement?.trim() ? { outcome_statement: v.outcome_statement.trim() } : {}),
-      ...(v.jira_epic_key?.trim()     ? { jira_epic_key:     v.jira_epic_key.trim()     } : {})
+      ...(v.jira_epic_key?.trim()     ? { jira_epic_key:     v.jira_epic_key.trim()     } : {}),
+      // CC-38 f14: Roadmap Theme + AI profile at creation.
+      ...(this.selectedThemeId ? { roadmap_theme_id: this.selectedThemeId } : {}),
+      ...(this.aiFunctionality ? { ai_functionality: this.aiFunctionality as 'yes' | 'no' | 'unknown' } : {}),
+      ...(this.aiFunctionality === 'yes' && this.aiDeliveryForm
+          ? { ai_delivery_form: this.aiDeliveryForm as 'product_embedded' | 'analytics_outputs' } : {}),
+      ...(this.aiFunctionality === 'yes' && this.aiAudience
+          ? { ai_audience: this.aiAudience as 'external' | 'internal' } : {})
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {

@@ -4,8 +4,9 @@
 // update / deactivate. Deactivate-only when referenced (D-437 pattern) —
 // there is no hard-delete path at all.
 //
-// Management is Admin-only for now: D-487 names a "Division Leader" role that
-// does not exist in the schema (CC-decision — flagged to Design).
+// Management access (Contract 38 follow-on 14, Phil 2026-07-17): Admin OR any
+// member of the theme's Division — Trios manage their Divisions' themes from
+// the Deploy by Quarter screen. Supersedes the Admin-only interim rule.
 // Reads (list_roadmap_themes) are open to any authenticated user — the Edit
 // panel and grid filters need the vocabulary.
 
@@ -13,14 +14,38 @@
 
 const { supabase } = require('../db');
 
-async function requireAdmin(caller_user_id) {
+/** Admin OR member of division_id. Returns true/false. */
+async function hasThemeAccess(caller_user_id, division_id) {
   const { data: caller } = await supabase
     .from('users')
     .select('is_admin')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
-  return caller?.is_admin === true;
+  if (caller?.is_admin === true) { return true; }
+  if (!division_id) { return false; }
+  const { data: membership } = await supabase
+    .from('division_memberships')
+    .select('division_id')
+    .eq('user_id', caller_user_id)
+    .eq('division_id', division_id)
+    .is('deleted_at', null)
+    .limit(1);
+  return Array.isArray(membership) && membership.length > 0;
+}
+
+const ACCESS_DENIED =
+  'You do not have access to manage Roadmap Themes for this Division. ' +
+  'Theme management requires Division membership or an Admin role.';
+
+/** Resolve a theme's division_id for the access check on update/deactivate. */
+async function themeDivisionId(theme_id) {
+  const { data } = await supabase
+    .from('roadmap_themes')
+    .select('division_id')
+    .eq('id', theme_id)
+    .single();
+  return data?.division_id ?? null;
 }
 
 // ── list_roadmap_themes ────────────────────────────────────────────────────────
@@ -42,13 +67,13 @@ async function list_roadmap_themes(params, _caller_user_id) {
 
 // ── create_roadmap_theme ───────────────────────────────────────────────────────
 async function create_roadmap_theme(params, caller_user_id) {
-  if (!(await requireAdmin(caller_user_id))) {
-    return { success: false, error: 'Admin role required to manage Roadmap Themes.' };
-  }
   const division_id = params?.division_id;
   const name = typeof params?.name === 'string' ? params.name.trim() : '';
   if (!division_id) return { success: false, error: 'division_id is required.' };
   if (!name)        return { success: false, error: 'name is required.' };
+  if (!(await hasThemeAccess(caller_user_id, division_id))) {
+    return { success: false, error: ACCESS_DENIED };
+  }
 
   const { data: maxRow } = await supabase
     .from('roadmap_themes')
@@ -79,15 +104,20 @@ async function create_roadmap_theme(params, caller_user_id) {
 }
 
 // ── update_roadmap_theme ───────────────────────────────────────────────────────
-// { theme_id, name?, sort_order? } — rename and/or reorder.
+// { theme_id, name?, sort_order?, active? } — rename, reorder, and/or
+// reactivate (active:true — Contract 38 f14 gives Trios the full cycle).
 async function update_roadmap_theme(params, caller_user_id) {
-  if (!(await requireAdmin(caller_user_id))) {
-    return { success: false, error: 'Admin role required to manage Roadmap Themes.' };
-  }
   const { theme_id } = params || {};
   if (!theme_id) return { success: false, error: 'theme_id is required.' };
+  if (!(await hasThemeAccess(caller_user_id, await themeDivisionId(theme_id)))) {
+    return { success: false, error: ACCESS_DENIED };
+  }
 
   const patch = { updated_at: new Date().toISOString() };
+  if (params.active !== undefined) {
+    if (typeof params.active !== 'boolean') return { success: false, error: 'active must be a boolean.' };
+    patch.active = params.active;
+  }
   if (params.name !== undefined) {
     const name = typeof params.name === 'string' ? params.name.trim() : '';
     if (!name) return { success: false, error: 'name cannot be empty.' };
@@ -117,11 +147,11 @@ async function update_roadmap_theme(params, caller_user_id) {
 // D-437 pattern: deactivation hides the Theme from pickers and new tagging.
 // Initiatives already tagged keep their tag and continue displaying the name.
 async function deactivate_roadmap_theme(params, caller_user_id) {
-  if (!(await requireAdmin(caller_user_id))) {
-    return { success: false, error: 'Admin role required to manage Roadmap Themes.' };
-  }
   const { theme_id } = params || {};
   if (!theme_id) return { success: false, error: 'theme_id is required.' };
+  if (!(await hasThemeAccess(caller_user_id, await themeDivisionId(theme_id)))) {
+    return { success: false, error: ACCESS_DENIED };
+  }
 
   const { count } = await supabase
     .from('delivery_cycles')

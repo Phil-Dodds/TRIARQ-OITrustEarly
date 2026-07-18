@@ -178,6 +178,10 @@ export class DeliveryService {
     outcome_statement?:       string;          // optional at creation
     jira_epic_key?:           string;          // optional
     roadmap_theme_id?:        string | null;   // D-487: optional Theme tag
+    // CC-38 f14: optional AI Governance profile at creation.
+    ai_functionality?:        'yes' | 'no' | 'unknown';
+    ai_delivery_form?:        'product_embedded' | 'analytics_outputs';
+    ai_audience?:             'external' | 'internal';
     milestone_target_dates?:  {               // optional gate target dates at creation
       brief_review?:   string;
       go_to_build?:    string;
@@ -605,7 +609,7 @@ export class DeliveryService {
     return this.mcp.call<RoadmapTheme>('delivery', 'create_roadmap_theme', { division_id, name });
   }
 
-  updateRoadmapTheme(theme_id: string, patch: { name?: string; sort_order?: number }): Observable<McpResponse<RoadmapTheme>> {
+  updateRoadmapTheme(theme_id: string, patch: { name?: string; sort_order?: number; active?: boolean }): Observable<McpResponse<RoadmapTheme>> {
     return this.mcp.call<RoadmapTheme>('delivery', 'update_roadmap_theme', { theme_id, ...patch });
   }
 

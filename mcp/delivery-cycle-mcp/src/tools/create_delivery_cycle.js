@@ -56,6 +56,10 @@ async function create_delivery_cycle(params, caller_user_id) {
     outcome_statement,
     jira_epic_key,
     roadmap_theme_id,        // D-487: optional Division-scoped theme tag
+    // Contract 38 f14: optional AI Governance profile at creation (migration 075).
+    ai_functionality,
+    ai_delivery_form,
+    ai_audience,
     milestone_target_dates
   } = params;
 
@@ -70,6 +74,16 @@ async function create_delivery_cycle(params, caller_user_id) {
   // If provided, it must exist. Active status is checked at gate submission (ARCH-23).
   if (!tier_classification) {
     return { success: false, error: 'tier_classification is required.' };
+  }
+  // Contract 38 f14: AI Governance enums — same domains as update_delivery_cycle.
+  if (ai_functionality != null && !['yes', 'no', 'unknown'].includes(ai_functionality)) {
+    return { success: false, error: 'ai_functionality must be one of: yes, no, unknown — or omitted.' };
+  }
+  if (ai_delivery_form != null && !['product_embedded', 'analytics_outputs'].includes(ai_delivery_form)) {
+    return { success: false, error: 'ai_delivery_form must be one of: product_embedded, analytics_outputs — or omitted.' };
+  }
+  if (ai_audience != null && !['external', 'internal'].includes(ai_audience)) {
+    return { success: false, error: 'ai_audience must be one of: external, internal — or omitted.' };
   }
   if (!VALID_TIERS.includes(tier_classification)) {
     return { success: false, error: 'tier_classification must be one of: tier_1, tier_2, tier_3.' };
@@ -176,7 +190,11 @@ async function create_delivery_cycle(params, caller_user_id) {
       assigned_dol_user_id:    assigned_dol_user_id || null,  // D-391: nullable at creation
       outcome_statement:       outcome_statement    || null,
       jira_epic_key:           jira_epic_key        || null,
-      roadmap_theme_id:        roadmap_theme_id     || null   // D-487
+      roadmap_theme_id:        roadmap_theme_id     || null,  // D-487
+      // Contract 38 f14: AI profile at creation; follow-ups only meaningful when yes.
+      ai_functionality:        ai_functionality     || null,
+      ai_delivery_form:        (ai_functionality === 'yes' ? ai_delivery_form : null) || null,
+      ai_audience:             (ai_functionality === 'yes' ? ai_audience      : null) || null
     })
     .select()
     .single();

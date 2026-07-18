@@ -33,6 +33,22 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-17',
+    contractLabel: 'Contract 38 follow-on — Create-form completions + Trio theme management',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'New Initiative form',
+        description: 'Roadmap Theme and the AI Governance questions (Includes AI functionality, delivery form, audience) can now be set at creation.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Deploy by Quarter — Manage Themes',
+        description: 'New Manage Themes panel: add, rename, deactivate, and reactivate Roadmap Themes for Divisions you belong to — changes appear immediately in the filter pills.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-17',
     contractLabel: 'Contract 38 follow-on — Gate submission triggers, checklist rework, AI Production Governance',
     items: [
       {

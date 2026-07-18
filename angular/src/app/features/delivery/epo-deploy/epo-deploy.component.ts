@@ -174,6 +174,68 @@ interface EpoGroup {
                 (click)="toggleThemeFilter('__none__')">Unthemed</button>
         <button *ngIf="selectedThemeIds.length" type="button" class="edp-theme-clear"
                 (click)="selectedThemeIds = []; saveEpoDeployStatePublic()">Clear</button>
+        <button type="button" class="edp-theme-clear" (click)="toggleThemeMgr()">
+          {{ themeMgrOpen ? 'Close theme manager' : 'Manage Themes' }}
+        </button>
+      </div>
+      <!-- Zero-theme entry point: filter row above hides when no themes exist. -->
+      <div *ngIf="!allThemes.length" style="margin:8px 0 12px;">
+        <button type="button" class="edp-theme-clear" (click)="toggleThemeMgr()">
+          {{ themeMgrOpen ? 'Close theme manager' : 'Manage Themes' }}
+        </button>
+      </div>
+
+      <!-- CC-38 f14: inline Roadmap Theme manager. Trios manage themes for
+           Divisions they belong to (admin: all). Edits reflect immediately in
+           the filter pills and grouping above. -->
+      <div *ngIf="themeMgrOpen" class="edp-theme-mgr">
+        <div class="edp-theme-mgr-title">Roadmap Themes</div>
+        <div *ngIf="!manageableDivisions.length" class="edp-theme-mgr-note">
+          No Divisions available. Theme management requires Division membership —
+          ask an Admin to add you to a Division.
+        </div>
+        <ng-container *ngIf="manageableDivisions.length">
+          <select class="edp-theme-mgr-select" [ngModel]="mgrDivisionId"
+                  (ngModelChange)="onMgrDivisionChange($event)">
+            <option value="">— Select Division —</option>
+            <option *ngFor="let d of manageableDivisions" [value]="d.id">{{ d.division_name }}</option>
+          </select>
+
+          <ng-container *ngIf="mgrDivisionId">
+            <div *ngIf="mgrLoading" class="edp-theme-mgr-note">Loading…</div>
+            <div *ngFor="let t of mgrThemes" class="edp-theme-mgr-row" [class.edp-theme-mgr-inactive]="!t.active">
+              <ng-container *ngIf="renameThemeId !== t.id">
+                <span class="edp-theme-mgr-name">{{ t.name }}<span *ngIf="!t.active"> (inactive)</span></span>
+                <button type="button" class="edp-theme-clear" [disabled]="mgrBusy" (click)="startRename(t)">Rename</button>
+                <button type="button" class="edp-theme-clear" [disabled]="mgrBusy"
+                        (click)="setThemeActive(t, !t.active)">
+                  {{ t.active ? 'Deactivate' : 'Reactivate' }}
+                </button>
+              </ng-container>
+              <ng-container *ngIf="renameThemeId === t.id">
+                <input class="edp-theme-mgr-input" [(ngModel)]="renameValue" maxlength="60" />
+                <button type="button" class="edp-theme-clear" [disabled]="mgrBusy || !renameValue.trim()"
+                        (click)="saveRename(t)">{{ mgrBusy ? 'Saving…' : 'Save' }}</button>
+                <button type="button" class="edp-theme-clear" [disabled]="mgrBusy"
+                        (click)="renameThemeId = null">Cancel</button>
+              </ng-container>
+            </div>
+            <div *ngIf="!mgrLoading && !mgrThemes.length" class="edp-theme-mgr-note">
+              No Themes yet for this Division.
+            </div>
+            <div class="edp-theme-mgr-row">
+              <input class="edp-theme-mgr-input" placeholder="New Theme name…"
+                     [(ngModel)]="newThemeName" maxlength="60" />
+              <button type="button" class="edp-theme-clear" [disabled]="mgrBusy || !newThemeName.trim()"
+                      (click)="addTheme()">{{ mgrBusy ? 'Saving…' : '+ Add' }}</button>
+            </div>
+            <div class="edp-theme-mgr-note">
+              Deactivated Themes keep displaying on Initiatives already tagged;
+              they stop appearing in pickers and new tagging.
+            </div>
+            <div *ngIf="mgrError" class="edp-theme-mgr-error">{{ mgrError }}</div>
+          </ng-container>
+        </ng-container>
       </div>
 
       <div *ngIf="loading">
@@ -424,6 +486,16 @@ interface EpoGroup {
     .edp-theme-pill { background: #fff; border: 1px solid #BDBDBD; border-radius: 999px; color: #5A5A5A; padding: 2px 12px; font-size: 12px; cursor: pointer; }
     .edp-theme-pill-active { background: var(--triarq-color-primary, #257099); border-color: var(--triarq-color-primary, #257099); color: #fff; }
     .edp-theme-clear { background: none; border: none; color: var(--triarq-color-primary, #257099); font-size: 12px; cursor: pointer; text-decoration: underline; }
+    /* CC-38 f14: inline theme manager */
+    .edp-theme-mgr { border: 1px solid var(--triarq-color-border, #E0E0E0); border-radius: 10px; padding: 10px 14px; margin: 0 0 12px; max-width: 520px; }
+    .edp-theme-mgr-title { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--triarq-color-text-secondary); margin-bottom: 8px; }
+    .edp-theme-mgr-select { font-size: 12px; padding: 4px 8px; border: 1px solid #BDBDBD; border-radius: 5px; margin-bottom: 8px; width: 100%; }
+    .edp-theme-mgr-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+    .edp-theme-mgr-name { flex: 1; }
+    .edp-theme-mgr-inactive .edp-theme-mgr-name { color: #9E9E9E; font-style: italic; }
+    .edp-theme-mgr-input { flex: 1; font-size: 12px; padding: 4px 8px; border: 1px solid #BDBDBD; border-radius: 5px; }
+    .edp-theme-mgr-note { font-size: 11px; font-style: italic; color: #757575; margin-top: 6px; }
+    .edp-theme-mgr-error { font-size: 12px; color: var(--triarq-color-error, #D32F2F); margin-top: 6px; }
     .edp-grid { display: grid; grid-template-columns: 3fr 1fr 1.4fr 1.4fr; gap: var(--triarq-space-sm); padding: 8px 12px; align-items: center; font-size: var(--triarq-text-small); }
     .edp-grid-header { font-weight: 500; color: var(--triarq-color-text-secondary); border-bottom: 2px solid var(--triarq-color-border); }
     .edp-grid-row { border-bottom: 1px solid var(--triarq-color-border); cursor: pointer; }
@@ -507,10 +579,127 @@ export class EpoDeployComponent implements OnInit, OnDestroy {
           this.dolRequiredByDivision = new Map(
             res.data.map(d => [d.id, d.dol_required !== false])
           );
+          this.allDivisions = res.data;   // CC-38 f14: theme manager Division list
           this.cdr.markForCheck();
         }
       },
       error: () => { /* map stays empty — default requires DOL */ }
+    });
+  }
+
+  // ── CC-38 f14: inline Roadmap Theme manager ────────────────────────────────
+  allDivisions: Division[] = [];
+  themeMgrOpen  = false;
+  mgrDivisionId = '';
+  mgrThemes: RoadmapTheme[] = [];
+  mgrLoading = false;
+  mgrBusy    = false;
+  mgrError   = '';
+  newThemeName = '';
+  renameThemeId: string | null = null;
+  renameValue = '';
+
+  /** Admin: every Division. Trio: Divisions the user belongs to. */
+  get manageableDivisions(): Division[] {
+    if (this.isPrivileged) { return this.allDivisions; }
+    return this.allDivisions.filter(d => this.userDivisionIds.includes(d.id));
+  }
+
+  toggleThemeMgr(): void {
+    this.themeMgrOpen = !this.themeMgrOpen;
+    this.mgrError = '';
+    // One manageable Division → preselect it.
+    if (this.themeMgrOpen && !this.mgrDivisionId && this.manageableDivisions.length === 1) {
+      this.onMgrDivisionChange(this.manageableDivisions[0].id);
+    }
+    this.cdr.markForCheck();
+  }
+
+  onMgrDivisionChange(divId: string): void {
+    this.mgrDivisionId = divId;
+    this.mgrThemes = [];
+    this.renameThemeId = null;
+    this.mgrError = '';
+    if (divId) { this.loadMgrThemes(); }
+    this.cdr.markForCheck();
+  }
+
+  private loadMgrThemes(): void {
+    this.mgrLoading = true;
+    this.delivery.listRoadmapThemes(this.mgrDivisionId, /*include_inactive*/ true).subscribe({
+      next: res => {
+        this.mgrThemes = res.success ? (res.data ?? []) : [];
+        this.mgrLoading = false;
+        this.cdr.markForCheck();
+      },
+      error: () => { this.mgrThemes = []; this.mgrLoading = false; this.cdr.markForCheck(); }
+    });
+  }
+
+  /** Filter pills + grouping consume allThemes — refresh after every mutation. */
+  private refreshAllThemes(): void {
+    this.delivery.listRoadmapThemes().subscribe({
+      next: res => { if (res.success) { this.allThemes = res.data ?? []; this.cdr.markForCheck(); } }
+    });
+  }
+
+  addTheme(): void {
+    const name = this.newThemeName.trim();
+    if (!name || this.mgrBusy) { return; }
+    this.mgrBusy = true; this.mgrError = '';
+    this.delivery.createRoadmapTheme(this.mgrDivisionId, name).subscribe({
+      next: res => {
+        this.mgrBusy = false;
+        if (res.success) { this.newThemeName = ''; this.loadMgrThemes(); this.refreshAllThemes(); }
+        else { this.mgrError = res.error ?? 'Could not add the Theme.'; }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.mgrBusy = false; this.mgrError = err?.error ?? 'Could not add the Theme.'; this.cdr.markForCheck();
+      }
+    });
+  }
+
+  startRename(t: RoadmapTheme): void {
+    this.renameThemeId = t.id;
+    this.renameValue   = t.name;
+    this.mgrError = '';
+    this.cdr.markForCheck();
+  }
+
+  saveRename(t: RoadmapTheme): void {
+    const name = this.renameValue.trim();
+    if (!name || this.mgrBusy) { return; }
+    this.mgrBusy = true; this.mgrError = '';
+    this.delivery.updateRoadmapTheme(t.id, { name }).subscribe({
+      next: res => {
+        this.mgrBusy = false;
+        if (res.success) { this.renameThemeId = null; this.loadMgrThemes(); this.refreshAllThemes(); }
+        else { this.mgrError = res.error ?? 'Could not rename the Theme.'; }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.mgrBusy = false; this.mgrError = err?.error ?? 'Could not rename the Theme.'; this.cdr.markForCheck();
+      }
+    });
+  }
+
+  setThemeActive(t: RoadmapTheme, active: boolean): void {
+    if (this.mgrBusy) { return; }
+    this.mgrBusy = true; this.mgrError = '';
+    const call = active
+      ? this.delivery.updateRoadmapTheme(t.id, { active: true })
+      : this.delivery.deactivateRoadmapTheme(t.id);
+    call.subscribe({
+      next: res => {
+        this.mgrBusy = false;
+        if (res.success) { this.loadMgrThemes(); this.refreshAllThemes(); }
+        else { this.mgrError = res.error ?? 'Could not update the Theme.'; }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.mgrBusy = false; this.mgrError = err?.error ?? 'Could not update the Theme.'; this.cdr.markForCheck();
+      }
     });
   }
 
