@@ -181,6 +181,24 @@ describe('update_delivery_cycle — CC-38 f13 AI fields', () => {
   });
 });
 
+describe('update_delivery_cycle — CC-38 f16 service_agent coercion', () => {
+  beforeEach(() => { queue = []; capturedUpdates = []; });
+
+  test('ai_delivery_form service_agent coerces ai_audience to internal', async () => {
+    queue = [
+      { data: { delivery_cycle_id: 'c1', cycle_status: 'active', ai_delivery_form: null, ai_audience: null }, error: null },
+      { data: { delivery_cycle_id: 'c1' }, error: null },
+      { data: null, error: null }
+    ];
+    const res = await update_delivery_cycle(
+      { delivery_cycle_id: 'c1', ai_delivery_form: 'service_agent' }, CALLER
+    );
+    assert.equal(res.success, true);
+    assert.equal(capturedUpdates[0].ai_delivery_form, 'service_agent');
+    assert.equal(capturedUpdates[0].ai_audience, 'internal');
+  });
+});
+
 describe('create_delivery_cycle — CC-38 f14 AI fields at creation', () => {
   beforeEach(() => { queue = []; capturedUpdates = []; });
 

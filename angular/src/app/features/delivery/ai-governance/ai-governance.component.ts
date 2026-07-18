@@ -235,7 +235,9 @@ export class AiGovernanceComponent implements OnInit {
         boardGate,
         gateLabel:    GATE_DISPLAY[boardGate] ?? boardGate,
         targetDate:   milestone?.target_date ?? null,
-        profileLabel: (c.ai_delivery_form === 'analytics_outputs' ? 'Analytics' : 'Embedded')
+        profileLabel: (c.ai_delivery_form === 'analytics_outputs' ? 'Analytics'
+                        : c.ai_delivery_form === 'service_agent' ? 'Service agent'
+                        : 'Embedded')
                       + ' · ' + (c.ai_audience === 'external' ? 'External' : 'Internal')
       });
     }

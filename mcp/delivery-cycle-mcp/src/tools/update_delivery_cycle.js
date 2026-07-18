@@ -42,7 +42,7 @@ const MUTABLE_FIELD_LABELS = {
 };
 
 const VALID_AI_FUNCTIONALITY = ['yes', 'no', 'unknown'];
-const VALID_AI_DELIVERY_FORM = ['product_embedded', 'analytics_outputs'];
+const VALID_AI_DELIVERY_FORM = ['product_embedded', 'analytics_outputs', 'service_agent'];
 const VALID_AI_AUDIENCE      = ['external', 'internal'];
 
 // D-458: uuid[] fields. Handled distinctly from scalar fields — full-array
@@ -104,7 +104,12 @@ async function update_delivery_cycle(params, caller_user_id) {
   }
   if (fields.ai_delivery_form !== undefined && fields.ai_delivery_form !== null &&
       !VALID_AI_DELIVERY_FORM.includes(fields.ai_delivery_form)) {
-    return { success: false, error: 'ai_delivery_form must be one of: product_embedded, analytics_outputs — or null to clear.' };
+    return { success: false, error: 'ai_delivery_form must be one of: product_embedded, analytics_outputs, service_agent — or null to clear.' };
+  }
+  // CC-38 f16: service agents are internal by definition — coerce audience.
+  if (fields.ai_delivery_form === 'service_agent') {
+    fields.ai_audience = 'internal';
+    if (!suppliedFields.includes('ai_audience')) { suppliedFields.push('ai_audience'); }
   }
   if (fields.ai_audience !== undefined && fields.ai_audience !== null &&
       !VALID_AI_AUDIENCE.includes(fields.ai_audience)) {

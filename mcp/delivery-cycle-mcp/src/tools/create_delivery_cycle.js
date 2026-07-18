@@ -79,8 +79,8 @@ async function create_delivery_cycle(params, caller_user_id) {
   if (ai_functionality != null && !['yes', 'no', 'unknown'].includes(ai_functionality)) {
     return { success: false, error: 'ai_functionality must be one of: yes, no, unknown — or omitted.' };
   }
-  if (ai_delivery_form != null && !['product_embedded', 'analytics_outputs'].includes(ai_delivery_form)) {
-    return { success: false, error: 'ai_delivery_form must be one of: product_embedded, analytics_outputs — or omitted.' };
+  if (ai_delivery_form != null && !['product_embedded', 'analytics_outputs', 'service_agent'].includes(ai_delivery_form)) {
+    return { success: false, error: 'ai_delivery_form must be one of: product_embedded, analytics_outputs, service_agent — or omitted.' };
   }
   if (ai_audience != null && !['external', 'internal'].includes(ai_audience)) {
     return { success: false, error: 'ai_audience must be one of: external, internal — or omitted.' };
@@ -194,7 +194,10 @@ async function create_delivery_cycle(params, caller_user_id) {
       // Contract 38 f14: AI profile at creation; follow-ups only meaningful when yes.
       ai_functionality:        ai_functionality     || null,
       ai_delivery_form:        (ai_functionality === 'yes' ? ai_delivery_form : null) || null,
-      ai_audience:             (ai_functionality === 'yes' ? ai_audience      : null) || null
+      // CC-38 f16: service agents are internal by definition — coerce audience.
+      ai_audience:             (ai_functionality === 'yes'
+                                 ? (ai_delivery_form === 'service_agent' ? 'internal' : ai_audience)
+                                 : null) || null
     })
     .select()
     .single();

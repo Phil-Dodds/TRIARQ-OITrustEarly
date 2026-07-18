@@ -180,7 +180,7 @@ export class DeliveryService {
     roadmap_theme_id?:        string | null;   // D-487: optional Theme tag
     // CC-38 f14: optional AI Governance profile at creation.
     ai_functionality?:        'yes' | 'no' | 'unknown';
-    ai_delivery_form?:        'product_embedded' | 'analytics_outputs';
+    ai_delivery_form?:        'product_embedded' | 'analytics_outputs' | 'service_agent';
     ai_audience?:             'external' | 'internal';
     milestone_target_dates?:  {               // optional gate target dates at creation
       brief_review?:   string;
@@ -209,7 +209,7 @@ export class DeliveryService {
     roadmap_theme_id?:       string | null;   // D-487: null clears the tag
     // CC-38 f13 (migration 075): AI Production Governance profile.
     ai_functionality?:       'yes' | 'no' | 'unknown' | null;
-    ai_delivery_form?:       'product_embedded' | 'analytics_outputs' | null;
+    ai_delivery_form?:       'product_embedded' | 'analytics_outputs' | 'service_agent' | null;
     ai_audience?:            'external' | 'internal' | null;
     ai_board_approved?:      boolean;
     // Contract 29 / D-458 (WS1): full-array replace; [] clears.

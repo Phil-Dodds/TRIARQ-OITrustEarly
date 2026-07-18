@@ -313,7 +313,8 @@ export interface DeliveryCycle {
   // ai_functionality: null = blank (allowed through Brief Review); must be
   // answered by Go to Build; 'yes'|'no' only by Go to Deploy.
   ai_functionality?:       'yes' | 'no' | 'unknown' | null;
-  ai_delivery_form?:       'product_embedded' | 'analytics_outputs' | null;
+  // f16: 'service_agent' = internal service/workflow agent (audience coerced internal).
+  ai_delivery_form?:       'product_embedded' | 'analytics_outputs' | 'service_agent' | null;
   ai_audience?:            'external' | 'internal' | null;
   ai_board_approved?:      boolean;
   ai_board_approved_at?:   string | null;

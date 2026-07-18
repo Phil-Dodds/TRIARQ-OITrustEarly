@@ -33,6 +33,17 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-17',
+    contractLabel: 'Contract 38 follow-on — AI delivery form: internal service agents',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'Initiative create/edit — AI Governance',
+        description: 'New AI delivery form option "Internal service / workflow agent" for AI that is neither product-embedded nor delivered analytics. Audience is set to Internal automatically; AI Prod Board approval applies before Go to Release.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-17',
     contractLabel: 'Contract 38 follow-on — AI Production Governance surfaces',
     items: [
       {

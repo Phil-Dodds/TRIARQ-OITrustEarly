@@ -355,13 +355,15 @@ function epAvatarColorFromName(name: string): string {
               <div class="ep-field">
                 <label class="ep-label">AI delivery form</label>
                 <select class="ep-input" [ngModel]="aiDeliveryForm" [ngModelOptions]="{standalone: true}"
-                        (ngModelChange)="aiDeliveryForm = $event">
+                        (ngModelChange)="onAiDeliveryFormChange($event)">
                   <option value="">— Not set —</option>
                   <option value="product_embedded">Embedded in the product</option>
                   <option value="analytics_outputs">Analytics / intelligence outputs</option>
+                  <option value="service_agent">Internal service / workflow agent</option>
                 </select>
               </div>
-              <div class="ep-field">
+              <!-- f16: service agents are internal by definition — audience hidden, coerced. -->
+              <div class="ep-field" *ngIf="aiDeliveryForm !== 'service_agent'">
                 <label class="ep-label">AI audience</label>
                 <select class="ep-input" [ngModel]="aiAudience" [ngModelOptions]="{standalone: true}"
                         (ngModelChange)="aiAudience = $event">
@@ -1143,7 +1145,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     }
     const newAiForm = (this.aiFunctionality === 'yes' ? this.aiDeliveryForm : '') || null;
     if (newAiForm !== (this.cycle.ai_delivery_form ?? null)) {
-      payload.ai_delivery_form = newAiForm as ('product_embedded' | 'analytics_outputs' | null);
+      payload.ai_delivery_form = newAiForm as ('product_embedded' | 'analytics_outputs' | 'service_agent' | null);
     }
     const newAiAud = (this.aiFunctionality === 'yes' ? this.aiAudience : '') || null;
     if (newAiAud !== (this.cycle.ai_audience ?? null)) {
@@ -1203,6 +1205,12 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   onAiFunctionalityChange(v: string): void {
     this.aiFunctionality = v;
     if (v !== 'yes') { this.aiDeliveryForm = ''; this.aiAudience = ''; this.aiBoardApproved = false; }
+  }
+
+  /** f16: service agents are internal by definition — coerce audience. */
+  onAiDeliveryFormChange(v: string): void {
+    this.aiDeliveryForm = v;
+    if (v === 'service_agent') { this.aiAudience = 'internal'; }
   }
 
   /** AI Prod Board approval applies to every Yes profile except analytics+external (Track 2). */

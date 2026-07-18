@@ -269,13 +269,15 @@ import {
             <div class="cp-field">
               <label class="cp-label">AI delivery form</label>
               <select class="cp-input" [ngModel]="aiDeliveryForm" [ngModelOptions]="{standalone: true}"
-                      (ngModelChange)="aiDeliveryForm = $event">
+                      (ngModelChange)="onAiDeliveryFormChange($event)">
                 <option value="">— Not set —</option>
                 <option value="product_embedded">Embedded in the product</option>
                 <option value="analytics_outputs">Analytics / intelligence outputs</option>
+                <option value="service_agent">Internal service / workflow agent</option>
               </select>
             </div>
-            <div class="cp-field">
+            <!-- f16: service agents are internal by definition — audience hidden, coerced. -->
+            <div class="cp-field" *ngIf="aiDeliveryForm !== 'service_agent'">
               <label class="cp-label">AI audience</label>
               <select class="cp-input" [ngModel]="aiAudience" [ngModelOptions]="{standalone: true}"
                       (ngModelChange)="aiAudience = $event">
@@ -703,6 +705,12 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
     if (v !== 'yes') { this.aiDeliveryForm = ''; this.aiAudience = ''; }
   }
 
+  /** f16: service agents are internal by definition — coerce audience. */
+  onAiDeliveryFormChange(v: string): void {
+    this.aiDeliveryForm = v;
+    if (v === 'service_agent') { this.aiAudience = 'internal'; }
+  }
+
   /** Consequence line — where the AI Production Board stop lands for this profile. */
   get aiConsequenceLine(): string {
     if (this.aiFunctionality !== 'yes' || !this.aiDeliveryForm || !this.aiAudience) { return ''; }
@@ -877,7 +885,7 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
       ...(this.selectedThemeId ? { roadmap_theme_id: this.selectedThemeId } : {}),
       ...(this.aiFunctionality ? { ai_functionality: this.aiFunctionality as 'yes' | 'no' | 'unknown' } : {}),
       ...(this.aiFunctionality === 'yes' && this.aiDeliveryForm
-          ? { ai_delivery_form: this.aiDeliveryForm as 'product_embedded' | 'analytics_outputs' } : {}),
+          ? { ai_delivery_form: this.aiDeliveryForm as 'product_embedded' | 'analytics_outputs' | 'service_agent' } : {}),
       ...(this.aiFunctionality === 'yes' && this.aiAudience
           ? { ai_audience: this.aiAudience as 'external' | 'internal' } : {})
     }).subscribe({
