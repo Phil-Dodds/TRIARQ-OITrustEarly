@@ -911,3 +911,85 @@ Commit `1acc563`; gh-pages `d404036`. No migrations.
 ## CLAUDE.md Candidates — Follow-on 14
 
 No candidates this session segment.
+
+
+---
+
+# Follow-on 15 — AI Production Governance surfaces + filter cleanup (2026-07-17)
+
+Commits: `e2b351f` (checkbox move), `ecf4b55` (screen + markers). gh-pages `b9ebcea`. No migrations.
+
+## CC-decisions
+
+- **CC-38-58** — Include-cancelled checkbox moved from the grid header into
+  the Filters panel (bottom row, applies immediately — not staged — still
+  never persisted per S-009). Header keeps only Filters + New Initiative.
+- **CC-38-59** — AI Production Board half-diamond marker added to the
+  CONDENSED StageTrack (smaller triangle, 5×7px, left flank, amber/blue —
+  same semantics as full mode). Initiatives grid rows bind it; chip idea
+  dropped (Phil: half-diamonds suffice). `aiBoardGateFor` extracted to
+  gate-visual.utils as the single source for Board-gate derivation (detail
+  panel refactored onto it).
+- **CC-38-60** — NEW "AI Production Governance" screen at
+  /initiatives/ai-governance + hub card. Three sections: Approval needed
+  (sorted by Board gate target date, undated last in amber — the Board's
+  agenda feed), Approved—active, Approved—closed (COMPLETE register the grid
+  can't show). CANCELLED excluded (S-009). Read-only phase 1 — approval is
+  recorded on the edit panel; visible to all users (governance transparency).
+  Track-2 external analytics intentionally absent (no Board stop) — footnote
+  explains. Phase-2 candidates deferred to Design: on-screen record-approval
+  action, Board-member notifications, formal Board role.
+  list_delivery_cycles adds ai_board_approved_at for the register stamps.
+
+## CodeClose Verification
+
+1. **Spec coverage:** Phil rulings (checkbox buried in Filters; grid gets
+   half-diamonds; screen only — no grid AI filter, no chip). All implemented. PASS.
+2. **Regression check:** ng build green; delivery-cycle-mcp suite unaffected
+   by the one-column select addition (250/250 at last run). Grid condensed
+   tracks: new inputs default null/false — rows without AI profile render
+   identically.
+3. **Test ratchet:** logic-touching MCP change = one select column (view-only
+   data addition; no branch logic — no new test). Angular: new screen +
+   marker rendering UAT-covered (ng test pre-existing broken; D-442
+   acknowledgment requested).
+4. **Pattern sweep:** shared StageTrack modified (condensed marker).
+   Consumers: detail (full — unchanged), grid + status dashboard (condensed —
+   inputs unbound default to no marker; grid explicitly bound). PASS.
+5. **Standards conformance:** read-only screen — no MCP-calling controls;
+   S-009 cancelled exclusion applied; D-200 error framing on load failure. PASS.
+6. **CC-decision completeness:** CC-38-58..60 sequential, no gaps.
+7. **Structural health:** NEW ai-governance.component.ts ~290 lines (within
+   threshold). stage-track 585 lines; dashboard grew ~15 lines — pre-existing
+   overs.
+8. **Deployment:** master pushed (delivery-cycle-mcp auto-deploy carries the
+   ai_board_approved_at select — confirm it completed; screen shows
+   "Recorded" without dates until it does) → build after commit
+   (version.json = ecf4b55) → gh-pages b9ebcea.
+9. **Repo cleanliness:** 1 new component file committed with its route import
+   in the same commit. Clean.
+
+## UAT Checklist — Follow-on 15
+
+**A. Initiatives grid**
+1. Filters panel bottom shows "Include cancelled Initiatives"; toggling
+   reveals/hides cancelled rows immediately; header checkbox gone. PASS/FAIL
+2. An AI-yes Initiative (embedded+external) shows a small amber triangle at
+   the left of its Go to Deploy diamond in the grid track; tooltip names the
+   AI Production Board. PASS/FAIL
+3. Record Board approval → grid triangle turns blue. PASS/FAIL
+
+**B. AI Production Governance screen**
+4. Initiative Tracking hub shows the "AI Production Governance" card; click
+   opens /initiatives/ai-governance. PASS/FAIL
+5. Pending section lists unapproved Board-gate Initiatives sorted by gate
+   target date; undated rows last with amber "No date set". PASS/FAIL
+6. Approved—active shows the approval date; mark an active AI Initiative
+   approved → it moves sections on reload. PASS/FAIL
+7. A COMPLETE approved Initiative appears under Approved—closed. PASS/FAIL
+8. Row click opens the Initiative panel on the right; close returns. PASS/FAIL
+9. Cancelled AI Initiatives appear nowhere on the screen. PASS/FAIL
+
+## CLAUDE.md Candidates — Follow-on 15
+
+No candidates this session segment.
