@@ -1048,3 +1048,59 @@ Commit `e3682fc`; gh-pages `f123201`. Migration 077 (Phil to run).
 ## CLAUDE.md Candidates — Follow-on 16
 
 No candidates this session segment.
+
+
+---
+
+# Follow-on 17 — Division filter restore fix (2026-07-17)
+
+Commit `e279ea6`; gh-pages `4462b4b`. No migrations, no MCP changes.
+
+## CC-decisions
+
+- **CC-38-62** — Bug fix (Phil report with screenshot: Division chip showed
+  Revenue Cycle Management while the grid listed every Division).
+  Root cause: `restoreScreenState()` is async; the initial `loadCycles()`
+  fires unfiltered before the saved state lands. Division filtering is
+  SERVER-side only — the restore then set `filterDivision` and ran the
+  client-side `applyFilters()`, which has no division predicate, so the chip
+  and grid disagreed. Compounding: Apply in the panel computed
+  `divisionChanged=false` (staged equals the already-restored value) so it
+  never reloaded either. Fix: a restored Division filter triggers
+  `loadCycles()` (server re-query) instead of `applyFilters(false)`.
+  Long-standing defect — present since Division filter persistence was
+  introduced; visible on every grid visit after saving a Division filter.
+
+## CodeClose Verification
+
+1. **Spec coverage:** bug fix per report. PASS.
+2. **Regression check:** ng build green; restore path without a Division
+   filter unchanged (client-side apply as before).
+3. **Test ratchet:** untested — async restore/load race needs component test
+   harness; ng test pre-existing broken. UAT covers (D-442 acknowledgment
+   requested).
+4. **Pattern sweep:** no shared pattern modified. Note: other screens restore
+   state BEFORE first load (await) — the dashboard was the outlier.
+5. **Standards conformance:** n/a — single-path fix. PASS.
+6. **CC-decision completeness:** CC-38-62 only; sequential.
+7. **Structural health:** no threshold changes.
+8. **Deployment:** Angular-only → build after commit (version.json =
+   e279ea6) → gh-pages 4462b4b. Deployment: MCP not touched.
+9. **Repo cleanliness:** not applicable — no new files.
+
+## UAT Checklist — Follow-on 17
+
+1. Set Division filter (e.g. Revenue Cycle Management) → Apply → only that
+   Division's Initiatives (plus children) show. PASS/FAIL
+2. Navigate away and back to the grid (or hard refresh) → chip shows the
+   Division AND the grid is actually filtered. PASS/FAIL
+3. Clear the chip (×) → full list returns. PASS/FAIL
+
+## CLAUDE.md Candidates — Follow-on 17
+
+6. **Candidate:** "Server-side filters restored from screen state must
+   re-trigger the server query — client-side applyFilters() cannot honor
+   them. Check every restore path that mixes server-side and client-side
+   filters."
+   **Why:** the Division filter silently showed a chip over unfiltered data.
+   **Trigger:** Phil's screenshot, 2026-07-17.
