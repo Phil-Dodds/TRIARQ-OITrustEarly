@@ -993,3 +993,58 @@ Commits: `e2b351f` (checkbox move), `ecf4b55` (screen + markers). gh-pages `b9eb
 ## CLAUDE.md Candidates — Follow-on 15
 
 No candidates this session segment.
+
+
+---
+
+# Follow-on 16 — AI delivery form: internal service agents (2026-07-17)
+
+Commit `e3682fc`; gh-pages `f123201`. Migration 077 (Phil to run).
+
+## CC-decisions
+
+- **CC-38-61** — Third ai_delivery_form value `service_agent` ("Internal
+  service / workflow agent") for AI that is neither product-embedded nor
+  delivered analytics (Phil's gap report: internal service agents had no
+  honest answer). Service agents are internal by definition — ai_audience is
+  coerced to 'internal' at BOTH layers (form UIs hide the audience question
+  and set it; update/create tools coerce server-side). Governance unchanged:
+  internal AI → AI Production Board approval before Go to Release.
+  aiBoardGateFor needed no change (keys off audience). Governance-screen
+  profile label: "Service agent · Internal". Migration 077 widens the CHECK
+  constraint.
+
+## CodeClose Verification
+
+1. **Spec coverage:** Phil's ruling (third option, auto-internal, Board at
+   Release) implemented across migration, both MCP tools, both forms, screen
+   label. PASS.
+2. **Regression check:** delivery-cycle-mcp 251/251; ng build green. Existing
+   two form values behave identically.
+3. **Test ratchet:** +1 test (server coercion writes ai_audience='internal').
+   UNTESTED (Angular): form option + audience hide — UAT covers (D-442
+   acknowledgment requested).
+4. **Pattern sweep:** no shared pattern modified.
+5. **Standards conformance:** no new server-calling controls; D-140 unchanged. PASS.
+6. **CC-decision completeness:** CC-38-61 only; sequential.
+7. **Structural health:** no file crossed a threshold this follow-on.
+8. **Deployment:** master pushed (delivery-cycle-mcp auto-deploys the enum +
+   coercion) → build after commit (version.json = e3682fc) → gh-pages
+   f123201. **Migration 077 must run before anyone selects the new option**
+   (save fails on the CHECK constraint until then) — displayed to Phil.
+9. **Repo cleanliness:** 1 new migration file, committed. Clean.
+
+## UAT Checklist — Follow-on 16
+
+1. Edit an AI-yes Initiative → AI delivery form shows "Internal service /
+   workflow agent"; choosing it hides the audience question. PASS/FAIL
+2. Save → reopen: form = service agent, audience shows Internal (visible
+   again if you switch form back). PASS/FAIL
+3. Consequence line reads "AI Production Board approval is required before
+   Go to Release…". PASS/FAIL
+4. Panel track shows the half-diamond at Go to Release. PASS/FAIL
+5. AI Production Governance screen lists it as "Service agent · Internal". PASS/FAIL
+
+## CLAUDE.md Candidates — Follow-on 16
+
+No candidates this session segment.
