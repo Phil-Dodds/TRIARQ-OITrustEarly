@@ -213,13 +213,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
         <!-- Right: Filters + New Cycle — flex-shrink:0, never wraps. Source: D-298. -->
         <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-end;">
-          <!-- CC-38-41 / S-009: cancelled reveal — off on every load, never persisted. -->
-          <label style="display:flex;align-items:center;gap:5px;font-size:12px;
-                        color:#5A5A5A;cursor:pointer;padding-bottom:9px;white-space:nowrap;">
-            <input type="checkbox" [(ngModel)]="includeCancelled" (ngModelChange)="applyFilters(false)" />
-            Include cancelled
-          </label>
-          <!-- Filters button: badge overlapping corner per D-298 -->
+          <!-- Filters button: badge overlapping corner per D-298.
+               Include-cancelled checkbox moved inside the panel (CC-38 f14 rev). -->
           <button (click)="toggleFilterPanel()"
                   style="position:relative;background:#257099;color:#fff;
                          padding:8px 16px;border:none;border-radius:6px;cursor:pointer;
@@ -586,6 +581,19 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   No workstreams found in this scope.
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- CC-38 f14 rev / S-009: cancelled reveal moved from the header into
+               the Filters panel (infrequent use). Applies immediately — not
+               staged — and never persists. -->
+          <div style="border-bottom:1px solid #F0F0F0;padding:14px 20px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+              <input type="checkbox" [(ngModel)]="includeCancelled" (ngModelChange)="applyFilters(false)" />
+              Include cancelled Initiatives
+            </label>
+            <div style="font-size:11px;font-style:italic;color:#757575;margin-top:4px;padding-left:24px;">
+              Applies immediately; resets off on every load.
             </div>
           </div>
 
