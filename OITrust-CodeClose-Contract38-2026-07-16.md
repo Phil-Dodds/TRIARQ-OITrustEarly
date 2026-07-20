@@ -1168,3 +1168,96 @@ No candidates this session segment.
   reference. **CLAUDE.md candidate 7:** "Template-bound getters must never
   return a freshly-allocated array/object per call when consumed by *ngFor
   containing form directives — memoize on the source reference."
+
+
+---
+
+# Follow-on 19 — Team Meetings presenter email reminders (2026-07-18)
+
+Commit `5875e68`; gh-pages `518bb1b`. Migration 078 (Phil runs — see deployment).
+
+## CC-decisions
+
+- **CC-38-66** — Presenter prep reminders. Track-level settings (migration
+  078): meeting_time (ET wall clock — fixed Eastern per Phil), reminder_lead
+  _minutes (Off/1h/2h/4h/24h in UI; 30–10080 at MCP), leader-editable
+  reminder_note (default "Please review and prep."). Recipients = the meeting
+  series' presenter configuration (distinct presenter_user_id on track
+  template sections).
+- **CC-38-67** — Sender architecture: the "30-minute service" is pg_cron SQL
+  (D-480..482) and cannot email — a SECOND pg_cron entry on the same
+  heartbeat POSTs via pg_net to a NEW team-meetings-mcp internal endpoint
+  `/internal/send_meeting_reminders`, authorized by RENDER_INTERNAL_API_KEY
+  header (registered before the JWT middleware). **Deliberate Arch-5
+  carve-out** for machine-to-machine — flagged for Design. The migration
+  ships with URL/key placeholders Phil substitutes at execution (Arch-4 — no
+  credential committed). Email relays through the existing
+  send-notification-email Edge Function (O365 SMTP) — no new mail env vars.
+- **CC-38-68** — Skip + one-and-done semantics: a presenter with a presence
+  row on that date's meeting instance is skipped ("entered the meeting once",
+  Phil — reuses the CC-38 presence table); no meeting instance created yet →
+  nobody can have prepped → everyone reminded, email links to the track's
+  latest-meeting redirect (Phil: not creating the meeting is itself a reason
+  to nudge). team_meeting_reminder_log UNIQUE(track, meeting_date, user) —
+  keyed on date, not meeting_id, because the instance may not exist; the log
+  row is written even when delivery fails so a flaky relay never re-nags.
+  Window math handles leads crossing midnight (24h lead → tomorrow's
+  occurrence). Cron granularity: email lands within ~30 min after the lead
+  threshold. Opt-out and sent-visibility deferred per Phil.
+
+## CodeClose Verification
+
+1. **Spec coverage:** Phil's Q&A rulings all implemented — presenter config
+   as recipients, track-level time+lead, ET fixed, "entered once" skip incl.
+   edit-of-any-kind superseded by presence, default note leader-adjustable,
+   one-and-done, opt-out deferred, no-meeting edge case sends. PASS.
+2. **Regression check:** team-meetings-mcp 37 tests: 30 pass, 7 pre-existing
+   stale "non-admin caller" failures (unchanged count — not regressions).
+   update_track existing fields untouched; ng build green.
+3. **Test ratchet:** 7 new tests (window math incl. midnight crossing;
+   HH:MM parsing; update_track reminder-field validation). UNTESTED: the
+   multi-query sweep happy path — Rule 37 single-result mock cannot sequence
+   it; verified via the cron summary log at UAT (D-442 acknowledgment
+   requested).
+4. **Pattern sweep:** no shared pattern modified. Email template duplicated
+   from delivery-cycle helper (provider-agnostic invoke) — extraction to a
+   shared package is a port-time candidate.
+5. **Standards conformance:** settings save on change (existing Track
+   Settings auto-save pattern); D-140 error strings on validation. PASS.
+6. **CC-decision completeness:** CC-38-66..68 sequential, no gaps.
+7. **Structural health:** send_meeting_reminders.js 262 lines (new tool);
+   track-settings.component.ts grows ~55 lines (~590 — over 300, pre-existing
+   over).
+8. **Deployment:** Angular deployed (gh-pages 518bb1b, version.json
+   5875e68). **Phil actions, in order:** (1) run migration 078 — substitute
+   the two placeholders (team-meetings Render URL + RENDER_INTERNAL_API_KEY)
+   before executing; (2) MANUALLY redeploy team-meetings-mcp in Render (new
+   endpoint + track fields — settings saves fail until then); (3) verify:
+   Render logs show a send_meeting_reminders line each half hour.
+9. **Repo cleanliness:** 3 new files (migration, tool, test) committed with
+   the index.js require in the same commit. Clean.
+
+## UAT Checklist — Follow-on 19
+
+1. Track Settings (leader): "Presenter Reminders" block — set a time, pick a
+   lead → saves; note field appears and edits persist. PASS/FAIL
+2. Clearing the time resets the lead to Off. PASS/FAIL
+3. Set a meeting time ~1–1.5h ahead with a 1h lead on a track with
+   presenters → within 30 min of the window opening, presenters receive the
+   email (name, time ET, note, Open-the-meeting link). PASS/FAIL
+4. A presenter who opened today's meeting before the window → no email. PASS/FAIL
+5. Cron rerun 30 min later → no duplicate emails (one-and-done). PASS/FAIL
+6. No meeting instance created for today → email still sends, linking to the
+   track's latest-meeting redirect. PASS/FAIL
+7. Render logs show the sweep summary each half hour after migration 078. PASS/FAIL
+
+## CLAUDE.md Candidates — Follow-on 19
+
+8. **Candidate:** "Scheduled/machine-to-machine work cannot originate in
+   pg_cron SQL alone when it needs MCP-side effects (email, HTTP) — pattern:
+   pg_cron + pg_net → MCP internal endpoint authorized by
+   RENDER_INTERNAL_API_KEY, registered before the JWT middleware; credentials
+   substituted at migration execution, never committed."
+   **Why:** first scheduled sender; the pattern will recur (digests, escalation
+   nudges).
+   **Trigger:** Phil's reminder feature request, 2026-07-18.
