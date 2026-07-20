@@ -13,7 +13,7 @@
 -- ⚠ Do NOT execute via Code. Phil executes against Supabase.
 -- ⚠ BEFORE RUNNING: replace the two placeholders in Step 3:
 --      <TEAM_MEETINGS_MCP_URL>     e.g. https://team-meetings-mcp-xxxx.onrender.com
---      <RENDER_INTERNAL_API_KEY>   the existing internal key from Render env
+--      <TEAM_MEETINGS_INTERNAL_CRON_KEY>  generated secret, also set in Render env
 --    The key is substituted at execution time so it is never committed (Arch-4).
 
 BEGIN;
@@ -63,7 +63,7 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url     := '<TEAM_MEETINGS_MCP_URL>/internal/send_meeting_reminders',
-    headers := jsonb_build_object('x-internal-key', '<RENDER_INTERNAL_API_KEY>',
+    headers := jsonb_build_object('x-internal-key', '<TEAM_MEETINGS_INTERNAL_CRON_KEY>',
                                   'Content-Type',  'application/json'),
     body    := '{}'::jsonb
   );

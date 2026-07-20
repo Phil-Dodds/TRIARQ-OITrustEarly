@@ -87,11 +87,12 @@ app.use(express.json());
 
 // ── CC-38 f19: internal cron endpoint — registered BEFORE the JWT middleware.
 // Machine-to-machine (pg_cron → pg_net, migration 078); authorized by the
-// RENDER_INTERNAL_API_KEY header instead of a user JWT. Deliberate Arch-5
-// carve-out for the scheduled sender — recorded as a CC-decision.
+// TEAM_MEETINGS_INTERNAL_CRON_KEY header instead of a user JWT (named
+// specifically per Phil 2026-07-20 — one purpose, one key). Deliberate
+// Arch-5 carve-out for the scheduled sender — recorded as a CC-decision.
 app.post('/internal/send_meeting_reminders', async (req, res) => {
   const key = req.get('x-internal-key');
-  if (!process.env.RENDER_INTERNAL_API_KEY || key !== process.env.RENDER_INTERNAL_API_KEY) {
+  if (!process.env.TEAM_MEETINGS_INTERNAL_CRON_KEY || key !== process.env.TEAM_MEETINGS_INTERNAL_CRON_KEY) {
     return res.status(401).json({ success: false, error: 'Invalid internal key.' });
   }
   const start = Date.now();
