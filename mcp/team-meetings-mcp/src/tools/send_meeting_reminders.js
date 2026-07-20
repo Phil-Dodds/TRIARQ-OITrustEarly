@@ -213,9 +213,10 @@ async function send_meeting_reminders(now = new Date()) {
 
     for (const u of users || []) {
       let deliveryError = null;
+      let relayResponse = null;
       if (u.email) {
         try {
-          const { error } = await supabase.functions.invoke('send-notification-email', {
+          const { data, error } = await supabase.functions.invoke('send-notification-email', {
             body: {
               to:        [u.email.trim().toLowerCase()],
               subject:   `Reminder: ${track.track_name} — ${formatTimeEt(track.meeting_time)}`,
@@ -224,12 +225,23 @@ async function send_meeting_reminders(now = new Date()) {
             }
           });
           if (error) { deliveryError = error.message || String(error); }
+          relayResponse = data ?? null;
         } catch (e) {
           deliveryError = e?.message ?? String(e);
         }
       } else {
         deliveryError = 'no email address on user record';
       }
+
+      // CC-38 f19 instrumentation (Phil report: reminders not received while
+      // relay reported success): one log line per send with the recipient
+      // address and the Edge Function's exact response — visible in Render.
+      console.log(JSON.stringify({
+        tool_name: 'send_meeting_reminders', step: 'send',
+        track_id: track.track_id, meeting_date: targetDate,
+        recipient: u.email ?? '(none)', delivery_error: deliveryError,
+        relay_response: relayResponse
+      }));
 
       // Log regardless of delivery outcome — one-and-done, never re-nag.
       const { error: logErr } = await supabase
