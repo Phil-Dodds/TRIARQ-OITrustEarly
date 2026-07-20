@@ -28,6 +28,11 @@ import nodemailer from "npm:nodemailer@6.9.16";
 
 interface EmailPayload {
   to: string[];
+  // CC-38 f19 fix: when cc is supplied, ONE message is sent with a real
+  // To/CC header (celebration emails — the finder is To, the club is CC).
+  // Without cc, behavior is unchanged: individual sends per `to` address so
+  // gate-notification recipients are not disclosed to each other.
+  cc?: string[];
   subject: string;
   html_body: string;
   initiative_id?: string | null;
@@ -86,7 +91,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
     greetingTimeout: 10000,
   });
 
+  const cc = Array.isArray(payload?.cc)
+    ? payload.cc.filter((e) => typeof e === "string" && e.includes("@"))
+    : [];
+
   try {
+    // cc supplied → ONE message with real To/CC headers (e.g. egg
+    // celebrations: finder in To, finishers club in CC).
+    if (cc.length > 0) {
+      await transporter.sendMail({
+        from,
+        to: to.join(", "),
+        cc: cc.join(", "),
+        subject: payload.subject,
+        html: payload.html_body,
+      });
+      return json({ success: true, sent: 1, failed: 0 });
+    }
+
     // Send individually so one bad address does not drop the batch and so
     // recipients are not disclosed to each other (no shared To/CC header).
     const results = await Promise.allSettled(

@@ -181,13 +181,15 @@ async function sendCongratsEmail(finder_user_id) {
   // so delivery is guaranteed (intended split recorded in metadata).
   try {
     await supabase.functions.invoke('send-notification-email', {
+      // CC-38 f19 fix: the Edge Function previously ignored cc and sent an
+      // individual To-copy to every address (Phil bug report 2026-07-20:
+      // David received "Congrats Ami" addressed To: David). Edge Function
+      // now honors cc — finder in To, club in CC, one message.
       body: {
-        to: [finderEmail, ...cc],
+        to: [finderEmail],
         cc,
         subject,
-        html_body,
-        intended_to: [finderEmail],
-        intended_cc: cc
+        html_body
       }
     });
   } catch (e) { /* fire-and-forget */ }
