@@ -270,7 +270,7 @@ async function get_track(params, caller_user_id) {
   // Cadence lives on the track row; getTrack() helper doesn't select it — fetch here.
   const { data: cadRow } = await supabase
     .from('team_meeting_tracks')
-    .select('meeting_cadence')
+    .select('meeting_cadence, meeting_time, reminder_lead_minutes, reminder_note')
     .eq('track_id', track_id)
     .maybeSingle();
   const meeting_cadence = cadRow?.meeting_cadence ?? null;
@@ -283,6 +283,10 @@ async function get_track(params, caller_user_id) {
       is_public:             track.is_public,
       ref_panel_person_type: track.ref_panel_person_type,
       meeting_cadence,
+      // CC-38 f19: presenter reminder settings.
+      meeting_time:          cadRow?.meeting_time ?? null,
+      reminder_lead_minutes: cadRow?.reminder_lead_minutes ?? null,
+      reminder_note:         cadRow?.reminder_note ?? 'Please review and prep.',
       suggested_next_meeting_date: suggestNextMeetingDate(meeting_cadence, latest?.meeting_date ?? null),
       deleted_at:            track.deleted_at,
       is_leader:             !!membership?.is_leader || caller.is_admin,
@@ -304,7 +308,8 @@ async function get_track(params, caller_user_id) {
 // ── update_track ───────────────────────────────────────────────────────────────
 // Leader only. track_name / is_public / ref_panel_person_type.
 async function update_track(params, caller_user_id) {
-  const { track_id, track_name, is_public, ref_panel_person_type, meeting_cadence } = params;
+  const { track_id, track_name, is_public, ref_panel_person_type, meeting_cadence,
+          meeting_time, reminder_lead_minutes, reminder_note } = params;
   if (!track_id) return { success: false, error: 'track_id is required.' };
 
   const access = await assertTrackAccess(track_id, caller_user_id, { requireLeader: true });
@@ -326,6 +331,24 @@ async function update_track(params, caller_user_id) {
     const cadErr = validateCadence(meeting_cadence);
     if (cadErr) return { success: false, error: cadErr };
     patch.meeting_cadence = meeting_cadence;   // null clears the cadence
+  }
+  // CC-38 f19: presenter reminder settings (migration 078).
+  if (meeting_time !== undefined) {
+    if (meeting_time !== null && !/^\d{1,2}:\d{2}$/.test(meeting_time)) {
+      return { success: false, error: 'meeting_time must be HH:MM (Eastern Time) or null to clear.' };
+    }
+    patch.meeting_time = meeting_time;   // null clears
+  }
+  if (reminder_lead_minutes !== undefined) {
+    if (reminder_lead_minutes !== null &&
+        (!Number.isInteger(reminder_lead_minutes) || reminder_lead_minutes < 30 || reminder_lead_minutes > 10080)) {
+      return { success: false, error: 'reminder_lead_minutes must be an integer between 30 and 10080, or null for off.' };
+    }
+    patch.reminder_lead_minutes = reminder_lead_minutes;   // null = reminders off
+  }
+  if (reminder_note !== undefined) {
+    const note = typeof reminder_note === 'string' ? reminder_note.trim() : '';
+    patch.reminder_note = note || 'Please review and prep.';
   }
   if (!Object.keys(patch).length) return { success: false, error: 'Nothing to update.' };
 

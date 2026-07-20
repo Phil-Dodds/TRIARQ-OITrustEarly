@@ -33,6 +33,17 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-18',
+    contractLabel: 'Contract 38 follow-on — Presenter meeting reminders',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Team Meetings — Series Settings',
+        description: 'Leaders can set the normal meeting time (ET) and a reminder lead; presenters get a prep email with the meeting link before each meeting — skipped automatically for anyone who already opened that day\'s meeting.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-18',
     contractLabel: 'Contract 38 follow-on — Division filter hierarchy',
     items: [
       {

@@ -144,7 +144,9 @@ export class TeamMeetingsService {
     return this.mcp.call<TrackDetail>('team-meetings', 'get_track', { track_id });
   }
 
-  updateTrack(track_id: string, patch: { track_name?: string; is_public?: boolean; ref_panel_person_type?: RefPanelPersonType; meeting_cadence?: MeetingCadence | null }): Observable<McpResponse<unknown>> {
+  updateTrack(track_id: string, patch: { track_name?: string; is_public?: boolean; ref_panel_person_type?: RefPanelPersonType; meeting_cadence?: MeetingCadence | null;
+    // CC-38 f19: presenter reminder settings (ET).
+    meeting_time?: string | null; reminder_lead_minutes?: number | null; reminder_note?: string; }): Observable<McpResponse<unknown>> {
     return this.mcp.call('team-meetings', 'update_track', { track_id, ...patch });
   }
 

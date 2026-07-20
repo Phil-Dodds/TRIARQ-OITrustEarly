@@ -155,6 +155,10 @@ export interface TrackDetail {
   is_public:             boolean;
   ref_panel_person_type: RefPanelPersonType;
   meeting_cadence:       MeetingCadence | null;
+  // CC-38 f19 (migration 078): presenter reminder settings.
+  meeting_time?:          string | null;   // 'HH:MM[:SS]' Eastern Time
+  reminder_lead_minutes?: number | null;   // null = reminders off
+  reminder_note?:         string;
   suggested_next_meeting_date: string;
   deleted_at:            string | null;
   is_leader:             boolean;

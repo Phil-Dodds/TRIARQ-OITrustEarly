@@ -93,6 +93,29 @@ import {
           </div>
         </div>
 
+        <!-- CC-38 f19: presenter prep reminders — emailed by the 30-minute
+             scheduled sweep to the series' configured presenters. -->
+        <div class="ts-block">
+          <label class="ts-label">Presenter Reminders</label>
+          <p class="ts-hint">Emails each presenter before the meeting with the meeting link — skipped for anyone who has already opened that day's meeting. Times are Eastern Time.</p>
+          <div class="ts-cadence-row">
+            <input class="ts-input" type="time" style="max-width:130px;"
+                   [ngModel]="reminderTime" (ngModelChange)="onReminderTime($event)"
+                   [disabled]="!track.is_leader" title="Normal meeting time (ET)" />
+            <select class="ts-select" [ngModel]="reminderLead" (ngModelChange)="onReminderLead($event)"
+                    [disabled]="!track.is_leader || !reminderTime">
+              <option value="">Reminders off</option>
+              <option value="60">1 hour before</option>
+              <option value="120">2 hours before</option>
+              <option value="240">4 hours before</option>
+              <option value="1440">1 day before</option>
+            </select>
+          </div>
+          <input *ngIf="reminderLead" class="ts-input" type="text" maxlength="200" style="margin-top:6px;"
+                 [(ngModel)]="reminderNote" (blur)="onReminderNoteBlur()"
+                 [disabled]="!track.is_leader" placeholder="Please review and prep." />
+        </div>
+
         <!-- Members -->
         <div class="ts-block">
           <label class="ts-label">Members ({{ track.members.length }})</label>
@@ -350,6 +373,10 @@ export class TrackSettingsComponent implements OnInit {
           this.track    = res.data;
           this.editName = res.data.track_name;
           this.seedCadenceControls(res.data.meeting_cadence);
+          // CC-38 f19: presenter reminder settings.
+          this.reminderTime = (res.data.meeting_time ?? '').slice(0, 5);
+          this.reminderLead = res.data.reminder_lead_minutes != null ? String(res.data.reminder_lead_minutes) : '';
+          this.reminderNote = res.data.reminder_note ?? 'Please review and prep.';
         } else {
           this.loadError = res.error ?? 'Failed to load series settings.';
         }
@@ -474,6 +501,33 @@ export class TrackSettingsComponent implements OnInit {
       }
     });
   }
+
+  // ── CC-38 f19: presenter reminder settings ─────────────────────────────────
+  reminderTime = '';   // 'HH:MM' ET; '' = not set
+  reminderLead = '';   // minutes as string; '' = reminders off
+  reminderNote = 'Please review and prep.';
+
+  private saveReminderSettings(): void {
+    this.svc.updateTrack(this.trackId, {
+      meeting_time:          this.reminderTime || null,
+      reminder_lead_minutes: this.reminderLead ? Number(this.reminderLead) : null,
+      reminder_note:         this.reminderNote
+    }).subscribe({
+      next: res => {
+        if (res.success) { this.changed.emit(); }
+        else { this.loadError = res.error ?? 'Failed to save reminder settings.'; }
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  onReminderTime(v: string): void {
+    this.reminderTime = v;
+    if (!v) { this.reminderLead = ''; }   // no time → reminders off
+    this.saveReminderSettings();
+  }
+  onReminderLead(v: string): void { this.reminderLead = v; this.saveReminderSettings(); }
+  onReminderNoteBlur(): void      { this.saveReminderSettings(); }
 
   onCadenceChoice(v: string): void      { this.cadenceChoice = v; this.saveCadence(); }
   onCadenceDow(v: string | number): void { this.cadenceDow = Number(v); this.saveCadence(); }

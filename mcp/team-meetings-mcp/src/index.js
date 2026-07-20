@@ -32,6 +32,7 @@ const { move_section }                     = require('./tools/move_section');
 const { update_bullet_text }               = require('./tools/update_bullet_text');
 const { restore_team_meeting }             = require('./tools/restore_team_meeting');
 const tracks                               = require('./tools/tracks');
+const { send_meeting_reminders }           = require('./tools/send_meeting_reminders');
 
 const app  = express();
 const PORT = process.env.PORT || 3005;
@@ -83,6 +84,33 @@ const TOOLS = {
 
 app.use(cors());
 app.use(express.json());
+
+// ── CC-38 f19: internal cron endpoint — registered BEFORE the JWT middleware.
+// Machine-to-machine (pg_cron → pg_net, migration 078); authorized by the
+// RENDER_INTERNAL_API_KEY header instead of a user JWT. Deliberate Arch-5
+// carve-out for the scheduled sender — recorded as a CC-decision.
+app.post('/internal/send_meeting_reminders', async (req, res) => {
+  const key = req.get('x-internal-key');
+  if (!process.env.RENDER_INTERNAL_API_KEY || key !== process.env.RENDER_INTERNAL_API_KEY) {
+    return res.status(401).json({ success: false, error: 'Invalid internal key.' });
+  }
+  const start = Date.now();
+  try {
+    const summary = await send_meeting_reminders();
+    console.log(JSON.stringify({
+      tool_name: 'send_meeting_reminders', user_id: 'internal-cron',
+      duration_ms: Date.now() - start, ...summary
+    }));
+    return res.json({ success: true, data: summary });
+  } catch (err) {
+    console.error(JSON.stringify({
+      tool_name: 'send_meeting_reminders', user_id: 'internal-cron',
+      error: err.message, duration_ms: Date.now() - start
+    }));
+    return res.json({ success: false, error: 'Reminder sweep failed.' });
+  }
+});
+
 app.use(validateJwt);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', server: 'team-meetings-mcp' }));
