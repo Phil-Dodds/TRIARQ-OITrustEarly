@@ -1367,3 +1367,34 @@ Commits `6e4ea96` + fix `c92b1e1`; gh-pages `31ebcf7`. No migrations.
    **Why:** two builds looked hung; both had exited with compile errors the
    grep filter missed.
    **Trigger:** f20 build sequence, 2026-07-21.
+
+---
+
+# Follow-on 21 — Start-next-meeting + jump-to-latest (2026-07-21)
+
+Commit `c246192`; gh-pages deploy confirmed. No migrations, no MCP changes.
+
+## CC-decisions
+
+- **CC-38-76** — (Phil: "stranded in last week's meeting") On the series'
+  NEWEST meeting when its date is past: "▸ Start next meeting — [cadence-
+  suggested date]" button creates the next occurrence (default title
+  "<Series> — <date>") and navigates into it; Pull-from-last stays a manual
+  second click (leader may want a fresh sheet). On OLDER meetings: "Jump to
+  latest meeting →" link. Date line gains "(most recent)"/"(earlier
+  meeting)" position cues. Busy guard + D-140 error on the create.
+
+## Verification (compact — Angular-only)
+
+Build green (version.json = c246192); no MCP or migration surface; suggested
+date reuses get_track's suggested_next_meeting_date. Untested by suite (ng
+test pre-existing broken) — UAT below; D-442 acknowledgment requested.
+
+## UAT Checklist — Follow-on 21
+
+1. Open a series whose newest meeting is past-dated → header shows
+   "(most recent)" and the Start-next button with the suggested date. PASS/FAIL
+2. Click it → new meeting created on that date, you land in it, Pull from
+   last meeting available. PASS/FAIL
+3. Walk back via "← Open last meeting" → "(earlier meeting)" cue +
+   "Jump to latest meeting →" returns you. PASS/FAIL
