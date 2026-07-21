@@ -74,6 +74,7 @@
     "@angular/platform-browser-dynamic": "_angular_platform_browser_dynamic-17_3_12.js",
     "@angular/router": "_angular_router-17_3_12.js",
     "@ionic/angular/common": "_ionic_angular_common-7_8_6.js",
+    "@kenjiuno/msgreader": "_kenjiuno_msgreader-1_28_0.js",
     "@supabase/supabase-js": "_supabase_supabase_js-2_101_0.js",
     "rxjs": "rxjs-7_8_2.js",
     "rxjs/operators": "rxjs_operators-7_8_2.js",
