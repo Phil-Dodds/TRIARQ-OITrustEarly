@@ -372,13 +372,13 @@ export class TeamMeetingsListComponent implements OnInit {
   // (next/latest + prior); the older tail collapses behind a toggle.
   showAllMeetings = false;
   // Memoized — fresh-array getters feeding *ngFor cause CD churn (CC-38-65 lesson).
-  private visCache: { src: unknown; all: boolean; out: typeof this.meetings } | null = null;
-  get visibleMeetings() {
+  private visCache: { src: unknown; all: boolean; out: unknown } | null = null;
+  get visibleMeetings(): typeof this.meetings {
     const all = this.showAllMeetings || this.showDeleted;
     if (this.visCache?.src !== this.meetings || this.visCache.all !== all) {
       this.visCache = { src: this.meetings, all, out: all ? this.meetings : this.meetings.slice(0, 2) };
     }
-    return this.visCache.out;
+    return this.visCache.out as typeof this.meetings;
   }
   trackName     = '';
   isLeader      = false;

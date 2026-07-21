@@ -146,7 +146,7 @@ interface InitiativeSearchResult {
                 • Collect <strong>Hot Topics</strong> from the room first, so nothing gets missed.
                 • Everyone edits <strong>live</strong> — take notes together, not in side files.
                 • <strong>⟲ Pull from last meeting</strong> carries open items forward and dedupes.
-                • Type <strong>@</strong> in a bullet to link an Initiative; it lands in the right section.
+                • Type <strong>&#64;</strong> in a bullet to link an Initiative; it lands in the right section.
                 • Presenters: prep your section before the meeting — email reminders nudge anyone who hasn't opened it.
                 • Paste the <strong>share link</strong> (⚙ Series) into the Outlook invite so everyone lands here.
               </span>
