@@ -166,7 +166,7 @@ interface InitiativeSearchResult {
                         style="background:none;border:none;cursor:pointer;color:#5A5A5A;font-size:14px;">×</button>
               </div>
               <span style="display:block;">
-                • Collect <strong>Hot Topics</strong> from the room first, so nothing gets missed.
+                <strong>Prep ahead of the meeting. Live collaboration during the meeting.</strong><br>
                 • Everyone edits <strong>live</strong> — take notes together, not in side files.
                 • <strong>⟲ Pull from last meeting</strong> carries open items forward and dedupes.
                 • Type <strong>&#64;</strong> in a bullet to link an Initiative; it lands in the right section.
