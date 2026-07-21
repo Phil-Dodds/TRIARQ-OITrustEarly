@@ -212,6 +212,11 @@ export class TeamMeetingsService {
     return this.mcp.call('team-meetings', 'reorder_track_sections', { track_id, ordered_ids });
   }
 
+  /** CC-38 f22: flat indent — 0 = bullet, 1 = sub-bullet. */
+  setBulletIndent(bullet_id: string, indent_level: 0 | 1): Observable<McpResponse<unknown>> {
+    return this.mcp.call('team-meetings', 'set_bullet_indent', { bullet_id, indent_level });
+  }
+
   setPresenterSection(track_id: string, user_id: string, enabled: boolean, meeting_id?: string): Observable<McpResponse<unknown>> {
     return this.mcp.call('team-meetings', 'set_presenter_section', { track_id, user_id, enabled, ...(meeting_id ? { meeting_id } : {}) });
   }

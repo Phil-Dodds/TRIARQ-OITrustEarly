@@ -19,13 +19,32 @@ async function remove_meeting_bullet(params, caller_user_id) {
 
   const { data: bullet } = await supabase
     .from('team_meeting_bullets')
-    .select('id, section_id')
+    .select('id, section_id, indent_level, sort_order')
     .eq('id', bullet_id)
     .maybeSingle();
   if (!bullet) return { success: false, error: 'Bullet not found.' };
 
   const access = await assertSectionAccess(bullet.section_id, caller_user_id);
   if (access.error) return { success: false, error: access.error };
+
+  // CC-38 f22: deleting a parent PROMOTES its contiguous sub-bullets — never
+  // a silent cascade (Phil ruling).
+  if ((bullet.indent_level ?? 0) === 0) {
+    const { data: siblings } = await supabase
+      .from('team_meeting_bullets')
+      .select('id, indent_level, sort_order')
+      .eq('section_id', bullet.section_id)
+      .gt('sort_order', bullet.sort_order)
+      .order('sort_order', { ascending: true });
+    const toPromote = [];
+    for (const s of siblings || []) {
+      if ((s.indent_level ?? 0) === 1) { toPromote.push(s.id); } else { break; }
+    }
+    if (toPromote.length) {
+      await supabase.from('team_meeting_bullets')
+        .update({ indent_level: 0 }).in('id', toPromote);
+    }
+  }
 
   const { error } = await supabase
     .from('team_meeting_bullets')

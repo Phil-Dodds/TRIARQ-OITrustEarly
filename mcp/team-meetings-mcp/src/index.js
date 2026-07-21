@@ -30,6 +30,7 @@ const { update_bullet_note }               = require('./tools/update_bullet_note
 const { delete_team_meeting }              = require('./tools/delete_team_meeting');
 const { move_section }                     = require('./tools/move_section');
 const { update_bullet_text }               = require('./tools/update_bullet_text');
+const { set_bullet_indent }                = require('./tools/set_bullet_indent');
 const { restore_team_meeting }             = require('./tools/restore_team_meeting');
 const tracks                               = require('./tools/tracks');
 const { send_meeting_reminders }           = require('./tools/send_meeting_reminders');
@@ -79,6 +80,7 @@ const TOOLS = {
   pull_from_last_meeting:     tracks.pull_from_last_meeting,
   move_section,
   update_bullet_text,
+  set_bullet_indent,
   restore_team_meeting
 };
 

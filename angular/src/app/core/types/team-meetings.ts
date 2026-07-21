@@ -24,6 +24,8 @@ export interface TeamMeetingBullet {
   text:                    string;
   bullet_note:             string | null;
   sort_order:              number;
+  /** CC-38 f22: 0 = bullet, 1 = sub-bullet (flat indent model). */
+  indent_level?:           number;
   carried_from_bullet_id:  string | null;
   created_by_display_name: string | null;
   initiative:              TeamMeetingInitiativeRef | null;

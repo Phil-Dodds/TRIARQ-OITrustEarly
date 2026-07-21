@@ -33,6 +33,17 @@ export interface ChangelogEntry {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date:          '2026-07-21',
+    contractLabel: 'Contract 38 follow-on — Sub-bullets in Meeting Collab',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Meeting Collab — bullets',
+        description: 'Bullets can be indented one level (⇥/⇤ buttons, or Tab / Shift+Tab while editing). Carrying a sub-bullet forward brings its parent line for context; deleting a parent promotes its sub-bullets.'
+      }
+    ]
+  },
+  {
+    date:          '2026-07-21',
     contractLabel: 'Contract 38 follow-on — Meeting Collab',
     items: [
       {

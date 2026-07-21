@@ -16,6 +16,8 @@ const { assertSectionAccess, bumpMeeting } = require('../track_access');
  */
 async function add_meeting_bullet(params, caller_user_id) {
   const { section_id, text, initiative_id, carried_from_bullet_id } = params;
+  // CC-38 f22: flat indent model — 0 = bullet, 1 = sub-bullet.
+  const indent_level = params.indent_level === 1 ? 1 : 0;
 
   if (!section_id) return { success: false, error: 'section_id is required.' };
   if (!text?.trim()) return { success: false, error: 'text is required.' };
@@ -37,6 +39,7 @@ async function add_meeting_bullet(params, caller_user_id) {
     section_id,
     text:                   text.trim(),
     sort_order,
+    indent_level,
     initiative_id:          initiative_id          ?? null,
     carried_from_bullet_id: carried_from_bullet_id ?? null,
     created_by:             caller_user_id

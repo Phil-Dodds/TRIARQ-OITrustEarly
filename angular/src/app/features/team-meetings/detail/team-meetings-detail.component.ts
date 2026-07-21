@@ -236,6 +236,7 @@ interface InitiativeSearchResult {
                   </div>
                   <div *ngFor="let bullet of section.bullets; trackBy: trackById"
                        class="tmd-bullet-row"
+                       [style.margin-left.px]="(bullet.indent_level ?? 0) * 26"
                        [class.tmd-bullet-dragging]="draggingBulletId === bullet.id"
                        [class.tmd-bullet-dropline]="dragOverBulletId === bullet.id"
                        [class.tmd-bullet-pending]="bullet.pending"
@@ -272,6 +273,8 @@ interface InitiativeSearchResult {
                            (input)="editingBulletDraft = $any($event.target).value"
                            (keydown.enter)="commitBulletEdit(bullet)"
                            (keydown.escape)="cancelBulletEdit()"
+                           (keydown.tab)="$event.preventDefault(); setIndent(section, bullet, 1)"
+                           (keydown.shift.tab)="$event.preventDefault(); setIndent(section, bullet, 0)"
                            (blur)="commitBulletEdit(bullet)"
                            (click)="$event.stopPropagation()" />
                     <span *ngIf="editingBulletId === bullet.id && editingBulletSaving" class="tmd-bullet-saving">Saving…</span>
@@ -312,6 +315,13 @@ interface InitiativeSearchResult {
 
                     <!-- Pending indicator (in-flight add) -->
                     <span *ngIf="bullet.pending" class="tmd-bullet-saving">Saving…</span>
+                    <!-- CC-38 f22: indent / outdent (flat model, 2 levels). -->
+                    <button *ngIf="!bullet.pending && (bullet.indent_level ?? 0) === 0 && canIndent(section, bullet)"
+                            class="tmd-edit-bullet-btn" type="button" title="Make sub-bullet (Tab)"
+                            (click)="setIndent(section, bullet, 1, $event)">⇥</button>
+                    <button *ngIf="!bullet.pending && (bullet.indent_level ?? 0) === 1"
+                            class="tmd-edit-bullet-btn" type="button" title="Promote to bullet (Shift+Tab)"
+                            (click)="setIndent(section, bullet, 0, $event)">⇤</button>
                     <!-- Edit button — free-text bullets only (initiative bullets show the Initiative name) -->
                     <button *ngIf="!bullet.pending && !bullet.initiative && editingBulletId !== bullet.id"
                             class="tmd-edit-bullet-btn"
@@ -891,6 +901,26 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
         }
         this.cdr.markForCheck();
       }
+    });
+  }
+
+  // ── CC-38 f22: bullet indentation (flat model — 0 bullet, 1 sub-bullet) ────
+  /** A bullet can indent only when it is not the section's first bullet. */
+  canIndent(section: TeamMeetingSection, bullet: TeamMeetingBullet): boolean {
+    const i = section.bullets.findIndex(b => b.id === bullet.id);
+    return i > 0;
+  }
+
+  setIndent(section: TeamMeetingSection, bullet: TeamMeetingBullet, level: 0 | 1, ev?: Event): void {
+    ev?.stopPropagation();
+    if (level === 1 && !this.canIndent(section, bullet)) { return; }
+    const prior = bullet.indent_level ?? 0;
+    if (prior === level) { return; }
+    bullet.indent_level = level;   // optimistic; reverted on server error only
+    this.cdr.markForCheck();
+    this.svc.setBulletIndent(bullet.id, level).subscribe({
+      next: res => { if (!res.success) { bullet.indent_level = prior; this.cdr.markForCheck(); } },
+      error: () => { bullet.indent_level = prior; this.cdr.markForCheck(); }
     });
   }
 
