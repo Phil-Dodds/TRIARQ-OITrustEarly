@@ -1398,3 +1398,45 @@ test pre-existing broken) — UAT below; D-442 acknowledgment requested.
    last meeting available. PASS/FAIL
 3. Walk back via "← Open last meeting" → "(earlier meeting)" cue +
    "Jump to latest meeting →" returns you. PASS/FAIL
+
+---
+
+# Follow-on 22 — Sub-bullets (flat indent model) (2026-07-21)
+
+Commit `944be4a`; gh-pages deployed. Migration 079 (Phil runs).
+**Phil action: MANUAL Render redeploy of team-meetings-mcp** (covers f20 + f22 together).
+
+## CC-decisions
+
+- **CC-38-77** — Sub-bullets via FLAT indent model (indent_level 0/1 on
+  team_meeting_bullets, migration 079) — NOT a parent_bullet_id tree; a
+  bullet is "under" the nearest shallower bullet above it. Two levels max
+  (Phil ruling: deeper nesting usually hides an Initiative). Ordering,
+  drag-drop, live-merge, trackBy all unchanged.
+- **CC-38-78** — Semantics per Phil's rulings: carrying a sub-bullet forward
+  auto-carries its parent line (deduped by lineage FK then identical text);
+  deleting a parent PROMOTES its contiguous sub-bullets, never cascades;
+  notes and sub-bullets coexist. New set_bullet_indent tool (works on
+  initiative-linked bullets, unlike text edits); UI = ⇥/⇤ hover buttons +
+  Tab / Shift+Tab in the bullet editor; first bullet of a section cannot
+  indent. Indent change is optimistic, reverted only on server error
+  (no-timer-reversion standard).
+
+## Verification (compact)
+
+MCP 30/37 (same 7 pre-existing failures); ng build green (version.json =
+944be4a); new tool registered with its require in the same commit (repo
+clean). Multi-query tool paths untested per Rule 37 — UAT covers; D-442
+acknowledgment requested. indent_level ?? 0 guards make all code safe to
+deploy BEFORE migration 079 runs (column absent → selects would fail:
+run 079 BEFORE the Render redeploy).
+
+## UAT Checklist — Follow-on 22
+
+1. Hover a bullet (not the section's first) → ⇥ appears; click → row indents
+   under the bullet above; ⇤ promotes it back. PASS/FAIL
+2. While editing a bullet, Tab indents, Shift+Tab outdents. PASS/FAIL
+3. Carry a sub-bullet forward alone → target meeting gets parent + child,
+   parent not duplicated when carried twice. PASS/FAIL
+4. Delete a parent with sub-bullets → children promote to top level. PASS/FAIL
+5. Initiative-linked bullets indent/outdent too. PASS/FAIL
