@@ -37,6 +37,11 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     items: [
       {
         audience:    'All',
+        surface:     'Meeting Collab — meeting screen',
+        description: 'On last week\'s meeting, a "Start next meeting" button creates the next occurrence on the cadence-suggested date; older meetings get a "Jump to latest" link.'
+      },
+      {
+        audience:    'All',
         surface:     'Meeting Collab (formerly Team Meetings)',
         description: 'Renamed to Meeting Collab. Clicking a series now lands on the latest meeting; older meetings collapse behind "Show earlier meetings"; a dismissible "How to run this" tip strip teaches best practice and Collab features.'
       },

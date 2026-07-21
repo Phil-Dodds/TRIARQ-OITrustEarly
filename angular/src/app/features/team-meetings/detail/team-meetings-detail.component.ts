@@ -117,7 +117,30 @@ interface InitiativeSearchResult {
                      [attr.aria-label]="'Edit meeting title'">
               <span *ngIf="savingTitle" class="tmd-title-saving">Saving…</span>
             </div>
-            <span class="tmd-meeting-date">{{ meeting.meeting_date | date:'EEEE, MMMM d, y' }}</span>
+            <span class="tmd-meeting-date">{{ meeting.meeting_date | date:'EEEE, MMMM d, y' }}
+              <!-- CC-38 f21: series-position cue -->
+              <em *ngIf="isLatestMeeting && meetingInPast" style="color:#9E9E9E;font-size:11px;">(most recent)</em>
+              <em *ngIf="latestMeetingId && !isLatestMeeting" style="color:#9E9E9E;font-size:11px;">(earlier meeting)</em>
+            </span>
+
+            <!-- CC-38 f21 (Phil): no stranding on last week's meeting — start
+                 the next one right here (cadence-suggested date), or jump
+                 forward when reading an older one. -->
+            <div *ngIf="isLatestMeeting && meetingInPast && startNextDate"
+                 style="margin-top:8px;">
+              <button type="button" [disabled]="startNextBusy" (click)="startNextMeeting()"
+                      style="background:var(--triarq-color-primary,#257099);color:#fff;border:none;
+                             border-radius:5px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer;">
+                {{ startNextBusy ? 'Starting…' : '▸ Start next meeting — ' + (startNextDate | date:'EEE, MMM d') }}
+              </button>
+              <span *ngIf="startNextError" style="color:var(--triarq-color-error,#D32F2F);font-size:12px;margin-left:8px;">{{ startNextError }}</span>
+            </div>
+            <a *ngIf="latestMeetingId && !isLatestMeeting"
+               [routerLink]="['/team-meetings', latestMeetingId]"
+               style="display:inline-block;margin-top:6px;font-size:12px;
+                      color:var(--triarq-color-primary,#257099);text-decoration:underline;">
+              Jump to latest meeting →
+            </a>
             <!-- Pull from last meeting — master (all sections), dedupes automatically -->
             <div *ngIf="previousMeetingId" class="tmd-pull-row">
               <button class="tmd-pull-btn" type="button" [disabled]="pulling" (click)="pullAll()">
@@ -853,6 +876,58 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
         if (this.isLatestMeeting && meetings.length > 1) {
           this.previousMeetingId = meetings[1].id;
         }
+        // CC-38 f21: on a past-dated latest meeting, offer "Start next meeting"
+        // with the cadence-suggested date from series settings.
+        if (this.isLatestMeeting && this.meetingInPast) {
+          this.svc.getTrack(trackId).subscribe({
+            next: tr => {
+              if (tr.success && tr.data) {
+                this.startNextDate  = tr.data.suggested_next_meeting_date || null;
+                this.startNextTrackName = tr.data.track_name;
+                this.cdr.markForCheck();
+              }
+            }
+          });
+        }
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // ── CC-38 f21: start-next-meeting affordance ───────────────────────────────
+  startNextDate: string | null = null;
+  startNextTrackName = '';
+  startNextBusy  = false;
+  startNextError = '';
+
+  get meetingInPast(): boolean {
+    const d = this.meeting?.meeting_date;
+    if (!d) { return false; }
+    return d < new Date().toISOString().slice(0, 10);
+  }
+
+  startNextMeeting(): void {
+    const trackId = this.meeting?.track?.track_id;
+    if (!trackId || !this.startNextDate || this.startNextBusy) { return; }
+    this.startNextBusy  = true;
+    this.startNextError = '';
+    this.cdr.markForCheck();
+    const dateLabel = new Date(this.startNextDate + 'T00:00:00')
+      .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const title = `${this.startNextTrackName || this.meeting?.track?.track_name || 'Meeting'} — ${dateLabel}`;
+    this.svc.createMeeting(trackId, title, this.startNextDate).subscribe({
+      next: res => {
+        this.startNextBusy = false;
+        if (res.success && res.data) {
+          this.router.navigate(['/team-meetings', res.data.id]);
+        } else {
+          this.startNextError = res.error ?? 'Could not start the next meeting.';
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.startNextBusy  = false;
+        this.startNextError = err?.error ?? 'Could not start the next meeting.';
         this.cdr.markForCheck();
       }
     });
