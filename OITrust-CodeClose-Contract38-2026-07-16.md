@@ -1261,3 +1261,109 @@ Commit `5875e68`; gh-pages `518bb1b`. Migration 078 (Phil runs — see deploymen
    **Why:** first scheduled sender; the pattern will recur (digests, escalation
    nudges).
    **Trigger:** Phil's reminder feature request, 2026-07-18.
+
+
+---
+
+# Follow-on 20 — Meeting Collab: rename, Outlook drop-import, UX batch (2026-07-21)
+
+Commits `6e4ea96` + fix `c92b1e1`; gh-pages `31ebcf7`. No migrations.
+**Phil action: MANUAL Render redeploy of team-meetings-mcp** (create_track changes + true-blank).
+
+## CC-decisions
+
+- **CC-38-69** — Feature renamed **"Meeting Collab"** (sidebar label, screen
+  title). Routes stay /team-meetings — bookmarks and Outlook share links keep
+  working. Shortlist considered: Meeting Helper / Collaborator / Companion /
+  Canvas; Collab chosen for naming the live-co-editing differentiator (Phil).
+- **CC-38-70** — Outlook drop-import on New Series: .msg parsed ENTIRELY in
+  the browser (@kenjiuno/msgreader, new Angular dep installed with
+  --legacy-peer-deps) — the file never leaves the machine. Meeting invite
+  (IPM.Appointment): name (Teams boilerplate + Re/Fw stripped), weekly
+  cadence on the invite's ET weekday + meeting time from apptStartWhole
+  (default 2h reminder lead), To line = presenters, To+CC+organizer =
+  invites. Email (IPM.Note): name + participants only. One-time meetings
+  default to weekly per Phil. X.500 exchange DNs filtered (smtpAddress only).
+  D-140-style errors: wrong file type / unsupported class / missing subject.
+  Import summary chip with Remove; invites textarea prefilled and editable.
+- **CC-38-71** — create_track made import-atomic: accepts meeting_time,
+  reminder_lead_minutes, invite_emails (Outlook format), presenter_emails —
+  members inserted and presenter sections upserted at create; unknown emails
+  returned in import_report, never fatal. Old chained addTrackMembers call
+  removed from the create flow.
+- **CC-38-72** — (Phil #3B) Blank type truly blank: template passes explicit
+  [], create_track distinguishes [] (no sections) from undefined (seed all
+  catalog — legacy default preserved for API callers). Card text updated.
+  {leader} resolution (3A) confirmed working as designed — resolves to the
+  creator; "Phil" only appears where Phil is the leader.
+- **CC-38-73** — (Phil #3) Public demoted: checkbox removed from New Series
+  (create is always private; Settings owns the toggle); "Search Public
+  Meetings to Join" demoted from header button to a quiet link under the list.
+- **CC-38-74** — (Phil #4) Series click lands on the latest meeting
+  (existing /track/:id/latest redirect); the series meeting list shows only
+  the two meetings of interest (latest + prior) with "Show earlier meetings
+  (N)" toggle (memoized getter per the CC-38-65 lesson). Full list unchanged
+  in admin/deleted views.
+- **CC-38-75** — (Phil #2) Dismissible "How to run this" coaching strip on
+  the meeting screen: practice + Collab feature reveal (live co-edit, pull
+  forward, @mention Initiatives, presenter prep + reminders, share link).
+  Dismissal is browser-local (localStorage) — deliberately NOT
+  user_screen_state: per-device tip, not a filter; recorded as a deviation
+  from the D-380 pattern. Inline styles only — the component CSS sits at the
+  10 kB hard budget (D-371).
+
+## CodeClose Verification
+
+1. **Spec coverage:** Phil's settled list (Collab name, To=presenter, atomic
+   create, drop affordance, coaching w/ feature reveal, public demotion,
+   latest-landing + list collapse, 3B) — all implemented. PASS.
+2. **Regression check:** team-meetings-mcp 30/37 (same 7 pre-existing stale
+   failures, no new); ng build green. Legacy create_track callers unaffected
+   (new params optional; undefined sections behavior unchanged).
+3. **Test ratchet:** MCP create extensions and browser .msg parsing UNTESTED
+   by suite (Rule 37 mock limitation; parser needs a browser File). Verified
+   against Phil's real sample .msg via node probe (class/subject/recipients/
+   smtpAddress/apptStartWhole all confirmed). UAT covers; D-442
+   acknowledgment requested.
+4. **Pattern sweep:** no shared pattern modified. New CD-memoization rule
+   self-applied to the new list getter.
+5. **Standards conformance:** busy guard on Create (existing saving flag);
+   import errors use D-140 phrasing. PASS.
+6. **CC-decision completeness:** CC-38-69..75 sequential, no gaps.
+7. **Structural health:** tracks-list ~+130 lines (~560); detail +45 (still
+   at CSS budget, inline styles); NEW outlook-import.ts 118 lines.
+8. **Deployment:** commit → build (version.json = c92b1e1) → gh-pages
+   31ebcf7. team-meetings-mcp requires MANUAL Render redeploy — until then,
+   Blank still seeds all sections and import create falls back gracefully
+   (unknown params ignored by old code; invites simply won't land — redeploy
+   before UAT).
+9. **Repo cleanliness:** new files (outlook-import.ts) committed with
+   importers; package.json/lock committed with the new dependency. Clean.
+
+## UAT Checklist — Follow-on 20
+
+1. Sidebar shows "Meeting Collab"; screen title matches; /team-meetings
+   bookmarks still resolve. PASS/FAIL
+2. Clicking a series lands on its latest meeting; the meeting's series page
+   shows two meetings + "Show earlier meetings (N)"; toggle reveals all. PASS/FAIL
+3. Meeting screen shows the "How to run this" strip; × dismisses; ⓘ Meeting
+   tips brings it back; dismissal survives reload. PASS/FAIL
+4. New Series: drop your Product/ITSec .msg → name fills, summary chip reads
+   "Weekly Tuesday · 14:00 ET + reminders · N members · M presenters";
+   invites textarea populated; Create → series opens with members present,
+   To-line people have presenter sections, Settings shows time 02:00 PM +
+   2h lead. PASS/FAIL
+5. Drop a plain email .msg → name + invites only, no cadence/time. PASS/FAIL
+6. Drop a .docx → clear error message, form untouched. PASS/FAIL
+7. Blank type → series created with zero sections. PASS/FAIL
+8. New Series panel has no Public checkbox; public search is a link below
+   the series list; Settings still has the Public toggle. PASS/FAIL
+
+## CLAUDE.md Candidates — Follow-on 20
+
+9. **Candidate:** "ng build 'hangs' that produce no grep output are usually
+   fast FAILURES — inspect the full build log before killing processes;
+   filter on 'ERROR|error' including esbuild's 'X [ERROR]' format."
+   **Why:** two builds looked hung; both had exited with compile errors the
+   grep filter missed.
+   **Trigger:** f20 build sequence, 2026-07-21.
