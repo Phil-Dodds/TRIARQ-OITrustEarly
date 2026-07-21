@@ -131,10 +131,18 @@ export class TeamMeetingsService {
     track_name: string,
     is_public: boolean,
     sections?: TemplateSectionSpec[],
-    meeting_cadence?: MeetingCadence
+    meeting_cadence?: MeetingCadence,
+    // CC-38 f20: atomic import-aware creation.
+    extras?: {
+      meeting_time?: string;
+      reminder_lead_minutes?: number;
+      invite_emails?: string;
+      presenter_emails?: string[];
+    }
   ): Observable<McpResponse<{ track_id: string }>> {
     return this.mcp.call('team-meetings', 'create_track', {
       track_name, is_public,
+      ...(extras ?? {}),
       ...(sections ? { sections } : {}),
       ...(meeting_cadence ? { meeting_cadence } : {})
     });

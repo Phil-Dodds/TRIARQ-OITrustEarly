@@ -152,8 +152,19 @@ async function list_my_tracks(params, caller_user_id) {
 //   - omitted entirely → seeds all active catalog sections (Blank behavior).
 // meeting_cadence (optional): validated cadence object (template suggestion).
 async function create_track(params, caller_user_id) {
-  const { track_name, is_public, sections, meeting_cadence } = params;
+  // CC-38 f20: import-aware atomic creation — meeting_time/reminder settings,
+  // invite emails, and presenter emails can all land at create so a dropped
+  // Outlook invite configures the whole series in one call.
+  const { track_name, is_public, sections, meeting_cadence,
+          meeting_time, reminder_lead_minutes, invite_emails, presenter_emails } = params;
   if (!track_name?.trim()) return { success: false, error: 'track_name is required.' };
+  if (meeting_time !== undefined && meeting_time !== null && !/^\d{1,2}:\d{2}$/.test(meeting_time)) {
+    return { success: false, error: 'meeting_time must be HH:MM (Eastern Time).' };
+  }
+  if (reminder_lead_minutes !== undefined && reminder_lead_minutes !== null &&
+      (!Number.isInteger(reminder_lead_minutes) || reminder_lead_minutes < 30 || reminder_lead_minutes > 10080)) {
+    return { success: false, error: 'reminder_lead_minutes must be an integer between 30 and 10080.' };
+  }
 
   const cadErr = validateCadence(meeting_cadence ?? null);
   if (cadErr) return { success: false, error: cadErr };
@@ -167,7 +178,9 @@ async function create_track(params, caller_user_id) {
       track_name: track_name.trim(),
       is_public: !!is_public,
       created_by: caller_user_id,
-      ...(meeting_cadence ? { meeting_cadence } : {})
+      ...(meeting_cadence ? { meeting_cadence } : {}),
+      ...(meeting_time ? { meeting_time } : {}),
+      ...(reminder_lead_minutes ? { reminder_lead_minutes } : {})
     })
     .select()
     .single();
@@ -189,7 +202,10 @@ async function create_track(params, caller_user_id) {
   const leaderName = firstNameOf(caller.display_name);
 
   let rows;
-  if (Array.isArray(sections) && sections.length) {
+  if (Array.isArray(sections) && sections.length === 0) {
+    // CC-38 f20 (3B): explicit empty list = truly blank — no seeded sections.
+    rows = [];
+  } else if (Array.isArray(sections) && sections.length) {
     const { randomUUID } = require('crypto');
     const catalogByKey = {};
     (catalog || []).forEach(c => { catalogByKey[c.section_key] = c; });
@@ -223,7 +239,38 @@ async function create_track(params, caller_user_id) {
     if (sErr) return { success: false, error: `Series created but sections failed: ${sErr.message}` };
   }
 
-  return { success: true, data: track };
+  // CC-38 f20: import invites + presenter flags at create. Unknown emails are
+  // reported back, never fatal — the series exists either way.
+  const import_report = { added: [], not_found: [], presenters: [] };
+  if (typeof invite_emails === 'string' && invite_emails.trim()) {
+    const parsed = parseEmails(invite_emails).filter(e => e !== (caller.email || '').toLowerCase());
+    if (parsed.length) {
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, email, display_name')
+        .in('email', parsed)
+        .is('deleted_at', null);
+      const byEmail = {};
+      (users || []).forEach(u => { byEmail[u.email.toLowerCase()] = u; });
+      const presenterSet = new Set((Array.isArray(presenter_emails) ? presenter_emails : [])
+        .map(e => String(e).trim().toLowerCase()));
+      for (const email of parsed) {
+        const user = byEmail[email];
+        if (!user) { import_report.not_found.push(email); continue; }
+        const { error: memErr } = await supabase
+          .from('team_meeting_track_members')
+          .insert({ track_id: track.track_id, user_id: user.id, is_leader: false });
+        if (memErr) { import_report.not_found.push(email); continue; }
+        import_report.added.push(user.display_name);
+        if (presenterSet.has(email)) {
+          const pr = await upsertPresenterSection(track.track_id, user, null);
+          if (!pr?.error) { import_report.presenters.push(user.display_name); }
+        }
+      }
+    }
+  }
+
+  return { success: true, data: { ...track, import_report } };
 }
 
 // ── get_track ──────────────────────────────────────────────────────────────────

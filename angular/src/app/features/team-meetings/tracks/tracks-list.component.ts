@@ -13,6 +13,7 @@ import { TeamMeetingsService }  from '../team-meetings.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { TrackListItem }        from '../../../core/types/team-meetings';
 import { MEETING_TEMPLATES }    from './meeting-templates';
+import { parseOutlookDrop, OutlookImport } from './outlook-import';
 
 // Business rule (session 2026-07-11): series creation restricted to Phil for now.
 // Series creation is open to any authenticated user (Phil 2026-07-14 —
@@ -27,7 +28,7 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
     <div class="tk-shell">
       <div class="tk-header">
         <div>
-          <h1 class="tk-title">My Team Meetings</h1>
+          <h1 class="tk-title">Meeting Collab</h1>
           <p class="tk-subtitle">
             Plan the agenda before the meeting, organize and take notes during it — everyone edits
             live — and pull items forward from last time. Your series, most recent first;
@@ -36,7 +37,6 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
         </div>
         <div class="tk-header-actions">
           <div class="tk-actions-row">
-            <a class="tk-btn-ghost" routerLink="/team-meetings/public">Search Public Meetings to Join</a>
             <button class="tk-btn-primary" (click)="openNewPanel()" type="button">
               + New Series
             </button>
@@ -129,6 +129,14 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
       </div>
     </div>
 
+    <!-- CC-38 f20 (Phil #3): public search demoted from header button to quiet link. -->
+    <p style="margin:18px 0 0;font-size:12px;">
+      <a routerLink="/team-meetings/public"
+         style="color:var(--triarq-color-primary,#257099);text-decoration:underline;">
+        Search public meeting series to join
+      </a>
+    </p>
+
     <!-- New Series panel -->
     <div *ngIf="showNewPanel" class="tk-scrim" (click)="closeNewPanel()"></div>
     <div *ngIf="showNewPanel" class="tk-panel">
@@ -142,6 +150,31 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
           <input class="tk-input" formControlName="track_name" type="text" placeholder="e.g. Product Ops">
           <span *ngIf="newForm.get('track_name')?.invalid && newForm.get('track_name')?.touched"
                 class="tk-field-error">Series name is required.</span>
+        </div>
+
+        <!-- CC-38 f20 (Phil #2): Outlook drop-import. Parsed entirely in the
+             browser — the file never leaves this machine. -->
+        <div class="tk-field">
+          <div (dragover)="$event.preventDefault(); dropActive = true"
+               (dragleave)="dropActive = false"
+               (drop)="onOutlookDrop($event)"
+               (click)="msgFileInput.click()"
+               [style.border-color]="dropActive ? 'var(--triarq-color-primary,#257099)' : '#C0C0C0'"
+               [style.background]="dropActive ? 'rgba(37,112,153,0.06)' : 'none'"
+               style="border:2px dashed #C0C0C0;border-radius:8px;padding:12px 14px;cursor:pointer;
+                      font-size:12px;color:#5A5A5A;text-align:center;">
+            <ng-container *ngIf="!importDraft">
+              Drag an <strong>Outlook meeting or email</strong> here to prefill — or click to browse.
+            </ng-container>
+            <ng-container *ngIf="importDraft">
+              <strong>Imported {{ importDraft.kind === 'meeting' ? 'meeting' : 'email' }}:</strong>
+              {{ importSummary }}
+              <a (click)="clearImport($event)" style="color:#B3261E;margin-left:8px;text-decoration:underline;">Remove</a>
+            </ng-container>
+          </div>
+          <input #msgFileInput type="file" accept=".msg" hidden
+                 (change)="onOutlookBrowse($event)">
+          <span *ngIf="importError" class="tk-field-error">{{ importError }}</span>
         </div>
 
         <!-- Meeting type — pre-loads sections + suggested cadence; everything editable after -->
@@ -160,12 +193,9 @@ import { MEETING_TEMPLATES }    from './meeting-templates';
           </div>
         </div>
 
-        <div class="tk-field">
-          <label class="tk-label-inline">
-            <input type="checkbox" formControlName="is_public">
-            Public — anyone can find and join this series
-          </label>
-        </div>
+        <!-- CC-38 f20 (Phil #3): Public checkbox removed from create — new
+             series are private; making one public is a deliberate act in
+             Series Settings. -->
 
         <!-- Invite at creation — same Outlook format as series settings -->
         <div class="tk-field">
@@ -357,7 +387,9 @@ export class TracksListComponent implements OnInit {
   }
 
   openTrack(t: TrackListItem): void {
-    this.router.navigate(['/team-meetings/track', t.track_id]);
+    // CC-38 f20 (Phil #4): land directly on the latest meeting — prep happens
+    // there. The full meeting list stays reachable from the meeting's series link.
+    this.router.navigate(['/team-meetings/track', t.track_id, 'latest']);
   }
 
   openNewPanel(): void {
@@ -372,28 +404,89 @@ export class TracksListComponent implements OnInit {
     this.showNewPanel = false;
   }
 
+  // ── CC-38 f20: Outlook drop-import state ────────────────────────────────────
+  dropActive = false;
+  importDraft: OutlookImport | null = null;
+  importError = '';
+
+  get importSummary(): string {
+    const d = this.importDraft;
+    if (!d) { return ''; }
+    const bits: string[] = [];
+    if (d.cadence && d.weekday_label) { bits.push(`Weekly ${d.weekday_label}`); }
+    if (d.meeting_time) { bits.push(`${d.meeting_time} ET + reminders`); }
+    bits.push(`${d.invite_emails.length} member${d.invite_emails.length === 1 ? '' : 's'}`);
+    if (d.presenter_emails.length) { bits.push(`${d.presenter_emails.length} presenter${d.presenter_emails.length === 1 ? '' : 's'}`); }
+    return bits.join(' · ');
+  }
+
+  onOutlookDrop(ev: DragEvent): void {
+    ev.preventDefault();
+    this.dropActive = false;
+    const file = ev.dataTransfer?.files?.[0];
+    if (file) { this.applyOutlookFile(file); }
+  }
+
+  onOutlookBrowse(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (file) { this.applyOutlookFile(file); }
+    input.value = '';
+  }
+
+  private applyOutlookFile(file: File): void {
+    this.importError = '';
+    parseOutlookDrop(file).then(draft => {
+      this.importDraft = draft;
+      this.newForm.patchValue({
+        track_name: draft.series_name,
+        invites:    draft.invite_emails.join('; ')
+      });
+      this.cdr.markForCheck();
+    }).catch((e: Error) => {
+      this.importError = e.message;
+      this.cdr.markForCheck();
+    });
+  }
+
+  clearImport(ev: Event): void {
+    ev.stopPropagation();
+    this.importDraft = null;
+    this.importError = '';
+    this.newForm.patchValue({ invites: '' });
+    this.cdr.markForCheck();
+  }
+
   createTrack(): void {
     if (this.newForm.invalid || this.saving) return;
-    const { track_name, is_public, invites } = this.newForm.value as { track_name: string; is_public: boolean; invites: string };
+    const { track_name, invites } = this.newForm.value as { track_name: string; invites: string };
     this.saving    = true;
     this.saveError = '';
     this.cdr.markForCheck();
     const template = this.templates.find(t => t.key === this.selectedTemplateKey);
-    this.svc.createTrack(track_name, !!is_public, template?.sections, template?.suggested_cadence).subscribe({
+    // Import wins for cadence when present; invites go through create_track
+    // atomically (CC-38 f20) so time/reminders/presenters land in one call.
+    const cadence = this.importDraft?.cadence ?? template?.suggested_cadence;
+    this.svc.createTrack(track_name, /* is_public — always private at create */ false,
+      template?.sections, cadence, {
+        ...(this.importDraft?.meeting_time ? {
+          meeting_time: this.importDraft.meeting_time,
+          reminder_lead_minutes: 120
+        } : {}),
+        ...(invites?.trim() ? { invite_emails: invites } : {}),
+        ...(this.importDraft?.presenter_emails.length ? { presenter_emails: this.importDraft.presenter_emails } : {})
+      }).subscribe({
       next: res => {
         if (res.success && res.data) {
           const trackId = res.data.track_id;
           const finish = () => {
             this.saving       = false;
             this.showNewPanel = false;
+            this.importDraft  = null;
             // Land on the series with setup open — participants/sections/cadence right there.
             this.router.navigate(['/team-meetings/track', trackId], { queryParams: { setup: 1 } });
           };
-          if (invites?.trim()) {
-            this.svc.addTrackMembers(trackId, invites).subscribe({ next: finish, error: finish });
-          } else {
-            finish();
-          }
+          finish();
         } else {
           this.saving    = false;
           this.saveError = res.error ?? 'Failed to create series.';

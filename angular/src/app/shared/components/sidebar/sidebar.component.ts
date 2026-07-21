@@ -46,7 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   // Contract 33 / D-490 + Tracks Phase A: Team Meetings — visible to ALL users.
   // Users without a series can create one (if permitted) or join a public series.
   // Badge = number of series the user participates in.
-  { label: 'Team Meetings', route: '/team-meetings', devStatus: 'live' },
+  { label: 'Meeting Collab', route: '/team-meetings', devStatus: 'live' },
   { label: 'Contact an Admin',     route: '/contact-admin',  devStatus: 'live'        },
   // Phil 2026-07-16 (CC-38-24): all coming-soon items collapse under one
   // "Coming Soon …" parent below Contact an Admin. The sidebar nests one

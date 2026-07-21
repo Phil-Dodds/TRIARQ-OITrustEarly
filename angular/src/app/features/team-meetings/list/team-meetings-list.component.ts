@@ -90,8 +90,10 @@ function todayIso(): string {
           <span>Latest Change</span>
           <span></span>
         </div>
-        <!-- D-308 / S-005: full-row tap navigates to meeting prep/run screen -->
-        <div *ngFor="let m of meetings"
+        <!-- D-308 / S-005: full-row tap navigates to meeting prep/run screen.
+             CC-38 f20 (Phil #4): only the two meetings of interest (next/latest
+             + prior) show by default; the older tail collapses. -->
+        <div *ngFor="let m of visibleMeetings"
              class="tm-row"
              [class.tm-row-deleting]="deletingId === m.id"
              [class.tm-row-unread]="m.unread"
@@ -143,6 +145,13 @@ function todayIso(): string {
             </ng-container>
           </span>
         </div>
+        <!-- CC-38 f20 (Phil #4): older-meetings collapse toggle. -->
+        <button *ngIf="!showAllMeetings && meetings.length > 2" type="button"
+                (click)="showAllMeetings = true"
+                style="background:none;border:none;cursor:pointer;padding:8px 0;
+                       color:var(--triarq-color-primary,#257099);font-size:12px;text-decoration:underline;">
+          Show earlier meetings ({{ meetings.length - 2 }})
+        </button>
       </div>
     </div>
 
@@ -359,6 +368,18 @@ export class TeamMeetingsListComponent implements OnInit {
   loadError = '';
 
   trackId       = '';
+  // CC-38 f20 (Phil #4): default view = the two meetings of interest
+  // (next/latest + prior); the older tail collapses behind a toggle.
+  showAllMeetings = false;
+  // Memoized — fresh-array getters feeding *ngFor cause CD churn (CC-38-65 lesson).
+  private visCache: { src: unknown; all: boolean; out: typeof this.meetings } | null = null;
+  get visibleMeetings() {
+    const all = this.showAllMeetings || this.showDeleted;
+    if (this.visCache?.src !== this.meetings || this.visCache.all !== all) {
+      this.visCache = { src: this.meetings, all, out: all ? this.meetings : this.meetings.slice(0, 2) };
+    }
+    return this.visCache.out;
+  }
   trackName     = '';
   isLeader      = false;
   showSettings  = false;

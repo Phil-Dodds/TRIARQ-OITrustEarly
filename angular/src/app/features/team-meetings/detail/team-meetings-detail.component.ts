@@ -128,6 +128,35 @@ interface InitiativeSearchResult {
                 ← Open last meeting
               </a>
             </div>
+
+            <!-- CC-38 f20 (Phil #2): coaching strip — best practice + Collab
+                 feature reveal. Dismiss remembered per browser; ⓘ reopens.
+                 Inline styles only: this component's CSS sits at the 10 kB
+                 hard budget (D-371). -->
+            <div *ngIf="!coachDismissed"
+                 style="margin-top:10px;border-left:3px solid var(--triarq-color-primary,#257099);
+                        background:rgba(37,112,153,0.06);border-radius:0 8px 8px 0;
+                        padding:10px 14px;font-size:12px;color:#1E1E1E;line-height:1.6;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong style="font-size:12px;">How to run this</strong>
+                <button type="button" (click)="dismissCoach()"
+                        style="background:none;border:none;cursor:pointer;color:#5A5A5A;font-size:14px;">×</button>
+              </div>
+              <span style="display:block;">
+                • Collect <strong>Hot Topics</strong> from the room first, so nothing gets missed.
+                • Everyone edits <strong>live</strong> — take notes together, not in side files.
+                • <strong>⟲ Pull from last meeting</strong> carries open items forward and dedupes.
+                • Type <strong>@</strong> in a bullet to link an Initiative; it lands in the right section.
+                • Presenters: prep your section before the meeting — email reminders nudge anyone who hasn't opened it.
+                • Paste the <strong>share link</strong> (⚙ Series) into the Outlook invite so everyone lands here.
+              </span>
+            </div>
+            <button *ngIf="coachDismissed" type="button" (click)="showCoach()"
+                    title="Show meeting tips"
+                    style="margin-top:6px;background:none;border:none;cursor:pointer;
+                           color:var(--triarq-color-primary,#257099);font-size:11px;text-decoration:underline;padding:0;">
+              ⓘ Meeting tips
+            </button>
           </div>
 
           <!-- Sections — snapshot title/color from the series template at creation.
@@ -1339,6 +1368,18 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   }
 
   // ── Pull from last meeting ────────────────────────────────────────────────────
+  // CC-38 f20: coaching strip dismissal — browser-local UI preference
+  // (deliberately NOT user_screen_state: it's a per-device tip, not a filter).
+  coachDismissed = typeof localStorage !== 'undefined' && localStorage.getItem('oi.collabCoachDismissed') === '1';
+  dismissCoach(): void {
+    this.coachDismissed = true;
+    try { localStorage.setItem('oi.collabCoachDismissed', '1'); } catch { /* private mode */ }
+  }
+  showCoach(): void {
+    this.coachDismissed = false;
+    try { localStorage.removeItem('oi.collabCoachDismissed'); } catch { /* private mode */ }
+  }
+
   pulling = false;
   pullingSectionId: string | null = null;
   pullResult = '';

@@ -79,10 +79,12 @@ export const MEETING_TEMPLATES: readonly MeetingTemplate[] = [
     suggested_cadence: { type: 'biweekly', day_of_week: 2 }  // Tuesday — leader adjusts
   },
   {
+    // CC-38 f20 (Phil #3B): truly blank — explicit [] means NO seeded
+    // sections (create_track distinguishes [] from undefined).
     key:         'blank',
+    sections:    [],
     label:       'Blank',
-    description: 'Start with every section from the shared list and trim to fit. No suggested cadence.',
-    sections:    undefined,
+    description: 'Start empty — add exactly the sections you want in Series Settings. No suggested cadence.',
     suggested_cadence: undefined
   }
 ];

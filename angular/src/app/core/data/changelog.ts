@@ -32,6 +32,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-21',
+    contractLabel: 'Contract 38 follow-on — Meeting Collab',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Meeting Collab (formerly Team Meetings)',
+        description: 'Renamed to Meeting Collab. Clicking a series now lands on the latest meeting; older meetings collapse behind "Show earlier meetings"; a dismissible "How to run this" tip strip teaches best practice and Collab features.'
+      },
+      {
+        audience:    'All',
+        surface:     'New Series',
+        description: 'Drag an Outlook meeting or email onto the New Series panel to prefill name, weekly cadence and time (ET) with reminders, members, and presenters (To line). Blank type now starts truly empty; the Public option moved to Series Settings.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-18',
     contractLabel: 'Contract 38 follow-on — Presenter meeting reminders',
     items: [
