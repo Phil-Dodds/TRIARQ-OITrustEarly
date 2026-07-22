@@ -1555,3 +1555,15 @@ D-442 acknowledgment requested.
   **Requires the team-meetings-mcp MANUAL Render redeploy.**
   UAT: open Ann's blank-series meeting → loads with no sections; add a
   section via ⚙ Series → bullets work normally.
+
+---
+
+# Follow-on 26 — Egg congrats email retired (2026-07-22)
+
+- **CC-38-86** — (Phil) The all-ten-eggs congratulations EMAIL no longer
+  sends; the in-app celebration, community feed, and leaderboard remain.
+  sendCongratsEmail kept unreferenced for a possible next season (with the
+  f25 To/CC fix already in it). EASTER_EGG_CELEBRATION_CC env var now unused.
+  **Requires division-mcp MANUAL Render redeploy** (same one still owed for
+  the f13 Jira toggle + f25 CC payload change).
+  UAT: a user completing all ten sees the celebration but no email arrives.
