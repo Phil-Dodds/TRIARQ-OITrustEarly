@@ -1440,3 +1440,26 @@ run 079 BEFORE the Render redeploy).
    parent not duplicated when carried twice. PASS/FAIL
 4. Delete a parent with sub-bullets → children promote to top level. PASS/FAIL
 5. Initiative-linked bullets indent/outdent too. PASS/FAIL
+
+---
+
+# Follow-on 23 — Meeting ordering by date (2026-07-21)
+
+Commit above. MCP-only; same pending team-meetings-mcp Manual Deploy covers it.
+
+## CC-decisions
+
+- **CC-38-79** — Bug (Phil screenshot: Jul 15, Jul 7, Jul 22 order): meetings
+  were ordered by created_at, so back-filling older meetings after creating a
+  future one reshuffled the list, made "latest" wrong (breaking the /latest
+  landing, Start-next visibility, top-2 collapse) and broke pull-from-last
+  (nearest-earlier by CREATION found nothing for the future meeting).
+  Fixed to meeting_date DESC with created_at tie-break in list_team_meetings,
+  get_track latest, public-tracks latest, and pull_from_last_meeting
+  (nearest earlier DATE). list_my_tracks was already date-first.
+
+## UAT — Follow-on 23 (after Render redeploy)
+1. Feedback Session series lists Jul 22, Jul 15, Jul 7 (top-2 shows Jul 22 +
+   Jul 15; toggle reveals Jul 7). PASS/FAIL
+2. Series click lands on Jul 22; "Pull from last meeting" there pulls from
+   Jul 15. PASS/FAIL
