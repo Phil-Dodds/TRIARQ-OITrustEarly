@@ -53,7 +53,7 @@ function todayIso(): string {
         <div class="tm-header-actions">
           <button class="tm-gear-btn" (click)="showSettings = true" type="button" title="Series settings">⚙</button>
           <button class="tm-btn-primary" (click)="openNewMeeting()" type="button">
-            + New Meeting
+            + New Meeting…
           </button>
         </div>
       </div>

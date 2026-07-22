@@ -38,7 +38,7 @@ import { parseOutlookDrop, OutlookImport } from './outlook-import';
         <div class="tk-header-actions">
           <div class="tk-actions-row">
             <button class="tk-btn-primary" (click)="openNewPanel()" type="button">
-              + New Series
+              + New Series…
             </button>
           </div>
           <p class="tk-create-hint">

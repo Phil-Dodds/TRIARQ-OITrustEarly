@@ -146,7 +146,7 @@ const CADENCE_PHRASE: Record<string, string> = {
             <div *ngIf="!latest?.latest" class="oi-zone-explain">No status updates recorded.</div>
             <!-- D-512 act-from-panel: Update Status available with or without a prior update. -->
             <div *ngIf="!latest?.latest" style="margin-top:12px;">
-              <button class="oi-btn-primary" (click)="startNewUpdate()">Update Status</button>
+              <button class="oi-btn-primary" (click)="startNewUpdate()">Update Status…</button>
             </div>
 
             <ng-container *ngIf="latest?.latest as u">
@@ -220,7 +220,7 @@ const CADENCE_PHRASE: Record<string, string> = {
 
               <!-- D-512 act-from-panel: Update Status (any user) + Edit (window rules) -->
               <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="oi-btn-primary" (click)="startNewUpdate()">Update Status</button>
+                <button class="oi-btn-primary" (click)="startNewUpdate()">Update Status…</button>
                 <button *ngIf="canEdit" class="oi-btn-secondary" (click)="startEditLatest()">Edit</button>
               </div>
 

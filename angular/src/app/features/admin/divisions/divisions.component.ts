@@ -170,7 +170,7 @@ const LEVEL_LABELS: Record<number, string> = {
         </span>
         <span style="flex:1"></span>
         <!-- Contract 31 follow-on (Phil-only): create a new top-level Trust. -->
-        <button *ngIf="isPhil" class="oi-btn-primary" (click)="openCreateTrust()">+ Add Trust</button>
+        <button *ngIf="isPhil" class="oi-btn-primary" (click)="openCreateTrust()">+ Add Trust…</button>
       </div>
 
       <!-- Active filter chips (S-012) ───────────────────────────────────── -->

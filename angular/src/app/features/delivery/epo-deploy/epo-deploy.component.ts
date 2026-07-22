@@ -126,7 +126,7 @@ interface EpoGroup {
           <!-- CC-38 f14 rev: Manage Themes stacked under + New Initiative,
                same styling (Phil 2026-07-17 — out of the main highway). -->
           <div style="display:flex;flex-direction:column;gap:6px;align-items:stretch;">
-            <button *ngIf="canCreateCycle" class="edp-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
+            <button *ngIf="canCreateCycle" class="edp-new-cycle" (click)="onNewCycle()">+ New Initiative…</button>
             <button class="edp-new-cycle" (click)="toggleThemeMgr()">
               {{ themeMgrOpen ? 'Close Themes' : 'Manage Themes' }}
             </button>

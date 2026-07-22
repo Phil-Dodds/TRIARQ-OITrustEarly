@@ -100,7 +100,7 @@ interface PersonGroup {
         <a routerLink="/initiatives" class="esch-back-link">← Initiative Tracking</a>
         <div class="esch-header-row">
           <h3 class="esch-title">Next Gates</h3>
-          <button *ngIf="canCreateCycle" class="esch-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
+          <button *ngIf="canCreateCycle" class="esch-new-cycle" (click)="onNewCycle()">+ New Initiative…</button>
         </div>
         <p class="esch-subtitle">
           Initiatives with gates overdue, due in the next 7 days, or missing a

@@ -115,7 +115,7 @@ interface EpoRowView {
         <a routerLink="/initiatives" class="es-back-link">← Initiative Tracking</a>
         <div class="es-header-row">
           <h3 class="es-title">EPO WIP Summary</h3>
-          <button *ngIf="canCreateCycle" class="es-new-cycle" (click)="onNewCycle()">+ New Initiative</button>
+          <button *ngIf="canCreateCycle" class="es-new-cycle" (click)="onNewCycle()">+ New Initiative…</button>
         </div>
         <p class="es-subtitle">
           Active Initiatives organized by EPO across three WIP zones. The ⚠ flag

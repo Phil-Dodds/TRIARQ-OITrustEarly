@@ -280,7 +280,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
                            background:none;border:1px solid var(--triarq-color-primary);
                            border-radius:5px;padding:3px 8px;cursor:pointer;">
-              Update Status
+              Update Status…
             </button>
             <button (click)="openHistoryPanel()"
                     style="white-space:nowrap;font-size:11px;color:var(--triarq-color-text-secondary);
@@ -572,7 +572,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
                          background:none;border:1px solid var(--triarq-color-primary);
                          border-radius:5px;padding:3px 8px;cursor:pointer;">
-            Update Status
+            Update Status…
           </button>
         </div>
 

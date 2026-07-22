@@ -75,7 +75,7 @@ type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
               <td>{{ r.last_saved_at ? formatDateTime(r.last_saved_at) : 'Never' }}</td>
               <td>{{ r.cadence || '—' }}</td>
               <td>{{ nextMeeting(r.status_due_at) }}</td>
-              <td><button class="oi-btn-secondary mis-sm" (click)="openUpdate(r.initiative_id, r.cycle_title)">Update Status</button></td>
+              <td><button class="oi-btn-secondary mis-sm" (click)="openUpdate(r.initiative_id, r.cycle_title)">Update Status…</button></td>
             </tr>
           </tbody>
         </table>

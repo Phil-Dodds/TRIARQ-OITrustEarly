@@ -53,7 +53,7 @@ interface SprintRowEdit extends SprintRow {
         <div class="scal-header-row">
           <h3 class="scal-title">Sprint Calendars</h3>
           <button *ngIf="!showCreate" type="button" class="scal-primary-btn"
-                  (click)="showCreate = true">+ New Calendar</button>
+                  (click)="showCreate = true">+ New Calendar…</button>
         </div>
         <p class="scal-subtitle">
           Sprint calendars let teams set Gate target dates by sprint instead of picking
