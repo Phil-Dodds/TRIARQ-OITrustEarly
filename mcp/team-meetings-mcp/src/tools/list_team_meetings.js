@@ -32,6 +32,10 @@ async function list_team_meetings(params, caller_user_id) {
     .from('team_meetings')
     .select('id, title, meeting_date, created_at, updated_at, content_updated_at, deleted_at')
     .eq('track_id', track_id)
+    // CC-38 f23 (Phil bug report): order by MEETING DATE, not creation time —
+    // back-filling an older meeting after creating next week's must not
+    // reshuffle the list or change which meeting is "latest".
+    .order('meeting_date', { ascending: false })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   query = includeDeleted ? query.not('deleted_at', 'is', null) : query.is('deleted_at', null);

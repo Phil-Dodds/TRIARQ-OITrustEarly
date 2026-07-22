@@ -310,6 +310,8 @@ async function get_track(params, caller_user_id) {
     .select('id, title, meeting_date, created_at')
     .eq('track_id', track_id)
     .is('deleted_at', null)
+    // CC-38 f23: latest = greatest meeting_date (creation time tie-break).
+    .order('meeting_date', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -592,6 +594,8 @@ async function list_public_tracks(params, caller_user_id) {
     .select('track_id, title, meeting_date, created_at')
     .in('track_id', ids)
     .is('deleted_at', null)
+    // CC-38 f23: latest = greatest meeting_date (creation time tie-break).
+    .order('meeting_date', { ascending: false })
     .order('created_at', { ascending: false });
   const latestByTrack = {};
   (meetings || []).forEach(m => { if (!latestByTrack[m.track_id]) latestByTrack[m.track_id] = m; });
@@ -1272,14 +1276,17 @@ async function pull_from_last_meeting(params, caller_user_id) {
   if (access.error) return { success: false, error: access.error };
   const meeting = access.meeting;
 
-  // Previous meeting = most recent other meeting in the track created before this one.
+  // CC-38 f23: previous meeting = nearest EARLIER meeting_date (was
+  // created_at, which broke when older meetings were back-filled after
+  // next week's was created — "pull from last" then found nothing).
   const { data: prev } = await supabase
     .from('team_meetings')
     .select('id')
     .eq('track_id', meeting.track_id)
     .is('deleted_at', null)
     .neq('id', meeting_id)
-    .lt('created_at', meeting.created_at)
+    .lt('meeting_date', meeting.meeting_date)
+    .order('meeting_date', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
