@@ -108,20 +108,28 @@ async function get_team_meeting(params, caller_user_id) {
 
   const sectionIds = (sections || []).map(s => s.id);
 
-  // Fetch bullets.
-  const { data: bullets, error: bulletErr } = await supabase
-    .from('team_meeting_bullets')
-    .select('id, section_id, text, bullet_note, sort_order, indent_level, carried_from_bullet_id, initiative_id, created_by')
-    .in('section_id', sectionIds.length ? sectionIds : ['__none__'])
-    .order('sort_order', { ascending: true });
-  if (bulletErr) return { success: false, error: bulletErr.message };
+  // CC-38 f25 hotfix (Ann's error): the '__none__' placeholder is not a valid
+  // uuid — Postgres rejected it the first time a ZERO-section meeting existed
+  // (possible since Blank became truly blank, CC-38-72). Skip the queries
+  // entirely when there are no sections.
+  let bullets = [];
+  let notes   = [];
+  if (sectionIds.length) {
+    const { data: bulletData, error: bulletErr } = await supabase
+      .from('team_meeting_bullets')
+      .select('id, section_id, text, bullet_note, sort_order, indent_level, carried_from_bullet_id, initiative_id, created_by')
+      .in('section_id', sectionIds)
+      .order('sort_order', { ascending: true });
+    if (bulletErr) return { success: false, error: bulletErr.message };
+    bullets = bulletData || [];
 
-  // Fetch notes.
-  const { data: notes, error: notesErr } = await supabase
-    .from('team_meeting_notes')
-    .select('section_id, notes_text, updated_at, updated_by')
-    .in('section_id', sectionIds.length ? sectionIds : ['__none__']);
-  if (notesErr) return { success: false, error: notesErr.message };
+    const { data: notesData, error: notesErr } = await supabase
+      .from('team_meeting_notes')
+      .select('section_id, notes_text, updated_at, updated_by')
+      .in('section_id', sectionIds);
+    if (notesErr) return { success: false, error: notesErr.message };
+    notes = notesData || [];
+  }
 
   // Resolve display names for note authors + bullet authors.
   const authorIds = [...new Set([
