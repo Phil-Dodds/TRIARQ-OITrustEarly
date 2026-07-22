@@ -1463,3 +1463,33 @@ Commit above. MCP-only; same pending team-meetings-mcp Manual Deploy covers it.
    Jul 15; toggle reveals Jul 7). PASS/FAIL
 2. Series click lands on Jul 22; "Pull from last meeting" there pulls from
    Jul 15. PASS/FAIL
+
+---
+
+# Follow-on 24 — Ellipsis convention on opens-a-form buttons (2026-07-21)
+
+Commit `bcf9143`; gh-pages deployed. Angular-only.
+
+## CC-decisions
+
+- **CC-38-80** — Classic HIG/Windows convention adopted: button labels that
+  OPEN A FORM (further input required before anything happens) end in "…";
+  immediate-action buttons stay plain. Applied: Update Status… (detail ×2,
+  status panel, My Initiative Status), + New Initiative… (grid,
+  deploy-schedule, epo-deploy, epo-schedule, epo-summary, gates-summary),
+  + New Series…, + New Meeting…, + Add Trust…, + New Calendar….
+  Left plain deliberately: Filters / Manage Themes (the panel IS the result),
+  Edit ✎ (opens the editing surface itself), Start next meeting / Pull /
+  Apply / Save (act immediately).
+
+## Design ask (Phil request)
+
+Create a UI standard: "Ellipsis on command labels that require further input
+before executing; none on immediate commands or panel/navigation toggles."
+Candidate S-number for standards-summary.md; Design to ratify wording and
+sweep future specs.
+
+## UAT — Follow-on 24
+1. Initiative panel / Status dashboard: buttons read "Update Status…". PASS/FAIL
+2. Grid + role screens: "+ New Initiative…"; Meeting Collab: "+ New Series…",
+   "+ New Meeting…"; Admin: "+ Add Trust…", "+ New Calendar…". PASS/FAIL
