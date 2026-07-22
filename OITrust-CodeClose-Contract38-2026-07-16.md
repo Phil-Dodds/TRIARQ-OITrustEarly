@@ -1493,3 +1493,53 @@ sweep future specs.
 1. Initiative panel / Status dashboard: buttons read "Update Status…". PASS/FAIL
 2. Grid + role screens: "+ New Initiative…"; Meeting Collab: "+ New Series…",
    "+ New Meeting…"; Admin: "+ Add Trust…", "+ New Calendar…". PASS/FAIL
+
+---
+
+# Follow-on 25 — Status dashboard performance + status-action placement (2026-07-21)
+
+Commit `0ff173c`; gh-pages deployed. delivery-cycle-mcp AUTO-deploys on the
+push — confirm in Render. No migrations.
+
+## CC-decisions
+
+- **CC-38-81** — (also covers the earlier same-day hotfix) New Initiative
+  footer made sticky — Cancel/Create had scrolled below the fold after the
+  f14 Theme+AI fields. Design ask amended: standardize panel actions as
+  ALWAYS-VISIBLE (header-pinned like Edit, or sticky footer), pick one.
+- **CC-38-82** — N+1 fix: get_initiative_status_dashboard called
+  computeNeedsReviewReasons per row, which ran 2-3 queries each (~300
+  sequential round-trips for ~94 rows — the slow load). The lib now accepts
+  prefetched { intervalDays, slipEvents, gateRows }; the dashboard batches
+  cadence per distinct Division, one slip-event query (widest window,
+  per-cycle window applied in-lib via new aggregateSlipLine), and reuses its
+  existing gate_records fetch. ~8 queries total. Single-initiative callers
+  (get_latest_initiative_status) keep the query path unchanged.
+- **CC-38-83** — Row-level refresh: dashboard tool accepts initiative_id;
+  after save/acknowledge the client re-fetches ONLY that row and splices
+  (falls back to silent full load if the id is missing; removes the row when
+  it no longer matches Needs-Review-only). trackBy keeps DOM stable.
+- **CC-38-84** — Status actions placement (Phil): Update Status… and View
+  Status History now live ONLY in the Current Status box; the top floater
+  keeps initiative-level commands (Edit Initiative…, Submit gate, Cancel).
+  "✎ Edit Initiative…" gains the ellipsis — the HIG edit-exception is
+  DROPPED from our standard: any opens-a-form command takes "…".
+
+## Verification (compact)
+
+delivery-cycle-mcp 251/251 (prefetch path is additive; existing suite covers
+the query path); ng build green (version.json = 0ff173c). Untested: batched
+prefetch parity vs per-row path — verified by inspection (same inputs, same
+logic via shared aggregateSlipLine); UAT compares reason chips before/after.
+D-442 acknowledgment requested.
+
+## UAT — Follow-on 25
+1. Initiative Status Dashboard loads in ~1-2s instead of the long skeleton;
+   Needs Review chips unchanged vs. yesterday's content. PASS/FAIL
+2. Update a status from the dashboard panel → only that row's cells change,
+   list doesn't flash/reload; scroll position holds. PASS/FAIL
+3. With "Needs Review only" on, saving a status that clears the reasons
+   removes the row. PASS/FAIL
+4. Initiative panel: floater shows "✎ Edit Initiative…" and gate/cancel only;
+   Current Status box has Update Status… + View Status History. PASS/FAIL
+5. New Initiative panel: Cancel/Create always visible while scrolling. PASS/FAIL
