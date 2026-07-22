@@ -53,6 +53,9 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
     .is('deleted_at', null)
     .not('current_lifecycle_stage', 'in', '(COMPLETE,CANCELLED)');
   if (scopeIds) { query = query.in('division_id', scopeIds); }
+  // CC-38 f25: single-row refresh — after a status save the client re-fetches
+  // only the affected initiative and splices it in (no full-list reload).
+  if (params?.initiative_id) { query = query.eq('delivery_cycle_id', params.initiative_id); }
 
   const { data: cycles, error } = await query;
   if (error) {
@@ -116,8 +119,34 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
     .in('delivery_cycle_id', cycles.map(c => c.delivery_cycle_id))
     .is('deleted_at', null);
   const gateStatusByCycle = {};
+  const gateRowsByCycle   = {};
   for (const g of (gateRows || [])) {
     (gateStatusByCycle[g.delivery_cycle_id] = gateStatusByCycle[g.delivery_cycle_id] || {})[g.gate_name] = g.gate_status;
+    (gateRowsByCycle[g.delivery_cycle_id] = gateRowsByCycle[g.delivery_cycle_id] || []).push(g);
+  }
+
+  // ── CC-38 f25 (N+1 fix): batch what computeNeedsReviewReasons used to
+  // query per row — cadence interval per DISTINCT division, and one slip-
+  // event query across all cycles (widest interval; per-cycle window applied
+  // inside the lib). Was ~3 queries × N rows; now 1 + #divisions.
+  const { resolveCadenceIntervalDays } = require('../lib/needs-review');
+  const intervalByDivision = {};
+  for (const divId of new Set(cycles.map(c => c.division_id).filter(Boolean))) {
+    intervalByDivision[divId] = await resolveCadenceIntervalDays(supabase, divId);
+  }
+  const maxInterval = Math.max(0, ...Object.values(intervalByDivision).map(v => v || 0));
+  const slipEventsByCycle = {};
+  if (maxInterval > 0 && cycles.length) {
+    const sinceIso = new Date(Date.now() - maxInterval * 24 * 60 * 60 * 1000).toISOString();
+    const { data: slipEvents } = await supabase
+      .from('cycle_event_log')
+      .select('delivery_cycle_id, event_metadata, created_at')
+      .in('delivery_cycle_id', cycles.map(c => c.delivery_cycle_id))
+      .eq('event_type', 'milestone_target_date_changed')
+      .gte('created_at', sinceIso);
+    for (const ev of (slipEvents || [])) {
+      (slipEventsByCycle[ev.delivery_cycle_id] = slipEventsByCycle[ev.delivery_cycle_id] || []).push(ev);
+    }
   }
 
   // ── Build rows + Needs Review reasons (D-485, D-509 lifecycle in lib) ──────
@@ -127,7 +156,13 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
     // D-507: age keys off the chain ROOT, never an edit.
     const root = latest ? rootMap.get(latest.id) : null;
     const reasons = await computeNeedsReviewReasons(
-      supabase, c, latest, milestonesByCycle[c.delivery_cycle_id] || []
+      supabase, c, latest, milestonesByCycle[c.delivery_cycle_id] || [],
+      // CC-38 f25: prefetched — no per-row queries.
+      {
+        intervalDays: intervalByDivision[c.division_id] ?? null,
+        slipEvents:   slipEventsByCycle[c.delivery_cycle_id] || [],
+        gateRows:     gateRowsByCycle[c.delivery_cycle_id] || []
+      }
     );
     if (needsReviewOnly && reasons.length === 0) { continue; }
 

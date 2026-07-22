@@ -271,23 +271,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <button (click)="openEditPanel()"
                     class="oi-btn-primary"
                     style="white-space:nowrap;font-size:var(--triarq-text-small);">
-              ✎ Edit Initiative
+              ✎ Edit Initiative…
             </button>
-
-            <!-- Contract 32 (WS2) — D-348 Tier 2 record-level actions. -->
-            <!-- D-506 (Contract 36): any user with visibility may author. -->
-            <button (click)="openStatusPanel()"
-                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
-                           background:none;border:1px solid var(--triarq-color-primary);
-                           border-radius:5px;padding:3px 8px;cursor:pointer;">
-              Update Status…
-            </button>
-            <button (click)="openHistoryPanel()"
-                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-text-secondary);
-                           background:none;border:1px solid var(--triarq-color-border,#e0e0e0);
-                           border-radius:5px;padding:3px 8px;cursor:pointer;">
-              View Status History
-            </button>
+            <!-- CC-38 f25 (Phil): status actions moved into the Current Status
+                 box — actions live where their data lives; floater keeps only
+                 initiative-level commands. -->
 
             <!-- 2. D-349 dual entry point — submittable: opens gate sub-panel
                     (the action zone). Submit confirmation happens inside the
@@ -567,13 +555,22 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--triarq-space-sm);">
           <span style="font-weight:500;">Current Status</span>
-          <!-- D-506 (Contract 36): any user with visibility may author. -->
-          <button (click)="openStatusPanel()"
-                  style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
-                         background:none;border:1px solid var(--triarq-color-primary);
-                         border-radius:5px;padding:3px 8px;cursor:pointer;">
-            Update Status…
-          </button>
+          <!-- D-506 (Contract 36): any user with visibility may author.
+               CC-38 f25: View Status History joins Update Status here. -->
+          <span style="display:flex;gap:6px;">
+            <button (click)="openStatusPanel()"
+                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-primary);
+                           background:none;border:1px solid var(--triarq-color-primary);
+                           border-radius:5px;padding:3px 8px;cursor:pointer;">
+              Update Status…
+            </button>
+            <button (click)="openHistoryPanel()"
+                    style="white-space:nowrap;font-size:11px;color:var(--triarq-color-text-secondary);
+                           background:none;border:1px solid var(--triarq-color-border,#e0e0e0);
+                           border-radius:5px;padding:3px 8px;cursor:pointer;">
+              View Status History
+            </button>
+          </span>
         </div>
 
         <!-- D-346 Context B skeleton — loads independently of the rest of the panel. -->

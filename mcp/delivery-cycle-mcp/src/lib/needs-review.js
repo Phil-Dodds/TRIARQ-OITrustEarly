@@ -64,10 +64,16 @@ async function computeSlippedGateLabels(supabase, delivery_cycle_id, cadenceInte
 
   if (error || !events) { return []; }
 
+  return aggregateSlipLine(events);
+}
+
+/** CC-38 f25: pure aggregation — shared by the per-cycle query path and the
+ *  dashboard's batched prefetch path (N+1 fix). */
+function aggregateSlipLine(events) {
   // CC-38-44 wording: one aggregated line, no gate names — total days the
   // target dates were pushed out within the cadence window.
   let movedDays = 0;
-  for (const ev of events) {
+  for (const ev of events || []) {
     const m = ev.event_metadata || {};
     const oldD = m.old_target_date;
     const newD = m.new_target_date;
@@ -91,7 +97,10 @@ async function computeSlippedGateLabels(supabase, delivery_cycle_id, cadenceInte
  * @param milestones     array of { gate_name, date_status, target_date }
  * @returns string[] (empty when nothing needs review)
  */
-async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, milestones) {
+async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, milestones, prefetch = {}) {
+  // CC-38 f25 (N+1 fix): the dashboard batches cadence intervals, slip
+  // events, and gate records ONCE and passes them here — no per-row queries.
+  // Single-initiative callers omit prefetch and keep the query path.
   const reasons = [];
 
   // 1) Escalation flagged
@@ -109,8 +118,20 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
   }
 
   // 3) Gate date slipped within cadence period (D-486)
-  const intervalDays = await resolveCadenceIntervalDays(supabase, cycle.division_id);
-  const slipped = await computeSlippedGateLabels(supabase, cycle.delivery_cycle_id, intervalDays);
+  const intervalDays = prefetch.intervalDays !== undefined
+    ? prefetch.intervalDays
+    : await resolveCadenceIntervalDays(supabase, cycle.division_id);
+  let slipped;
+  if (prefetch.slipEvents !== undefined) {
+    const sinceIso = intervalDays
+      ? new Date(Date.now() - intervalDays * 24 * 60 * 60 * 1000).toISOString()
+      : null;
+    slipped = sinceIso
+      ? aggregateSlipLine((prefetch.slipEvents || []).filter(e => e.created_at >= sinceIso))
+      : [];
+  } else {
+    slipped = await computeSlippedGateLabels(supabase, cycle.delivery_cycle_id, intervalDays);
+  }
   for (const line of slipped) {
     reasons.push(line);   // 'Gate Date Moved +N days' (CC-38-44)
   }
@@ -150,11 +171,15 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
   // Review passed, Go to Deploy not yet resolved, and the Deploy milestone has
   // neither a target nor an actual date — the initiative is in motion with no
   // deploy commitment. Distinct from (5), which only watches the NEXT gate.
-  const { data: gateRows } = await supabase
-    .from('gate_records')
-    .select('gate_name, gate_status')
-    .eq('delivery_cycle_id', cycle.delivery_cycle_id)
-    .is('deleted_at', null);
+  let gateRows = prefetch.gateRows;
+  if (gateRows === undefined) {
+    const res = await supabase
+      .from('gate_records')
+      .select('gate_name, gate_status')
+      .eq('delivery_cycle_id', cycle.delivery_cycle_id)
+      .is('deleted_at', null);
+    gateRows = res.data;
+  }
   const gs = {};
   for (const g of (gateRows || [])) { gs[g.gate_name] = g.gate_status; }
   const briefPassed  = gs.brief_review === 'approved' || gs.brief_review === 'skipped';

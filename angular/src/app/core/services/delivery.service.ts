@@ -133,7 +133,7 @@ export class DeliveryService {
   }
 
   /** Initiative Status Dashboard rows (D-485). */
-  getInitiativeStatusDashboard(params: { division_ids?: string[]; needs_review_only?: boolean } = {}):
+  getInitiativeStatusDashboard(params: { division_ids?: string[]; needs_review_only?: boolean; initiative_id?: string } = {}):
     Observable<McpResponse<InitiativeStatusDashboardRow[]>> {
     return this.mcp.call<InitiativeStatusDashboardRow[]>('delivery', 'get_initiative_status_dashboard', params as Record<string, unknown>);
   }

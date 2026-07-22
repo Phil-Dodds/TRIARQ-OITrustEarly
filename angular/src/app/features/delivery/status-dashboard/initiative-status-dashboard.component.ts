@@ -262,8 +262,8 @@ type PersonRole = 'dcs' | 'epo' | 'dol';
       [hasNext]="viewIndex >= 0 && viewIndex < visibleRows.length - 1"
       (prev)="stepView(-1)"
       (next)="stepView(1)"
-      (saved)="load(true)"
-      (acknowledged)="load(true)"
+      (saved)="refreshRow(viewId)"
+      (acknowledged)="refreshRow(viewId)"
       (viewInitiative)="openDetail(viewId!); viewId = null"
       (cancelled)="viewId = null">
     </app-initiative-status-update-panel>
@@ -407,6 +407,34 @@ export class InitiativeStatusDashboardComponent implements OnInit, OnDestroy {
         }
       },
       error: () => { this.pollInFlight = false; }
+    });
+  }
+
+  /** CC-38 f25: after save/acknowledge, re-fetch ONLY the affected row and
+   *  splice it in — no full-list reload. Falls back to a silent full load
+   *  when the id is missing or the row vanished from scope. */
+  refreshRow(initiativeId: string | null): void {
+    if (!initiativeId) { this.load(true); return; }
+    this.delivery.getInitiativeStatusDashboard({
+      needs_review_only: this.needsReviewOnly,
+      initiative_id: initiativeId
+    }).subscribe({
+      next: (res) => {
+        const fresh = res.success ? (res.data ?? []) : [];
+        const i = this.rows.findIndex(r => r.initiative_id === initiativeId);
+        if (fresh.length === 1 && i >= 0) {
+          const next = this.rows.slice();
+          next[i] = fresh[0];
+          this.rows = next;
+        } else if (fresh.length === 1) {
+          this.rows = [...this.rows, fresh[0]];
+        } else if (i >= 0) {
+          // Row no longer matches the filter (e.g. Needs Review cleared).
+          this.rows = this.rows.filter(r => r.initiative_id !== initiativeId);
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => this.load(true)
     });
   }
 
