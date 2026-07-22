@@ -139,7 +139,9 @@ async function find_egg(params, caller_user_id) {
         .from('user_egg_achievements').insert({ user_id: caller_user_id, season: SEASON });
       if (!achErr) {
         just_completed = true;
-        await sendCongratsEmail(caller_user_id).catch(() => {}); // fire-and-forget
+        // CC-38 f26 (Phil 2026-07-22): congrats EMAIL retired — the in-app
+        // celebration + community feed carry the moment. sendCongratsEmail is
+        // kept below (unreferenced) in case the hunt returns next season.
       }
     }
   }
