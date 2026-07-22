@@ -484,6 +484,12 @@ import {
       display: flex; justify-content: flex-end; gap: 12px;
       padding-top: 20px; margin-top: 8px;
       border-top: 1px solid #E8E8E8;
+      /* CC-38 f24 fix: the f14 Theme + AI fields made the form taller than
+         the panel and Cancel/Create scrolled out of view (Phil report).
+         Sticky pins the footer to the visible bottom of the scroll area;
+         -24px cancels .cp-body's bottom padding. */
+      position: sticky; bottom: -24px; background: #fff;
+      padding-bottom: 16px; z-index: 2;
     }
     .cp-btn-cancel {
       background: #fff; border: 1.5px solid #D0D0D0; border-radius: 5px;
