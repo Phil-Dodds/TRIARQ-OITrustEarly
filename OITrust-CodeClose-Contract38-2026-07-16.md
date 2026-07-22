@@ -1543,3 +1543,15 @@ D-442 acknowledgment requested.
 4. Initiative panel: floater shows "✎ Edit Initiative…" and gate/cancel only;
    Current Status box has Update Status… + View Status History. PASS/FAIL
 5. New Initiative panel: Cancel/Create always visible while scrolling. PASS/FAIL
+
+### Follow-on 25 addendum (CC-38-85, commit ff4d26f)
+- **CC-38-85** — Zero-section meetings crashed get_team_meeting with
+  `invalid input syntax for type uuid: "__none__"` (Ann's report): the
+  empty-sectionIds guard passed a placeholder string into a uuid .in().
+  Latent since Contract 33; surfaced the first time a truly-blank series
+  (CC-38-72) produced a meeting with no sections. Fix: skip the bullets/notes
+  queries when the meeting has no sections. Swept for other '__none__' SQL
+  placeholders — the only other occurrence is a JS map key (safe).
+  **Requires the team-meetings-mcp MANUAL Render redeploy.**
+  UAT: open Ann's blank-series meeting → loads with no sections; add a
+  section via ⚙ Series → bullets work normally.
