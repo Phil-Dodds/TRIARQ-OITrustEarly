@@ -424,7 +424,11 @@ export class TracksListComponent implements OnInit {
     ev.preventDefault();
     this.dropActive = false;
     const file = ev.dataTransfer?.files?.[0];
-    if (file) { this.applyOutlookFile(file); }
+    if (file) { this.applyOutlookFile(file); return; }
+    // CC-38 f26: some Outlook builds (esp. New Outlook / OWA) don't hand the
+    // browser a file on drag — explain the workaround instead of doing nothing.
+    this.importError = 'Outlook didn\'t hand the browser a file. Drag the item to your Desktop first, then drag that .msg here — or click this box to browse.';
+    this.cdr.markForCheck();
   }
 
   onOutlookBrowse(ev: Event): void {

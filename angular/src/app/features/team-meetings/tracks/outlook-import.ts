@@ -6,7 +6,16 @@
 // only (an email has no schedule). One-time meetings still default to a
 // weekly cadence per Phil's rule.
 
-import MsgReader from '@kenjiuno/msgreader';
+import * as MsgReaderModule from '@kenjiuno/msgreader';
+
+// CC-38 f26 fix (Phil: drop always errored): the library's default export
+// unwraps differently between the node CJS probe and the browser ESM bundle —
+// resolve the constructor defensively instead of trusting `default`.
+const MsgReaderCtor: any =
+  (MsgReaderModule as any).default?.default ??
+  (MsgReaderModule as any).default ??
+  (MsgReaderModule as any).MsgReader ??
+  MsgReaderModule;
 import { MeetingCadence } from '../../../core/types/team-meetings';
 
 export interface OutlookImport {
@@ -55,9 +64,11 @@ export async function parseOutlookDrop(file: File): Promise<OutlookImport> {
   const buf = await file.arrayBuffer();
   let data: any;
   try {
-    data = new (MsgReader as any)(buf).getFileData();
-  } catch {
-    throw new Error('Could not read that file as an Outlook item. Re-drag it directly from Outlook.');
+    data = new MsgReaderCtor(buf).getFileData();
+  } catch (e) {
+    // Surface the real cause in the console for support; keep the message human.
+    console.error('[outlook-import] parse failed:', e);
+    throw new Error('Could not read that file as an Outlook item. Re-drag it directly from Outlook, or save it to your Desktop first and use click-to-browse.');
   }
 
   const messageClass: string = data?.messageClass || '';
