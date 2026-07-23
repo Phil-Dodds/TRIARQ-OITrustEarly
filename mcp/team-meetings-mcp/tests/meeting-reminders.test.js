@@ -28,7 +28,7 @@ require.cache[require.resolve('../src/db')] = {
   exports: { supabase: { from() { return mockChain; }, functions: { invoke: async () => ({ error: null }) } } }
 };
 
-const { occurrenceInWindow, timeToMinutes } = require('../src/tools/send_meeting_reminders');
+const { occurrenceInWindow, timeToMinutes, isScheduledOccurrence } = require('../src/tools/send_meeting_reminders');
 
 describe('occurrenceInWindow — ET reminder window math', () => {
   const et = (dateStr, minutes) => ({ dateStr, minutes });
@@ -57,6 +57,64 @@ describe('occurrenceInWindow — ET reminder window math', () => {
     assert.strictEqual(timeToMinutes('09:30'), 570);
     assert.strictEqual(timeToMinutes('14:05:00'), 845);
     assert.strictEqual(timeToMinutes('bogus'), null);
+  });
+});
+
+describe('isScheduledOccurrence — schedule gate (defect fix 2026-07-23)', () => {
+  // Date helpers relative to the real clock: suggestNextMeetingDate clamps to
+  // "never in the past", so fixtures must be computed from today (UTC-date
+  // space, matching cadence.js).
+  const iso = d => d.toISOString().slice(0, 10);
+  const addDays = (d, n) => { const x = new Date(d.getTime()); x.setUTCDate(x.getUTCDate() + n); return x; };
+  const todayUtc = () => new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+  /** Next date >= today+minAhead whose UTC weekday = dow. */
+  const nextDow = (dow, minAhead = 0) => {
+    let d = addDays(todayUtc(), minAhead);
+    while (d.getUTCDay() !== dow) { d = addDays(d, 1); }
+    return d;
+  };
+
+  it('fires on the cadence-suggested day even with NO meeting instance (Phil 2026-07-23)', () => {
+    const nextMonday = nextDow(1);
+    const lastMonday = addDays(nextMonday, -7);
+    const cadence = { type: 'weekly', day_of_week: 1 };
+    assert.strictEqual(
+      isScheduledOccurrence(iso(nextMonday), false, cadence, iso(lastMonday)),
+      true
+    );
+  });
+
+  it('does NOT fire on an off-cadence day with no instance (the daily-spam defect)', () => {
+    // Weekly Monday series; window date = the next Thursday. No instance.
+    const nextMonday = nextDow(1);
+    const lastMonday = addDays(nextMonday, -7);
+    const offDay = nextDow(4, 1); // a Thursday >= tomorrow, never the suggested Monday
+    const cadence = { type: 'weekly', day_of_week: 1 };
+    assert.strictEqual(
+      isScheduledOccurrence(iso(offDay), false, cadence, iso(lastMonday)),
+      false
+    );
+  });
+
+  it('an actual instance dated that day fires regardless of cadence (reschedule/ad-hoc)', () => {
+    const offDay = nextDow(4, 1);
+    const cadence = { type: 'weekly', day_of_week: 1 };
+    assert.strictEqual(isScheduledOccurrence(iso(offDay), true, cadence, null), true);
+  });
+
+  it('no cadence configured → instance is the only schedule signal', () => {
+    const anyDay = iso(addDays(todayUtc(), 2));
+    assert.strictEqual(isScheduledOccurrence(anyDay, false, null, null), false);
+    assert.strictEqual(isScheduledOccurrence(anyDay, false, {}, null), false);
+    assert.strictEqual(isScheduledOccurrence(anyDay, true, null, null), true);
+  });
+
+  it('interval cadence: fires only on last + interval_days', () => {
+    const target = addDays(todayUtc(), 3);
+    const last = addDays(target, -7);
+    const cadence = { type: 'interval', interval_days: 7 };
+    assert.strictEqual(isScheduledOccurrence(iso(target), false, cadence, iso(last)), true);
+    assert.strictEqual(isScheduledOccurrence(iso(addDays(target, 1)), false, cadence, iso(last)), false);
   });
 });
 

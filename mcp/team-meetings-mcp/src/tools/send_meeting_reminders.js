@@ -9,12 +9,21 @@
 // Per run, for every live track with meeting_time + reminder_lead_minutes set:
 //   1. Window check in Eastern Time: now ∈ [meeting_time − lead, meeting_time)
 //      for today's or tomorrow's occurrence (long leads cross midnight).
-//   2. Presenters = distinct presenter_user_id on the track's template
+//   2. Schedule gate (defect fix 2026-07-23 — reminders fired every day at
+//      lead time, not just on meeting days): the window date must be in the
+//      series' scheduled timeframe — it equals the cadence-suggested next
+//      meeting date (cadence.js, the same suggestion "Start next meeting"
+//      uses). The reminder fires whether or not the meeting instance exists
+//      yet (Phil 2026-07-23). An instance dated that day also passes, so
+//      rescheduled/ad-hoc meetings still get reminders. No cadence configured
+//      → instance-exists is the only available schedule signal. Time-of-day
+//      alone never triggers a send.
+//   3. Presenters = distinct presenter_user_id on the track's template
 //      sections (the meeting-series presenter configuration).
-//   3. Skip a presenter when they have a presence row on that date's meeting
+//   4. Skip a presenter when they have a presence row on that date's meeting
 //      instance (they already opened/prepped it — Phil: "entered the meeting
 //      once"). No meeting instance yet → nobody prepped → everyone reminded.
-//   4. One-and-done via team_meeting_reminder_log UNIQUE(track, date, user):
+//   5. One-and-done via team_meeting_reminder_log UNIQUE(track, date, user):
 //      the row is written whether or not delivery succeeded, so a flaky mail
 //      relay never turns into repeated nag emails.
 //
@@ -25,6 +34,7 @@
 'use strict';
 
 const { supabase } = require('../db');
+const { suggestNextMeetingDate } = require('../cadence');
 
 const APP_BASE_URL =
   process.env.APP_BASE_URL ||
@@ -73,6 +83,24 @@ function formatTimeEt(t) {
   const h24 = Math.floor(mins / 60), m = mins % 60;
   const h12 = ((h24 + 11) % 12) + 1;
   return `${h12}:${String(m).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'} ET`;
+}
+
+/**
+ * Schedule gate (defect fix 2026-07-23): is targetDate a scheduled occurrence
+ * of this series? True when the series' cadence suggests exactly that date
+ * (instance need not exist yet), or when a meeting instance is already dated
+ * that day (reschedules / ad-hoc). Without a cadence, the instance is the only
+ * schedule signal. Pure — unit-tested without the DB mock (Rule 37).
+ *
+ * @param {string} targetDate       — ET 'YYYY-MM-DD' from occurrenceInWindow
+ * @param {boolean} hasInstance     — a team_meetings row exists for that date
+ * @param {object|null} cadence     — team_meeting_tracks.meeting_cadence
+ * @param {string|null} lastMeetingDate — latest meeting_date in the series
+ */
+function isScheduledOccurrence(targetDate, hasInstance, cadence, lastMeetingDate) {
+  if (hasInstance) { return true; }
+  if (!cadence || !cadence.type) { return false; }
+  return suggestNextMeetingDate(cadence, lastMeetingDate) === targetDate;
 }
 
 /**
@@ -135,11 +163,11 @@ function buildReminderHtml({ trackName, timeLabel, note, url }) {
  */
 async function send_meeting_reminders(now = new Date()) {
   const nowEt = etParts(now);
-  const summary = { tracks_in_window: 0, reminders_sent: 0, skipped_presence: 0, skipped_already_sent: 0, errors: [] };
+  const summary = { tracks_in_window: 0, skipped_off_schedule: 0, reminders_sent: 0, skipped_presence: 0, skipped_already_sent: 0, errors: [] };
 
   const { data: tracks, error: trackErr } = await supabase
     .from('team_meeting_tracks')
-    .select('track_id, track_name, meeting_time, reminder_lead_minutes, reminder_note')
+    .select('track_id, track_name, meeting_time, reminder_lead_minutes, reminder_note, meeting_cadence')
     .not('meeting_time', 'is', null)
     .not('reminder_lead_minutes', 'is', null)
     .is('deleted_at', null)
@@ -153,16 +181,6 @@ async function send_meeting_reminders(now = new Date()) {
     if (!targetDate) { continue; }
     summary.tracks_in_window += 1;
 
-    // Presenter configuration for the meeting series.
-    const { data: sections } = await supabase
-      .from('team_meeting_track_sections')
-      .select('presenter_user_id')
-      .eq('track_id', track.track_id)
-      .not('presenter_user_id', 'is', null)
-      .is('deleted_at', null);
-    const presenterIds = [...new Set((sections || []).map(s => s.presenter_user_id))];
-    if (presenterIds.length === 0) { continue; }
-
     // That date's meeting instance, if it exists.
     const { data: meeting } = await supabase
       .from('team_meetings')
@@ -172,6 +190,36 @@ async function send_meeting_reminders(now = new Date()) {
       .is('deleted_at', null)
       .limit(1)
       .maybeSingle();
+
+    // Schedule gate (defect fix 2026-07-23): the time window alone is not a
+    // trigger — targetDate must be the series' cadence-suggested occurrence
+    // (instance optional) or an actual instance date.
+    let lastMeetingDate = null;
+    if (!meeting?.id) {
+      const { data: lastMeeting } = await supabase
+        .from('team_meetings')
+        .select('meeting_date')
+        .eq('track_id', track.track_id)
+        .is('deleted_at', null)
+        .order('meeting_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      lastMeetingDate = lastMeeting?.meeting_date ?? null;
+    }
+    if (!isScheduledOccurrence(targetDate, !!meeting?.id, track.meeting_cadence, lastMeetingDate)) {
+      summary.skipped_off_schedule += 1;
+      continue;
+    }
+
+    // Presenter configuration for the meeting series.
+    const { data: sections } = await supabase
+      .from('team_meeting_track_sections')
+      .select('presenter_user_id')
+      .eq('track_id', track.track_id)
+      .not('presenter_user_id', 'is', null)
+      .is('deleted_at', null);
+    const presenterIds = [...new Set((sections || []).map(s => s.presenter_user_id))];
+    if (presenterIds.length === 0) { continue; }
 
     // Skip 1 — already sent (one-and-done).
     const { data: sentRows } = await supabase
@@ -262,4 +310,4 @@ async function send_meeting_reminders(now = new Date()) {
   return summary;
 }
 
-module.exports = { send_meeting_reminders, occurrenceInWindow, timeToMinutes };
+module.exports = { send_meeting_reminders, occurrenceInWindow, timeToMinutes, isScheduledOccurrence };

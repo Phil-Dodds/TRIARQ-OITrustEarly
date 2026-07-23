@@ -196,4 +196,62 @@ No feature built or modified in NAV_ITEMS scope this contract (schema + MCP only
 - D-575 referenced in spec but absent from registry v3.62 (next available D-570) — flag for Author.
 
 ---
+
+## Addendum — Meeting reminder daily-fire defect (same session, 2026-07-23)
+
+**Defect (new, distinct from CC-38 f19):** presenter reminder emails fired every
+day at lead time, not just on meeting days. Phil received a 1:01 PM reminder on
+Thu 7/23 for a weekly-Monday series (latest meeting Jul 20, next Jul 27).
+Root cause: `send_meeting_reminders.js` `occurrenceInWindow()` checks
+time-of-day only — nothing consulted the series cadence. Every day with
+`meeting_time`/lead set was treated as a meeting day; one-and-done log resets
+daily → daily email to all 16 presenters.
+
+**Fix:** schedule gate `isScheduledOccurrence()` in
+`mcp/team-meetings-mcp/src/tools/send_meeting_reminders.js` — the window date
+must equal the cadence-suggested next meeting date
+(`cadence.js suggestNextMeetingDate`, same suggestion "Start next meeting"
+uses). Fires whether or not the meeting instance exists (Phil 2026-07-23
+direction). An instance dated that day also passes (reschedule/ad-hoc).
+
+**CC-decisions (addendum):**
+- **CC-R1-01** — Gate = cadence-suggested date (instance optional) OR
+  instance-dated day. No cadence configured → instance-exists is the only
+  schedule signal (otherwise reminders with no cadence can never be correct).
+- **CC-R1-02** — Gate implemented as exported pure function; 5 unit tests added
+  (Rule 37: no multi-query happy path against the single-result mock; fixtures
+  computed relative to the real clock because suggestNextMeetingDate clamps to
+  never-in-past).
+- **CC-R1-03** — Known limitation: cadence math is UTC-date-space; for
+  meetings at/after 8 PM ET with no instance created, the suggested date can
+  sit one day ahead of the ET window date and the reminder would skip.
+  All current series meet in business hours; flagged, not fixed.
+
+**Rule 8 conflict check:** no conflict with G1 CC-decisions or session-brief
+D-numbers. Refines Contract 38 f19 reminder behavior per Phil's live direction.
+
+**Rule 11:** logic-touching. Baseline before: meeting-reminders.test.js 7/7;
+full team-meetings suite 30 pass / 7 pre-existing failures. After: 12/12
+reminder tests (5 new); suite 35 pass / same 7 pre-existing failures.
+
+**Structural health:** send_meeting_reminders.js 266→~320 lines, single
+responsibility (reminder sweep), under threshold.
+
+**CLAUDE.md candidate (addendum):** team-meetings.test.js carries 7 stale
+"returns error for non-admin caller" failures — expectations predate Contract
+33's open-access model. `node --test tests/*.test.js` on team-meetings-mcp is
+red at baseline. Candidate: repair or retire these tests next contract.
+
+**Deployment:** push to master done; **Phil: manual Render redeploy of
+team-meetings-mcp required.** No migration, no Angular change.
+
+**UAT (after redeploy):**
+1. Tomorrow (Fri 7/24) 1:00–3:00 PM ET: no reminder email for the
+   Written Stand Up series. PASS/FAIL
+2. Monday 7/27 ~1:00 PM ET: reminder email arrives (even before anyone
+   clicks "Start next meeting"). PASS/FAIL
+3. Render logs on any 30-min tick: summary line shows
+   `skipped_off_schedule` ≥ 1 on non-meeting days. PASS/FAIL
+
+---
 *TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | 2026-07-23*
