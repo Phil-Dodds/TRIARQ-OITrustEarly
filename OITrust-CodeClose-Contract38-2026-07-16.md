@@ -1567,3 +1567,16 @@ D-442 acknowledgment requested.
   **Requires division-mcp MANUAL Render redeploy** (same one still owed for
   the f13 Jira toggle + f25 CC payload change).
   UAT: a user completing all ten sees the celebration but no email arrives.
+
+### Follow-on 26 addendum (CC-38-87, commit 27792d6)
+- **CC-38-87** — Outlook drop-import always errored (Phil): the msgreader
+  default export unwraps differently in the browser ESM bundle than in the
+  node probe — constructor resolved defensively now (default.default →
+  default → MsgReader → module), verified against the sample .msg via the
+  same fallback chain. Also: when Outlook's drag delivers NO file (New
+  Outlook/OWA behavior), the drop zone now explains the workaround (drag to
+  Desktop first, or click-to-browse) instead of silently doing nothing;
+  parse failures log the underlying error to the console for support.
+  UAT: drag the saved .msg from Desktop → prefills; drag directly from
+  classic Outlook → prefills or shows the guidance message; console shows
+  the real cause on any parse failure.
