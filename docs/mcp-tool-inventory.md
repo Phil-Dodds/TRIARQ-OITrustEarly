@@ -165,6 +165,29 @@ Attach-at-creation wiring is G4.
 
 ---
 
+## 1.6 Contract G2 — Approver Resolution v2 (modified tool)
+
+**`submit_gate_for_approval`** (modified — D-557/D-561/D-570):
+- Resolution is now effective-level-aware via `helpers/approver.js
+  resolveGateApproverV2`. Effective level = COALESCE(set_level, baseline_level):
+  - NULL (unsized) → legacy chain (config → DL → Phil) exactly as pre-G2; no
+    gate_approvals dual-write (D-570b).
+  - Level 1 → legacy chain unchanged until G5 (D-570a), dual-written; oversight
+    set promotes to L2 semantics (S-C4).
+  - Level 2 → oversight (D-561) → gate_approver_configs → Division Leader → Phil.
+  - Level 3 → leadership only (oversight-if-leadership → DL → Phil); configs
+    ignored; non-leadership config/oversight adds
+    `warnings: ['level3_sub_leadership_config_ignored']` (D-570c, S-C1).
+- Sized submissions dual-write one `gate_approvals` row per (gate, approver)
+  with approval_type 'assigned' (D-570a truthful history).
+- Board detection now sourced from `helpers/board-trigger.js` (CC-G1-18);
+  behavior unchanged.
+- Response additions: `effective_level` (1|2|3|null), `approver_source`
+  ('oversight'|'config'|'division_owner'|'phil'|'legacy_*'|'unresolved'),
+  `warnings` (string[]).
+
+---
+
 ## 2. Pre-G1 tool inventory (names only)
 
 Authoritative runtime list: `GET /tools` on each service. Behavior: per-contract

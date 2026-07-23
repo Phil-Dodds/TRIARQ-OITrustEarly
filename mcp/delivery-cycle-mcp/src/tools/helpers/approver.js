@@ -76,4 +76,207 @@ async function resolveGateApprover({ division_id, gate_name }) {
   return { approver_user_id: null, source: 'unresolved' };
 }
 
-module.exports = { resolveGateApprover };
+// ── Contract G2 — Approver Resolution v2 (D-557/D-561/D-570) ─────────────────
+
+/**
+ * Is this user "leadership" for L3 purposes — owner of any live Division, or
+ * Phil? (CC-G2 lean: spec says L3 is leadership-only without defining the
+ * boundary; any-Division-owner is the widest defensible reading of DL.)
+ */
+async function isLeadershipUser(user_id) {
+  if (!user_id) { return false; }
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('id, is_super_admin')
+    .eq('id', user_id)
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (!userRow) { return false; }
+  if (userRow.is_super_admin === true) { return true; }
+  const { data: ownedDivision } = await supabase
+    .from('divisions')
+    .select('id')
+    .eq('owner_user_id', user_id)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+  return !!ownedDivision;
+}
+
+/** Live (non-deleted) user check shared by v2 tiers. */
+async function isLiveUser(user_id) {
+  if (!user_id) { return false; }
+  const { data: live } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', user_id)
+    .is('deleted_at', null)
+    .maybeSingle();
+  return !!live;
+}
+
+/**
+ * Contract G2 — effective-level-aware approver resolution (D-557 chain,
+ * D-561 oversight, D-570 transition rulings, S-C4).
+ *
+ * Levels:
+ *   NULL (unsized) → legacy resolveGateApprover, dual_write=false (D-570b).
+ *                    Oversight ignored (CC-G2 lean: unsized = "exactly as
+ *                    today", strictly legacy).
+ *   L1  → oversight set → runs as L2: oversight person (S-C4).
+ *         Otherwise legacy chain unchanged, dual_write=true (D-570a).
+ *   L2  → oversight → gate_approver_configs → Division Leader → Phil.
+ *         dual_write=true.
+ *   L3  → leadership only: oversight (only when the person is leadership —
+ *         non-leadership oversight ignored with warning) → DL → Phil.
+ *         gate_approver_configs ignored entirely; a config row naming a
+ *         non-leadership person adds warnings[]
+ *         'level3_sub_leadership_config_ignored' (D-570c, S-C1).
+ *         dual_write=true.
+ *
+ * @param {object} args
+ * @param {object} args.cycle — delivery_cycles row incl. division_id,
+ *                              baseline_level, set_level, oversight_user_id
+ * @param {string} args.gate_name
+ * @returns {Promise<{ approver_user_id: string|null, source: string,
+ *   effective_level: number|null, warnings: string[], dual_write: boolean }>}
+ *   source ∈ 'oversight' | 'config' | 'division_owner' | 'phil' |
+ *            'legacy_config' | 'legacy_division_owner' | 'legacy_phil' |
+ *            'unresolved'
+ */
+async function resolveGateApproverV2({ cycle, gate_name }) {
+  const effective_level = cycle.set_level ?? cycle.baseline_level ?? null;
+  const warnings = [];
+
+  // Unsized → legacy exactly as today (D-570b). No dual-write.
+  if (effective_level === null) {
+    const legacy = await resolveGateApprover({ division_id: cycle.division_id, gate_name });
+    return {
+      approver_user_id: legacy.approver_user_id,
+      source: `legacy_${legacy.source}`,
+      effective_level: null,
+      warnings,
+      dual_write: false
+    };
+  }
+
+  // Oversight (D-561). At L1/L2 it wins outright (S-C4: L1 + oversight runs
+  // as L2). At L3 only a leadership person may hold it.
+  if (cycle.oversight_user_id && await isLiveUser(cycle.oversight_user_id)) {
+    if (effective_level !== 3) {
+      return {
+        approver_user_id: cycle.oversight_user_id,
+        source: 'oversight',
+        effective_level,
+        warnings,
+        dual_write: true
+      };
+    }
+    if (await isLeadershipUser(cycle.oversight_user_id)) {
+      return {
+        approver_user_id: cycle.oversight_user_id,
+        source: 'oversight',
+        effective_level,
+        warnings,
+        dual_write: true
+      };
+    }
+    warnings.push('level3_sub_leadership_config_ignored');
+  }
+
+  // L1 without oversight → legacy chain unchanged, dual-written (D-570a).
+  if (effective_level === 1) {
+    const legacy = await resolveGateApprover({ division_id: cycle.division_id, gate_name });
+    return {
+      approver_user_id: legacy.approver_user_id,
+      source: `legacy_${legacy.source}`,
+      effective_level,
+      warnings,
+      dual_write: true
+    };
+  }
+
+  // L2: config tier. L3: config ignored — warn when it names non-leadership.
+  if (cycle.division_id) {
+    const { data: config } = await supabase
+      .from('gate_approver_configs')
+      .select('approver_user_id')
+      .eq('division_id', cycle.division_id)
+      .eq('gate_name', gate_name)
+      .maybeSingle();
+
+    if (config?.approver_user_id) {
+      if (effective_level === 2) {
+        if (await isLiveUser(config.approver_user_id)) {
+          return {
+            approver_user_id: config.approver_user_id,
+            source: 'config',
+            effective_level,
+            warnings,
+            dual_write: true
+          };
+        }
+      } else if (!(await isLeadershipUser(config.approver_user_id))) {
+        // L3 (D-570c/S-C1): sub-leadership config exists and is ignored.
+        if (!warnings.includes('level3_sub_leadership_config_ignored')) {
+          warnings.push('level3_sub_leadership_config_ignored');
+        }
+      }
+    }
+  }
+
+  // Shared L2/L3 terminal chain: Division Leader → Phil.
+  if (cycle.division_id) {
+    const { data: division } = await supabase
+      .from('divisions')
+      .select('owner_user_id')
+      .eq('id', cycle.division_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (division?.owner_user_id && await isLiveUser(division.owner_user_id)) {
+      return {
+        approver_user_id: division.owner_user_id,
+        source: 'division_owner',
+        effective_level,
+        warnings,
+        dual_write: true
+      };
+    }
+  }
+
+  const philId = await getPhilUserId();
+  if (philId && await isLiveUser(philId)) {
+    return { approver_user_id: philId, source: 'phil', effective_level, warnings, dual_write: true };
+  }
+
+  return { approver_user_id: null, source: 'unresolved', effective_level, warnings, dual_write: false };
+}
+
+/**
+ * Contract G2 dual-write (D-570a / spec §2): record the resolved assignment in
+ * gate_approvals as 'assigned' so the G5 transition has a truthful history.
+ * Dup guard (CC-G2 lean): one 'assigned' row per (gate, approver) — a
+ * resubmission resolving the same person adds no duplicate; a different
+ * resolution is a new history row. Non-fatal on failure (returns error string
+ * for the caller's server log; the submission itself already succeeded).
+ *
+ * @returns {Promise<{ written: boolean, error: string|null }>}
+ */
+async function recordAssignedDualWrite(gate_record_id, approver_user_id) {
+  const { data: existingAssigned } = await supabase
+    .from('gate_approvals')
+    .select('approval_id')
+    .eq('gate_record_id', gate_record_id)
+    .eq('approver_user_id', approver_user_id)
+    .eq('approval_type', 'assigned')
+    .maybeSingle();
+  if (existingAssigned) { return { written: false, error: null }; }
+
+  const { error: insertErr } = await supabase
+    .from('gate_approvals')
+    .insert({ gate_record_id, approver_user_id, approval_type: 'assigned' });
+  if (insertErr) { return { written: false, error: insertErr.message }; }
+  return { written: true, error: null };
+}
+
+module.exports = { resolveGateApprover, resolveGateApproverV2, recordAssignedDualWrite };

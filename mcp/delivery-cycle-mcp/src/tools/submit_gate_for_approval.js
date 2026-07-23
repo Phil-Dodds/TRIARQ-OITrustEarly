@@ -37,7 +37,10 @@
 const { supabase } = require('../db');
 const { computeArtifactSuggestionWarnings } = require('./helpers/artifact-warnings');
 // Contract 29: WS3 approver resolution, WS2 consultation setup, WS4 email.
-const { resolveGateApprover } = require('./helpers/approver');
+// Contract G2: effective-level-aware resolution (D-557/D-570) + shared
+// board-trigger helper (CC-G1-18 executed).
+const { resolveGateApproverV2, recordAssignedDualWrite } = require('./helpers/approver');
+const { isBoardTriggeredGate } = require('./helpers/board-trigger');
 const { deriveConsultedUserIds, setupGateConsultations } = require('./helpers/consultations');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
@@ -100,7 +103,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   // D-424 / Contract 23 Item 3.6: division_id added — used to look up dol_required.
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, workstream_id, division_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, other_consulted_user_ids, jira_epic_key, ai_functionality, ai_delivery_form, ai_audience, ai_board_approved')
+    .select('delivery_cycle_id, cycle_title, workstream_id, division_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, other_consulted_user_ids, jira_epic_key, ai_functionality, ai_delivery_form, ai_audience, ai_board_approved, baseline_level, set_level, oversight_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -364,8 +367,8 @@ async function submit_gate_for_approval(params, caller_user_id) {
           'audience (external or internal) in the Initiative edit panel.');
       }
       // Embedded + external → AI Production Board approval before pilot.
-      if (cycle.ai_delivery_form === 'product_embedded' &&
-          cycle.ai_audience === 'external' &&
+      // G2 (CC-G1-18): board detection sourced from the shared helper.
+      if (isBoardTriggeredGate(cycle, gate_name) &&
           cycle.ai_board_approved !== true) {
         return blockGate('ai_prod_board_approval_missing',
           'Cannot submit Go to Deploy — external user-facing AI requires AI Production Board ' +
@@ -375,9 +378,9 @@ async function submit_gate_for_approval(params, caller_user_id) {
     }
   }
 
+  // G2 (CC-G1-18): board detection sourced from the shared helper.
   if (gate_name === 'go_to_release' &&
-      cycle.ai_functionality === 'yes' &&
-      cycle.ai_audience === 'internal' &&
+      isBoardTriggeredGate(cycle, gate_name) &&
       cycle.ai_board_approved !== true) {
     // Internal AI (embedded or analytics) → Board approval before release.
     return blockGate('ai_prod_board_approval_missing',
@@ -458,13 +461,13 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
-  // ── WS3 (D-463): resolve and store the Accountable approver at submission ──
-  // Resolution order: gate_approver_configs → divisions.owner_user_id → Phil.
-  // Stored on gate_records.approver_user_id (existing column, migration 019).
-  const { approver_user_id: resolvedApproverId } = await resolveGateApprover({
-    division_id: cycle.division_id,
-    gate_name
-  });
+  // ── WS3 (D-463) + Contract G2: effective-level-aware approver resolution ──
+  // D-557 chain via resolveGateApproverV2: unsized → legacy (D-570b);
+  // L1 → legacy w/ dual-write (D-570a), oversight promotes to L2 (S-C4);
+  // L2 → oversight → config → DL → Phil; L3 → leadership only + warnings
+  // (D-570c). Stored on gate_records.approver_user_id (D-463 retained).
+  const resolution = await resolveGateApproverV2({ cycle, gate_name });
+  const resolvedApproverId = resolution.approver_user_id;
 
   // ── Submission path — Workstream active OR Workstream not assigned ───────
   //   workstream_active_at_clearance:
@@ -488,6 +491,24 @@ async function submit_gate_for_approval(params, caller_user_id) {
 
   if (updateErr) {
     return { success: false, error: `Failed to update gate record: ${updateErr.message}` };
+  }
+
+  // ── Contract G2 dual-write (D-570a / spec §2 step 3–4): record the resolved
+  // assignment in gate_approvals as 'assigned' for sized initiatives, so the
+  // G5 transition has a truthful history. Unsized cycles write nothing (AC #1).
+  // Dup guard (CC-G2 lean): one 'assigned' row per (gate, approver) — a
+  // resubmission resolving the same person adds no duplicate; a different
+  // resolution is a new history row.
+  if (resolution.dual_write && resolvedApproverId) {
+    const dualWrite = await recordAssignedDualWrite(gate_record.gate_record_id, resolvedApproverId);
+    if (dualWrite.error) {
+      // Non-fatal: the gate is already submitted; log for the server.
+      console.error(JSON.stringify({
+        tool_name: 'submit_gate_for_approval', step: 'gate_approvals_dual_write',
+        delivery_cycle_id, gate_record_id: gate_record.gate_record_id,
+        error: dualWrite.error
+      }));
+    }
   }
 
   await supabase
@@ -583,7 +604,17 @@ async function submit_gate_for_approval(params, caller_user_id) {
   const suggestion_warnings = warningEntries.map(w => w.artifact_type_name);
 
   // assigned_approver (WS3 D-463): Angular shows "Submitted for approval by [chip]".
-  return { success: true, data: updated_gate, suggestion_warnings, assigned_approver };
+  // G2: resolution metadata — effective_level, approver_source, and
+  // warnings[] (e.g. 'level3_sub_leadership_config_ignored', D-570c).
+  return {
+    success: true,
+    data: updated_gate,
+    suggestion_warnings,
+    assigned_approver,
+    effective_level: resolution.effective_level,
+    approver_source: resolution.source,
+    warnings: resolution.warnings
+  };
 }
 
 module.exports = { submit_gate_for_approval };
