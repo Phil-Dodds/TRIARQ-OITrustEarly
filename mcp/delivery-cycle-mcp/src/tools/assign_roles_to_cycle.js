@@ -8,6 +8,7 @@
 'use strict';
 
 const { supabase } = require('../db');
+const { recomputeBaselineForCycle } = require('../lib/governance-derivation');
 
 // Contract 19 (D-394): any of these flags grants assigner authority.
 const ASSIGNER_FLAGS = ['is_admin', 'is_dcs', 'is_epo', 'is_dol', 'is_ce'];
@@ -142,6 +143,14 @@ async function assign_roles_to_cycle(params, caller_user_id) {
       actor_user_id:     caller_user_id,
       event_metadata:    updates
     });
+
+  // ── Contract G1 (D-558/D-562): DCS reassignment recomputes cached baseline ──
+  if (
+    'assigned_dcs_user_id' in updates &&
+    updates.assigned_dcs_user_id !== cycle.assigned_dcs_user_id
+  ) {
+    await recomputeBaselineForCycle(supabase, delivery_cycle_id);
+  }
 
   return { success: true, data: updated };
 }

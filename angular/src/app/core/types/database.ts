@@ -26,6 +26,10 @@ export interface User {
   //   set by direct DB assignment (Supabase Studio) to prevent privilege escalation.
   is_super_admin:                        boolean;
   allow_both_admin_and_functional_roles: boolean;
+  // Contract G1 (D-559, migration 081): global trust flag for this user acting
+  // as assigned DCS. Feeds the L1/L2 branch of baseline level derivation.
+  // Set via set_trusted_dcs MCP tool (admin/Phil); every change activity-logged.
+  trusted_dcs?:                          boolean;
   is_active:                             boolean;
   created_at:                            string;
   updated_at:                            string;
@@ -322,6 +326,18 @@ export interface DeliveryCycle {
   // D-487: optional Division-scoped Roadmap Theme tag.
   roadmap_theme_id?:       string | null;
   roadmap_theme_name?:     string | null;   // joined by get/list
+  // Contract G1 (D-561/D-562, migration 081): governance level + oversight.
+  // Effective level = COALESCE(set_level, baseline_level). baseline_level
+  // null = unsized (no initiative_sizing row — D-567). Legacy
+  // tier_classification is untouched; retired per-initiative in G3.
+  baseline_level?:           1 | 2 | 3 | null;
+  set_level?:                1 | 2 | 3 | null;
+  set_level_by_user_id?:     string | null;
+  set_level_reason?:         string | null;
+  set_level_at?:             string | null;
+  oversight_user_id?:        string | null;
+  oversight_set_via?:        'default' | 'manual' | null;
+  oversight_set_by_user_id?: string | null;
   created_at:              string;
   updated_at:              string;
   deleted_at:              string | null;
@@ -655,6 +671,143 @@ export interface GateApproverConfig {
   approver_user_id:   string;
   updated_at:         string;
   updated_by_user_id: string | null;
+}
+
+// ── Contract G1 (D-555–D-569) — governance redesign schema foundation ────────
+// Four primitives: sizing, level (columns on DeliveryCycle/User above),
+// participation, gate events. Migrations 080–083. MCP tools on
+// delivery-cycle-mcp are the public data API for these tables (D-575 intent).
+
+/** initiative_sizing row (migration 080, D-558). No row = not yet sized (D-567). */
+export interface InitiativeSizing {
+  delivery_cycle_id:   string;
+  q1_investment:       'small' | 'medium' | 'large' | 'xlarge';
+  q1_sub_engineering:  'small' | 'medium' | 'large' | 'xlarge' | null;
+  q1_sub_operational:  'small' | 'medium' | 'large' | 'xlarge' | null;
+  q1_note:             string | null;
+  q2_novelty:          'standard' | 'major';
+  q2_sub_persona:      'well_known' | 'new' | null;
+  q2_sub_scenarios:    'highly_studied' | 'in_discovery' | null;
+  q2_sub_technology:   'standard' | 'new_untried' | null;
+  q2_sub_new_vendor:   boolean | null;
+  q2_note:             string | null;
+  q3_wrongness:        'contained' | 'significant' | 'large_hard';
+  q3_sub_blast:        'contained_internal' | 'external_large' | null;
+  q3_sub_correctable:  'easy' | 'difficult' | null;
+  q3_note:             string | null;
+  q4_security_impact:  boolean;
+  q4_note:             string | null;
+  q5_ux:               'standard' | 'critical';
+  q5_sub_facing:       'none' | 'patient' | 'provider_clinical' | null;
+  q5_sub_application:  'established' | 'new_application' | null;
+  q5_note:             string | null;
+  answered_by_user_id: string;
+  answered_at:         string;
+  updated_by_user_id:  string | null;
+  updated_at:          string | null;
+  created_at:          string;
+}
+
+/** derive_governance response shape (read-only recompute + chips). */
+export interface GovernanceDerivation {
+  is_sized:               boolean;
+  baseline_level:         1 | 2 | 3 | null;
+  cached_baseline_level?: 1 | 2 | 3 | null;
+  set_level:              1 | 2 | 3 | null;
+  set_level_reason?:      string | null;
+  effective_level:        1 | 2 | 3 | null;
+  explanation_chips:      string[];
+  alerts:                 string[];   // 'sub_exceeds_answer' | 'novelty_ux_mismatch'
+}
+
+/** specialty_groups row (migration 082, D-563). Seeded: Security, UX, Compliance, IT/Infrastructure. */
+export interface SpecialtyGroup {
+  group_id:      string;
+  group_name:    string;
+  active_status: boolean;
+  created_at:    string;
+  updated_at:    string;
+  // Joined by list_specialty_groups.
+  members?:      SpecialtyGroupMember[];
+}
+
+/** specialty_group_members roster entry as returned by list_specialty_groups. */
+export interface SpecialtyGroupMember {
+  user_id:      string;
+  display_name: string | null;
+  is_active:    boolean | null;
+  member_since: string;
+}
+
+/** participation_records row (migration 082, D-564) — the C and I letters. */
+export interface ParticipationRecord {
+  record_id:          string;
+  delivery_cycle_id:  string;
+  letter:             'C' | 'I';
+  holder_user_id:     string | null;
+  holder_group_id:    string | null;
+  set_via:            'trio' | 'self' | 'rule' | 'division_default' | 'approver' | 'leadership';
+  set_by_user_id:     string;
+  created_at:         string;
+  updated_at:         string;
+  removed_at:         string | null;
+  removed_by_user_id: string | null;
+  removal_note:       string | null;
+  // Resolved by list tools.
+  holder_display_name?: string | null;
+  holder_group_name?:   string | null;
+}
+
+/** division_default_consulteds row (migration 082, D-563). */
+export interface DivisionDefaultConsulted {
+  default_consulted_id: string;
+  division_id:          string;
+  holder_user_id:       string | null;
+  holder_group_id:      string | null;
+  created_by_user_id:   string;
+  created_at:           string;
+  updated_at:           string;
+  deleted_at:           string | null;
+  holder_display_name?: string | null;
+  holder_group_name?:   string | null;
+}
+
+/** gate_approvals row (migration 083, D-557/D-569) — N-approval collection, append-only. */
+export interface GateApproval {
+  approval_id:                string;
+  gate_record_id:             string;
+  approver_user_id:           string;
+  approval_type:              'assigned' | 'trio_member' | 'ie_override' | 'condition_cosign';
+  over_returned_consultation: boolean;
+  reason_note:                string | null;
+  created_at:                 string;
+  approver_display_name?:     string | null;
+}
+
+/** gate_conditions row (migration 083, D-565). condition_status per S-003 — not bare "status". */
+export interface GateConditionRecord {
+  condition_id:           string;
+  gate_record_id:         string;
+  condition_type:         'general' | 'consultation_required';
+  condition_text:         string;
+  target_consultation_id: string | null;
+  condition_status:       'open' | 'resolved';
+  set_by_user_id:         string;
+  created_at:             string;
+  updated_at:             string;
+  resolved_at:            string | null;
+  resolved_by_user_id:    string | null;
+  resolution_note:        string | null;
+}
+
+/** gate_thread_messages row (migration 083, D-565) — append-only gate thread. */
+export interface GateThreadMessage {
+  message_id:           string;
+  gate_record_id:       string;
+  user_id:              string;
+  message_text:         string;
+  created_at:           string;
+  author_display_name?: string | null;
 }
 
 /** Enriched row from get_gate_approver_configs (admin grid, D-464). */

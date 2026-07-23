@@ -17,6 +17,7 @@
 'use strict';
 
 const { supabase } = require('../db');
+const { recomputeBaselineForCycle } = require('../lib/governance-derivation');
 
 const VALID_TIERS = ['tier_1', 'tier_2', 'tier_3'];
 
@@ -297,6 +298,11 @@ async function update_delivery_cycle(params, caller_user_id) {
     await supabase
       .from('cycle_event_log')
       .insert(eventRows);
+  }
+
+  // ── Contract G1 (D-558/D-562): DCS reassignment recomputes cached baseline ──
+  if (changedFields.includes('assigned_dcs_user_id')) {
+    await recomputeBaselineForCycle(supabase, delivery_cycle_id);
   }
 
   return { success: true, data: updated };

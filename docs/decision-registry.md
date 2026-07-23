@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.59 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.62 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-493**
+**Next available: D-570**
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -130,7 +130,7 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-225 | Triggered Structural Read | Claude Chat | 2026-04-09 | Active |
 | D-226 | Responsibility Declaration on New Files | Claude Chat | 2026-04-09 | Active |
 | D-227 | Required File Verification at Session Start | Claude Chat | 2026-04-09 | Active |
-| D-228 | Tier Classification Edit Behavior on Existing Cycles | Claude Chat | 2026-04-09 | Active |
+| D-228 | Tier Classification Edit Behavior on Existing Cycles | Claude Chat | 2026-04-09 | RESOLVED by D-562/D-567 |
 | D-229 | Delivery Cycle Field Edit Audit Log | Claude Chat | 2026-04-09 | Active |
 | D-230 | Cancelled Item Visibility Philosophy (superseded by S-009) | Claude Chat | 2026-04-09 | Superseded |
 | D-231 | Standards Govern Design Output | Claude Chat | 2026-04-09 | Active |
@@ -368,7 +368,7 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-462 | gate_consultations Schema and MCP Tools | LOCKED | 2026-06-18 | Product | built |
 | D-463 | Gate Approver Stored at Submission Time | LOCKED | 2026-06-18 | Product | built |
 | D-464 | Gate Approvers Admin Screen | LOCKED | 2026-06-18 | Product | built |
-| D-465 | Phil Super-Approver: Displaced Approver Converted to Consulted | LOCKED | 2026-06-18 | Product | built |
+| D-465 | Phil Super-Approver: Displaced Approver Converted to Consulted | LOCKED | 2026-06-18 | Product | built | SUPERSEDED by D-560 |
 | D-466 | Post-Approval Decline Notification to Approver and Phil | LOCKED | 2026-06-18 | Product | built |
 | D-467 | Transactional Email Infrastructure: Supabase Edge Function | LOCKED | 2026-06-18 | Product | built |
 | D-468 | Consulted Action Queue Item Behavior Post-Approval | LOCKED | 2026-06-18 | Product | built |
@@ -379,23 +379,99 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-473 | Public Initiative MCP (initiative-public-mcp) | LOCKED | 2026-06-22 | Product | not-specced |
 | D-474 | API Key Infrastructure: Schema and MCP Tools | LOCKED | 2026-06-22 | Product | not-specced |
 | D-475 | API Key Management Admin Screen | LOCKED | 2026-06-22 | Product | not-specced |
-| D-476 | Initiative Status Update Data Model | 2026-06-23 | specced |
-| D-477 | Confidence Fields Are Gate Status | 2026-06-23 | specced |
-| D-478 | Status Update Entry and Panel Design | 2026-06-23 | specced |
-| D-479 | Confidence Field Applicability Logic | 2026-06-23 | specced |
-| D-480 | Division Cadence Configuration Model | 2026-06-23 | specced |
-| D-481 | Cadence Inheritance | 2026-06-23 | specced |
-| D-482 | Overdue Detection and Scheduled Function | 2026-06-23 | specced |
-| D-483 | Acknowledgment Model | 2026-06-23 | specced |
-| D-484 | My Initiative Status Screen | 2026-06-23 | specced |
-| D-485 | Initiative Status Dashboard | 2026-06-23 | specced |
-| D-486 | Gate Date Slip Detection | 2026-06-23 | specced |
+| D-476 | Initiative Status Update Data Model | 2026-06-23 | built |
+| D-477 | Confidence Fields Are Gate Status | 2026-06-23 | built |
+| D-478 | Status Update Entry and Panel Design | 2026-06-23 | built |
+| D-479 | Confidence Field Applicability Logic | 2026-06-23 | built |
+| D-480 | Division Cadence Configuration Model | 2026-06-23 | built |
+| D-481 | Cadence Inheritance | 2026-06-23 | built |
+| D-482 | Overdue Detection and Scheduled Function | 2026-06-23 | built |
+| D-483 | Acknowledgment Model | 2026-06-23 | built |
+| D-484 | My Initiative Status Screen | 2026-06-23 | built |
+| D-485 | Initiative Status Dashboard | 2026-06-23 | built |
+| D-486 | Gate Date Slip Detection | 2026-06-23 | built |
 | D-487 | Roadmap Theme: Division-Scoped Vocabulary and Tagging | 2026-06-30 | specced |
 | D-488 | Roadmap Theme: Display and Filtering | 2026-06-30 | specced |
 | D-489 | Gate Submission Justification Note | 2026-06-30 | specced |
-| D-490 | Team Meetings Feature | 2026-06-30 | specced |
-| D-491 | Amendment to D-484: My Initiative Status Nav Placement | 2026-06-30 | specced |
-| D-492 | Amendment to D-485: Initiative Status Dashboard Nav Placement | 2026-06-30 | specced |
+| D-490 | Team Meetings Feature | 2026-06-30 | built |
+| D-491 | Amendment to D-484: My Initiative Status Nav Placement | 2026-06-30 | built |
+| D-492 | Amendment to D-485: Initiative Status Dashboard Nav Placement | 2026-06-30 | built |
+| D-493 | Team Meetings Platform Scope (amends D-490) | 2026-07-12 | built |
+| D-494 | Team Meetings Track & Membership Model | 2026-07-12 | built |
+| D-495 | Team Meetings Section Model | 2026-07-12 | built |
+| D-496 | Team Meetings Templates | 2026-07-12 | built |
+| D-497 | Presenter Sections | 2026-07-12 | built |
+| D-498 | Team Meetings Cadence Model | 2026-07-12 | built |
+| D-499 | Team Meetings Live Collaboration Model | 2026-07-12 | built |
+| D-500 | Pull From Last Meeting & Carry-Forward | 2026-07-12 | built |
+| D-501 | Gate Date Clear Model | 2026-07-12 | specced |
+| D-502 | MCP Date Null Contract | 2026-07-12 | specced |
+| D-503 | Date Clear Status Independence | 2026-07-12 | specced |
+| D-504 | Target Date Editable During Pending Approval | 2026-07-12 | specced |
+| D-505 | Target Date Change Audit | 2026-07-12 | specced |
+| D-506 | Universal Status Update Authorship (amends D-483) | 2026-07-12 | specced |
+| D-507 | Status Update Edit Model | 2026-07-12 | specced |
+| D-508 | Status Recency Definition: 3 Calendar Days (amends D-483) | 2026-07-12 | specced |
+| D-509 | Confidence Review-Reason Lifecycle | 2026-07-12 | specced |
+| D-510 | Dashboard Column Redesign (amends D-485) | 2026-07-12 | specced |
+| D-511 | Dashboard Person Filters (amends D-485) | 2026-07-12 | specced |
+| D-512 | Dashboard Meeting Run Model | 2026-07-12 | specced |
+| D-513 | Acknowledgment Visibility | 2026-07-12 | specced |
+| D-514 | Cadence-Named Helper Text | 2026-07-12 | specced |
+| D-515 | My Actions Tab Restructure (amends D-491) | 2026-07-12 | specced |
+| D-516 | Ack Window: Queue Membership vs. Action Availability | 2026-07-13 | built |
+| D-517 | Canonical Gate Label Source | 2026-07-13 | built |
+| D-518 | Pending Approval Dashboard Qualifier | 2026-07-13 | built |
+| D-519 | Dashboard Column Layout Refinement (amends D-510) | 2026-07-13 | built |
+| D-520 | Target Date Display Format | 2026-07-13 | built |
+| D-521 | "No target date: [gate]" Needs Review Reason (extends D-485) | 2026-07-13 | built |
+| D-522 | Team Meetings Section Drag-to-Reorder (Meeting-Local) | 2026-07-13 | built |
+| D-523 | Team Meetings Bullet Edit Features | 2026-07-13 | built |
+| D-524 | CLAUDE.md Rule: Build-After-Commit Sequence | 2026-07-13 | specced |
+| D-525 | CLAUDE.md Rule: Gate Labels from Canonical Source Only | 2026-07-13 | specced |
+| D-526 | CLAUDE.md Rule: team-meetings-mcp Test Mock Limitation | 2026-07-13 | specced |
+| D-527 | Gate Coaching Text (In-Application) | 2026-07-13 | built |
+| D-528 | create_user Stranded-Account Recovery | 2026-07-14 | built |
+| D-529 | Series Settings Section Reorder: Drag Only | 2026-07-14 | built |
+| D-530 | Gate Coaching Trimmed Build (amends D-527) | 2026-07-14 | built |
+| D-531 | Initiative Guide | 2026-07-14 | built |
+| D-532 | Initiative Tracking Hub Layout | 2026-07-14 | built |
+| D-533 | Recently Approved Gates Filter Completion | 2026-07-14 | built |
+| D-534 | My Actions Approval Filters and Note Display | 2026-07-14 | built |
+| D-535 | Dashboard Silent Refresh | 2026-07-14 | built |
+| D-536 | Lifecycle-Ordered Gate Sorts | 2026-07-14 | built |
+| D-537 | Status Overdue Final Model (amends D-482) | 2026-07-14 | built |
+| D-538 | Positioned Bullet Drag | 2026-07-14 | built |
+| D-539 | Series Creation Open to All Users (amends C33 restriction) | 2026-07-14 | built |
+| D-540 | Latest-Activity Preview | 2026-07-14 | built |
+| D-541 | Sticky Meeting Header | 2026-07-14 | built |
+| D-542 | Latest Change Column | 2026-07-14 | built |
+| D-543 | Admin Scope Toggle Swaps | 2026-07-14 | built |
+| D-544 | Deleted Visibility and Meeting Restore | 2026-07-14 | built |
+| D-545 | Last Updated Precision and Preview Divergence | 2026-07-14 | built |
+| D-546 | RLS Posture for MCP-Only Tables | 2026-07-14 | built |
+| D-547 | CLAUDE.md Rule: RLS Enabled in Every CREATE TABLE Migration | 2026-07-14 | specced |
+| D-548 | Signal Semantics Principle | 2026-07-14 | n/a |
+| D-549 | Sprint Calendar Entity Model | 2026-07-14 | specced |
+| D-550 | Per-Division Sprint Calendar Assignment | 2026-07-14 | specced |
+| D-551 | Gate Date Rule Model | 2026-07-14 | specced |
+| D-552 | Date Cascade Semantics | 2026-07-14 | specced |
+| D-553 | Sprint Rule Display | 2026-07-14 | specced |
+| D-555 | Gate Purposes and the Decision Severity Principle | 2026-07-19 | not-specced |
+| D-556 | Two Independent Governance Axes | 2026-07-19 | not-specced |
+| D-557 | Governance Levels Defined | 2026-07-19 | specced-partial |
+| D-558 | Sizing Questions and Level Derivation | 2026-07-19 | specced-partial |
+| D-559 | Trust Anchored on the DCS | 2026-07-19 | specced-partial |
+| D-560 | Initiative Executive Role | 2026-07-19 | specced-partial |
+| D-561 | Oversight Field | 2026-07-19 | specced-partial |
+| D-562 | Effective Level: Computed Baseline plus Leadership Set | 2026-07-19 | specced-partial |
+| D-563 | Participation: Interest Profiles, Suggestions, Auto-Attach | 2026-07-19 | specced-partial |
+| D-564 | RACI Completion: Informed, and Consultation's Single Form | 2026-07-19 | specced-partial |
+| D-565 | Gate as Visible Process | 2026-07-19 | specced-partial |
+| D-566 | Cancellation Authority Follows Severity | 2026-07-19 | not-specced |
+| D-567 | Sizing Lifecycle and Migration | 2026-07-19 | specced-partial |
+| D-568 | Gate KPIs: Direction Lock | 2026-07-19 | not-specced |
+| D-569 | Approving Over a Returned Consultation | 2026-07-19 | specced-partial |
 
 ---
 
@@ -421,6 +497,7 @@ D-145 through D-147: Pre-existing decisions not yet entered in this registry.
 D-149 through D-150: Pre-existing decisions not yet entered in this registry.
 D-152 through D-153: Pre-existing decisions not yet entered in this registry.
 D-376: Not assigned — Rule 33 absorbed into Rule 31 (D-374). 2026-05-16.
+D-554: Not assigned — was Next available at close of 2026-07-14 session; Governance redesign session (2026-07-19) opened at D-555. 2026-07-19.
 D-156 through D-162: Pre-existing or open decisions not yet entered in this registry.
 
 D-163 through D-169: Numbers occupied in decisions-active.md by pre-existing decisions. Registry rows corrected 2026-04-14 to reflect decisions-active content. Prior registry entries for these numbers (Workflow Entry Point Completeness, Admin Hub Consolidation, Workstream optional, Division filter, Workstream filter, Claude Code debate, source tagging) are now registered as D-310 through D-315 and D-201.

@@ -107,6 +107,17 @@ const sprintCalendars                    = require('./tools/sprint_calendars');
 const { set_division_sprint_calendar, get_effective_sprint_calendar } = require('./tools/division_sprint_calendar');
 const { set_gate_date_rule }             = require('./tools/set_gate_date_rule');
 
+// Contract G1 (D-555–D-569): governance redesign schema foundation.
+// Four primitives — sizing, level, participation, gate events. No UI in G1.
+const initiativeSizing                   = require('./tools/initiative_sizing');
+const governanceLevel                    = require('./tools/governance_level');
+const participation                      = require('./tools/participation');
+const specialtyGroups                    = require('./tools/specialty_groups');
+const divisionDefaultConsulteds          = require('./tools/division_default_consulteds');
+const gateThread                         = require('./tools/gate_thread');
+const gateConditions                     = require('./tools/gate_conditions');
+const gateApprovals                      = require('./tools/gate_approvals');
+
 const app  = express();
 const PORT = process.env.PORT || 3003;
 
@@ -216,7 +227,38 @@ const TOOLS = {
   status_dashboard_changed_since,
   get_initiative_status_dashboard,
   trigger_status_refresh,
-  get_status_refresh_last_run
+  get_status_refresh_last_run,
+
+  // Contract G1 — governance redesign schema foundation (D-555–D-569)
+  // Primitive 1 — sizing
+  get_initiative_sizing:              initiativeSizing.get_initiative_sizing,
+  upsert_initiative_sizing:           initiativeSizing.upsert_initiative_sizing,
+  derive_governance:                  initiativeSizing.derive_governance,
+  // Primitive 2 — governance level + trust + oversight
+  set_effective_level:                governanceLevel.set_effective_level,
+  clear_effective_level:              governanceLevel.clear_effective_level,
+  set_oversight:                      governanceLevel.set_oversight,
+  clear_oversight:                    governanceLevel.clear_oversight,
+  set_trusted_dcs:                    governanceLevel.set_trusted_dcs,
+  // Primitive 3 — participation
+  add_participation:                  participation.add_participation,
+  remove_participation:               participation.remove_participation,
+  list_participation:                 participation.list_participation,
+  list_my_participation:              participation.list_my_participation,
+  list_specialty_groups:              specialtyGroups.list_specialty_groups,
+  add_specialty_group_member:         specialtyGroups.add_specialty_group_member,
+  remove_specialty_group_member:      specialtyGroups.remove_specialty_group_member,
+  list_division_default_consulteds:   divisionDefaultConsulteds.list_division_default_consulteds,
+  add_division_default_consulted:     divisionDefaultConsulteds.add_division_default_consulted,
+  remove_division_default_consulted:  divisionDefaultConsulteds.remove_division_default_consulted,
+  // Primitive 4 — gate events
+  add_gate_thread_message:            gateThread.add_gate_thread_message,
+  list_gate_thread:                   gateThread.list_gate_thread,
+  add_gate_condition:                 gateConditions.add_gate_condition,
+  resolve_gate_condition:             gateConditions.resolve_gate_condition,
+  list_gate_conditions:               gateConditions.list_gate_conditions,
+  record_gate_approval:               gateApprovals.record_gate_approval,
+  list_gate_approvals:                gateApprovals.list_gate_approvals
 };
 
 // ── CORS — allow GitHub Pages and local dev origins ───────────────────────────
