@@ -77,6 +77,20 @@ const HUB_CARDS: HubCard[] = [
                  'and a Needs Review column (overdue, escalation, gate-date slip, or At Risk). ' +
                  'Filter by Division and toggle Needs Review to triage for a meeting.'
   },
+  {
+    // Post-GEnd correction (Phil 2026-07-24): "Following" moved from a
+    // standalone nav item to a hub card — the D-485 status-dashboard
+    // precedent. The concept may generalize beyond Initiatives later; for
+    // now it is Initiatives-only, so it lives here.
+    id:          'following',
+    title:       'Initiatives I\'m Following',
+    route:       '/initiatives/following',
+    icon:        '★',
+    description: 'Every Initiative where you hold a Consulted or Informed stake — directly or ' +
+                 'through a Specialty Group. Follow any Initiative with the ★ on the All ' +
+                 'Initiatives list or from its detail panel; Informed parties receive gate ' +
+                 'decisions automatically.'
+  },
   // D-527 follow-on: Initiative Guide (concept guide / OI Library seed) — top
   // row placement per Phil 2026-07-13.
   {

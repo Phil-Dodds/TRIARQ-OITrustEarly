@@ -27,9 +27,14 @@ import { ParticipationRecord } from '../../../core/types/database';
 
       <div *ngIf="loading" class="fl-loading">Loading…</div>
 
+      <!-- Post-GEnd (Phil 2026-07-24): the empty state now sends the user
+           somewhere they can act — the ☆ on the All Initiatives list. -->
       <div *ngIf="!loading && rows.length === 0" class="fl-empty">
-        You are not following any Initiatives yet. Use "Follow (Informed)" on any
-        Initiative's detail panel to start.
+        You are not following any Initiatives yet.
+        <a [routerLink]="['/initiatives/list']"
+           style="color:#257099;text-decoration:underline;">Browse All Initiatives</a>
+        and tap the ☆ on any row — or use "Follow (Informed)" on an Initiative's
+        detail panel.
       </div>
 
       <table *ngIf="!loading && rows.length > 0" class="fl-table">

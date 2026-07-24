@@ -43,9 +43,9 @@ const NAV_ITEMS: NavItem[] = [
   // Contract 32 / D-485: Initiative Status Dashboard is now a card on this hub
   // (not a standalone nav item).
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'live'        },
-  // Contract G4 (D-564): the viewer's Consulted/Informed memberships.
-  // devStatus 'uat' — first post-build stage per Phil's progression order.
-  { label: 'Following',            route: '/initiatives/following', devStatus: 'uat' },
+  // Post-GEnd correction (Phil 2026-07-24): "Following" is a hub card on
+  // Initiative Tracking now (D-485 precedent) — the standalone nav item is
+  // retired; the /initiatives/following route stays for deep links.
   // Contract G8 (D-560): IE pull-only monitoring — never merged with My Actions.
   { label: 'All Pending Gates',    route: '/initiatives/all-pending-gates',
     requiresFlag: 'is_initiative_executive', devStatus: 'uat' },

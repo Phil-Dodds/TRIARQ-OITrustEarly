@@ -792,6 +792,18 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
           <!-- Col 2: Cycle Name — 3-line clamp + Tier badge. CC-Decision-2026-04-12-A: Contract 5 restores Tier badge (D-264 overridden). -->
           <div>
+            <!-- Post-GEnd correction (Phil 2026-07-24): one-tap Follow star on
+                 the row — D-564's patrol gesture without opening the panel.
+                 stopPropagation keeps the row's open-panel tap intact. -->
+            <button type="button"
+                    (click)="$event.stopPropagation(); toggleFollow(cycle)"
+                    [disabled]="followBusyId === cycle.delivery_cycle_id"
+                    [title]="isFollowing(cycle) ? 'Following (Informed) — tap to stop' : 'Follow this Initiative (Informed)'"
+                    [style.color]="isFollowing(cycle) ? '#F2A620' : '#B9C4CE'"
+                    style="float:right;background:none;border:none;cursor:pointer;
+                           font-size:16px;line-height:1;padding:0 0 0 6px;">
+              {{ isFollowing(cycle) ? '★' : '☆' }}
+            </button>
             <!-- D-488: "[Theme] · [Name]" prefix when a Roadmap Theme is set. -->
             <div style="font-size:14px;font-weight:600;color:#1E1E1E;
                         display:-webkit-box;-webkit-line-clamp:3;
@@ -1195,6 +1207,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    // Post-GEnd (Phil 2026-07-24): my Informed stakes for the row Follow stars.
+    this.loadMyFollowing();
     // D-175: read query params from summary view drill-down and apply as initial filters.
     // Item 5: set drillDownFromQp so the visual confirmation banner renders.
     const qp = this.route.snapshot.queryParams;
@@ -1821,6 +1835,54 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   }
 
   // persist=false used by count card shortcuts — set filter without writing to memory. Source: D-HubCounts-2026-04-06.
+  // ── Post-GEnd (Phil 2026-07-24): one-tap Follow on list rows (D-564) ───────
+  /** delivery_cycle_id → participation record_id for MY direct Informed stakes. */
+  private myInformedByCycle = new Map<string, string>();
+  followBusyId: string | null = null;
+
+  isFollowing(cycle: DeliveryCycle): boolean {
+    return this.myInformedByCycle.has(cycle.delivery_cycle_id);
+  }
+
+  loadMyFollowing(): void {
+    const me = this.profile.getCurrentProfile()?.id;
+    if (!me) { return; }
+    this.delivery.listMyParticipation().subscribe({
+      next: (res) => {
+        this.myInformedByCycle.clear();
+        for (const r of res.data?.participation_records ?? []) {
+          // Direct Informed stakes only — group-held stakes aren't removable
+          // with one tap (the group holds them, not the viewer).
+          if (r.letter === 'I' && r.holder_user_id === me) {
+            this.myInformedByCycle.set(r.delivery_cycle_id, r.record_id);
+          }
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { /* stars render unfollowed; the detail panel still works */ }
+    });
+  }
+
+  toggleFollow(cycle: DeliveryCycle): void {
+    const me = this.profile.getCurrentProfile()?.id;
+    if (!me || this.followBusyId) { return; }
+    this.followBusyId = cycle.delivery_cycle_id;
+    this.cdr.markForCheck();
+    const existing = this.myInformedByCycle.get(cycle.delivery_cycle_id);
+    const call = existing
+      ? this.delivery.removeParticipation({ record_id: existing })
+      : this.delivery.addParticipation({
+          delivery_cycle_id: cycle.delivery_cycle_id,
+          letter: 'I',
+          holder_user_id: me,
+          set_via: 'self'
+        });
+    call.subscribe({
+      next: () => { this.followBusyId = null; this.loadMyFollowing(); },
+      error: () => { this.followBusyId = null; this.cdr.markForCheck(); }
+    });
+  }
+
   // ── Contract G9 (D-563 Grade 1): interest profile state + panel ────────────
   interestConditions: InterestCondition[] = [];
   interestPanelOpen = false;
