@@ -430,12 +430,10 @@ export class TracksListComponent implements OnInit {
     // browser a file on drag — OLE formats Chrome can't read. Best effort
     // (Phil 2026-07-24): a subject line sometimes rides along as plain text;
     // prefill what we can and say exactly what was captured.
+    // Diagnosed 2026-07-24: direct Outlook drags expose only text/plain +
+    // text/uri-list, both carrying the bare subject — no attendees, no times.
+    // Subject prefill is the ceiling; .msg via Desktop/browse is the full path.
     const text = (dt?.getData('text/plain') || '').trim();
-    // Diagnostic (Phil 2026-07-24): dump every payload Outlook exposes so we
-    // can decide what else is harvestable (attendees may ride in text/html).
-    for (const t of (dt ? Array.from(dt.types) : [])) {
-      console.info(`[outlook-drop] ${t} →`, (dt?.getData(t) || '(empty)').slice(0, 2000));
-    }
     const subject = text && !/^https?:\/\//i.test(text)
       ? text.split(/\r?\n/)[0].slice(0, 120).trim() : '';
     if (subject) {
