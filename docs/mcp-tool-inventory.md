@@ -340,6 +340,24 @@ Leadership sets extended to IEs: `resolveGateApproverV2` L3 chain,
 
 ---
 
+## 1.12 Contract G9 — Suggestions + interest filters (new + modified tools)
+
+**`get_suggestion_state`** (new — D-563 Grade 2): per-Initiative state of the
+two hardcoded rules (`q4_security`, `q5_ux`) — applies / attached / dismissed
+(with the specialty-visible note, S-C7) / live.
+
+**`apply_suggestion_decision`** (new): `action 'add'` attaches the group as
+Consulted (set_via 'rule', idempotent); `action 'dismiss'` requires a note and
+records it in `suggestion_dismissals` (migration 087, UNIQUE per cycle+rule).
+Auth: Initiative trio or Admin. Unknown rule_key rejected — no rules framework
+until rule three arrives (D-563 locked).
+
+**`list_delivery_cycles`** (modified — D-563 Grade 1): rows carry the full
+`sizing` object (answers, sub-answers, Other-notes) so interest profiles
+filter client-side over queryable facts; rows also carry `waiting_on` (G7).
+
+---
+
 ## 2. Pre-G1 tool inventory (names only)
 
 Authoritative runtime list: `GET /tools` on each service. Behavior: per-contract

@@ -874,6 +874,27 @@ export class DeliveryService {
     );
   }
 
+  // ── Contract G9 — the two hardcoded suggestion rules (D-563 Grade 2) ────────
+
+  getSuggestionState(params: { delivery_cycle_id: string }):
+    Observable<McpResponse<{ suggestions: SuggestionState[] }>> {
+    return this.mcp.call<{ suggestions: SuggestionState[] }>(
+      'delivery', 'get_suggestion_state', params as unknown as Record<string, unknown>
+    );
+  }
+
+  /** Add attaches the group as Consulted; dismiss requires a note (S-C7). */
+  applySuggestionDecision(params: {
+    delivery_cycle_id: string;
+    rule_key: 'q4_security' | 'q5_ux';
+    action: 'add' | 'dismiss';
+    note?: string;
+  }): Observable<McpResponse<{ rule_key: string; action: string; group_name: string }>> {
+    return this.mcp.call<{ rule_key: string; action: string; group_name: string }>(
+      'delivery', 'apply_suggestion_decision', params as unknown as Record<string, unknown>
+    );
+  }
+
   // ── Contract G8 — governance level controls (D-562, S-C6 prompt) ───────────
 
   setEffectiveLevel(params: { delivery_cycle_id: string; level: 1 | 2 | 3; reason: string }):
@@ -908,6 +929,21 @@ export class DeliveryService {
       'delivery', 'list_all_pending_gates', {}
     );
   }
+}
+
+/** Contract G9 (D-563): one suggestion rule's state on an Initiative. */
+export interface SuggestionState {
+  rule_key:             'q4_security' | 'q5_ux';
+  group_id:             string;
+  group_name:           string;
+  label:                string;
+  rationale:            string;
+  applies:              boolean;
+  attached:             boolean;
+  dismissed:            boolean;
+  dismissal_note:       string | null;
+  dismissed_by_user_id: string | null;
+  live:                 boolean;
 }
 
 /** Contract G8 (D-560): one row of the All Pending Gates view. */

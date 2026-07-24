@@ -24,6 +24,9 @@ export interface SizingFormPayload {
   answers: SizingAnswers;
   subs:    SizingSubs;
   notes:   SizingNotes;
+  /** Contract G9 (D-563): the trio's Add/Dismiss decisions on the two
+   *  hardcoded suggestion rules — applied post-save by the host component. */
+  suggestionDecisions: Partial<Record<'q4_security' | 'q5_ux', { action: 'add' | 'dismiss'; note?: string }>>;
 }
 
 interface ChipOption { value: string; label: string; }
@@ -108,6 +111,37 @@ interface SubGroup   { key: keyof SizingSubs; label: string; options: ChipOption
           <div class="sz-alert" *ngIf="previewAlerts.includes('novelty_ux_mismatch')">
             ⚠ Major novelty with standard UX involvement is unusual — confirm Q5.
           </div>
+
+          <!-- Contract G9 (D-563 Grade 2): exactly two hardcoded suggestions.
+               Add attaches the group as Consulted; Dismiss requires a note
+               visible to the specialty (S-C7). -->
+          <div *ngFor="let s of liveSuggestions" class="sz-suggestion">
+            <div class="sz-suggest-text">
+              Suggested: <strong>{{ s.label }}</strong> — {{ s.rationale }}
+            </div>
+            <div class="sz-suggest-actions" *ngIf="!readOnly">
+              <ng-container *ngIf="!suggestionDecisions[s.rule_key]">
+                <button type="button" class="sz-chip sz-chip--sub" (click)="acceptSuggestion(s.rule_key)">Add</button>
+                <button type="button" class="sz-chip sz-chip--sub sz-chip--other" (click)="startDismiss(s.rule_key)">Dismiss…</button>
+              </ng-container>
+              <span *ngIf="suggestionDecisions[s.rule_key]?.action === 'add'" class="sz-suggest-state">
+                ✓ Will attach {{ s.group_name }} as Consulted
+                <button type="button" class="sz-link" (click)="clearDecision(s.rule_key)">undo</button>
+              </span>
+              <span *ngIf="suggestionDecisions[s.rule_key]?.action === 'dismiss'" class="sz-suggest-state">
+                Dismissed — note recorded (visible to {{ s.group_name }})
+                <button type="button" class="sz-link" (click)="clearDecision(s.rule_key)">undo</button>
+              </span>
+            </div>
+            <div *ngIf="dismissNoteOpenFor === s.rule_key" class="sz-suggest-note">
+              <input type="text" maxlength="300"
+                     placeholder="Why is this suggestion being dismissed? (visible to {{ s.group_name }})"
+                     [(ngModel)]="dismissNoteDraft" class="sz-note-input" />
+              <button type="button" class="sz-chip sz-chip--sub"
+                      [disabled]="!dismissNoteDraft.trim()"
+                      (click)="confirmDismiss(s.rule_key)">Dismiss</button>
+            </div>
+          </div>
         </ng-container>
         <ng-template #govPending>
           <div class="sz-gov-pending">Answer all five questions to see the derived governance level.</div>
@@ -153,6 +187,16 @@ interface SubGroup   { key: keyof SizingSubs; label: string; options: ChipOption
       border-left: 3px solid #F2A620; background: rgba(242, 166, 32, 0.08);
       padding: 6px 10px; font: 400 12px Roboto, sans-serif; color: #1a1a1a;
     }
+    /* G9 suggestions */
+    .sz-suggestion {
+      border-left: 3px solid #257099; background: rgba(37, 112, 153, 0.06);
+      padding: 6px 10px; display: flex; flex-direction: column; gap: 4px;
+    }
+    .sz-suggest-text { font: 400 12px Roboto, sans-serif; color: #1a1a1a; }
+    .sz-suggest-actions { display: flex; gap: 6px; align-items: center; }
+    .sz-suggest-state { font: italic 11px Roboto, sans-serif; color: #2e7d32; }
+    .sz-suggest-note { display: flex; gap: 6px; align-items: center; }
+    .sz-link { background: none; border: none; color: #257099; cursor: pointer; font-size: 11px; text-decoration: underline; }
   `]
 })
 export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
@@ -175,6 +219,60 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
   previewLevel: 1 | 2 | 3 | null = null;
   previewChips: string[] = [];
   previewAlerts: string[] = [];
+
+  // Contract G9 (D-563 Grade 2): decision state for the two hardcoded rules.
+  suggestionDecisions: SizingFormPayload['suggestionDecisions'] = {};
+  dismissNoteOpenFor: 'q4_security' | 'q5_ux' | null = null;
+  dismissNoteDraft = '';
+
+  /** Pure rule evaluation from the current answers — exactly two rules. */
+  get liveSuggestions(): Array<{ rule_key: 'q4_security' | 'q5_ux'; group_name: string; label: string; rationale: string }> {
+    const out: Array<{ rule_key: 'q4_security' | 'q5_ux'; group_name: string; label: string; rationale: string }> = [];
+    if (this.answers.q4_security_impact === true) {
+      out.push({
+        rule_key: 'q4_security', group_name: 'Security', label: 'Security as Consulted',
+        rationale: 'Q4 flags a new security or access element — Security consults at Go to Build.'
+      });
+    }
+    if (this.answers.q5_ux === 'critical') {
+      out.push({
+        rule_key: 'q5_ux', group_name: 'UX', label: 'UX as Consulted',
+        rationale: 'Q5 marks UX involvement critical — UX consults at Brief Review and Go to Build.'
+      });
+    }
+    return out;
+  }
+
+  acceptSuggestion(rule_key: 'q4_security' | 'q5_ux'): void {
+    this.suggestionDecisions = { ...this.suggestionDecisions, [rule_key]: { action: 'add' } };
+    this.dismissNoteOpenFor = null;
+    this.emitPayload();
+    this.cdr.markForCheck();
+  }
+
+  startDismiss(rule_key: 'q4_security' | 'q5_ux'): void {
+    this.dismissNoteOpenFor = rule_key;
+    this.dismissNoteDraft = '';
+    this.cdr.markForCheck();
+  }
+
+  confirmDismiss(rule_key: 'q4_security' | 'q5_ux'): void {
+    const note = this.dismissNoteDraft.trim();
+    if (!note) { return; }
+    this.suggestionDecisions = { ...this.suggestionDecisions, [rule_key]: { action: 'dismiss', note } };
+    this.dismissNoteOpenFor = null;
+    this.dismissNoteDraft = '';
+    this.emitPayload();
+    this.cdr.markForCheck();
+  }
+
+  clearDecision(rule_key: 'q4_security' | 'q5_ux'): void {
+    const next = { ...this.suggestionDecisions };
+    delete next[rule_key];
+    this.suggestionDecisions = next;
+    this.emitPayload();
+    this.cdr.markForCheck();
+  }
 
   readonly questions: Array<{
     key: keyof SizingAnswers; noteKey: keyof SizingNotes; label: string;
@@ -359,7 +457,8 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
       valid: this.allAnswered,
       answers: this.answers,
       subs: this.subs,
-      notes: this.notes
+      notes: this.notes,
+      suggestionDecisions: this.suggestionDecisions
     });
   }
 

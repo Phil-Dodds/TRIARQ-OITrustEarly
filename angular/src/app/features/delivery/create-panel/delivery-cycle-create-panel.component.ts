@@ -947,6 +947,16 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
                 this.submitError = `Initiative created, but sizing failed to save: ${sizeRes.error ?? 'unknown error'}. ` +
                                    'Sizing will be required at the first gate.';
               }
+              // Contract G9 (D-563): apply the trio's suggestion decisions.
+              // Fire-and-forget — failures surface on the detail panel.
+              for (const [rule_key, decision] of Object.entries(payload.suggestionDecisions ?? {})) {
+                this.delivery.applySuggestionDecision({
+                  delivery_cycle_id: created.delivery_cycle_id,
+                  rule_key: rule_key as 'q4_security' | 'q5_ux',
+                  action: decision.action,
+                  ...(decision.note ? { note: decision.note } : {})
+                }).subscribe({ next: () => {}, error: () => {} });
+              }
               this.cycleCreated.emit(created);
               this.submitting = false;
               this.cdr.markForCheck();

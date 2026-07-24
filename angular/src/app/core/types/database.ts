@@ -345,6 +345,10 @@ export interface DeliveryCycle {
   oversight_user_id?:        string | null;
   oversight_set_via?:        'default' | 'manual' | null;
   oversight_set_by_user_id?: string | null;
+  // Contract G7: rolled-up waiting-on line (list rows; null = nothing awaiting).
+  waiting_on?:               { state: string; line: string; days_waiting: number } | null;
+  // Contract G9: sizing row joined by list_delivery_cycles (interest filters).
+  sizing?:                   InitiativeSizing | null;
   created_at:              string;
   updated_at:              string;
   deleted_at:              string | null;

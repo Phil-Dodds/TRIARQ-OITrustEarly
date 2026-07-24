@@ -301,6 +301,17 @@ async function list_delivery_cycles(params, caller_user_id) {
     (themeRows || []).forEach(t => { themeMap[t.id] = t.name; });
   }
 
+  // ── Contract G9 (D-563 Grade 1): sizing rows for interest filters —
+  // answers, sub-answers, and Other-notes are queryable list-row facts.
+  let sizingMap = {};
+  if (cycleIds.length > 0) {
+    const { data: sizingRows } = await supabase
+      .from('initiative_sizing')
+      .select('*')
+      .in('delivery_cycle_id', cycleIds);
+    (sizingRows || []).forEach(s => { sizingMap[s.delivery_cycle_id] = s; });
+  }
+
   // ── Contract G7 (D-565 item 4): waiting-on rolled up to the list rows.
   // One computation source; a row carries its awaiting gate's line.
   const allGateRows = Object.values(gateRecordsMap).flat();
@@ -318,6 +329,8 @@ async function list_delivery_cycles(params, caller_user_id) {
     ...c,
     // G7: null when no gate is awaiting approval on this Initiative.
     waiting_on: waitingOnByCycle[c.delivery_cycle_id] ?? null,
+    // G9: sizing row for interest filters; null = unsized.
+    sizing: sizingMap[c.delivery_cycle_id] ?? null,
     roadmap_theme_name:        c.roadmap_theme_id ? (themeMap[c.roadmap_theme_id] ?? null) : null,
     assigned_dcs_display_name: c.assigned_dcs_user_id ? (userMap[c.assigned_dcs_user_id] ?? null) : null,
     assigned_epo_display_name: c.assigned_epo_user_id ? (userMap[c.assigned_epo_user_id] ?? null) : null,

@@ -121,6 +121,8 @@ const gateApprovals                      = require('./tools/gate_approvals');
 const { get_governance_config_warnings } = require('./tools/governance_config_warnings');
 // Contract G8 (D-560): Initiative Executive role + All Pending Gates view.
 const { set_initiative_executive, list_all_pending_gates } = require('./tools/initiative_executive');
+// Contract G9 (D-563 Grade 2): the two hardcoded suggestion rules.
+const { get_suggestion_state, apply_suggestion_decision } = require('./tools/suggestions');
 
 const app  = express();
 const PORT = process.env.PORT || 3003;
@@ -244,6 +246,9 @@ const TOOLS = {
   // Contract G8 (D-560)
   set_initiative_executive,
   list_all_pending_gates,
+  // Contract G9 (D-563)
+  get_suggestion_state,
+  apply_suggestion_decision,
   // Primitive 2 — governance level + trust + oversight
   set_effective_level:                governanceLevel.set_effective_level,
   clear_effective_level:              governanceLevel.clear_effective_level,

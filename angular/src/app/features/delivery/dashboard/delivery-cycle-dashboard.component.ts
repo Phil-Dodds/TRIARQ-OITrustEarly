@@ -65,6 +65,8 @@ import {
 } from '../../../core/types/database';
 import { themedTitle } from '../shared/theme-display.util';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
+// Contract G9 (D-563 Grade 1): interest profile matcher (OR-of-ANDs).
+import { InterestCondition, matchesInterestProfile, hasAnyField } from '../../../core/utils/governance-filter';
 // Contract 23 Item 2.2 / D-267: pure computeHeadline utility — 6-rule priority order.
 // Replaces inline headline()/headlineColor() logic; extracted for unit-testability.
 import {
@@ -214,6 +216,21 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
         <!-- Right: Filters + New Cycle — flex-shrink:0, never wraps. Source: D-298. -->
         <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-end;">
+          <!-- Contract G9 (D-563 Grade 1): interest profile — the patrol
+               mechanism. OR-of-ANDs over sizing fields; remembered per user. -->
+          <button (click)="interestPanelOpen = !interestPanelOpen"
+                  style="position:relative;background:#fff;color:#257099;border:1.5px solid #257099;
+                         padding:8px 16px;border-radius:6px;cursor:pointer;
+                         font-size:14px;font-family:Roboto,sans-serif;font-weight:500;">
+            Interest
+            <span *ngIf="activeInterestConditionCount > 0"
+                  style="position:absolute;top:-8px;right:-8px;
+                         background:#E96127;color:#fff;font-size:11px;font-weight:700;
+                         border-radius:999px;width:18px;height:18px;
+                         display:flex;align-items:center;justify-content:center;line-height:1;">
+              {{ activeInterestConditionCount }}
+            </span>
+          </button>
           <!-- Filters button: badge overlapping corner per D-298.
                Include-cancelled checkbox moved inside the panel (CC-38 f14 rev). -->
           <button (click)="toggleFilterPanel()"
@@ -240,6 +257,75 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </div>
 
       </div><!-- /Row 2 -->
+
+      <!-- ── Contract G9 (D-563 Grade 1): interest profile panel ──────────── -->
+      <!-- OR-of-ANDs: an Initiative shows when ANY condition matches; each
+           condition is a small AND of its set fields. No nested boolean UI. -->
+      <div *ngIf="interestPanelOpen"
+           style="margin-bottom:var(--triarq-space-sm);padding:10px 14px;
+                  border:1px solid #DDE5EA;border-radius:10px;background:#F7FAFC;">
+        <div style="font-size:11px;font-style:italic;color:#5A5A5A;margin-bottom:8px;">
+          Interest profile — an Initiative shows when ANY condition matches; each
+          condition combines its chosen fields. Remembered for you on this screen.
+        </div>
+        <div *ngFor="let cond of interestConditions; let i = index"
+             style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+          <span style="font-size:11px;color:#5A5A5A;">{{ i === 0 ? 'Show when' : 'or when' }}</span>
+          <select [(ngModel)]="cond.q1_investment" (ngModelChange)="onInterestConditionChange()"
+                  style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">
+            <option value="">Q1: any</option><option value="small">Q1 Small</option>
+            <option value="medium">Q1 Medium</option><option value="large">Q1 Large</option>
+            <option value="xlarge">Q1 X-Large</option>
+          </select>
+          <select [(ngModel)]="cond.q2_novelty" (ngModelChange)="onInterestConditionChange()"
+                  style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">
+            <option value="">Q2: any</option><option value="standard">Q2 Standard</option>
+            <option value="major">Q2 Major</option>
+          </select>
+          <select [(ngModel)]="cond.q3_wrongness" (ngModelChange)="onInterestConditionChange()"
+                  style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">
+            <option value="">Q3: any</option><option value="contained">Q3 Contained</option>
+            <option value="significant">Q3 Significant</option><option value="large_hard">Q3 Large/Hard</option>
+          </select>
+          <select [(ngModel)]="cond.q4_security_impact" (ngModelChange)="onInterestConditionChange()"
+                  style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">
+            <option value="">Q4: any</option><option value="yes">Q4 Security Yes</option>
+            <option value="no">Q4 Security No</option>
+          </select>
+          <select [(ngModel)]="cond.q5_ux" (ngModelChange)="onInterestConditionChange()"
+                  style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">
+            <option value="">Q5: any</option><option value="standard">Q5 Standard</option>
+            <option value="critical">Q5 Critical</option>
+          </select>
+          <select [(ngModel)]="cond.q2_sub_new_vendor" (ngModelChange)="onInterestConditionChange()"
+                  style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">
+            <option value="">Vendor: any</option><option value="yes">New vendor</option>
+            <option value="no">No new vendor</option>
+          </select>
+          <select [(ngModel)]="cond.stage" (ngModelChange)="onInterestConditionChange()"
+                  style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">
+            <option value="">Stage: any</option>
+            <option *ngFor="let s of stageOptions" [value]="s">{{ s }}</option>
+          </select>
+          <input type="text" placeholder="Note contains…" maxlength="100"
+                 [(ngModel)]="cond.note_contains" (ngModelChange)="onInterestConditionChange()"
+                 style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 8px;font-size:11px;width:130px;" />
+          <button (click)="removeInterestCondition(i)"
+                  style="background:none;border:none;cursor:pointer;color:#5A5A5A;font-size:14px;">×</button>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button (click)="addInterestCondition()"
+                  style="background:none;border:1px dashed #B9C4CE;border-radius:999px;
+                         padding:3px 12px;font-size:12px;color:#257099;cursor:pointer;">
+            + Add condition
+          </button>
+          <button *ngIf="interestConditions.length > 0" (click)="clearInterestConditions()"
+                  style="background:none;border:none;font-size:12px;color:#5A5A5A;
+                         cursor:pointer;text-decoration:underline;">
+            Clear all
+          </button>
+        </div>
+      </div>
 
       <!-- ── Item 5: Drill-down filter visual confirmation — Principle 3 ──── -->
       <!-- When landing from a drill-down (query params set), show the applied filter clearly. -->
@@ -1662,7 +1748,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         filterDol:             this.filterDol,
         filterGateStatus:      this.filterGateStatus,
         filterAssignedPerson:  this.filterAssignedPerson,
-        filterThemes:          this.filterThemes            // D-488 / D-171
+        filterThemes:          this.filterThemes,           // D-488 / D-171
+        // G9 (D-563): interest profile remembered per-user per-screen.
+        interestConditions:    this.interestConditions
       },
       {
         sortField: this.sortField,
@@ -1704,6 +1792,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (Array.isArray(filter['filterThemes'])) {
       this.filterThemes = (filter['filterThemes'] as unknown[]).filter((v): v is string => typeof v === 'string');
     }
+    // G9 (D-563): interest profile restore.
+    if (Array.isArray(filter['interestConditions'])) {
+      this.interestConditions = (filter['interestConditions'] as unknown[])
+        .filter((v): v is InterestCondition => !!v && typeof v === 'object');
+    }
     if (typeof sort['sortField'] === 'string') {
       const allowed = ['cycle_title', 'current_lifecycle_stage', 'tier_classification', 'next_gate'];
       if (allowed.includes(sort['sortField'] as string)) {
@@ -1728,6 +1821,36 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   }
 
   // persist=false used by count card shortcuts — set filter without writing to memory. Source: D-HubCounts-2026-04-06.
+  // ── Contract G9 (D-563 Grade 1): interest profile state + panel ────────────
+  interestConditions: InterestCondition[] = [];
+  interestPanelOpen = false;
+  readonly stageOptions: string[] = [
+    'BRIEF', 'DESIGN', 'SPEC', 'BUILD', 'VALIDATE', 'UAT', 'PILOT', 'RELEASE', 'OUTCOME', 'COMPLETE'
+  ];
+
+  get activeInterestConditionCount(): number {
+    return this.interestConditions.filter(c => hasAnyField(c)).length;
+  }
+
+  addInterestCondition(): void {
+    this.interestConditions = [...this.interestConditions, {}];
+    this.cdr.markForCheck();
+  }
+
+  removeInterestCondition(index: number): void {
+    this.interestConditions = this.interestConditions.filter((_, i) => i !== index);
+    this.applyFilters();
+  }
+
+  onInterestConditionChange(): void {
+    this.applyFilters();
+  }
+
+  clearInterestConditions(): void {
+    this.interestConditions = [];
+    this.applyFilters();
+  }
+
   applyFilters(persist: boolean = true): void {
     let result = this.cycles.filter(c => {
       // CC-38-41 / S-009: cancelled excluded by default; revealed by the toggle
@@ -1736,6 +1859,10 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
           !this.includeCancelled && this.filterStage !== 'CANCELLED') { return false; }
       if (this.filterStage && c.current_lifecycle_stage !== this.filterStage) { return false; }
       if (this.filterTier  && c.tier_classification    !== this.filterTier)  { return false; }
+
+      // Contract G9 (D-563 Grade 1): interest profile — OR-of-ANDs over
+      // sizing answers/subs/notes, Division, stage. Empty profile passes all.
+      if (!matchesInterestProfile(c, this.interestConditions)) { return false; }
 
       // D-488: Roadmap Theme multi-select — '__none__' matches untagged.
       if (this.filterThemes.length) {

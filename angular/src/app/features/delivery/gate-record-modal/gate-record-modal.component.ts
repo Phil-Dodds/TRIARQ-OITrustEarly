@@ -1435,6 +1435,15 @@ export class GateRecordModalComponent {
           // Keep the modal's cycle in sync so cycleIsSized flips (level chip
           // refresh happens on the parent's post-close reload).
           this.data.cycle.baseline_level = res.data.baseline_level ?? null;
+          // Contract G9 (D-563): apply the trio's suggestion decisions.
+          for (const [rule_key, decision] of Object.entries(this.sizingPayload?.suggestionDecisions ?? {})) {
+            this.delivery.applySuggestionDecision({
+              delivery_cycle_id: this.data.cycle.delivery_cycle_id,
+              rule_key: rule_key as 'q4_security' | 'q5_ux',
+              action: decision.action,
+              ...(decision.note ? { note: decision.note } : {})
+            }).subscribe({ next: () => {}, error: () => {} });
+          }
           this.gtbSizingConfirmed = true;   // answers just entered = confirmed
           this.confirmMode = 'none';
           this.endProcessing();
