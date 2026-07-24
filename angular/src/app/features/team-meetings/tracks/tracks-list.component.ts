@@ -440,9 +440,9 @@ export class TracksListComponent implements OnInit {
       if (!(this.newForm.value as { track_name?: string }).track_name) {
         this.newForm.patchValue({ track_name: subject });
       }
-      this.importError = 'Outlook handed over only the subject, not the meeting file — series name prefilled. For members and cadence: drag the item to your Desktop first, then drag that .msg here, or click this box to browse.';
+      this.importError = 'This browser received only the subject (prefilled above) — Chrome can\'t accept a full Outlook drag. For members and cadence: use Microsoft Edge (full drag works there), or drag the item to your Desktop first and drop the saved .msg here — or click this box to browse for it.';
     } else {
-      this.importError = 'Outlook didn\'t hand the browser a file. Drag the item to your Desktop first, then drag that .msg here — or click this box to browse.';
+      this.importError = 'This browser didn\'t receive the Outlook item — Chrome can\'t accept a full Outlook drag. Use Microsoft Edge (full drag works there), or drag the item to your Desktop first and drop the saved .msg here — or click this box to browse for it.';
     }
     this.cdr.markForCheck();
   }
