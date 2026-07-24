@@ -2099,7 +2099,8 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     });
   }
 
-  private loadCycle(cycleId: string): void {
+  // G10: template-accessible — the cancel-request banner refreshes the cycle.
+  loadCycle(cycleId: string): void {
     this.loading   = true;
     this.loadError = '';
     this.cdr.markForCheck();

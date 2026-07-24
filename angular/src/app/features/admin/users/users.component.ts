@@ -1594,14 +1594,17 @@ export class UsersComponent implements OnInit {
     is_dcs:   '#f3e5f5',
     is_epo:   '#e8f5e9',
     is_dol:   '#fde7e9',
-    is_ce:    '#fff3e0'
+    is_ce:    '#fff3e0',
+    // G8 (D-560): IE pill — grant is Phil-only via MCP; not in ALL_ROLE_FLAGS.
+    is_initiative_executive: '#e8eaf6'
   };
   private static readonly FLAG_PILL_COLOR: Record<ActiveRoleFlag, string> = {
     is_admin: '#1565c0',
     is_dcs:   '#6a1b9a',
     is_epo:   '#2e7d32',
     is_dol:   '#c2185b',
-    is_ce:    '#e65100'
+    is_ce:    '#e65100',
+    is_initiative_executive: '#283593'
   };
 
   flagPillBg(flag: ActiveRoleFlag): string    { return UsersComponent.FLAG_PILL_BG[flag];    }

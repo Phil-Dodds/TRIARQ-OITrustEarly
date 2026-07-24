@@ -32,6 +32,50 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    // Governance redesign GEnd (D-555–D-575): ONE composed entry covering
+    // Contracts G2–G10 per the 2026-07-23 checkpoint ruling 4. Ships with the
+    // single GEnd production deployment.
+    date:          '2026-07-23',
+    contractLabel: 'Governance Redesign — Contracts G2–G10',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'Initiative creation & gates — sizing',
+        description: 'Five sizing questions size every new Initiative and derive its governance level (shown live as you answer). Existing Initiatives answer them once at their next gate; the tier badge retires per Initiative and a level chip takes its place.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Level 1 gates — trio self-governance',
+        description: 'Level 1 gates pass when the whole trio and every consulted party approve — no external approver. Submitting counts as your approval; any single return restarts the gate for everyone.'
+      },
+      {
+        audience:    'All',
+        surface:     'Gate panel — thread, conditions, waiting-on',
+        description: 'Every gate carries a message thread (your submission note opens it), individually resolvable approver conditions ("nearly there — fix these"), and one Waiting-on line that reads the same everywhere: lists, queues, and the gate itself.'
+      },
+      {
+        audience:    'All',
+        surface:     'Participation — Consulted & Informed',
+        description: 'Follow any Initiative as Informed with one tap (see "Following" in the sidebar); trios, approvers, and Division Leaders attach Consulted parties or Specialty Groups; Informed parties receive gate decisions automatically.'
+      },
+      {
+        audience:    'All',
+        surface:     'Initiative Tracking — Interest filters',
+        description: 'A new Interest button filters Initiatives over the sizing answers, notes, Division, and stage (any matching condition shows the Initiative) — remembered for you. Security and UX get automatic consultation suggestions the trio can add or dismiss with a note.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Initiative Executive & leadership tools',
+        description: 'Phil can grant the Initiative Executive role: an All Pending Gates monitoring view (aging highlighted), a loud gate override with mandatory reason, and leadership level/oversight controls. Approving over a returned consultation now always requires recorded reasoning.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Cancellation & the quarter deploy goal',
+        description: 'Cancellation follows severity: trios cancel early work directly and request cancellation later (routed to the approver with your reason). A new home card tracks your quarter deploy goal — gates done, remaining, and pace.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-21',
     contractLabel: 'Contract 38 follow-on — Sub-bullets in Meeting Collab',
     items: [
