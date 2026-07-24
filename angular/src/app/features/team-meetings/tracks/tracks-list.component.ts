@@ -268,7 +268,7 @@ import { parseOutlookDrop, OutlookImport } from './outlook-import';
     .tk-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #E0E0E0; }
     .tk-panel-title { font: 600 16px Roboto, sans-serif; }
     .tk-close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #757575; }
-    .tk-panel-body { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 16px; }
+    .tk-panel-body { padding: 20px; flex: 1; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
     .tk-field { display: flex; flex-direction: column; gap: 4px; }
     .tk-label { font: 600 13px Roboto, sans-serif; color: #1A1A1A; }
     .tk-label-inline { display: flex; align-items: center; gap: 8px; font: 13px Roboto, sans-serif; color: #1A1A1A; cursor: pointer; }

@@ -152,7 +152,9 @@ import {
 
           <!-- Invite -->
           <div *ngIf="track.is_leader" class="ts-invite">
-            <label class="ts-label">Invite Members</label>
+            <!-- Phil 2026-07-24: "Invite More Members" once anyone beyond a sole
+                 leader is in — the create modal already offered first invites. -->
+            <label class="ts-label">{{ track.members.length > 1 ? 'Invite More Members' : 'Invite Members' }}</label>
             <p class="ts-hint">Single email, or Outlook format: "Name &lt;email&gt;; Name &lt;email&gt;". Invitees become participants immediately — no email is sent.</p>
             <textarea class="ts-textarea" rows="2" [(ngModel)]="inviteText"
                       placeholder="cbickford@triarqhealth.com; Julie Lundberg <jlundberg@triarqhealth.com>"></textarea>
