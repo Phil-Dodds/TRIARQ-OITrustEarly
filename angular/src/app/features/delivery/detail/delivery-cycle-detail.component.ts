@@ -90,6 +90,8 @@ import { EggSpotComponent } from '../../easter-eggs/egg-spot.component';
 import { SizingEditDialogComponent, SizingEditDialogData } from '../sizing-form/sizing-edit-dialog.component';
 // Contract G4 (D-563/D-564): participation section (replaces D-458 array pills).
 import { InitiativeParticipationSectionComponent } from '../participation/initiative-participation-section.component';
+// Contract G10 (D-566): cancel request banner + request affordance.
+import { CancelRequestBannerComponent } from '../cancellation/cancel-request-banner.component';
 import { EGG_KEYS }         from '../../../core/constants/easter-egg.constants';
 
 const GATE_LABELS: Record<GateName, string> = {
@@ -123,7 +125,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent, InitiativeStatusUpdatePanelComponent, InitiativeStatusHistoryPanelComponent, EggSpotComponent, InitiativeParticipationSectionComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent, InitiativeStatusUpdatePanelComponent, InitiativeStatusHistoryPanelComponent, EggSpotComponent, InitiativeParticipationSectionComponent, CancelRequestBannerComponent],
   styles: [`:host { display: block; position: relative; }`],
   template: `
 
@@ -394,6 +396,17 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             {{ regressError }}
           </div>
         </div>
+
+        <!-- ── Contract G10 (D-566): cancel request banner + request affordance.
+             Server enforces severity-based authority; Execute routes into the
+             existing D-183 two-step Cancel panel below. -->
+        <app-cancel-request-banner
+          *ngIf="cycle"
+          [deliveryCycleId]="cycle.delivery_cycle_id"
+          [showRequestAffordance]="callerCanSubmitGates && cycle.current_lifecycle_stage !== 'CANCELLED' && cycle.current_lifecycle_stage !== 'COMPLETE'"
+          (executeRequested)="cancelConfirming = true"
+          (requestChanged)="loadCycle(cycle.delivery_cycle_id)">
+        </app-cancel-request-banner>
 
         <!-- ── Cancel Cycle confirm panel — D-183 two-step ───────────────── -->
         <div *ngIf="cancelConfirming"

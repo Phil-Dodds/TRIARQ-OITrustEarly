@@ -358,6 +358,34 @@ filter client-side over queryable facts; rows also carry `waiting_on` (G7).
 
 ---
 
+## 1.13 Contract G10 — Cancellation + the one v1 KPI (new + modified tools)
+
+**`cancel_delivery_cycle`** (modified — D-566): authority follows severity —
+pre-Brief-Review / L1 / unsized: any trio member; L2/L3 post-Brief-Review: the
+resolved approver (awaiting gate's stamp, else next gate via the D-557 chain).
+Admin/Phil/IE retain operational authority (IE = the release valve for stuck
+requests). Executing closes any open cancel request and notifies every
+Consulted and Informed holder (groups expanded).
+
+**`request_cancel`** (new — D-566): trio-only, reason required; routes to the
+cancel authority (cancel_requests, migration 088) — email + a
+`cancel_request` row in the authority's My Actions queue.
+**`decline_cancel_request`** (new): authority/IE/Admin declines with a note;
+the requester is notified.
+**`get_open_cancel_request`** (new): the Initiative-panel banner source.
+
+**`get_quarter_deploy_goal`** (new — D-568 family C, THE one v1 KPI): per
+person — assigned Initiatives with a Go to Deploy target this quarter; gates
+done vs remaining across the deploy chain; recent weekly pace vs needed pace;
+deploy-target movement count (shown, not hidden); Division roll-ups for DLs.
+Families A/B/D NOT built (dedicated metric pass required — deferred).
+
+**`list_pending_approvals`** (modified): open cancel requests routed to the
+caller appear as `item_type 'cancel_request'` rows (reason in
+submission_note); resolution happens on the Initiative panel.
+
+---
+
 ## 2. Pre-G1 tool inventory (names only)
 
 Authoritative runtime list: `GET /tools` on each service. Behavior: per-contract

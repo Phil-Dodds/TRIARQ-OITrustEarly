@@ -123,6 +123,9 @@ const { get_governance_config_warnings } = require('./tools/governance_config_wa
 const { set_initiative_executive, list_all_pending_gates } = require('./tools/initiative_executive');
 // Contract G9 (D-563 Grade 2): the two hardcoded suggestion rules.
 const { get_suggestion_state, apply_suggestion_decision } = require('./tools/suggestions');
+// Contract G10 (D-566/D-568): cancellation authority + the one v1 KPI.
+const { request_cancel, decline_cancel_request, get_open_cancel_request } = require('./tools/cancel_requests');
+const { get_quarter_deploy_goal } = require('./tools/quarter_deploy_goal');
 
 const app  = express();
 const PORT = process.env.PORT || 3003;
@@ -249,6 +252,11 @@ const TOOLS = {
   // Contract G9 (D-563)
   get_suggestion_state,
   apply_suggestion_decision,
+  // Contract G10 (D-566/D-568)
+  request_cancel,
+  decline_cancel_request,
+  get_open_cancel_request,
+  get_quarter_deploy_goal,
   // Primitive 2 — governance level + trust + oversight
   set_effective_level:                governanceLevel.set_effective_level,
   clear_effective_level:              governanceLevel.clear_effective_level,

@@ -14,6 +14,8 @@ import { MyDeliveryCyclesCardComponent } from './components/my-delivery-cycles-c
 import { MyActivityCardComponent }       from './components/my-activity-card.component';
 // Contract G8 (D-560): IE pending-gates count card (standalone).
 import { AllPendingGatesCardComponent }  from './components/all-pending-gates-card.component';
+// Contract G10 (D-568 C): quarter deploy-goal card (standalone).
+import { QuarterDeployGoalCardComponent } from './components/quarter-deploy-goal-card.component';
 import { MyCompletedGatesCardComponent } from './components/my-completed-gates-card.component';
 import { EmbeddedChatCardComponent }     from './components/embedded-chat-card.component';
 import { OnboardingMessageCardComponent } from './components/onboarding-message-card.component';
@@ -39,6 +41,7 @@ import { EggSpotComponent }              from '../easter-eggs/egg-spot.component
     MyDeliveryCyclesCardComponent,
     MyActivityCardComponent,
     AllPendingGatesCardComponent,
+    QuarterDeployGoalCardComponent,
     MyCompletedGatesCardComponent,
     MyEasterEggsCardComponent,
     CommunityEggsCardComponent,

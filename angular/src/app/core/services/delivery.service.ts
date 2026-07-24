@@ -895,6 +895,33 @@ export class DeliveryService {
     );
   }
 
+  // ── Contract G10 — cancellation authority + the one v1 KPI (D-566/D-568) ───
+
+  requestCancel(params: { delivery_cycle_id: string; reason: string }):
+    Observable<McpResponse<CancelRequest>> {
+    return this.mcp.call<CancelRequest>(
+      'delivery', 'request_cancel', params as unknown as Record<string, unknown>
+    );
+  }
+
+  declineCancelRequest(params: { request_id: string; note: string }):
+    Observable<McpResponse<CancelRequest>> {
+    return this.mcp.call<CancelRequest>(
+      'delivery', 'decline_cancel_request', params as unknown as Record<string, unknown>
+    );
+  }
+
+  getOpenCancelRequest(params: { delivery_cycle_id: string }):
+    Observable<McpResponse<{ request: CancelRequest | null }>> {
+    return this.mcp.call<{ request: CancelRequest | null }>(
+      'delivery', 'get_open_cancel_request', params as unknown as Record<string, unknown>
+    );
+  }
+
+  getQuarterDeployGoal(): Observable<McpResponse<QuarterDeployGoal>> {
+    return this.mcp.call<QuarterDeployGoal>('delivery', 'get_quarter_deploy_goal', {});
+  }
+
   // ── Contract G8 — governance level controls (D-562, S-C6 prompt) ───────────
 
   setEffectiveLevel(params: { delivery_cycle_id: string; level: 1 | 2 | 3; reason: string }):
@@ -929,6 +956,35 @@ export class DeliveryService {
       'delivery', 'list_all_pending_gates', {}
     );
   }
+}
+
+/** Contract G10 (D-566): a trio cancel request. */
+export interface CancelRequest {
+  request_id:                string;
+  delivery_cycle_id:         string;
+  requested_by_user_id:      string;
+  requested_by_display_name?: string | null;
+  reason:                    string;
+  authority_user_id:         string | null;
+  request_status:            'open' | 'executed' | 'declined';
+  resolution_note?:          string | null;
+  created_at:                string;
+}
+
+/** Contract G10 (D-568 family C): the one v1 KPI payload. */
+export interface QuarterDeployGoal {
+  quarter:         string;
+  weeks_remaining: number;
+  personal: QuarterGoalNumbers;
+  division_rollups: Array<{ division_id: string; division_name: string } & QuarterGoalNumbers>;
+}
+export interface QuarterGoalNumbers {
+  initiative_count:            number;
+  gates_done:                  number;
+  gates_remaining:             number;
+  weekly_pace:                 number;
+  needed_pace:                 number;
+  target_changes_this_quarter: number;
 }
 
 /** Contract G9 (D-563): one suggestion rule's state on an Initiative. */

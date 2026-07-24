@@ -41,6 +41,12 @@
       *ngIf="showAllPendingGates">
     </app-all-pending-gates-card>
 
+    <!-- Contract G10 (D-568 family C): THE one v1 KPI — quarter deploy goal.
+         Renders its own empty state when nothing targets this quarter. -->
+    <app-quarter-deploy-goal-card
+      *ngIf="showDeliveryCycles">
+    </app-quarter-deploy-goal-card>
+
     <app-my-activity-card
       [userId]="profile?.id ?? ''">
     </app-my-activity-card>

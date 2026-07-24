@@ -183,6 +183,10 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
                [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">Approve / Decline</a>
           </div>
           <span *ngSwitchCase="'returned'" class="ga-decision ga-decision--returned">{{ decisionText(item) }}</span>
+          <!-- Contract G10 (D-566): cancel request routed to you — resolve on the panel. -->
+          <a *ngSwitchCase="'cancel-request'" class="ga-action-btn"
+             [routerLink]="['/initiatives', item.delivery_cycle_id]"
+             [queryParams]="{ returnTo: returnTo }">Review Cancel Request</a>
           <a *ngSwitchDefault class="ga-action-btn" [routerLink]="['/initiatives', item.delivery_cycle_id]"
              [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">Approve / Deny</a>
         </ng-container>
@@ -465,7 +469,10 @@ export class ActionsListComponent implements OnChanges {
    *  'returned' — consulted on a returned gate: decision text only, no action.
    *  'action'   — awaiting gate (approver or consulted): Approve / Deny button.
    */
-  rowActionMode(item: PendingApprovalItem): 'approved' | 'returned' | 'action' {
+  rowActionMode(item: PendingApprovalItem): 'approved' | 'returned' | 'action' | 'cancel-request' {
+    // Contract G10 (D-566): cancel requests are informational rows — the
+    // execute/decline actions live on the Initiative panel banner.
+    if (item.item_type === 'cancel_request') { return 'cancel-request'; }
     if (item.item_type === 'consulted' && item.gate_status === 'approved') { return 'approved'; }
     if (item.item_type === 'consulted' && item.gate_status === 'returned') { return 'returned'; }
     return 'action';

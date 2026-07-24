@@ -627,7 +627,9 @@ export interface PendingApprovalItem {
   // Contract G5 (D-557): 'trio_member_approval' = an L1 consensus gate waiting
   // on the caller's trio approval — actionable like an accountable row.
   gate_status:                   GateStatus;
-  item_type:                     'accountable' | 'consulted' | 'trio_member_approval';
+  // Contract G10 (D-566): 'cancel_request' rows route a trio cancel request
+  // to the authority's queue; resolution happens on the Initiative panel.
+  item_type:                     'accountable' | 'consulted' | 'trio_member_approval' | 'cancel_request';
   // Contract G7 (D-565 item 4): the single waiting-on line for queue rollups.
   waiting_on?:                   { state: string; line: string; days_waiting: number };
   submitted_at:                  string;

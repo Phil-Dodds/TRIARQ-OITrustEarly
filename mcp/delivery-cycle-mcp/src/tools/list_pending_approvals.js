@@ -291,6 +291,65 @@ async function list_pending_approvals(_params, caller_user_id) {
     };
   });
 
+  // ── Contract G10 (D-566 AC #2): open cancel requests routed to the caller —
+  // authority-mode requests where the caller is the resolved authority.
+  // Synthetic queue rows: item_type 'cancel_request'; the reason travels in
+  // submission_note; resolution happens on the Initiative panel.
+  {
+    const { data: myRequests } = await supabase
+      .from('cancel_requests')
+      .select('request_id, delivery_cycle_id, requested_by_user_id, reason, created_at')
+      .eq('authority_user_id', caller_user_id)
+      .eq('request_status', 'open');
+    if (myRequests && myRequests.length > 0) {
+      const reqCycleIds = [...new Set(myRequests.map(r => r.delivery_cycle_id))];
+      const { data: reqCycles } = await supabase
+        .from('delivery_cycles')
+        .select('delivery_cycle_id, cycle_title, division_id, tier_classification')
+        .in('delivery_cycle_id', reqCycleIds)
+        .is('deleted_at', null);
+      const reqCycleMap = {};
+      (reqCycles || []).forEach(c => { reqCycleMap[c.delivery_cycle_id] = c; });
+      const requesterIds = [...new Set(myRequests.map(r => r.requested_by_user_id))];
+      const { data: requesters } = await supabase
+        .from('users')
+        .select('id, display_name')
+        .in('id', requesterIds);
+      const requesterMap = {};
+      (requesters || []).forEach(u => { requesterMap[u.id] = u.display_name; });
+
+      for (const r of myRequests) {
+        const c = reqCycleMap[r.delivery_cycle_id];
+        if (!c) { continue; }
+        items.push({
+          gate_record_id:                r.request_id,      // synthetic row key
+          delivery_cycle_id:             r.delivery_cycle_id,
+          cycle_title:                   c.cycle_title || '',
+          division_display_name_short:   '',
+          workstream_display_name_short: '',
+          gate_name:                     'brief_review',    // placeholder; not rendered for this type
+          gate_name_display:             'Cancel Request',
+          gate_status:                   'awaiting_approval',
+          item_type:                     'cancel_request',
+          submitted_at:                  r.created_at,
+          submitted_by_display_name:     requesterMap[r.requested_by_user_id] || 'Unknown',
+          tier_classification:           c.tier_classification,
+          approver_display_name:         null,
+          approver_decision_at:          null,
+          created_at:                    r.created_at,
+          gate_target_date:              null,
+          submission_note:               r.reason,
+          assigned_dcs_user_id:          null,
+          assigned_epo_user_id:          null,
+          assigned_dol_user_id:          null,
+          assigned_dcs_display_name:     null,
+          assigned_epo_display_name:     null,
+          assigned_dol_display_name:     null
+        });
+      }
+    }
+  }
+
   // Newest-submitted first.
   items.sort((a, b) => {
     const ta = a.submitted_at ? Date.parse(a.submitted_at) : 0;
