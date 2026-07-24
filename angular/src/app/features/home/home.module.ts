@@ -12,6 +12,8 @@ import { DivisionsCardComponent }        from './components/divisions-card.compo
 import { UserManagementCardComponent }   from './components/user-management-card.component';
 import { MyDeliveryCyclesCardComponent } from './components/my-delivery-cycles-card.component';
 import { MyActivityCardComponent }       from './components/my-activity-card.component';
+// Contract G8 (D-560): IE pending-gates count card (standalone).
+import { AllPendingGatesCardComponent }  from './components/all-pending-gates-card.component';
 import { MyCompletedGatesCardComponent } from './components/my-completed-gates-card.component';
 import { EmbeddedChatCardComponent }     from './components/embedded-chat-card.component';
 import { OnboardingMessageCardComponent } from './components/onboarding-message-card.component';
@@ -36,6 +38,7 @@ import { EggSpotComponent }              from '../easter-eggs/egg-spot.component
     MyActionQueueCardComponent,
     MyDeliveryCyclesCardComponent,
     MyActivityCardComponent,
+    AllPendingGatesCardComponent,
     MyCompletedGatesCardComponent,
     MyEasterEggsCardComponent,
     CommunityEggsCardComponent,

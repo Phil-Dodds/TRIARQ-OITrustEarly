@@ -77,18 +77,18 @@ async function record_gate_approval(params, caller_user_id) {
         error: 'This gate carries the AI Production Board requirement — board gates cannot be overridden by an Initiative Executive (D-560).'
       };
     }
-    // CC-G1: IE role storage lands in G8 — until then only Phil may record
-    // an ie_override approval.
+    // G8 (D-560): the IE role grant exists — the Phil-only interim
+    // (CC-G1-14) is retired. ie_override callers: IEs and Phil.
     const { data: caller } = await supabase
       .from('users')
-      .select('is_super_admin')
+      .select('is_super_admin, is_initiative_executive')
       .eq('id', caller_user_id)
       .is('deleted_at', null)
       .maybeSingle();
-    if (caller?.is_super_admin !== true) {
+    if (caller?.is_super_admin !== true && caller?.is_initiative_executive !== true) {
       return {
         success: false,
-        error: 'Initiative Executive override requires the Initiative Executive role (available in a later contract) or Phil.'
+        error: 'Initiative Executive override requires the Initiative Executive role or Phil.'
       };
     }
   }

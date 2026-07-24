@@ -109,6 +109,13 @@ import { IonicModule }  from '@ionic/angular';
           import('./status-dashboard/initiative-status-dashboard.component')
             .then(c => c.InitiativeStatusDashboardComponent)
       },
+      // Contract G8 (D-560): All Pending Gates — IE monitoring view.
+      {
+        path: 'all-pending-gates',
+        loadComponent: () =>
+          import('./all-pending-gates/all-pending-gates.component')
+            .then(c => c.AllPendingGatesComponent)
+      },
       // Contract G4 (D-564): "Initiatives I'm following" — C/I memberships.
       {
         path: 'following',

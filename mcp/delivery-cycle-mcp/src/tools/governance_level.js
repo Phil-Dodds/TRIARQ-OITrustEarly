@@ -29,7 +29,7 @@ async function loadCycleWithLeadershipCheck(delivery_cycle_id, caller_user_id) {
 
   const { data: caller, error: callerErr } = await supabase
     .from('users')
-    .select('id, display_name, is_super_admin, is_active')
+    .select('id, display_name, is_super_admin, is_initiative_executive, is_active')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -52,7 +52,10 @@ async function loadCycleWithLeadershipCheck(delivery_cycle_id, caller_user_id) {
   return {
     cycle,
     caller,
-    isLeadership: isDivisionLeader || caller.is_super_admin === true
+    // G8 (D-560): Initiative Executives join the leadership checks
+    // (set/clear level, oversight — completes CC-G1-08/-09).
+    isLeadership: isDivisionLeader || caller.is_super_admin === true ||
+                  caller.is_initiative_executive === true
   };
 }
 

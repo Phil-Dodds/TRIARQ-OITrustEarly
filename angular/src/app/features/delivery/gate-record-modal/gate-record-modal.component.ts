@@ -383,6 +383,14 @@ const GATE_LABELS: Record<GateName, string> = {
             Only the designated approver or Phil can record a decision on this gate.
           </div>
 
+          <!-- Contract G8 (D-560): the loud IE override — release valve. -->
+          <button *ngIf="canShowIeOverride"
+                  class="grm-btn-secondary" type="button"
+                  [disabled]="processing"
+                  (click)="confirmMode = 'ie-override'">
+            Initiative Executive Override…
+          </button>
+
           <!-- approved — the approver has no further action, but a consulted
                reviewer can still record their response in the Consulted section above. -->
           <div *ngIf="record?.gate_status === 'approved'" class="grm-meta">
@@ -533,6 +541,60 @@ const GATE_LABELS: Record<GateName, string> = {
               <button class="grm-btn-ghost" type="button"
                       [disabled]="processing"
                       (click)="onCancelSizing()">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONTRACT G8 (D-560): IE override — loud, reason required ───── -->
+        <div *ngIf="confirmMode === 'ie-override'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              This approves the gate as an Initiative Executive override — the
+              assigned approver is notified, the override is recorded on the
+              gate face and counted in analytics. One-line reason required.
+            </div>
+            <input type="text" maxlength="300" placeholder="Why is this override warranted?"
+                   [(ngModel)]="ieOverrideReasonDraft" [ngModelOptions]="{standalone: true}"
+                   [disabled]="processing"
+                   style="width:100%;border:1px solid #B9C4CE;border-radius:5px;
+                          padding:6px 10px;font:400 12px Roboto,sans-serif;margin-bottom:8px;" />
+            <div class="grm-action-row">
+              <button class="grm-btn-primary" type="button"
+                      [disabled]="processing || !ieOverrideReasonDraft.trim()"
+                      (click)="onIeOverrideConfirm()">
+                {{ processing && processingAction === 'approve' ? 'Overriding…' : 'Override & Approve' }}
+              </button>
+              <button class="grm-btn-ghost" type="button" [disabled]="processing" (click)="cancelConfirm()">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONTRACT G8 (D-569): approving over a returned consultation ── -->
+        <div *ngIf="confirmMode === 'over-returned-reason'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              A consulted party returned this gate{{ overReturnedParties.length ? ' (' + overReturnedParties.join(', ') + ')' : '' }}.
+              Approving over a returned consultation is recorded on the gate face
+              and the returning party is notified with your reasoning. Reason required.
+            </div>
+            <input type="text" maxlength="500" placeholder="Your reasoning (required — D-569)"
+                   [(ngModel)]="overReturnedReasonDraft" [ngModelOptions]="{standalone: true}"
+                   [disabled]="processing"
+                   style="width:100%;border:1px solid #B9C4CE;border-radius:5px;
+                          padding:6px 10px;font:400 12px Roboto,sans-serif;margin-bottom:8px;" />
+            <div class="grm-action-row">
+              <button class="grm-btn-primary" type="button"
+                      [disabled]="processing || !overReturnedReasonDraft.trim()"
+                      (click)="onOverReturnedConfirm()">
+                {{ processing && processingAction === 'approve' ? 'Approving…' : 'Approve Over Return' }}
+              </button>
+              <button class="grm-btn-ghost" type="button" [disabled]="processing" (click)="cancelConfirm()">
                 Cancel
               </button>
             </div>
@@ -888,13 +950,19 @@ export class GateRecordModalComponent {
     | 'submitted'                       // Contract 29 WS3 — post-submit approver confirmation
     | 'backdate-confirm'
     | 'sizing-required'                 // Contract G3 (D-567) — migration interstitial
-    | 'sizing-confirm' = 'none';        // Contract G3 — Go to Build answer re-presentation
+    | 'sizing-confirm'                  // Contract G3 — Go to Build answer re-presentation
+    | 'ie-override'                     // Contract G8 (D-560) — loud override w/ reason
+    | 'over-returned-reason' = 'none';  // Contract G8 (D-569) — reasoning prompt
   /** Contract 29 WS3 (D-463/AC-32): resolved approver shown in the submit confirmation. */
   submittedApprover: { id: string; display_name: string | null } | null = null;
   /** D-489: "Why is this gate ready?" draft — sent with submit, trimmed to null server-side. */
   submissionNoteDraft = '';
   /** G7 (D-565 item 5): the one approver note field on the approve confirm. */
   approveNoteDraft = '';
+  /** G8 (D-560/D-569): override + over-returned reasoning drafts. */
+  ieOverrideReasonDraft = '';
+  overReturnedReasonDraft = '';
+  overReturnedParties: string[] = [];
 
   /** G7 (D-555): one of the four purposes, rotated daily per gate — subtle
    *  rotation against habituation (D-527 architecture). */
@@ -1078,6 +1146,20 @@ export class GateRecordModalComponent {
   /** Contract 29 WS2: current user id for the Consulted section's own-row edit. */
   get currentUserId(): string | null {
     return this.profile.getCurrentProfile()?.id ?? null;
+  }
+
+  /** Contract G8 (D-560): viewer holds the IE role (or is Phil). */
+  get viewerIsIE(): boolean {
+    const p = this.profile.getCurrentProfile();
+    return p?.is_initiative_executive === true || p?.is_super_admin === true;
+  }
+
+  /** G8: the loud override affordance — IEs on awaiting gates they can't
+   *  approve through the normal route. Board gates rejected server-side. */
+  get canShowIeOverride(): boolean {
+    return this.viewerIsIE
+        && this.record?.gate_status === 'awaiting_approval'
+        && !this.record?.current_user_gate_authority?.can_approve;
   }
 
   private get currentUserDisplayName(): string {
@@ -1449,6 +1531,24 @@ export class GateRecordModalComponent {
   }
 
   onApproveConfirm(): void {
+    this.performApproval({});
+  }
+
+  /** G8 (D-560): loud IE override — reason travels as override_reason. */
+  onIeOverrideConfirm(): void {
+    const reason = this.ieOverrideReasonDraft.trim();
+    if (!reason) { return; }
+    this.performApproval({ ie_override: true, override_reason: reason });
+  }
+
+  /** G8 (D-569): retry the approval carrying the over-returned reasoning. */
+  onOverReturnedConfirm(): void {
+    const reason = this.overReturnedReasonDraft.trim();
+    if (!reason) { return; }
+    this.performApproval({ over_returned_reason: reason });
+  }
+
+  private performApproval(extra: { ie_override?: boolean; override_reason?: string; over_returned_reason?: string }): void {
     this.startProcessing('approve');
 
     const note = this.approveNoteDraft.trim();
@@ -1457,9 +1557,20 @@ export class GateRecordModalComponent {
       gate_name:         this.data.gateName,
       decision:          'approved',
       // G7 (D-565 item 5): the one approver note field.
-      ...(note ? { approver_notes: note } : {})
+      ...(note ? { approver_notes: note } : {}),
+      ...extra
     }).subscribe({
       next: (res) => {
+        // G8 (D-569): a returned consultation demands reasoning — prompt and retry.
+        if (!res.success && res.error === 'RETURNED_CONSULTATION_REQUIRES_REASON') {
+          const payload = (res.data ?? {}) as { returned_consultation_user_ids?: string[] };
+          this.overReturnedParties = (payload.returned_consultation_user_ids ?? [])
+            .map(id => this.approverDisplayName(id));
+          this.endProcessing();
+          this.confirmMode = 'over-returned-reason';
+          this.cdr.markForCheck();
+          return;
+        }
         if (res.success) {
           this.endProcessing();
           // Contract 24 (AC-18 / D-437): if the response carries warnings,

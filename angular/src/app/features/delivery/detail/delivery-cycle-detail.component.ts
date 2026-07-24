@@ -788,6 +788,28 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                  style="margin-top:4px;font-size:11px;font-style:italic;color:#5A5A5A;">
               {{ levelAttributionLine }}
             </div>
+            <!-- Contract G8 (S-C6/D-562): baseline rose above the set level —
+                 the setter (or leadership) confirms or releases. Never silent. -->
+            <div *ngIf="showSetLevelDivergencePrompt"
+                 style="margin-top:6px;padding:8px 10px;border-left:3px solid #F2A620;
+                        background:rgba(242,166,32,0.08);font:400 12px Roboto,sans-serif;color:#1a1a1a;">
+              The computed baseline (Level {{ cycle!.baseline_level }}) has risen above the set
+              Level {{ cycle!.set_level }}. Confirm the set level or release it to the baseline.
+              <div style="display:flex;gap:8px;margin-top:6px;">
+                <button type="button" [disabled]="levelPromptBusy"
+                        (click)="confirmSetLevel()"
+                        style="background:#257099;border:none;border-radius:5px;padding:5px 12px;
+                               font:500 12px Roboto,sans-serif;color:#fff;cursor:pointer;">
+                  {{ levelPromptBusy ? 'Saving…' : 'Confirm Level ' + cycle!.set_level }}
+                </button>
+                <button type="button" [disabled]="levelPromptBusy"
+                        (click)="releaseSetLevel()"
+                        style="background:none;border:1px solid #B9C4CE;border-radius:5px;padding:5px 12px;
+                               font:500 12px Roboto,sans-serif;color:#00274E;cursor:pointer;">
+                  Release to baseline
+                </button>
+              </div>
+            </div>
             <button *ngIf="callerCanSubmitGates" type="button"
                     (click)="openSizingEdit()"
                     style="margin-top:4px;background:none;border:none;padding:0;
@@ -3747,6 +3769,44 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       return 'Level 1 — the Initiative trio and consulted parties approve gates together.';
     }
     return this.levelAttributionLine || 'Governance level derived from the sizing answers.';
+  }
+
+  // ── Contract G8 (S-C6/D-562): set-level divergence prompt ──────────────────
+  levelPromptBusy = false;
+
+  /** Visible to the setter or any leadership viewer when baseline > set. */
+  get showSetLevelDivergencePrompt(): boolean {
+    const c = this.cycle;
+    if (!c || c.set_level == null || c.baseline_level == null) { return false; }
+    if (c.baseline_level <= c.set_level) { return false; }
+    const me = this.profileService.getCurrentProfile();
+    return c.set_level_by_user_id === me?.id || me?.is_admin === true ||
+           me?.is_super_admin === true || me?.is_initiative_executive === true;
+  }
+
+  confirmSetLevel(): void {
+    if (!this.cycle || this.levelPromptBusy) { return; }
+    this.levelPromptBusy = true;
+    this.delivery.setEffectiveLevel({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      level: this.cycle.set_level as 1 | 2 | 3,
+      reason: `Confirmed after the computed baseline rose to Level ${this.cycle.baseline_level} (S-C6).`
+    }).subscribe({
+      next: () => { this.levelPromptBusy = false; this.loadCycle(this.cycle!.delivery_cycle_id); },
+      error: () => { this.levelPromptBusy = false; this.cdr.markForCheck(); }
+    });
+  }
+
+  releaseSetLevel(): void {
+    if (!this.cycle || this.levelPromptBusy) { return; }
+    this.levelPromptBusy = true;
+    this.delivery.clearEffectiveLevel({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      reason: `Released to the computed baseline (Level ${this.cycle.baseline_level}) after it rose above the set level (S-C6).`
+    }).subscribe({
+      next: () => { this.levelPromptBusy = false; this.loadCycle(this.cycle!.delivery_cycle_id); },
+      error: () => { this.levelPromptBusy = false; this.cdr.markForCheck(); }
+    });
   }
 
   /** Contract G3: post-creation sizing edit (MCP guards post-GtB edits). */

@@ -48,6 +48,8 @@ const {
 } = require('./helpers/l1-consensus');
 // Contract G6 (D-565): open conditions hold approvals; returns clear them.
 const { countOpenConditions, clearOpenConditionsOnReturn } = require('./helpers/gate-conditions');
+// Contract G8 (D-560): board gates are untouchable by the IE override.
+const { isBoardTriggeredGate } = require('./helpers/board-trigger');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 // D-400: gates whose approval transitions a cycle INTO a counted WIP zone.
@@ -146,7 +148,7 @@ async function record_gate_decision(params, caller_user_id) {
   // G5: trio + governance level columns for L1 consensus routing (D-557).
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, workstream_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, baseline_level, set_level')
+    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, workstream_id, division_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, baseline_level, set_level, ai_functionality, ai_delivery_form, ai_audience')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -160,7 +162,7 @@ async function record_gate_decision(params, caller_user_id) {
   // Build C: approver_user_id is null → Admin fallback approves.
   const { data: caller } = await supabase
     .from('users')
-    .select('is_admin, is_super_admin, display_name')
+    .select('is_admin, is_super_admin, is_initiative_executive, display_name')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
@@ -316,7 +318,31 @@ async function record_gate_decision(params, caller_user_id) {
     return { success: true, data: { ...transition.data, l1_consensus: true, l1_completed: true } };
   }
 
-  if (!isAdmin && !isDesignatedApprover) {
+  // ── Contract G8 (D-560): Initiative Executive loud override ────────────────
+  // An IE (or Phil) may approve any non-board gate at any time as a release
+  // valve. Maximally loud: distinct approval type, one-line reason required,
+  // assigned approver notified, activity event, countable.
+  const isIE       = caller?.is_initiative_executive === true;
+  const ieOverride = params.ie_override === true;
+  if (ieOverride) {
+    if (!isIE && !isPhil) {
+      return { success: false, error: 'The Initiative Executive override requires the Initiative Executive role or Phil.' };
+    }
+    if (decision !== 'approved') {
+      return { success: false, error: 'The Initiative Executive override is an approval action — use Return for pushback.' };
+    }
+    if (!params.override_reason || !String(params.override_reason).trim()) {
+      return { success: false, error: 'A one-line reason is required for an Initiative Executive override (D-560).' };
+    }
+    if (isBoardTriggeredGate(cycle, gate_name)) {
+      return {
+        success: false,
+        error: 'This gate carries the AI Production Board requirement — board gates cannot be overridden (D-560, untouchable).'
+      };
+    }
+  }
+
+  if (!isAdmin && !isDesignatedApprover && !ieOverride) {
     const reason = approverUnconfigured
       ? 'No approver has been configured for this gate — an Admin is the default approver.'
       : 'You are not the designated approver for this gate.';
@@ -324,6 +350,35 @@ async function record_gate_decision(params, caller_user_id) {
       success: false,
       error: `You do not have authority to approve or return this gate. ${reason}`
     };
+  }
+
+  // ── Contract G8 (D-569): approving over a returned consultation ────────────
+  // Any approver may — but the act is maximally loud: mandatory reason,
+  // distinct marker, returning party notified with the reasoning, DL
+  // auto-notified on content-triggered cases (Q4-Security; Compliance
+  // pre-deploy). Applies to normal approvals and IE overrides alike.
+  let returnedConsultations = [];
+  if (decision === 'approved') {
+    const { data: declinedRows } = await supabase
+      .from('gate_consultations')
+      .select('id, consulted_user_id, response, notes')
+      .eq('gate_record_id', gate_record.gate_record_id)
+      .eq('response', 'declined');
+    returnedConsultations = declinedRows || [];
+    const overReturnedReason = (params.over_returned_reason ?? params.override_reason ?? '').trim();
+    if (returnedConsultations.length > 0 && !overReturnedReason) {
+      return {
+        success: false,
+        error: 'RETURNED_CONSULTATION_REQUIRES_REASON',
+        data: {
+          code: 'RETURNED_CONSULTATION_REQUIRES_REASON',
+          returned_consultation_user_ids: returnedConsultations.map(r => r.consulted_user_id),
+          message: 'A consulted party returned this gate. Approving over a returned consultation ' +
+                   'requires your reasoning — it is recorded on the gate face and the returning ' +
+                   'party is notified (D-569).'
+        }
+      };
+    }
   }
 
   // ── On return: record, append event, clear collected approvals, exit ──────
@@ -399,7 +454,157 @@ async function record_gate_decision(params, caller_user_id) {
   if (transition.error) {
     return { success: false, error: transition.error };
   }
-  return { success: true, data: transition.data };
+
+  // ── Contract G8 loud-override + D-569 marker side effects ──────────────────
+  const overReturned = returnedConsultations.length > 0;
+  if (ieOverride || overReturned) {
+    const reasonNote = String(params.override_reason ?? params.over_returned_reason ?? '').trim() || null;
+    await supabase.from('gate_approvals').insert({
+      gate_record_id:             gate_record.gate_record_id,
+      approver_user_id:           caller_user_id,
+      approval_type:              ieOverride ? 'ie_override' : 'assigned',
+      over_returned_consultation: overReturned,
+      reason_note:                reasonNote
+    });
+  }
+
+  if (ieOverride) {
+    await supabase.from('cycle_event_log').insert({
+      delivery_cycle_id,
+      event_type:        'gate_ie_override',
+      event_description: `${callerDisplayName} approved ${gateNameDisplay} as Initiative Executive override. Reason: ${String(params.override_reason).trim()}`,
+      actor_user_id:     caller_user_id,
+      event_metadata:    { gate_name, original_approver_user_id, override_reason: String(params.override_reason).trim() }
+    });
+    if (original_approver_user_id && original_approver_user_id !== caller_user_id) {
+      const { data: displaced } = await supabase
+        .from('users')
+        .select('display_name, email')
+        .eq('id', original_approver_user_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (displaced?.email) {
+        await sendGateNotificationEmail({
+          recipients:       [{ email: displaced.email, display_name: displaced.display_name }],
+          subject:          `${cycle.cycle_title} — ${gateNameDisplay} approved by Initiative Executive override`,
+          initiativeName:   cycle.cycle_title,
+          gateNameDisplay,
+          contextParagraph: `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title} ` +
+                            `as an Initiative Executive override. You were the assigned approver. ` +
+                            `Reason: ${String(params.override_reason).trim()}`,
+          delivery_cycle_id,
+          email_type:       'ie_override'
+        });
+      }
+    }
+  }
+
+  if (overReturned) {
+    const overReason = String(params.over_returned_reason ?? params.override_reason ?? '').trim();
+    const returningIds = returnedConsultations.map(r => r.consulted_user_id);
+    const { data: returningRows } = await supabase
+      .from('users')
+      .select('id, display_name, email')
+      .in('id', returningIds)
+      .is('deleted_at', null);
+    const returningNames = (returningRows || []).map(u => u.display_name).join(', ');
+
+    // D-569 (1): the distinct visible marker — gate face, feed, panel all read
+    // from the event + approval row written above.
+    await supabase.from('cycle_event_log').insert({
+      delivery_cycle_id,
+      event_type:        'approved_over_returned_consultation',
+      event_description: `Approved over returned consultation — ${returningNames || 'a consulted party'} (${gateNameDisplay}). Reason: ${overReason}`,
+      actor_user_id:     caller_user_id,
+      event_metadata:    { gate_name, returning_user_ids: returningIds, reason: overReason }
+    });
+
+    // D-569 (3): returning parties notified with the approver's reasoning.
+    const recipients = (returningRows || []).filter(u => u.email)
+      .map(u => ({ email: u.email, display_name: u.display_name }));
+    if (recipients.length > 0) {
+      await sendGateNotificationEmail({
+        recipients,
+        subject:          `${cycle.cycle_title} — ${gateNameDisplay} approved over your returned consultation`,
+        initiativeName:   cycle.cycle_title,
+        gateNameDisplay,
+        contextParagraph: `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title} over your ` +
+                          `returned consultation. Reasoning: ${overReason}. You may escalate to the Division ` +
+                          `Leader or an Initiative Executive, or seek consultation-required standing on the next gate.`,
+        delivery_cycle_id,
+        email_type:       'approved_over_returned_consultation'
+      });
+    }
+
+    // D-569 (5): content-triggered cases auto-notify the Division Leader
+    // (Security on Q4-triggered work; Compliance pre-deploy — CC-G8 lean on
+    // membership-based detection until G9 suggestion provenance exists).
+    const triggered = await hasContentTriggeredReturn(delivery_cycle_id, gate_name, returningIds);
+    if (triggered && cycle.division_id) {
+      const { data: division } = await supabase
+        .from('divisions')
+        .select('owner_user_id')
+        .eq('id', cycle.division_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (division?.owner_user_id) {
+        const { data: dl } = await supabase
+          .from('users')
+          .select('display_name, email')
+          .eq('id', division.owner_user_id)
+          .is('deleted_at', null)
+          .maybeSingle();
+        if (dl?.email) {
+          await sendGateNotificationEmail({
+            recipients:       [{ email: dl.email, display_name: dl.display_name }],
+            subject:          `${cycle.cycle_title} — content-triggered consultation overridden at ${gateNameDisplay}`,
+            initiativeName:   cycle.cycle_title,
+            gateNameDisplay,
+            contextParagraph: `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title} over a ` +
+                              `returned content-triggered consultation (${returningNames}). You are notified as ` +
+                              `Division Leader (D-569 clause 5). Reasoning: ${overReason}`,
+            delivery_cycle_id,
+            email_type:       'dl_override_notification'
+          });
+        }
+      }
+    }
+  }
+
+  return { success: true, data: { ...transition.data, ...(ieOverride ? { ie_override: true } : {}), ...(overReturned ? { approved_over_returned_consultation: true } : {}) } };
+}
+
+/**
+ * G8 (D-569 clause 5): does any returning party represent a content trigger —
+ * Security membership on Q4-flagged work, or Compliance membership at the
+ * pre-deploy gate?
+ */
+async function hasContentTriggeredReturn(delivery_cycle_id, gate_name, returningIds) {
+  if (!returningIds || returningIds.length === 0) { return false; }
+  const { data: sizing } = await supabase
+    .from('initiative_sizing')
+    .select('q4_security_impact')
+    .eq('delivery_cycle_id', delivery_cycle_id)
+    .maybeSingle();
+  const { data: groups } = await supabase
+    .from('specialty_groups')
+    .select('group_id, group_name')
+    .in('group_name', ['Security', 'Compliance']);
+  if (!groups || groups.length === 0) { return false; }
+  const { data: memberships } = await supabase
+    .from('specialty_group_members')
+    .select('group_id, user_id')
+    .in('group_id', groups.map(g => g.group_id))
+    .in('user_id', returningIds)
+    .is('deleted_at', null);
+  const groupNameById = {};
+  groups.forEach(g => { groupNameById[g.group_id] = g.group_name; });
+  for (const m of memberships || []) {
+    const name = groupNameById[m.group_id];
+    if (name === 'Security' && sizing?.q4_security_impact === true) { return true; }
+    if (name === 'Compliance' && gate_name === 'go_to_deploy') { return true; }
+  }
+  return false;
 }
 
 /**

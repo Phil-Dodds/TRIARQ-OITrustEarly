@@ -26,7 +26,10 @@ export const ROLE_DISPLAY_NAMES: Record<SystemRole, string> = {
 
 // Boolean role flag column names on public.users. Maps a SystemRole to its flag.
 // is_phil is intentionally absent — CC-19-01 collapsed 'phil' into is_admin.
-export type RoleFlag = 'is_admin' | 'is_dcs' | 'is_epo' | 'is_dol' | 'is_ce';
+// Contract G8 (D-560): is_initiative_executive gates the All Pending Gates
+// nav item. NOT in ALL_ROLE_FLAGS — it is not an assignable functional role;
+// Phil grants it via set_initiative_executive.
+export type RoleFlag = 'is_admin' | 'is_dcs' | 'is_epo' | 'is_dol' | 'is_ce' | 'is_initiative_executive';
 
 export function userRoleToFlag(role: SystemRole): RoleFlag {
   switch (role) {
@@ -49,6 +52,7 @@ export const ROLE_FLAG_ABBREVIATIONS: Record<RoleFlag, string> = {
   is_epo:   'EPO',
   is_dol:   'DOL',
   is_ce:    'CE',
+  is_initiative_executive: 'IE',
 };
 
 export const ROLE_FLAG_DISPLAY_NAMES: Record<RoleFlag, string> = {
@@ -57,6 +61,7 @@ export const ROLE_FLAG_DISPLAY_NAMES: Record<RoleFlag, string> = {
   is_epo:   'Engineering Product Owner',
   is_dol:   'Domain Outcome Lead',
   is_ce:    'Context Engineer',
+  is_initiative_executive: 'Initiative Executive',
 };
 
 // Entity display names (D-392 — Delivery Cycle → Initiative).

@@ -326,6 +326,11 @@ export class DeliveryService {
     gate_name:         GateName;
     decision:          'approved' | 'returned';
     approver_notes?:   string;
+    // Contract G8 (D-560): loud IE override — reason required server-side.
+    ie_override?:      boolean;
+    override_reason?:  string;
+    // Contract G8 (D-569): reasoning when approving over a returned consultation.
+    over_returned_reason?: string;
   }): Observable<McpResponse<GateDecisionResult>> {
     return this.mcp.call<GateDecisionResult>(
       'delivery', 'record_gate_decision', params as Record<string, unknown>
@@ -868,6 +873,59 @@ export class DeliveryService {
       'delivery', 'resolve_gate_condition', params as unknown as Record<string, unknown>
     );
   }
+
+  // ── Contract G8 — governance level controls (D-562, S-C6 prompt) ───────────
+
+  setEffectiveLevel(params: { delivery_cycle_id: string; level: 1 | 2 | 3; reason: string }):
+    Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>(
+      'delivery', 'set_effective_level', params as unknown as Record<string, unknown>
+    );
+  }
+
+  clearEffectiveLevel(params: { delivery_cycle_id: string; reason: string }):
+    Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>(
+      'delivery', 'clear_effective_level', params as unknown as Record<string, unknown>
+    );
+  }
+
+  // ── Contract G8 — Initiative Executive (D-560) ──────────────────────────────
+
+  /** Phil-only grant/revoke. */
+  setInitiativeExecutive(params: { user_id: string; granted: boolean; note?: string }):
+    Observable<McpResponse<{ user_id: string; display_name: string; is_initiative_executive: boolean }>> {
+    return this.mcp.call<{ user_id: string; display_name: string; is_initiative_executive: boolean }>(
+      'delivery', 'set_initiative_executive', params as unknown as Record<string, unknown>
+    );
+  }
+
+  /** IE/Admin pull-only monitoring view. */
+  listAllPendingGates(): Observable<McpResponse<{
+    pending_gates: AllPendingGateRow[]; aging_threshold_days: number;
+  }>> {
+    return this.mcp.call<{ pending_gates: AllPendingGateRow[]; aging_threshold_days: number }>(
+      'delivery', 'list_all_pending_gates', {}
+    );
+  }
+}
+
+/** Contract G8 (D-560): one row of the All Pending Gates view. */
+export interface AllPendingGateRow {
+  gate_record_id:              string;
+  delivery_cycle_id:           string;
+  cycle_title:                 string;
+  gate_name:                   GateName;
+  gate_name_display:           string;
+  division_id:                 string | null;
+  division_display_name_short: string;
+  effective_level:             1 | 2 | 3 | null;
+  approver_user_id:            string | null;
+  approver_display_name:       string | null;
+  submitted_at:                string;
+  days_waiting:                number;
+  aging:                       boolean;
+  waiting_on:                  { state: string; line: string; days_waiting: number } | null;
 }
 
 // ── Contract G3 payload shapes ────────────────────────────────────────────────

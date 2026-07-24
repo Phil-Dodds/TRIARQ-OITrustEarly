@@ -46,6 +46,9 @@ const NAV_ITEMS: NavItem[] = [
   // Contract G4 (D-564): the viewer's Consulted/Informed memberships.
   // devStatus 'uat' — first post-build stage per Phil's progression order.
   { label: 'Following',            route: '/initiatives/following', devStatus: 'uat' },
+  // Contract G8 (D-560): IE pull-only monitoring — never merged with My Actions.
+  { label: 'All Pending Gates',    route: '/initiatives/all-pending-gates',
+    requiresFlag: 'is_initiative_executive', devStatus: 'uat' },
   // Contract 33 / D-490 + Tracks Phase A: Team Meetings — visible to ALL users.
   // Users without a series can create one (if permitted) or join a public series.
   // Badge = number of series the user participates in.

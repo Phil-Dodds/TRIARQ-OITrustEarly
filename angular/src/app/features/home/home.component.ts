@@ -72,6 +72,11 @@ export class HomeComponent implements OnInit {
   get isCE():    boolean { return this.profile?.is_ce    === true; }
   get isAdmin(): boolean { return this.profile?.is_admin === true; }
 
+  // Contract G8 (D-560): IE (or Phil) home count card.
+  get showAllPendingGates(): boolean {
+    return this.profile?.is_initiative_executive === true || this.profile?.is_super_admin === true;
+  }
+
   get showSystemHealth():    boolean { return this.isAdmin; }
   get showDivisions():       boolean { return this.isAdmin; }
   get showUserManagement():  boolean { return this.isAdmin; }

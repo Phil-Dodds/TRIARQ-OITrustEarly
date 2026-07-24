@@ -35,6 +35,12 @@
       [userId]="profile?.id ?? ''">
     </app-my-action-queue-card>
 
+    <!-- Contract G8 (D-560): IE-only pending-gates count. Pull summary —
+         never merged with the Action Queue above. -->
+    <app-all-pending-gates-card
+      *ngIf="showAllPendingGates">
+    </app-all-pending-gates-card>
+
     <app-my-activity-card
       [userId]="profile?.id ?? ''">
     </app-my-activity-card>

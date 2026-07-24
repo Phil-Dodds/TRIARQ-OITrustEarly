@@ -30,6 +30,8 @@ export interface User {
   // as assigned DCS. Feeds the L1/L2 branch of baseline level derivation.
   // Set via set_trusted_dcs MCP tool (admin/Phil); every change activity-logged.
   trusted_dcs?:                          boolean;
+  // Contract G8 (D-560, migration 086): Initiative Executive — Phil-only grant.
+  is_initiative_executive?:              boolean;
   is_active:                             boolean;
   created_at:                            string;
   updated_at:                            string;

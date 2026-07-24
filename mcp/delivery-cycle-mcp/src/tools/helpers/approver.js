@@ -89,12 +89,14 @@ async function isLeadershipForCycle(user_id, division_id) {
   if (!user_id) { return false; }
   const { data: userRow } = await supabase
     .from('users')
-    .select('id, is_super_admin')
+    .select('id, is_super_admin, is_initiative_executive')
     .eq('id', user_id)
     .is('deleted_at', null)
     .maybeSingle();
   if (!userRow) { return false; }
   if (userRow.is_super_admin === true) { return true; }
+  // G8 (D-560): Initiative Executives are leadership everywhere.
+  if (userRow.is_initiative_executive === true) { return true; }
 
   // Walk the Division parent chain (Trust → Service Line → Functional Team is
   // 3 levels today; depth-guarded against accidental cycles).

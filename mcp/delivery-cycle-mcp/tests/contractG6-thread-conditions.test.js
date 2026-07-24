@@ -62,6 +62,7 @@ describe('G6 — open conditions hold approvals (AC #3)', () => {
       { data: { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER }, error: null },
       { data: l2Cycle, error: null },
       { data: { is_admin: false, is_super_admin: false, display_name: 'Approver' }, error: null },
+      { data: [], error: null },                                          // declined consultations (G8) — none
       { data: [{ condition_id: 'cond1' }], error: null }                  // one open condition
     ];
     const r = await record_gate_decision(

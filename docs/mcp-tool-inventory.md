@@ -309,6 +309,37 @@ current approver (CC-G1-20 + spec).
 
 ---
 
+## 1.11 Contract G8 — Initiative Executive (new + modified tools)
+
+**`set_initiative_executive`** (new — D-560/D-464 posture): Phil-only
+grant/revoke of `users.is_initiative_executive` (migration 086);
+activity-logged (structured server log).
+
+**`list_all_pending_gates`** (new — D-560): every awaiting gate company-wide —
+gate, initiative, Division, effective level, assigned approver, days waiting,
+the G7 waiting-on line, aging highlight past ARCH-33-APG-AGING (7 days, code
+constant — CC-G8). Pull-only, oldest first. Auth: IE, Phil, or Admin.
+
+**`record_gate_decision`** (modified — D-560/D-569):
+- `ie_override: true` + `override_reason` — IEs/Phil approve any non-board
+  gate; distinct `ie_override` approval row, `gate_ie_override` event,
+  assigned approver emailed; board gates rejected (untouchable).
+- Approving any gate that carries a DECLINED consultation requires
+  `over_returned_reason` (else the structured error
+  `RETURNED_CONSULTATION_REQUIRES_REASON`); approving writes the
+  over_returned marker row + event, notifies returning parties with the
+  reasoning, and auto-notifies the Division Leader on content-triggered
+  cases (Security membership + Q4 flag; Compliance membership at Go to
+  Deploy — CC-G8 lean until G9 suggestion provenance exists).
+
+**`record_gate_approval`** (modified): ie_override callers = IEs + Phil
+(CC-G1-14 interim retired).
+
+Leadership sets extended to IEs: `resolveGateApproverV2` L3 chain,
+`set/clear_effective_level`, `set/clear_oversight` (completes CC-G1-08/-09).
+
+---
+
 ## 2. Pre-G1 tool inventory (names only)
 
 Authoritative runtime list: `GET /tools` on each service. Behavior: per-contract
