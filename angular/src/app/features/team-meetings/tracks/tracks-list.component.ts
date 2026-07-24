@@ -423,11 +423,25 @@ export class TracksListComponent implements OnInit {
   onOutlookDrop(ev: DragEvent): void {
     ev.preventDefault();
     this.dropActive = false;
-    const file = ev.dataTransfer?.files?.[0];
+    const dt = ev.dataTransfer;
+    const file = dt?.files?.[0];
     if (file) { this.applyOutlookFile(file); return; }
     // CC-38 f26: some Outlook builds (esp. New Outlook / OWA) don't hand the
-    // browser a file on drag — explain the workaround instead of doing nothing.
-    this.importError = 'Outlook didn\'t hand the browser a file. Drag the item to your Desktop first, then drag that .msg here — or click this box to browse.';
+    // browser a file on drag — OLE formats Chrome can't read. Best effort
+    // (Phil 2026-07-24): a subject line sometimes rides along as plain text;
+    // prefill what we can and say exactly what was captured.
+    const text = (dt?.getData('text/plain') || '').trim();
+    console.info('[outlook-drop] no file received; dataTransfer types:', dt ? Array.from(dt.types) : []);
+    const subject = text && !/^https?:\/\//i.test(text)
+      ? text.split(/\r?\n/)[0].slice(0, 120).trim() : '';
+    if (subject) {
+      if (!(this.newForm.value as { track_name?: string }).track_name) {
+        this.newForm.patchValue({ track_name: subject });
+      }
+      this.importError = 'Outlook handed over only the subject, not the meeting file — series name prefilled. For members and cadence: drag the item to your Desktop first, then drag that .msg here, or click this box to browse.';
+    } else {
+      this.importError = 'Outlook didn\'t hand the browser a file. Drag the item to your Desktop first, then drag that .msg here — or click this box to browse.';
+    }
     this.cdr.markForCheck();
   }
 
