@@ -50,7 +50,10 @@ import {
   // Contract G4 (D-563/D-564)
   ParticipationRecord,
   SpecialtyGroup,
-  DivisionDefaultConsulted
+  DivisionDefaultConsulted,
+  // Contract G6 (D-565)
+  GateThreadMessage,
+  GateConditionRecord
 } from '../types/database';
 import {
   LatestInitiativeStatus,
@@ -822,6 +825,47 @@ export class DeliveryService {
     Observable<McpResponse<{ default_consulted_id: string; removed: boolean }>> {
     return this.mcp.call<{ default_consulted_id: string; removed: boolean }>(
       'delivery', 'remove_division_default_consulted', params as unknown as Record<string, unknown>
+    );
+  }
+
+  // ── Contract G6 — gate thread + conditions (D-565) ──────────────────────────
+
+  listGateThread(params: { gate_record_id: string }):
+    Observable<McpResponse<{ gate_thread_messages: GateThreadMessage[] }>> {
+    return this.mcp.call<{ gate_thread_messages: GateThreadMessage[] }>(
+      'delivery', 'list_gate_thread', params as unknown as Record<string, unknown>
+    );
+  }
+
+  addGateThreadMessage(params: { gate_record_id: string; text: string }):
+    Observable<McpResponse<GateThreadMessage>> {
+    return this.mcp.call<GateThreadMessage>(
+      'delivery', 'add_gate_thread_message', params as unknown as Record<string, unknown>
+    );
+  }
+
+  listGateConditions(params: { gate_record_id: string }):
+    Observable<McpResponse<{ gate_conditions: GateConditionRecord[] }>> {
+    return this.mcp.call<{ gate_conditions: GateConditionRecord[] }>(
+      'delivery', 'list_gate_conditions', params as unknown as Record<string, unknown>
+    );
+  }
+
+  addGateCondition(params: {
+    gate_record_id: string;
+    type: 'general' | 'consultation_required';
+    text: string;
+    target_consultation_id?: string;
+  }): Observable<McpResponse<GateConditionRecord>> {
+    return this.mcp.call<GateConditionRecord>(
+      'delivery', 'add_gate_condition', params as unknown as Record<string, unknown>
+    );
+  }
+
+  resolveGateCondition(params: { condition_id: string; note?: string }):
+    Observable<McpResponse<GateConditionRecord>> {
+    return this.mcp.call<GateConditionRecord>(
+      'delivery', 'resolve_gate_condition', params as unknown as Record<string, unknown>
     );
   }
 }

@@ -45,6 +45,8 @@ import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/materia
 import { DeliveryService } from '../../../core/services/delivery.service';
 import { UserProfileService } from '../../../core/services/user-profile.service';
 import { GateConsultationSectionComponent } from './gate-consultation-section.component';
+// Contract G6 (D-565): thread + conditions, one tap deep.
+import { GateThreadConditionsComponent } from './gate-thread-conditions.component';
 // Contract G3 (D-567/D-558): sizing interstitial + Go to Build confirm step.
 import { InitiativeSizingFormComponent, SizingFormPayload } from '../sizing-form/initiative-sizing-form.component';
 import { GATE_COACHING_SHORT } from '../../../shared/constants/gate-coaching.constants';
@@ -92,7 +94,7 @@ const GATE_LABELS: Record<GateName, string> = {
   selector:        'app-gate-record-modal',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, GateConsultationSectionComponent, InitiativeSizingFormComponent],
+  imports:         [CommonModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, GateConsultationSectionComponent, InitiativeSizingFormComponent, GateThreadConditionsComponent],
   template: `
     <div class="grm-shell" [attr.aria-busy]="processing ? 'true' : null">
 
@@ -194,6 +196,13 @@ const GATE_LABELS: Record<GateName, string> = {
           [gateStatus]="record?.gate_status ?? null"
           [currentUserId]="currentUserId">
         </app-gate-consultation-section>
+
+        <!-- THREAD & CONDITIONS — Contract G6 (D-565). One line, one tap deep. -->
+        <app-gate-thread-conditions
+          *ngIf="record?.gate_record_id"
+          [gateRecordId]="record!.gate_record_id"
+          [canManageConditions]="!!record?.current_user_gate_authority?.can_approve || !!data.callerCanSubmitGates">
+        </app-gate-thread-conditions>
 
         <!-- GATE CHECKLIST -->
         <section class="grm-section">

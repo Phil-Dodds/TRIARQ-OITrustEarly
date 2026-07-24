@@ -287,6 +287,28 @@ pending_trio_display_names, pending_consulted_count, caller_has_approved }`;
 
 ---
 
+## 1.10 Contract G6 — Gate thread + conditions (modified tools)
+
+**`submit_gate_for_approval`** (modified — D-565 AC #1): a submission note is
+also written as the gate thread's opening message (gate_thread_messages).
+
+**`record_consultation_response`** (modified — S-B5): a consulted 'approved'
+auto-resolves any open `consultation_required` conditions targeting that
+consultation.
+
+**`record_gate_decision`** (modified — D-565): approval is blocked while the
+gate has open conditions (single-approver and L1 collection alike — CC-G6
+lean: conditions hold the gate; resolving never auto-approves). Returns clear
+open conditions with the approvals (AC #5 lean — resolved with a clearing
+note, never deleted).
+
+**`add_gate_condition`** (modified): setter auth = the gate's resolved
+approver, an Initiative trio member, or an Admin (CC-G6 lean).
+**`resolve_gate_condition`** (modified): resolver set extended to the gate's
+current approver (CC-G1-20 + spec).
+
+---
+
 ## 2. Pre-G1 tool inventory (names only)
 
 Authoritative runtime list: `GET /tools` on each service. Behavior: per-contract

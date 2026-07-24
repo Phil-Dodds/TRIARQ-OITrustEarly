@@ -46,6 +46,8 @@ const {
   isL1ConsensusGate, trioIdsOf, getL1CollectedState,
   recordTrioApproval, clearGateApprovals
 } = require('./helpers/l1-consensus');
+// Contract G6 (D-565): open conditions hold approvals; returns clear them.
+const { countOpenConditions, clearOpenConditionsOnReturn } = require('./helpers/gate-conditions');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 // D-400: gates whose approval transitions a cycle INTO a counted WIP zone.
@@ -227,6 +229,8 @@ async function record_gate_decision(params, caller_user_id) {
           gate_record_id: gate_record.gate_record_id, error: cleared.error
         }));
       }
+      // G6 (AC #5): a return clears open conditions with the approvals.
+      await clearOpenConditionsOnReturn(gate_record.gate_record_id, caller_user_id);
 
       // S-A2: trio notified (the returner excluded).
       const notifyIds = trioIds.filter(id => id !== caller_user_id);
@@ -279,7 +283,11 @@ async function record_gate_decision(params, caller_user_id) {
       return { success: false, error: state.error };
     }
 
-    if (!state.allCollected) {
+    // G6 (D-565): open conditions hold the gate even when the collection is
+    // otherwise complete — the last approval waits until they resolve.
+    const openConditions = await countOpenConditions(gate_record.gate_record_id);
+
+    if (!state.allCollected || openConditions.count > 0) {
       return {
         success: true,
         data: {
@@ -288,7 +296,8 @@ async function record_gate_decision(params, caller_user_id) {
           l1_consensus:  true,
           l1_pending: {
             pending_trio_user_ids:      state.pendingTrioIds,
-            pending_consulted_user_ids: state.pendingConsultedIds
+            pending_consulted_user_ids: state.pendingConsultedIds,
+            open_conditions_count:      openConditions.count
           }
         }
       };
@@ -357,8 +366,23 @@ async function record_gate_decision(params, caller_user_id) {
         gate_record_id: gate_record.gate_record_id, error: cleared.error
       }));
     }
+    // G6 (AC #5): a return clears open conditions with the approvals.
+    await clearOpenConditionsOnReturn(gate_record.gate_record_id, caller_user_id);
 
     return { success: true, data: { gate_record: returned_gate, stage_advanced: false } };
+  }
+
+  // ── G6 (D-565): open conditions hold the approval — "nearly there — fix
+  // these" must be satisfied (or resolved by the approver) before approving.
+  {
+    const openConditions = await countOpenConditions(gate_record.gate_record_id);
+    if (openConditions.count > 0) {
+      return {
+        success: false,
+        error: `This gate has ${openConditions.count} open condition${openConditions.count === 1 ? '' : 's'}. ` +
+               'Resolve the conditions (the gate panel lists them), then approve — or return the gate instead.'
+      };
+    }
   }
 
   // ── Approved: shared approval transition (G5 extraction — also used by the

@@ -32,13 +32,47 @@ async function add_gate_condition(params, caller_user_id) {
 
   const { data: gateRecord, error: gateErr } = await supabase
     .from('gate_records')
-    .select('gate_record_id, delivery_cycle_id, gate_name')
+    .select('gate_record_id, delivery_cycle_id, gate_name, approver_user_id')
     .eq('gate_record_id', gate_record_id)
     .is('deleted_at', null)
     .single();
 
   if (gateErr || !gateRecord) {
     return { success: false, error: 'Gate record not found.' };
+  }
+
+  // ── Contract G6 (D-565): conditions are the approver's tool — setter must be
+  // the gate's resolved approver, an L1 trio member, or an Admin (CC-G6 lean).
+  {
+    let authorized = gateRecord.approver_user_id === caller_user_id;
+    if (!authorized) {
+      const { data: cycleRow } = await supabase
+        .from('delivery_cycles')
+        .select('assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
+        .eq('delivery_cycle_id', gateRecord.delivery_cycle_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      const isTrio = cycleRow &&
+        [cycleRow.assigned_dcs_user_id, cycleRow.assigned_epo_user_id, cycleRow.assigned_dol_user_id]
+          .includes(caller_user_id);
+      if (!isTrio) {
+        const { data: callerRow } = await supabase
+          .from('users')
+          .select('is_admin, is_super_admin')
+          .eq('id', caller_user_id)
+          .is('deleted_at', null)
+          .maybeSingle();
+        authorized = callerRow?.is_admin === true || callerRow?.is_super_admin === true;
+      } else {
+        authorized = true;
+      }
+    }
+    if (!authorized) {
+      return {
+        success: false,
+        error: 'Setting a gate condition requires the gate\'s approver, an Initiative trio member, or an Admin.'
+      };
+    }
   }
 
   if (type === 'consultation_required') {
@@ -117,17 +151,28 @@ async function resolve_gate_condition(params, caller_user_id) {
   }
 
   if (condition.set_by_user_id !== caller_user_id) {
-    const { data: caller } = await supabase
-      .from('users')
-      .select('is_admin, is_super_admin')
-      .eq('id', caller_user_id)
+    // G6 (CC-G1-20 extended per spec): the gate's current approver may also
+    // resolve, alongside the setter and Admins.
+    const { data: gateRow } = await supabase
+      .from('gate_records')
+      .select('approver_user_id')
+      .eq('gate_record_id', condition.gate_record_id)
       .is('deleted_at', null)
       .maybeSingle();
-    if (caller?.is_admin !== true && caller?.is_super_admin !== true) {
-      return {
-        success: false,
-        error: 'Resolving a gate condition requires the condition setter or an Admin role.'
-      };
+    const isGateApprover = gateRow?.approver_user_id === caller_user_id;
+    if (!isGateApprover) {
+      const { data: caller } = await supabase
+        .from('users')
+        .select('is_admin, is_super_admin')
+        .eq('id', caller_user_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (caller?.is_admin !== true && caller?.is_super_admin !== true) {
+        return {
+          success: false,
+          error: 'Resolving a gate condition requires the condition setter, the gate\'s approver, or an Admin role.'
+        };
+      }
     }
   }
 

@@ -636,7 +636,7 @@ describe('gate thread', () => {
 describe('gate conditions', () => {
   test('consultation_required without target_consultation_id is rejected', async () => {
     queue = [
-      { data: { gate_record_id: GATE, delivery_cycle_id: CYC, gate_name: 'go_to_build' }, error: null }
+      { data: { gate_record_id: GATE, delivery_cycle_id: CYC, gate_name: 'go_to_build', approver_user_id: CALLER }, error: null }
     ];
     const r = await conditionTools.add_gate_condition(
       { gate_record_id: GATE, type: 'consultation_required', text: 'Security must weigh in' }, CALLER);
@@ -646,7 +646,7 @@ describe('gate conditions', () => {
 
   test('target consultation on a different gate is rejected', async () => {
     queue = [
-      { data: { gate_record_id: GATE, delivery_cycle_id: CYC, gate_name: 'go_to_build' }, error: null },
+      { data: { gate_record_id: GATE, delivery_cycle_id: CYC, gate_name: 'go_to_build', approver_user_id: CALLER }, error: null },
       { data: { id: 'cons-1', gate_record_id: 'different-gate' }, error: null }
     ];
     const r = await conditionTools.add_gate_condition(
@@ -657,7 +657,7 @@ describe('gate conditions', () => {
 
   test('general condition happy path', async () => {
     queue = [
-      { data: { gate_record_id: GATE, delivery_cycle_id: CYC, gate_name: 'go_to_build' }, error: null },
+      { data: { gate_record_id: GATE, delivery_cycle_id: CYC, gate_name: 'go_to_build', approver_user_id: CALLER }, error: null },
       { data: { condition_id: 'cond-1', gate_record_id: GATE, condition_type: 'general', condition_status: 'open' }, error: null },
       { data: null, error: null }
     ];

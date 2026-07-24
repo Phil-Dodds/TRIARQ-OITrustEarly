@@ -21,6 +21,8 @@ const { GATE_NAME_DISPLAY } = require('./helpers/gates');
 // Contract G5 (D-557): L1 consensus — consulted responses carry gate force.
 const { isL1ConsensusGate, trioIdsOf, getL1CollectedState, clearGateApprovals } = require('./helpers/l1-consensus');
 const { applyGateApprovalTransition } = require('./record_gate_decision');
+// Contract G6 (D-565): conditions hold gates; returns clear them.
+const { countOpenConditions, clearOpenConditionsOnReturn } = require('./helpers/gate-conditions');
 
 const VALID_RESPONSES = ['approved', 'declined', 'declined_post_approval'];
 
@@ -100,6 +102,27 @@ async function record_consultation_response(params, caller_user_id) {
 
   const gateNameDisplay = GATE_NAME_DISPLAY[gate_record.gate_name] ?? gate_record.gate_name;
 
+  // ── Contract G6 (D-565, S-B5): consultation_required conditions targeting
+  // this consultation auto-resolve the moment the party approves. Non-fatal.
+  if (response === 'approved') {
+    const { error: autoResolveErr } = await supabase
+      .from('gate_conditions')
+      .update({
+        condition_status:    'resolved',
+        resolved_at:         new Date().toISOString(),
+        resolved_by_user_id: caller_user_id,
+        resolution_note:     'Auto-resolved — the required consultation was approved (S-B5).'
+      })
+      .eq('target_consultation_id', consultation.id)
+      .eq('condition_status', 'open');
+    if (autoResolveErr) {
+      console.error(JSON.stringify({
+        tool_name: 'record_consultation_response', step: 'condition_auto_resolve',
+        consultation_id: consultation.id, error: autoResolveErr.message
+      }));
+    }
+  }
+
   // ── Contract G5 (D-557): Level 1 consensus hooks ───────────────────────────
   // On an awaiting L1 gate a consulted response carries gate force:
   //   - declined → returns the gate ENTIRELY (S-A4 — consulted return = trio
@@ -149,6 +172,8 @@ async function record_consultation_response(params, caller_user_id) {
           .single();
 
         await clearGateApprovals(gate_record.gate_record_id, returnEvent?.event_id ?? null);
+        // G6 (AC #5): a return clears open conditions with the approvals.
+        await clearOpenConditionsOnReturn(gate_record.gate_record_id, caller_user_id);
 
         // S-A2/S-A4: trio notified.
         const trioIds = trioIdsOf(cycle).filter(id => id !== caller_user_id);
@@ -180,7 +205,9 @@ async function record_consultation_response(params, caller_user_id) {
 
       if (response === 'approved') {
         const state = await getL1CollectedState(gate_record.gate_record_id, cycle);
-        if (!state.error && state.allCollected) {
+        // G6: open conditions hold the gate even at full collection.
+        const openConditions = await countOpenConditions(gate_record.gate_record_id);
+        if (!state.error && state.allCollected && openConditions.count === 0) {
           const transition = await applyGateApprovalTransition({
             delivery_cycle_id: gate_record.delivery_cycle_id,
             gate_name:         gate_record.gate_name,

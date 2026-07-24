@@ -186,6 +186,7 @@ describe('record_gate_decision — L1 consensus route (G5)', () => {
           { approver_user_id: DOL, approval_type: 'trio_member' }
         ], error: null },                                                  // approvals — complete
       { data: [], error: null },                                           // consultations — none pending
+      { data: [], error: null },                                           // open conditions (G6) — none
       // ── applyGateApprovalTransition ──
       { data: { ...gateRow, gate_status: 'approved', approver_user_id: null }, error: null }, // gate update
       { data: null, error: null },                                         // milestone update
@@ -236,6 +237,7 @@ describe('record_consultation_response — L1 force (S-A3/S-A4)', () => {
       { data: { id: 'cons1', gate_record_id: GATE, consulted_user_id: CONS, response: 'pending' }, error: null },
       { data: awaitingGate, error: null },
       { data: { id: 'cons1', response: 'approved' }, error: null },        // consultation update
+      { data: null, error: null },                                         // G6 condition auto-resolve
       { data: l1Cycle(), error: null },                                    // cycle
       { data: { display_name: 'Consulted Person' }, error: null },         // responder
       { data: [
@@ -244,6 +246,7 @@ describe('record_consultation_response — L1 force (S-A3/S-A4)', () => {
           { approver_user_id: DOL, approval_type: 'trio_member' }
         ], error: null },                                                  // approvals
       { data: [ { consulted_user_id: CONS, response: 'approved' } ], error: null }, // consultations
+      { data: [], error: null },                                           // open conditions (G6) — none
       // transition
       { data: { ...awaitingGate, gate_status: 'approved' }, error: null },
       { data: null, error: null },                                         // milestone

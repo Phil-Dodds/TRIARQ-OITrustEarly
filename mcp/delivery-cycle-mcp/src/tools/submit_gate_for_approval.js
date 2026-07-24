@@ -600,6 +600,24 @@ async function submit_gate_for_approval(params, caller_user_id) {
       event_metadata:    { gate_name }
     });
 
+  // ── Contract G6 (D-565): the submission note opens the gate thread ─────────
+  // Message #1 on every submission that carries a note (AC #1). Non-fatal.
+  if (submission_note) {
+    const { error: threadErr } = await supabase
+      .from('gate_thread_messages')
+      .insert({
+        gate_record_id: gate_record.gate_record_id,
+        user_id:        caller_user_id,
+        message_text:   submission_note
+      });
+    if (threadErr) {
+      console.error(JSON.stringify({
+        tool_name: 'submit_gate_for_approval', step: 'thread_opening_message',
+        gate_record_id: gate_record.gate_record_id, error: threadErr.message
+      }));
+    }
+  }
+
   // ── WS2 (D-459/D-460) + G4 (D-564): derive Consulted set and create
   // consultation rows. Set = non-null trio + active participation C stakes
   // (groups expanded to members), deduplicated. Submitter row auto-approved
