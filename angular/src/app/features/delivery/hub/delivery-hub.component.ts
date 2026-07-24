@@ -39,7 +39,7 @@ interface HubCard {
   id?:         'all-initiatives' | 'epo-summary' | 'epo-schedule' | 'epo-deploy'
             |  'workstream-summary' | 'gate-schedule' | 'deploy-schedule'
             |  'initiative-activity' | 'gates-approved' | 'status-dashboard'
-            |  'ai-governance';
+            |  'ai-governance' | 'following';
 }
 
 /** Spec §4 headline color semantics. */
