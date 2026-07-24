@@ -156,6 +156,12 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
              [routerLink]="['/initiatives', item.delivery_cycle_id]"
              [queryParams]="{ gate: item.gate_name, returnTo: returnTo }"
              [title]="item.submission_note">“{{ item.submission_note }}”</a>
+          <!-- Contract G7 (D-565 item 4): the single waiting-on line, rolled
+               up to queues — identical string to the gate panel. -->
+          <span *ngIf="item.waiting_on"
+                style="display:block;font-size:11px;font-style:italic;color:#5A5A5A;">
+            {{ item.waiting_on.line }}
+          </span>
         </span>
         <span class="ga-muted">{{ item.division_display_name_short }}</span>
         <!-- Submitted: when + who, stacked. -->

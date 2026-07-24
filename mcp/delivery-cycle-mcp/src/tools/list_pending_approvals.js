@@ -15,6 +15,8 @@
 'use strict';
 
 const { supabase } = require('../db');
+// Contract G7 (D-565): single waiting-on computation source.
+const { computeWaitingOnBatch } = require('../lib/waiting-on');
 
 const GATE_NAME_DISPLAY = {
   brief_review:  'Brief Review',
@@ -192,7 +194,7 @@ async function list_pending_approvals(_params, caller_user_id) {
   // Resolve submitter + approver display names from one users lookup.
   const { data: cycles } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, tier_classification, division_id, workstream_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
+    .select('delivery_cycle_id, cycle_title, tier_classification, division_id, workstream_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, baseline_level, set_level')
     .in('delivery_cycle_id', cycleIds)
     .is('deleted_at', null);
 
@@ -237,6 +239,11 @@ async function list_pending_approvals(_params, caller_user_id) {
   (workstreams || []).forEach(w => { workstreamMap[w.workstream_id] = w; });
   (submitters  || []).forEach(u => { userNameMap[u.id] = u.display_name; });
 
+  // ── Contract G7 (D-565): waiting-on line per awaiting gate ────────────────
+  const cyclesByIdForWaiting = {};
+  (cycles || []).forEach(c => { cyclesByIdForWaiting[c.delivery_cycle_id] = c; });
+  const waitingOnByGate = await computeWaitingOnBatch(gates, cyclesByIdForWaiting);
+
   // ── Assemble response items ──────────────────────────────────────────────
   // Drop gates whose cycle is missing (soft-deleted initiative). cycleMap is
   // built from delivery_cycles filtered to deleted_at IS NULL, so a missing
@@ -278,7 +285,9 @@ async function list_pending_approvals(_params, caller_user_id) {
       assigned_epo_display_name:     c.assigned_epo_user_id ? (userNameMap[c.assigned_epo_user_id] ?? null) : null,
       assigned_dol_display_name:     c.assigned_dol_user_id ? (userNameMap[c.assigned_dol_user_id] ?? null) : null,
       // WS1.2 (D-468): Consulted summary — omitted when both counts are zero.
-      ...(cs && (cs.pending_count > 0 || cs.declined_count > 0) ? { consulted_summary: cs } : {})
+      ...(cs && (cs.pending_count > 0 || cs.declined_count > 0) ? { consulted_summary: cs } : {}),
+      // G7 (D-565): the single waiting-on line for queue rollups.
+      ...(waitingOnByGate[g.gate_record_id] ? { waiting_on: waitingOnByGate[g.gate_record_id] } : {})
     };
   });
 

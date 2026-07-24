@@ -49,7 +49,7 @@ import { GateConsultationSectionComponent } from './gate-consultation-section.co
 import { GateThreadConditionsComponent } from './gate-thread-conditions.component';
 // Contract G3 (D-567/D-558): sizing interstitial + Go to Build confirm step.
 import { InitiativeSizingFormComponent, SizingFormPayload } from '../sizing-form/initiative-sizing-form.component';
-import { GATE_COACHING_SHORT } from '../../../shared/constants/gate-coaching.constants';
+import { GATE_COACHING_SHORT, GATE_PURPOSES } from '../../../shared/constants/gate-coaching.constants';
 import {
   DeliveryCycle,
   GateName,
@@ -340,11 +340,16 @@ const GATE_LABELS: Record<GateName, string> = {
             </button>
           </ng-container>
 
-          <!-- Contract G5 (D-557): L1 interim waiting list ("Waiting on: [names]"
-               until G7's rolled-up line). -->
-          <div *ngIf="record?.gate_status === 'awaiting_approval' && record?.l1_waiting_on"
+          <!-- Contract G7 (D-565 item 4): THE waiting-on line — identical on
+               every surface (computed once, server-side). -->
+          <div *ngIf="record?.gate_status === 'awaiting_approval' && (record?.waiting_on || record?.l1_waiting_on)"
                class="grm-meta">
-            Waiting on: {{ l1WaitingLine }}
+            {{ record?.waiting_on?.line ?? ('Waiting on: ' + l1WaitingLine) }}
+          </div>
+          <!-- G7 (AC #3): trio roster per party on L1 gates. -->
+          <div *ngIf="record?.gate_status === 'awaiting_approval' && record?.l1_waiting_on?.approved_trio_display_names?.length"
+               class="grm-meta">
+            Trio approved: {{ record!.l1_waiting_on!.approved_trio_display_names!.join(', ') }}
           </div>
 
           <!-- awaiting_approval (Approver viewing) — Approve + Return -->
@@ -416,6 +421,17 @@ const GATE_LABELS: Record<GateName, string> = {
                   ? 'Approving records your Level 1 approval. The gate passes — and the Initiative advances — the moment the last collected party approves.'
                   : 'Approving this gate will advance the Initiative. This cannot be undone without a stage regression.' }}
             </div>
+            <!-- G7 (D-555/D-565 item 5): rotating purposes reminder + one note. -->
+            <div style="margin:6px 0;padding:6px 10px;border-left:3px solid #B9C4CE;
+                        font:italic 11px Roboto,sans-serif;color:#5A5A5A;">
+              {{ approvalPurposeReminder }}
+            </div>
+            <input type="text" maxlength="500"
+                   placeholder="Approver note (optional)"
+                   [(ngModel)]="approveNoteDraft" [ngModelOptions]="{standalone: true}"
+                   [disabled]="processing"
+                   style="width:100%;border:1px solid #B9C4CE;border-radius:5px;
+                          padding:6px 10px;font:400 12px Roboto,sans-serif;margin-bottom:8px;" />
             <div class="grm-action-row">
               <button class="grm-btn-primary"
                       type="button"
@@ -877,6 +893,17 @@ export class GateRecordModalComponent {
   submittedApprover: { id: string; display_name: string | null } | null = null;
   /** D-489: "Why is this gate ready?" draft — sent with submit, trimmed to null server-side. */
   submissionNoteDraft = '';
+  /** G7 (D-565 item 5): the one approver note field on the approve confirm. */
+  approveNoteDraft = '';
+
+  /** G7 (D-555): one of the four purposes, rotated daily per gate — subtle
+   *  rotation against habituation (D-527 architecture). */
+  get approvalPurposeReminder(): string {
+    const day = Math.floor(Date.now() / 86400000);
+    const gateIdx = ['brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review']
+      .indexOf(this.data.gateName);
+    return GATE_PURPOSES[(day + Math.max(gateIdx, 0)) % GATE_PURPOSES.length];
+  }
   processing      = false;
   processingAction:
     | 'submit'
@@ -1424,10 +1451,13 @@ export class GateRecordModalComponent {
   onApproveConfirm(): void {
     this.startProcessing('approve');
 
+    const note = this.approveNoteDraft.trim();
     this.delivery.recordGateDecision({
       delivery_cycle_id: this.data.cycle.delivery_cycle_id,
       gate_name:         this.data.gateName,
-      decision:          'approved'
+      decision:          'approved',
+      // G7 (D-565 item 5): the one approver note field.
+      ...(note ? { approver_notes: note } : {})
     }).subscribe({
       next: (res) => {
         if (res.success) {

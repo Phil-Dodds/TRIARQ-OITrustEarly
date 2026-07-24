@@ -40,6 +40,16 @@ export const GATE_COACHING_FULL: Record<string, string> = {
     'The Outcome is accomplished and reviewed with exec. The initiative closes.',
 };
 
+/** Contract G7 (D-555/D-565 item 5, via the D-527 coaching architecture):
+ *  the four gate purposes — short rotating reminder text at the approval
+ *  action. Subtle rotation (one at a time) guards against habituation. */
+export const GATE_PURPOSES: string[] = [
+  'Teamwork verification — this gate confirms the trio is genuinely aligned.',
+  'Craft development — the approver acts as coach and inspector; this is where the organization teaches what good looks like.',
+  'Stakeholder awareness with teeth — parties outside the trio follow along, question, and can genuinely stop passage.',
+  'Routing judgment — catching what this Initiative needs that nobody realized yet.',
+];
+
 /** Outcome definition — Initiative Guide Outcome section. */
 export const OUTCOME_COACHING =
   'An Outcome is a business or operational result, not usually a technical one. What are the ' +

@@ -25,6 +25,8 @@
 'use strict';
 
 const { supabase } = require('../db');
+// Contract G7 (D-565): single waiting-on computation source.
+const { computeWaitingOnBatch } = require('../lib/waiting-on');
 
 /**
  * @param {object} params
@@ -225,7 +227,8 @@ async function list_delivery_cycles(params, caller_user_id) {
   if (cycleIds.length > 0) {
     const { data: gateRows } = await supabase
       .from('gate_records')
-      .select('gate_name, gate_status, delivery_cycle_id, approver_user_id, submitted_at, submitted_by_user_id, created_at')
+      // G7: gate_record_id added for the waiting-on batch computation key.
+      .select('gate_record_id, gate_name, gate_status, delivery_cycle_id, approver_user_id, submitted_at, submitted_by_user_id, created_at')
       .in('delivery_cycle_id', cycleIds)
       .is('deleted_at', null);
     if (gateRows) {
@@ -298,8 +301,23 @@ async function list_delivery_cycles(params, caller_user_id) {
     (themeRows || []).forEach(t => { themeMap[t.id] = t.name; });
   }
 
+  // ── Contract G7 (D-565 item 4): waiting-on rolled up to the list rows.
+  // One computation source; a row carries its awaiting gate's line.
+  const allGateRows = Object.values(gateRecordsMap).flat();
+  const cyclesByIdForWaiting = {};
+  cycles.forEach(c => { cyclesByIdForWaiting[c.delivery_cycle_id] = c; });
+  const waitingOnByGate = await computeWaitingOnBatch(allGateRows, cyclesByIdForWaiting);
+  const waitingOnByCycle = {};
+  for (const g of allGateRows) {
+    if (waitingOnByGate[g.gate_record_id] && !waitingOnByCycle[g.delivery_cycle_id]) {
+      waitingOnByCycle[g.delivery_cycle_id] = waitingOnByGate[g.gate_record_id];
+    }
+  }
+
   const enriched = cycles.map(c => ({
     ...c,
+    // G7: null when no gate is awaiting approval on this Initiative.
+    waiting_on: waitingOnByCycle[c.delivery_cycle_id] ?? null,
     roadmap_theme_name:        c.roadmap_theme_id ? (themeMap[c.roadmap_theme_id] ?? null) : null,
     assigned_dcs_display_name: c.assigned_dcs_user_id ? (userMap[c.assigned_dcs_user_id] ?? null) : null,
     assigned_epo_display_name: c.assigned_epo_user_id ? (userMap[c.assigned_epo_user_id] ?? null) : null,

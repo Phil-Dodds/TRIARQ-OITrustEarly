@@ -10,6 +10,8 @@
 'use strict';
 
 const { supabase } = require('../db');
+// Contract G7 (D-565): single waiting-on computation source.
+const { computeWaitingOnBatch } = require('../lib/waiting-on');
 
 /**
  * @param {object} params
@@ -235,12 +237,15 @@ async function get_delivery_cycle(params, caller_user_id) {
           .map(a => a.approver_user_id)
       );
       const pendingTrio = trioIds.filter(id => !approvedSet.has(id));
+      const approvedTrio = trioIds.filter(id => approvedSet.has(id));
       const pendingConsulted = (consultRows || [])
         .filter(c => c.gate_record_id === gid &&
           !trioIds.includes(c.consulted_user_id) && c.response === 'pending');
       l1WaitingByGate[gid] = {
         pending_trio_user_ids:       pendingTrio,
         pending_trio_display_names:  pendingTrio.map(id => trioNameMap[id] || 'Unknown'),
+        // G7 (AC #3): approved side of the trio roster.
+        approved_trio_display_names: approvedTrio.map(id => trioNameMap[id] || 'Unknown'),
         pending_consulted_count:     pendingConsulted.length,
         caller_has_approved:         approvedSet.has(caller_user_id)
       };
@@ -281,6 +286,17 @@ async function get_delivery_cycle(params, caller_user_id) {
       }
     };
   });
+
+  // ── Contract G7 (D-565 item 4): the single waiting-on line per awaiting gate.
+  const waitingOnByGate = await computeWaitingOnBatch(
+    enrichedGateRecords,
+    { [cycle.delivery_cycle_id]: cycle }
+  );
+  for (const gr of enrichedGateRecords) {
+    if (waitingOnByGate[gr.gate_record_id]) {
+      gr.waiting_on = waitingOnByGate[gr.gate_record_id];
+    }
+  }
 
   // D-487: resolve Roadmap Theme name (nullable tag).
   let roadmap_theme_name = null;
