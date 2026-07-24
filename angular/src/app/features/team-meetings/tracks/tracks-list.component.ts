@@ -396,6 +396,11 @@ export class TracksListComponent implements OnInit {
     this.newForm.reset({ track_name: '', is_public: false, invites: '' });
     this.selectedTemplateKey = 'team';
     this.saveError    = '';
+    // Phil 2026-07-24: import state persisted across open/close — a stale
+    // draft's cadence/presenters would apply to the next series. Reset here.
+    this.importDraft  = null;
+    this.importError  = '';
+    this.dropActive   = false;
     this.showNewPanel = true;
   }
 
