@@ -196,15 +196,17 @@ async function resolveGateApproverV2({ cycle, gate_name }) {
     warnings.push('level3_sub_leadership_config_ignored');
   }
 
-  // L1 without oversight → legacy chain unchanged, dual-written (D-570a).
+  // L1 without oversight → consensus route (Contract G5 — D-570a RETIRED).
+  // approver_user_id NULL is the real state: the gate collects approvals from
+  // the trio + consulted parties instead of routing a single approver. No
+  // 'assigned' dual-write — trio_member rows are written as approvals arrive.
   if (effective_level === 1) {
-    const legacy = await resolveGateApprover({ division_id: cycle.division_id, gate_name });
     return {
-      approver_user_id: legacy.approver_user_id,
-      source: `legacy_${legacy.source}`,
+      approver_user_id: null,
+      source: 'l1_consensus',
       effective_level,
       warnings,
-      dual_write: true
+      dual_write: false
     };
   }
 

@@ -155,21 +155,15 @@ describe('resolveGateApproverV2 — Level 2 (D-557/D-561)', () => {
   });
 });
 
-describe('resolveGateApproverV2 — Level 1 transition (D-570a, S-C4)', () => {
-  test('L1 without oversight → legacy chain, dual-write ON (AC #6)', async () => {
-    queue = [
-      { data: { approver_user_id: CFG }, error: null },  // legacy: config
-      { data: { owner_user_id: DL }, error: null },      // legacy: division
-      { data: { id: PHIL }, error: null },               // legacy: phil
-      { data: { id: CFG }, error: null }                 // liveness
-    ];
+describe('resolveGateApproverV2 — Level 1 consensus (G5 retires D-570a; S-C4)', () => {
+  test('L1 without oversight → consensus route: NULL approver, no dual-write (G5)', async () => {
     const r = await resolveGateApproverV2({
       cycle: baseCycle({ baseline_level: 1 }), gate_name: 'brief_review'
     });
-    assert.equal(r.approver_user_id, CFG);
-    assert.equal(r.source, 'legacy_config');
+    assert.equal(r.approver_user_id, null);
+    assert.equal(r.source, 'l1_consensus');
     assert.equal(r.effective_level, 1);
-    assert.equal(r.dual_write, true);
+    assert.equal(r.dual_write, false);
   });
 
   test('L1 with oversight set → runs as L2: oversight person (S-C4)', async () => {
@@ -274,7 +268,7 @@ describe('F-1 regression (Checkpoint ruling 2) — decision param domain', () =>
     const fs = require('node:fs');
     const src = fs.readFileSync(require.resolve('../src/tools/record_gate_decision.js'), 'utf8');
     assert.ok(!/decision\s*===\s*'approve'/.test(src), "bare 'approve' comparison must not return");
-    assert.match(src, /decision\s*===\s*'approved'/);
+    assert.match(src, /decision\s*===\s*'returned'/);
   });
 });
 

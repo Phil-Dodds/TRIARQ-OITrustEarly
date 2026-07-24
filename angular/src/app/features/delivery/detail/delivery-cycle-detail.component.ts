@@ -3742,9 +3742,9 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   }
 
   get levelChipTooltip(): string {
-    // G3 transition state: L1 still routes the standard approver until G5.
+    // G5: the G3 interim "coming release" line is retired — L1 consensus is live.
     if (this.effectiveGovernanceLevel === 1) {
-      return 'Trio self-governance arrives with a coming release; until then this gate uses the standard approver.';
+      return 'Level 1 — the Initiative trio and consulted parties approve gates together.';
     }
     return this.levelAttributionLine || 'Governance level derived from the sizing answers.';
   }

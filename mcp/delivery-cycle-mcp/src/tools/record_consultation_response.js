@@ -18,6 +18,9 @@ const { supabase }                  = require('../db');
 const { getPhil }                   = require('./helpers/phil');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
 const { GATE_NAME_DISPLAY } = require('./helpers/gates');
+// Contract G5 (D-557): L1 consensus — consulted responses carry gate force.
+const { isL1ConsensusGate, trioIdsOf, getL1CollectedState, clearGateApprovals } = require('./helpers/l1-consensus');
+const { applyGateApprovalTransition } = require('./record_gate_decision');
 
 const VALID_RESPONSES = ['approved', 'declined', 'declined_post_approval'];
 
@@ -96,6 +99,105 @@ async function record_consultation_response(params, caller_user_id) {
   }
 
   const gateNameDisplay = GATE_NAME_DISPLAY[gate_record.gate_name] ?? gate_record.gate_name;
+
+  // ── Contract G5 (D-557): Level 1 consensus hooks ───────────────────────────
+  // On an awaiting L1 gate a consulted response carries gate force:
+  //   - declined → returns the gate ENTIRELY (S-A4 — consulted return = trio
+  //     return semantics); all collected approvals cleared (ruling 1).
+  //   - approved → the gate passes the instant this was the last collected
+  //     party (AC #6) via the shared approval transition.
+  if (gate_record.gate_status === 'awaiting_approval') {
+    const { data: cycle } = await supabase
+      .from('delivery_cycles')
+      .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, workstream_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, baseline_level, set_level')
+      .eq('delivery_cycle_id', gate_record.delivery_cycle_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (cycle && isL1ConsensusGate(cycle, gate_record)) {
+      const { data: responder } = await supabase
+        .from('users')
+        .select('display_name')
+        .eq('id', caller_user_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      const responderName = responder?.display_name ?? 'A consulted party';
+
+      if (response === 'declined') {
+        const { error: returnErr } = await supabase
+          .from('gate_records')
+          .update({
+            gate_status:          'returned',
+            approver_decision_at: new Date().toISOString(),
+            approver_notes:       notes ?? null
+          })
+          .eq('gate_record_id', gate_record.gate_record_id);
+        if (returnErr) {
+          return { success: false, error: `Response recorded but the gate return failed: ${returnErr.message}` };
+        }
+
+        const { data: returnEvent } = await supabase
+          .from('cycle_event_log')
+          .insert({
+            delivery_cycle_id: gate_record.delivery_cycle_id,
+            event_type:        'gate_returned',
+            event_description: `${responderName} declined their consultation on ${gateNameDisplay} — Level 1 consulted return returns the gate entirely (S-A4).`,
+            actor_user_id:     caller_user_id,
+            event_metadata:    { gate_name: gate_record.gate_name, l1_consensus: true, consulted_return: true }
+          })
+          .select('event_id')
+          .single();
+
+        await clearGateApprovals(gate_record.gate_record_id, returnEvent?.event_id ?? null);
+
+        // S-A2/S-A4: trio notified.
+        const trioIds = trioIdsOf(cycle).filter(id => id !== caller_user_id);
+        if (trioIds.length > 0) {
+          const { data: trioRows } = await supabase
+            .from('users')
+            .select('id, display_name, email')
+            .in('id', trioIds)
+            .is('deleted_at', null);
+          const recipients = (trioRows || []).filter(u => u.email)
+            .map(u => ({ email: u.email, display_name: u.display_name }));
+          if (recipients.length > 0) {
+            await sendGateNotificationEmail({
+              recipients,
+              subject:          `${cycle.cycle_title} — ${gateNameDisplay} returned by a consulted party`,
+              initiativeName:   cycle.cycle_title,
+              gateNameDisplay,
+              contextParagraph: `${responderName} declined their consultation on ${gateNameDisplay} for ` +
+                                `${cycle.cycle_title}. At Level 1 a consulted return returns the gate entirely — ` +
+                                `all collected approvals were cleared.${notes?.trim() ? ` Notes: ${notes.trim()}` : ''}`,
+              delivery_cycle_id: gate_record.delivery_cycle_id,
+              email_type:        'l1_gate_returned'
+            });
+          }
+        }
+
+        return { success: true, data: { ...updated, l1_gate_returned: true } };
+      }
+
+      if (response === 'approved') {
+        const state = await getL1CollectedState(gate_record.gate_record_id, cycle);
+        if (!state.error && state.allCollected) {
+          const transition = await applyGateApprovalTransition({
+            delivery_cycle_id: gate_record.delivery_cycle_id,
+            gate_name:         gate_record.gate_name,
+            gate_record, cycle,
+            actor_user_id:     caller_user_id,
+            actorDisplayName:  responderName,
+            approver_user_id_for_record: null,
+            approver_notes:    null
+          });
+          if (transition.error) {
+            return { success: false, error: `Response recorded but the gate approval failed: ${transition.error}` };
+          }
+          return { success: true, data: { ...updated, l1_gate_approved: true, ...transition.data } };
+        }
+      }
+    }
+  }
 
   // ── WS4 (D-466): post-approval decline email to approver + Phil ───────────
   if (response === 'declined_post_approval') {

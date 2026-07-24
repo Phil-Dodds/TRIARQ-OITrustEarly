@@ -40,6 +40,8 @@ const { computeArtifactSuggestionWarnings } = require('./helpers/artifact-warnin
 // Contract G2: effective-level-aware resolution (D-557/D-570) + shared
 // board-trigger helper (CC-G1-18 executed).
 const { resolveGateApproverV2, recordAssignedDualWrite } = require('./helpers/approver');
+// Contract G5 (S-A1): submitter auto-approval on L1 consensus gates.
+const { recordTrioApproval } = require('./helpers/l1-consensus');
 const { isBoardTriggeredGate } = require('./helpers/board-trigger');
 // Contract G4 (D-564): Consulted set now derives from participation_records
 // (trio + C stakes with group expansion) — the D-458 array is retired.
@@ -332,6 +334,31 @@ async function submit_gate_for_approval(params, caller_user_id) {
     return { success: false, error: message };
   };
 
+  // ── Contract G5 (D-557): Level 1 assignment floor ──────────────────────────
+  // L1-consensus gates (effective level 1, no oversight promotion) collect
+  // trio approvals — the trio must exist. Brief Review requires DCS + DOL
+  // (absolute at L1 — the Division dol_required exemption applies to the
+  // single-approver routes only, CC-G5 lean); Go to Build onward requires the
+  // full trio. D-140 message names the missing role.
+  {
+    const l1Consensus = ((cycle.set_level ?? cycle.baseline_level) === 1) && !cycle.oversight_user_id;
+    if (l1Consensus) {
+      const missing = [];
+      if (!cycle.assigned_dcs_user_id) { missing.push('Domain Capability Strategist'); }
+      if (!cycle.assigned_dol_user_id) { missing.push('Domain Outcome Lead'); }
+      if (gate_name !== 'brief_review' && !cycle.assigned_epo_user_id) {
+        missing.push('Engineering Product Owner');
+      }
+      if (missing.length > 0) {
+        return blockGate('l1_assignment_floor',
+          `Cannot submit ${gateNameDisplay} — this Level 1 gate collects approvals from the ` +
+          `Initiative trio, and the following role${missing.length === 1 ? ' is' : 's are'} ` +
+          `unassigned: ${missing.join(', ')}. Assign the missing role${missing.length === 1 ? '' : 's'} ` +
+          'in the Initiative edit panel, then submit again.');
+      }
+    }
+  }
+
   if (gate_name === 'go_to_build') {
     // Context Brief attached — hard stop (Phil 2026-07-17).
     const { data: cbType } = await supabase
@@ -539,6 +566,27 @@ async function submit_gate_for_approval(params, caller_user_id) {
         delivery_cycle_id, gate_record_id: gate_record.gate_record_id,
         error: dualWrite.error
       }));
+    }
+  }
+
+  // ── Contract G5 (S-A1): L1 consensus — submitter approval auto-recorded ────
+  // Only when the submitter is a trio member (an Admin submitting on behalf is
+  // not a collected party — CC-G5 lean). Uncleared-dup-guarded, so a
+  // re-submission after return restarts collection cleanly.
+  if (resolution.source === 'l1_consensus') {
+    const trioIds = [cycle.assigned_dcs_user_id, cycle.assigned_epo_user_id, cycle.assigned_dol_user_id]
+      .filter(Boolean);
+    if (trioIds.includes(caller_user_id)) {
+      const auto = await recordTrioApproval(gate_record.gate_record_id, caller_user_id);
+      if (auto.recorded) {
+        await supabase.from('cycle_event_log').insert({
+          delivery_cycle_id,
+          event_type:        'gate_trio_approved',
+          event_description: `${callerDisplayName} submitted ${gateNameDisplay} — submitter approval auto-recorded (Level 1).`,
+          actor_user_id:     caller_user_id,
+          event_metadata:    { gate_name, l1_consensus: true, auto_recorded: true }
+        });
+      }
     }
   }
 

@@ -94,10 +94,58 @@ async function list_pending_approvals(_params, caller_user_id) {
     consultedGates = cg || [];
   }
 
+  // ── Contract G5 (D-557): trio-member approval items on L1 consensus gates ──
+  // Awaiting L1 gates (approver_user_id NULL + effective level 1) where the
+  // caller is an assigned trio member and has not yet recorded an uncleared
+  // trio_member approval. Queue item type 'trio_member_approval'.
+  const { data: myTrioCycles } = await supabase
+    .from('delivery_cycles')
+    .select('delivery_cycle_id, baseline_level, set_level')
+    .or(`assigned_dcs_user_id.eq.${caller_user_id},assigned_epo_user_id.eq.${caller_user_id},assigned_dol_user_id.eq.${caller_user_id}`)
+    .is('deleted_at', null);
+  const l1CycleIds = (myTrioCycles || [])
+    .filter(c => (c.set_level ?? c.baseline_level) === 1)
+    .map(c => c.delivery_cycle_id);
+
+  let trioGates = [];
+  if (l1CycleIds.length > 0) {
+    const { data: tg, error: tgErr } = await supabase
+      .from('gate_records')
+      .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at, submitted_by_user_id, approver_user_id, approver_decision_at, created_at, submission_note')
+      .in('delivery_cycle_id', l1CycleIds)
+      .eq('gate_status', 'awaiting_approval')
+      .is('approver_user_id', null)
+      .is('deleted_at', null);
+    if (tgErr) {
+      return { success: false, error: `Failed to list trio-member approvals: ${tgErr.message}` };
+    }
+    const candidateIds = (tg || []).map(g => g.gate_record_id);
+    let actedIds = new Set();
+    if (candidateIds.length > 0) {
+      const { data: myApprovals } = await supabase
+        .from('gate_approvals')
+        .select('gate_record_id')
+        .in('gate_record_id', candidateIds)
+        .eq('approver_user_id', caller_user_id)
+        .eq('approval_type', 'trio_member')
+        .is('cleared_by_return_at', null);
+      actedIds = new Set((myApprovals || []).map(a => a.gate_record_id));
+    }
+    trioGates = (tg || []).filter(g => !actedIds.has(g.gate_record_id));
+  }
+  const trioGateIds = new Set(trioGates.map(g => g.gate_record_id));
+
   // Tag with item_type before enrichment (D-468 — Angular reads item_type + gate_status).
+  // Trio-member typing wins over the admin null-approver fallback and over a
+  // pending consulted row on the same gate (the trio approval IS the action).
   const gates = [
-    ...(accountableGates || []).map(g => ({ ...g, item_type: 'accountable' })),
-    ...consultedGates.map(g => ({ ...g, item_type: 'consulted' }))
+    ...(accountableGates || [])
+      .filter(g => !trioGateIds.has(g.gate_record_id))
+      .map(g => ({ ...g, item_type: 'accountable' })),
+    ...consultedGates
+      .filter(g => !trioGateIds.has(g.gate_record_id))
+      .map(g => ({ ...g, item_type: 'consulted' })),
+    ...trioGates.map(g => ({ ...g, item_type: 'trio_member_approval' }))
   ];
 
   if (gates.length === 0) {

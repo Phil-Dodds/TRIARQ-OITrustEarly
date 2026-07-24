@@ -41,6 +41,11 @@ const { computeArtifactSuggestionWarnings } = require('./helpers/artifact-warnin
 // Contract 29 WS3 (D-465): Phil super-approver override side-effects.
 const { getPhil } = require('./helpers/phil');
 const { upsertDisplacedApproverConsultation, deriveInformedUserIds } = require('./helpers/consultations');
+// Contract G5 (D-557): Level 1 consensus mechanics.
+const {
+  isL1ConsensusGate, trioIdsOf, getL1CollectedState,
+  recordTrioApproval, clearGateApprovals
+} = require('./helpers/l1-consensus');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 // D-400: gates whose approval transitions a cycle INTO a counted WIP zone.
@@ -136,9 +141,10 @@ async function record_gate_decision(params, caller_user_id) {
 
   // ── Fetch cycle ───────────────────────────────────────────────────────────
   // assigned_epo_user_id added Contract 20 for EPO WIP check (D-400).
+  // G5: trio + governance level columns for L1 consensus routing (D-557).
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, workstream_id, assigned_epo_user_id')
+    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, workstream_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, baseline_level, set_level')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -169,6 +175,138 @@ async function record_gate_decision(params, caller_user_id) {
   // When no approver configured, any Admin can approve (Build C default).
   const approverUnconfigured = !gate_record.approver_user_id;
 
+  // ── Contract G5 (D-557): Level 1 consensus route ───────────────────────────
+  // L1 gates awaiting approval collect trio + consulted approvals instead of a
+  // single approver decision. D-570a is retired — approver_user_id NULL is the
+  // real L1 state; any single return by any collected party returns the gate
+  // entirely (Checkpoint ruling 1 clearing semantics).
+  if (gate_record.gate_status === 'awaiting_approval' && isL1ConsensusGate(cycle, gate_record)) {
+    const trioIds      = trioIdsOf(cycle);
+    const isTrioMember = trioIds.includes(caller_user_id);
+    if (!isTrioMember && !isAdmin) {
+      return {
+        success: false,
+        error: 'This Level 1 gate collects approvals from the Initiative trio (Domain Capability ' +
+               'Strategist, Engineering Product Owner, Domain Outcome Lead) and its consulted ' +
+               'parties. Only a trio member or an Admin can act on it.'
+      };
+    }
+
+    if (decision === 'returned') {
+      const { data: returnedGate, error: returnErr } = await supabase
+        .from('gate_records')
+        .update({
+          gate_status:          'returned',
+          approver_decision_at: new Date().toISOString(),
+          approver_notes:       approver_notes || null
+          // approver_user_id stays NULL — L1 has no single approver.
+        })
+        .eq('gate_record_id', gate_record.gate_record_id)
+        .select()
+        .single();
+      if (returnErr) {
+        return { success: false, error: `Failed to return gate: ${returnErr.message}` };
+      }
+
+      const { data: returnEvent } = await supabase
+        .from('cycle_event_log')
+        .insert({
+          delivery_cycle_id,
+          event_type:        'gate_returned',
+          event_description: `${callerDisplayName} returned ${gateNameDisplay} — Level 1 return clears all collected approvals (S-A2).`,
+          actor_user_id:     caller_user_id,
+          event_metadata:    { gate_name, l1_consensus: true }
+        })
+        .select('event_id')
+        .single();
+
+      const cleared = await clearGateApprovals(gate_record.gate_record_id, returnEvent?.event_id ?? null);
+      if (cleared.error) {
+        console.error(JSON.stringify({
+          tool_name: 'record_gate_decision', step: 'l1_clear_approvals',
+          gate_record_id: gate_record.gate_record_id, error: cleared.error
+        }));
+      }
+
+      // S-A2: trio notified (the returner excluded).
+      const notifyIds = trioIds.filter(id => id !== caller_user_id);
+      if (notifyIds.length > 0) {
+        const { data: trioRows } = await supabase
+          .from('users')
+          .select('id, display_name, email')
+          .in('id', notifyIds)
+          .is('deleted_at', null);
+        const recipients = (trioRows || []).filter(u => u.email)
+          .map(u => ({ email: u.email, display_name: u.display_name }));
+        if (recipients.length > 0) {
+          await sendGateNotificationEmail({
+            recipients,
+            subject:          `${cycle.cycle_title} — ${gateNameDisplay} returned`,
+            initiativeName:   cycle.cycle_title,
+            gateNameDisplay,
+            contextParagraph: `${callerDisplayName} returned ${gateNameDisplay} for ${cycle.cycle_title}. ` +
+                              `All collected approvals were cleared — the gate restarts on re-submission. ` +
+                              `Return note: ${approver_notes?.trim() ?? '(none)'}`,
+            delivery_cycle_id,
+            email_type:       'l1_gate_returned'
+          });
+        }
+      }
+
+      return { success: true, data: { gate_record: returnedGate, stage_advanced: false, l1_consensus: true } };
+    }
+
+    // decision === 'approved': record this trio-member approval; finalize only
+    // when the collection completes (AC #6).
+    const rec = await recordTrioApproval(gate_record.gate_record_id, caller_user_id);
+    if (rec.error) {
+      return { success: false, error: `Failed to record approval: ${rec.error}` };
+    }
+    if (rec.duplicate) {
+      return { success: false, error: 'You have already approved this gate — waiting on the remaining collected parties.' };
+    }
+
+    await supabase.from('cycle_event_log').insert({
+      delivery_cycle_id,
+      event_type:        'gate_trio_approved',
+      event_description: `${callerDisplayName} approved ${gateNameDisplay} (Level 1 trio approval).`,
+      actor_user_id:     caller_user_id,
+      event_metadata:    { gate_name, l1_consensus: true }
+    });
+
+    const state = await getL1CollectedState(gate_record.gate_record_id, cycle);
+    if (state.error) {
+      return { success: false, error: state.error };
+    }
+
+    if (!state.allCollected) {
+      return {
+        success: true,
+        data: {
+          gate_record:   { ...gate_record, gate_status: 'awaiting_approval' },
+          stage_advanced: false,
+          l1_consensus:  true,
+          l1_pending: {
+            pending_trio_user_ids:      state.pendingTrioIds,
+            pending_consulted_user_ids: state.pendingConsultedIds
+          }
+        }
+      };
+    }
+
+    const transition = await applyGateApprovalTransition({
+      delivery_cycle_id, gate_name, gate_record, cycle,
+      actor_user_id: caller_user_id,
+      actorDisplayName: callerDisplayName,
+      approver_user_id_for_record: null,   // L1: no single approver (D-570a retired)
+      approver_notes: null
+    });
+    if (transition.error) {
+      return { success: false, error: transition.error };
+    }
+    return { success: true, data: { ...transition.data, l1_consensus: true, l1_completed: true } };
+  }
+
   if (!isAdmin && !isDesignatedApprover) {
     const reason = approverUnconfigured
       ? 'No approver has been configured for this gate — an Admin is the default approver.'
@@ -179,12 +317,91 @@ async function record_gate_decision(params, caller_user_id) {
     };
   }
 
-  // ── Record the gate decision ──────────────────────────────────────────────
+  // ── On return: record, append event, clear collected approvals, exit ──────
+  // D-345 §3.2: approver_notes lives on gate_record only — never duplicated
+  // into event log. G5 (Checkpoint ruling 1): a return clears the gate's
+  // collected gate_approvals rows (the G2 'assigned' dual-writes) — cleared,
+  // never deleted.
+  if (decision === 'returned') {
+    const { data: returned_gate, error: returnErr } = await supabase
+      .from('gate_records')
+      .update({
+        gate_status:          'returned',
+        approver_user_id:     caller_user_id,
+        approver_decision_at: new Date().toISOString(),
+        approver_notes:       approver_notes || null
+      })
+      .eq('gate_record_id', gate_record.gate_record_id)
+      .select()
+      .single();
+    if (returnErr) {
+      return { success: false, error: `Failed to record gate decision: ${returnErr.message}` };
+    }
+
+    const { data: returnEvent } = await supabase
+      .from('cycle_event_log')
+      .insert({
+        delivery_cycle_id,
+        event_type:        'gate_returned',
+        event_description: `${callerDisplayName} returned ${gateNameDisplay} for revision.`,
+        actor_user_id:     caller_user_id,
+        event_metadata:    { gate_name, approver_user_id: caller_user_id }
+      })
+      .select('event_id')
+      .single();
+
+    const cleared = await clearGateApprovals(gate_record.gate_record_id, returnEvent?.event_id ?? null);
+    if (cleared.error) {
+      console.error(JSON.stringify({
+        tool_name: 'record_gate_decision', step: 'clear_approvals_on_return',
+        gate_record_id: gate_record.gate_record_id, error: cleared.error
+      }));
+    }
+
+    return { success: true, data: { gate_record: returned_gate, stage_advanced: false } };
+  }
+
+  // ── Approved: shared approval transition (G5 extraction — also used by the
+  // L1 consensus route above and record_consultation_response's L1 last-piece).
+  const transition = await applyGateApprovalTransition({
+    delivery_cycle_id, gate_name, gate_record, cycle,
+    actor_user_id: caller_user_id,
+    actorDisplayName: callerDisplayName,
+    approver_user_id_for_record: caller_user_id,
+    approver_notes: approver_notes || null,
+    isPhil,
+    original_approver_user_id
+  });
+  if (transition.error) {
+    return { success: false, error: transition.error };
+  }
+  return { success: true, data: transition.data };
+}
+
+/**
+ * Contract G5 — the gate approval transition, extracted so the L1 consensus
+ * route (this tool) and record_consultation_response's L1 last-piece can run
+ * the identical machinery: gate update, milestone actual date, stage advance,
+ * events, Phil displaced-approver override (D-465), Informed notifications
+ * (G4), EPO WIP warning (D-400), artifact suggestion warnings (D-438).
+ * approver_user_id_for_record is NULL at L1 (D-570a retired).
+ * Returns { data } or { error }.
+ */
+async function applyGateApprovalTransition({
+  delivery_cycle_id, gate_name, gate_record, cycle,
+  actor_user_id, actorDisplayName,
+  approver_user_id_for_record, approver_notes,
+  isPhil = false, original_approver_user_id = null
+}) {
+  const caller_user_id    = actor_user_id;
+  const callerDisplayName = actorDisplayName;
+  const gateNameDisplay   = GATE_NAME_DISPLAY[gate_name] ?? gate_name;
+
   const { data: updated_gate, error: updateErr } = await supabase
     .from('gate_records')
     .update({
-      gate_status:          decision,
-      approver_user_id:     caller_user_id,
+      gate_status:          'approved',
+      approver_user_id:     approver_user_id_for_record,
       approver_decision_at: new Date().toISOString(),
       approver_notes:       approver_notes || null
     })
@@ -193,23 +410,7 @@ async function record_gate_decision(params, caller_user_id) {
     .single();
 
   if (updateErr) {
-    return { success: false, error: `Failed to record gate decision: ${updateErr.message}` };
-  }
-
-  // ── On return: append event and exit ─────────────────────────────────────
-  // D-345 §3.2: approver_notes lives on gate_record only — never duplicated into event log.
-  if (decision === 'returned') {
-    await supabase
-      .from('cycle_event_log')
-      .insert({
-        delivery_cycle_id,
-        event_type:        'gate_returned',
-        event_description: `${callerDisplayName} returned ${gateNameDisplay} for revision.`,
-        actor_user_id:     caller_user_id,
-        event_metadata:    { gate_name, approver_user_id: caller_user_id }
-      });
-
-    return { success: true, data: { gate_record: updated_gate, stage_advanced: false } };
+    return { error: `Failed to record gate decision: ${updateErr.message}` };
   }
 
   // ── On approval: record actual_date on milestone and advance stage ────────
@@ -346,7 +547,9 @@ async function record_gate_decision(params, caller_user_id) {
       const informedRecipients = (informedRows || []).filter(u => u.email && u.is_active !== false)
         .map(u => ({ email: u.email, display_name: u.display_name }));
       if (informedRecipients.length > 0) {
-        const decisionWord = decision === 'approved' ? 'approved' : 'returned';
+        // Inside the approval transition the decision is always 'approved'
+        // (returns exit before this function — G5 refactor).
+        const decisionWord = 'approved';
         await sendGateNotificationEmail({
           recipients:       informedRecipients,
           subject:          `${cycle.cycle_title} — ${gateNameDisplay} ${decisionWord}`,
@@ -390,17 +593,14 @@ async function record_gate_decision(params, caller_user_id) {
   // Shared computation lives in helpers/artifact-warnings (CC-24-07 follow-up).
   // Wire shape is artifact_type_name[] — preserves the Angular gate-record
   // modal contract. Approval status is unchanged regardless.
-  // Run 2 F-1 fix (Checkpoint 2026-07-23 ruling 2): the param domain is
-  // 'approved'|'returned' — the old `=== 'approve'` comparison never matched,
-  // so suggestion_warnings silently never computed on approval.
-  let suggestion_warnings = [];
-  if (decision === 'approved') {
-    const warningEntries = await computeArtifactSuggestionWarnings(delivery_cycle_id, gate_name);
-    suggestion_warnings = warningEntries.map(w => w.artifact_type_name);
-  }
+  // Run 2 F-1 fix (Checkpoint 2026-07-23 ruling 2): the old `=== 'approve'`
+  // comparison never matched the 'approved'|'returned' domain, so
+  // suggestion_warnings silently never computed on approval. Inside this
+  // transition the decision is always 'approved' — compute unconditionally.
+  const warningEntries = await computeArtifactSuggestionWarnings(delivery_cycle_id, gate_name);
+  const suggestion_warnings = warningEntries.map(w => w.artifact_type_name);
 
   return {
-    success: true,
     data: {
       gate_record:    updated_gate,
       stage_advanced,
@@ -513,4 +713,4 @@ function prevStageOf(target_stage) {
   return STAGE_SEQUENCE[idx - 1];
 }
 
-module.exports = { record_gate_decision };
+module.exports = { record_gate_decision, applyGateApprovalTransition };

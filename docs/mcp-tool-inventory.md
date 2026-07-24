@@ -253,6 +253,40 @@ attach automatically at creation (participation records, set_via
 
 ---
 
+## 1.9 Contract G5 — Level 1 consensus (modified tools)
+
+**`submit_gate_for_approval`** (modified — D-557/S-A1): L1-consensus gates
+(effective level 1, no oversight) enforce the assignment floor (DCS+DOL at
+Brief Review — absolute, overriding the Division DOL exemption; full trio from
+Go to Build on), resolve `approver_user_id` NULL (D-570a retired, no
+'assigned' dual-write), and auto-record the submitter's `trio_member` approval
+when the submitter is a trio member.
+
+**`record_gate_decision`** (modified — D-557): on an awaiting L1 gate, only a
+trio member or Admin may act. 'approved' records an uncleared-dup-guarded
+`trio_member` approval; the gate passes the instant the collection completes
+(all non-null trio + all non-trio consulted approved) via the shared
+`applyGateApprovalTransition` (exported for the consultation tool). 'returned'
+returns the gate entirely: approvals cleared (`cleared_by_return_at` +
+`cleared_by_event_id`, migration 085 — never deleted), trio notified. Normal
+single-approver returns also clear collected G2 'assigned' rows (ruling 1).
+
+**`record_consultation_response`** (modified — S-A3/S-A4): on an awaiting L1
+gate a consulted 'declined' returns the gate entirely (trio-return semantics);
+a consulted 'approved' that completes the collection passes the gate.
+
+**`list_pending_approvals`** (modified): new item_type `trio_member_approval`
+for awaiting L1 gates where the caller is an assigned trio member without an
+uncleared approval; wins typing over the admin null-approver fallback and over
+a pending consulted row on the same gate.
+
+**`get_delivery_cycle`** (modified): awaiting L1 gate records carry
+`l1_consensus: true` and `l1_waiting_on { pending_trio_user_ids,
+pending_trio_display_names, pending_consulted_count, caller_has_approved }`;
+`can_approve` extends to trio members who haven't approved yet.
+
+---
+
 ## 2. Pre-G1 tool inventory (names only)
 
 Authoritative runtime list: `GET /tools` on each service. Behavior: per-contract

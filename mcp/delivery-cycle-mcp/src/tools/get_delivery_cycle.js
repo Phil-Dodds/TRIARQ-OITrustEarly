@@ -198,31 +198,89 @@ async function get_delivery_cycle(params, caller_user_id) {
     (gateUserRows || []).forEach(u => { gateUserMap[u.id] = u.display_name; });
   }
 
-  const enrichedGateRecords = (gate_records || []).map(gr => ({
-    ...gr,
-    submitted_by_display_name: gr.submitted_by_user_id
-      ? (gateUserMap[gr.submitted_by_user_id] ?? null)
-      : null,
-    // Server-resolved Accountable approver name (fixes "Unknown user").
-    approver_display_name: gr.approver_user_id
-      ? (gateUserMap[gr.approver_user_id] ?? null)
-      : null,
-    current_user_gate_authority: {
-      // can_submit: caller has submit authority AND gate is not in a terminal
-      // or in-flight state. 'skipped' is terminal per D-447 — backdate via
-      // set_milestone_actual_date is the only path off skipped.
-      can_submit: callerCanSubmitAny &&
-        gr.gate_status !== 'approved' &&
-        gr.gate_status !== 'awaiting_approval' &&
-        gr.gate_status !== 'skipped',
-      // can_approve: caller is Phil, or caller is the designated approver_user_id, AND gate is awaiting
-      // When approver_user_id is null (Build C default), Phil is the fallback approver
-      can_approve: gr.gate_status === 'awaiting_approval' &&
-        (callerIsAdmin || gr.approver_user_id === caller_user_id),
-      // can_withdraw: caller has submit authority and gate is awaiting_approval (D-345 §4)
-      can_withdraw: callerCanSubmitAny && gr.gate_status === 'awaiting_approval'
+  // ── Contract G5 (D-557): L1 consensus gate flags + waiting-on interim ──────
+  // An awaiting L1 gate (effective level 1, NULL approver) collects trio +
+  // consulted approvals: trio members get can_approve; the gate panel shows a
+  // plain "Waiting on: [names]" list until G7's rolled-up line.
+  const effectiveLevel = cycle.set_level ?? cycle.baseline_level ?? null;
+  const trioIds = [cycle.assigned_dcs_user_id, cycle.assigned_epo_user_id, cycle.assigned_dol_user_id]
+    .filter(Boolean);
+  const isTrioMemberCaller = trioIds.includes(caller_user_id);
+  const l1AwaitingGateIds = (gate_records || [])
+    .filter(gr => effectiveLevel === 1 && !gr.approver_user_id && gr.gate_status === 'awaiting_approval')
+    .map(gr => gr.gate_record_id);
+
+  const l1WaitingByGate = {};
+  if (l1AwaitingGateIds.length > 0) {
+    const [{ data: approvalRows }, { data: consultRows }, { data: trioUsers }] = await Promise.all([
+      supabase.from('gate_approvals')
+        .select('gate_record_id, approver_user_id, approval_type')
+        .in('gate_record_id', l1AwaitingGateIds)
+        .is('cleared_by_return_at', null),
+      supabase.from('gate_consultations')
+        .select('gate_record_id, consulted_user_id, response')
+        .in('gate_record_id', l1AwaitingGateIds),
+      trioIds.length
+        ? supabase.from('users').select('id, display_name').in('id', trioIds)
+        : Promise.resolve({ data: [] })
+    ]);
+    const trioNameMap = {};
+    (trioUsers || []).forEach(u => { trioNameMap[u.id] = u.display_name; });
+
+    for (const gid of l1AwaitingGateIds) {
+      const approvedSet = new Set(
+        (approvalRows || [])
+          .filter(a => a.gate_record_id === gid &&
+            (a.approval_type === 'trio_member' || a.approval_type === 'ie_override'))
+          .map(a => a.approver_user_id)
+      );
+      const pendingTrio = trioIds.filter(id => !approvedSet.has(id));
+      const pendingConsulted = (consultRows || [])
+        .filter(c => c.gate_record_id === gid &&
+          !trioIds.includes(c.consulted_user_id) && c.response === 'pending');
+      l1WaitingByGate[gid] = {
+        pending_trio_user_ids:       pendingTrio,
+        pending_trio_display_names:  pendingTrio.map(id => trioNameMap[id] || 'Unknown'),
+        pending_consulted_count:     pendingConsulted.length,
+        caller_has_approved:         approvedSet.has(caller_user_id)
+      };
     }
-  }));
+  }
+
+  const enrichedGateRecords = (gate_records || []).map(gr => {
+    const isL1Gate = effectiveLevel === 1 && !gr.approver_user_id &&
+      (gr.gate_status === 'awaiting_approval' || gr.gate_status === 'pending' || gr.gate_status === 'returned' || gr.gate_status === 'not_started');
+    const l1Waiting = l1WaitingByGate[gr.gate_record_id] ?? null;
+    return {
+      ...gr,
+      submitted_by_display_name: gr.submitted_by_user_id
+        ? (gateUserMap[gr.submitted_by_user_id] ?? null)
+        : null,
+      // Server-resolved Accountable approver name (fixes "Unknown user").
+      approver_display_name: gr.approver_user_id
+        ? (gateUserMap[gr.approver_user_id] ?? null)
+        : null,
+      // G5: L1 consensus metadata for the gate panel.
+      ...(isL1Gate ? { l1_consensus: true } : {}),
+      ...(l1Waiting ? { l1_waiting_on: l1Waiting } : {}),
+      current_user_gate_authority: {
+        // can_submit: caller has submit authority AND gate is not in a terminal
+        // or in-flight state. 'skipped' is terminal per D-447 — backdate via
+        // set_milestone_actual_date is the only path off skipped.
+        can_submit: callerCanSubmitAny &&
+          gr.gate_status !== 'approved' &&
+          gr.gate_status !== 'awaiting_approval' &&
+          gr.gate_status !== 'skipped',
+        // can_approve: awaiting AND (admin, the designated approver, or — G5 —
+        // a trio member on an L1 consensus gate who hasn't approved yet).
+        can_approve: gr.gate_status === 'awaiting_approval' &&
+          (callerIsAdmin || gr.approver_user_id === caller_user_id ||
+           (!!l1Waiting && isTrioMemberCaller && !l1Waiting.caller_has_approved)),
+        // can_withdraw: caller has submit authority and gate is awaiting_approval (D-345 §4)
+        can_withdraw: callerCanSubmitAny && gr.gate_status === 'awaiting_approval'
+      }
+    };
+  });
 
   // D-487: resolve Roadmap Theme name (nullable tag).
   let roadmap_theme_name = null;

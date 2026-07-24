@@ -331,9 +331,20 @@ const GATE_LABELS: Record<GateName, string> = {
             </button>
           </ng-container>
 
+          <!-- Contract G5 (D-557): L1 interim waiting list ("Waiting on: [names]"
+               until G7's rolled-up line). -->
+          <div *ngIf="record?.gate_status === 'awaiting_approval' && record?.l1_waiting_on"
+               class="grm-meta">
+            Waiting on: {{ l1WaitingLine }}
+          </div>
+
           <!-- awaiting_approval (Approver viewing) — Approve + Return -->
           <ng-container *ngIf="canShowApproverActions">
-            <div class="grm-meta">{{ gateLabel }} submitted for your approval.</div>
+            <div class="grm-meta">
+              {{ record?.l1_consensus
+                  ? gateLabel + ' collects trio and consulted approvals — yours is pending.'
+                  : gateLabel + ' submitted for your approval.' }}
+            </div>
             <div class="grm-action-row">
               <button class="grm-btn-primary"
                       type="button"
@@ -392,8 +403,9 @@ const GATE_LABELS: Record<GateName, string> = {
           <div class="oi-confirm-icon">⚠</div>
           <div class="oi-confirm-body">
             <div class="oi-confirm-text">
-              Approving this gate will advance the Initiative. This cannot be
-              undone without a stage regression.
+              {{ record?.l1_consensus
+                  ? 'Approving records your Level 1 approval. The gate passes — and the Initiative advances — the moment the last collected party approves.'
+                  : 'Approving this gate will advance the Initiative. This cannot be undone without a stage regression.' }}
             </div>
             <div class="grm-action-row">
               <button class="grm-btn-primary"
@@ -999,6 +1011,17 @@ export class GateRecordModalComponent {
   get canShowApproverActions(): boolean {
     return this.record?.gate_status === 'awaiting_approval'
         && !!this.record?.current_user_gate_authority?.can_approve;
+  }
+
+  /** Contract G5: interim waiting list on awaiting L1 gates (pre-G7). */
+  get l1WaitingLine(): string {
+    const w = this.record?.l1_waiting_on;
+    if (!w) { return ''; }
+    const parts: string[] = [...(w.pending_trio_display_names ?? [])];
+    if (w.pending_consulted_count > 0) {
+      parts.push(`${w.pending_consulted_count} consulted ${w.pending_consulted_count === 1 ? 'party' : 'parties'}`);
+    }
+    return parts.length > 0 ? parts.join(', ') : 'no one — finalizing';
   }
 
   get approverNameOrDefault(): string {

@@ -480,6 +480,15 @@ export interface GateRecord {
   created_at:                  string;
   updated_at:                  string;
   // Supplement Section 1: populated by get_delivery_cycle for the calling user
+  // Contract G5 (D-557): L1 consensus gate metadata. l1_waiting_on present on
+  // awaiting L1 gates — the interim "Waiting on: [names]" line until G7.
+  l1_consensus?: boolean;
+  l1_waiting_on?: {
+    pending_trio_user_ids:      string[];
+    pending_trio_display_names: string[];
+    pending_consulted_count:    number;
+    caller_has_approved:        boolean;
+  };
   current_user_gate_authority?: {
     can_submit:   boolean;
     can_approve:  boolean;
@@ -601,8 +610,10 @@ export interface PendingApprovalItem {
   gate_name_display:             string;  // human-readable e.g. "Brief Review"
   // Contract 29 / D-462, D-468 (WS2): item_type distinguishes accountable vs
   // consulted; gate_status drives post-approval relabeling of consulted items.
+  // Contract G5 (D-557): 'trio_member_approval' = an L1 consensus gate waiting
+  // on the caller's trio approval — actionable like an accountable row.
   gate_status:                   GateStatus;
-  item_type:                     'accountable' | 'consulted';
+  item_type:                     'accountable' | 'consulted' | 'trio_member_approval';
   submitted_at:                  string;
   submitted_by_display_name:     string;
   tier_classification:           TierClassification;
