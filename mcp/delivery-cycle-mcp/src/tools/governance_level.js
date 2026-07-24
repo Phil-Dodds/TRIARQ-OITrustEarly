@@ -11,6 +11,8 @@
 
 const { supabase } = require('../db');
 const { recomputeBaselineForCycle } = require('../lib/governance-derivation');
+// Contract G3 (D-562/AC#6): displaced-approver notification on level-lowering set.
+const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 /** Load cycle + resolve whether caller is DL of its Division or Phil. */
 async function loadCycleWithLeadershipCheck(delivery_cycle_id, caller_user_id) {
@@ -105,6 +107,41 @@ async function set_effective_level(params, caller_user_id) {
     actor_user_id:     caller_user_id,
     event_metadata:    { set_level: level, baseline_level: ctx.cycle.baseline_level ?? null }
   });
+
+  // ── Contract G3 (D-562, S-C6/AC#6): a level-lowering set displaces the
+  // approver of any gate currently awaiting approval — notify them.
+  const priorEffective = ctx.cycle.set_level ?? ctx.cycle.baseline_level ?? null;
+  if (priorEffective !== null && level < priorEffective) {
+    const { data: awaiting } = await supabase
+      .from('gate_records')
+      .select('gate_record_id, gate_name, approver_user_id')
+      .eq('delivery_cycle_id', delivery_cycle_id)
+      .eq('gate_status', 'awaiting_approval')
+      .is('deleted_at', null);
+    const approverIds = [...new Set((awaiting || []).map(g => g.approver_user_id).filter(Boolean))];
+    if (approverIds.length > 0) {
+      const { data: approverRows } = await supabase
+        .from('users')
+        .select('id, display_name, email')
+        .in('id', approverIds)
+        .is('deleted_at', null);
+      const recipients = (approverRows || []).filter(u => u.email)
+        .map(u => ({ email: u.email, display_name: u.display_name }));
+      if (recipients.length > 0) {
+        await sendGateNotificationEmail({
+          recipients,
+          subject:          `${ctx.cycle.cycle_title} — governance level lowered`,
+          initiativeName:   ctx.cycle.cycle_title,
+          gateNameDisplay:  'Governance level',
+          contextParagraph: `Leadership set the governance level on ${ctx.cycle.cycle_title} to ` +
+                            `Level ${level} (previously effective Level ${priorEffective}). ` +
+                            `You are notified as the approver of a gate currently awaiting approval.`,
+          delivery_cycle_id,
+          email_type:       'governance_level_lowered'
+        });
+      }
+    }
+  }
 
   return {
     success: true,

@@ -33,8 +33,8 @@ const MUTABLE_FIELD_LABELS = {
   assigned_dol_user_id:    'Assigned Domain Outcome Lead',
   jira_epic_key:           'Jira Epic Link',
   roadmap_theme_id:        'Roadmap Theme',   // D-487: nullable — clearing removes the tag
-  other_consulted_user_ids: 'Other Consulted',
-  other_informed_user_ids:  'Other Informed',
+  // Contract G4: other_consulted_user_ids / other_informed_user_ids retired
+  // (migration 084) — writes rejected below; participation_records replace them.
   // Contract 38 follow-on 13 — AI Production Governance profile (migration 075).
   ai_functionality:        'Includes AI Functionality',
   ai_delivery_form:        'AI Delivery Form',
@@ -46,12 +46,10 @@ const VALID_AI_FUNCTIONALITY = ['yes', 'no', 'unknown'];
 const VALID_AI_DELIVERY_FORM = ['product_embedded', 'analytics_outputs', 'service_agent'];
 const VALID_AI_AUDIENCE      = ['external', 'internal'];
 
-// D-458: uuid[] fields. Handled distinctly from scalar fields — full-array
-// replace, never null, JSON change-detection, per-element user validation.
-const ARRAY_USER_FIELDS = new Set([
-  'other_consulted_user_ids',
-  'other_informed_user_ids'
-]);
+// Contract G4: the D-458 uuid[] fields are retired — set kept empty so the
+// array-handling branches below are inert without restructuring (D-252).
+const ARRAY_USER_FIELDS = new Set([]);
+const RETIRED_D458_FIELDS = ['other_consulted_user_ids', 'other_informed_user_ids'];
 
 /**
  * @param {object} params
@@ -74,6 +72,17 @@ async function update_delivery_cycle(params, caller_user_id) {
 
   if (!delivery_cycle_id) {
     return { success: false, error: 'delivery_cycle_id is required.' };
+  }
+
+  // ── Contract G4: reject writes to the retired D-458 arrays (migration 084) ──
+  const retiredSupplied = RETIRED_D458_FIELDS.filter(f => fields[f] !== undefined);
+  if (retiredSupplied.length > 0) {
+    return {
+      success: false,
+      error: `${retiredSupplied.join(', ')} ${retiredSupplied.length === 1 ? 'is' : 'are'} retired — ` +
+             'Consulted and Informed participation is managed on the Initiative panel ' +
+             '(participation records), not through this tool.'
+    };
   }
 
   // ── Validate that at least one mutable field was supplied ─────────────────

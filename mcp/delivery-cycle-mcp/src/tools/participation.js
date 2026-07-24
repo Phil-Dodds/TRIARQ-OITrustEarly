@@ -41,16 +41,71 @@ async function add_participation(params, caller_user_id) {
   if (set_via === 'self' && holder_user_id !== caller_user_id) {
     return { success: false, error: "set_via 'self' requires the holder to be the calling user." };
   }
+  // Contract G4 (D-564): 'self' is the one-tap Informed claim only — Consulted
+  // stakes attach via trio/approver/DL/IE roles.
+  if (set_via === 'self' && letter !== 'I') {
+    return { success: false, error: "set_via 'self' is the one-tap Informed claim — Consulted stakes are attached by the trio, the gate approver, or leadership." };
+  }
 
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title')
+    .select('delivery_cycle_id, cycle_title, division_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
 
   if (cycleErr || !cycle) {
     return { success: false, error: 'Initiative not found or has been deleted.' };
+  }
+
+  // ── Contract G4 role-scoped attach auth (supersedes CC-G1-19's open posture) ──
+  if (set_via !== 'self') {
+    const { data: callerRow } = await supabase
+      .from('users')
+      .select('id, is_admin, is_super_admin, is_active')
+      .eq('id', caller_user_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!callerRow || !callerRow.is_active) {
+      return { success: false, error: 'Caller user record not found or inactive.' };
+    }
+    const isAdminCaller = callerRow.is_admin === true || callerRow.is_super_admin === true;
+
+    let authorized = isAdminCaller;
+    if (!authorized && set_via === 'trio') {
+      authorized = [cycle.assigned_dcs_user_id, cycle.assigned_epo_user_id, cycle.assigned_dol_user_id]
+        .includes(caller_user_id);
+    } else if (!authorized && set_via === 'approver') {
+      const { data: awaiting } = await supabase
+        .from('gate_records')
+        .select('gate_record_id')
+        .eq('delivery_cycle_id', delivery_cycle_id)
+        .eq('gate_status', 'awaiting_approval')
+        .eq('approver_user_id', caller_user_id)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle();
+      authorized = !!awaiting;
+    } else if (!authorized && set_via === 'leadership') {
+      if (cycle.division_id) {
+        const { data: division } = await supabase
+          .from('divisions')
+          .select('owner_user_id')
+          .eq('id', cycle.division_id)
+          .is('deleted_at', null)
+          .maybeSingle();
+        authorized = division?.owner_user_id === caller_user_id;
+      }
+    }
+    // 'rule' and 'division_default' are server-side attach paths — external
+    // callers need an Admin role (CC-G4 lean).
+
+    if (!authorized) {
+      return {
+        success: false,
+        error: 'Attaching this participation stake requires the Initiative trio, the awaiting gate approver, the Division Leader, or an Admin.'
+      };
+    }
   }
 
   let holderLabel;
@@ -265,6 +320,26 @@ async function list_my_participation(params, caller_user_id) {
   }
 
   const resolved = await resolveHolderLabels(records || []);
+
+  // Contract G4: join Initiative context for "Initiatives I'm following".
+  const cycleIds = [...new Set(resolved.map(r => r.delivery_cycle_id))];
+  if (cycleIds.length > 0) {
+    const { data: cycles } = await supabase
+      .from('delivery_cycles')
+      .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, division_id, baseline_level, set_level')
+      .in('delivery_cycle_id', cycleIds)
+      .is('deleted_at', null);
+    const cycleById = {};
+    for (const c of cycles || []) { cycleById[c.delivery_cycle_id] = c; }
+    for (const r of resolved) {
+      const c = cycleById[r.delivery_cycle_id];
+      r.cycle_title             = c?.cycle_title ?? null;
+      r.current_lifecycle_stage = c?.current_lifecycle_stage ?? null;
+      r.division_id             = c?.division_id ?? null;
+      r.effective_level         = c ? (c.set_level ?? c.baseline_level ?? null) : null;
+    }
+  }
+
   return { success: true, data: { participation_records: resolved } };
 }
 

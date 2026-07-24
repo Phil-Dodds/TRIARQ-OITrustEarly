@@ -43,6 +43,9 @@ const NAV_ITEMS: NavItem[] = [
   // Contract 32 / D-485: Initiative Status Dashboard is now a card on this hub
   // (not a standalone nav item).
   { label: 'Initiative Tracking',  route: '/initiatives',    devStatus: 'live'        },
+  // Contract G4 (D-564): the viewer's Consulted/Informed memberships.
+  // devStatus 'uat' — first post-build stage per Phil's progression order.
+  { label: 'Following',            route: '/initiatives/following', devStatus: 'uat' },
   // Contract 33 / D-490 + Tracks Phase A: Team Meetings — visible to ALL users.
   // Users without a series can create one (if permitted) or join a public series.
   // Badge = number of series the user participates in.

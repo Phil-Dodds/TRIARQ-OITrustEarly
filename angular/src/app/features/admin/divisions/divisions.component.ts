@@ -39,7 +39,7 @@ import { IonicModule }                 from '@ionic/angular';
 import { McpService }                  from '../../../core/services/mcp.service';
 // Contract 37 (D-550): Sprint Calendar assignment selector.
 import { SprintCalendarService }       from '../../../core/services/sprint-calendar.service';
-import { DeliveryService }             from '../../../core/services/delivery.service';
+import { DeliveryService, GovernanceConfigWarning } from '../../../core/services/delivery.service';
 import {
   ScreenStateService,
   SCREEN_KEYS
@@ -48,6 +48,8 @@ import { BlockedActionComponent }      from '../../../shared/components/blocked-
 import { LoadingOverlayComponent }     from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DivisionInitiativeCycleComponent } from './initiative-cycle/division-initiative-cycle.component';
 import { DivisionRoadmapThemesComponent }   from './division-roadmap-themes.component';
+// Contract G4 (D-563): Division default Consulted parties section.
+import { DivisionDefaultConsultedsComponent } from './division-default-consulteds.component';
 import { UserPickerComponent }         from '../../../shared/pickers/user-picker/user-picker.component';
 import { UserProfileService }          from '../../../core/services/user-profile.service';
 import { Division, User, SprintCalendar } from '../../../core/types/database';
@@ -98,7 +100,8 @@ const LEVEL_LABELS: Record<number, string> = {
     LoadingOverlayComponent,
     UserPickerComponent,
     DivisionInitiativeCycleComponent,
-    DivisionRoadmapThemesComponent
+    DivisionRoadmapThemesComponent,
+    DivisionDefaultConsultedsComponent
   ],
   styles: [`
     :host{display:block}
@@ -149,6 +152,30 @@ const LEVEL_LABELS: Record<number, string> = {
             TRIARQ organizational hierarchy: Trust → Service Line → Functional Team.
             Tap a row to view details. Phil can add new Divisions; re-parenting and
             level changes still require a Design session.
+          </div>
+        </div>
+      </div>
+
+      <!-- Contract G3 (D-557/D-570c): L3 governance config warning banner.
+           Level 3 initiatives ignore sub-leadership approver configs — this
+           names the configs being ignored. D-200 Pattern 2 (amber, advisory). -->
+      <div *ngIf="governanceConfigWarnings.length > 0"
+           style="display:flex;gap:10px;border-left:3px solid #F2A620;
+                  background:rgba(242,166,32,0.08);padding:10px 14px;margin-bottom:14px;">
+        <div style="color:#F2A620;">⚠</div>
+        <div style="font:400 13px Roboto,sans-serif;color:#1a1a1a;">
+          <div style="font-weight:500;margin-bottom:4px;">
+            Gate approver configuration ignored for Level 3 Initiatives
+          </div>
+          <div style="margin-bottom:6px;">
+            These Divisions have live Level 3 Initiatives, whose gates route to
+            leadership only. The configured approvers below are not leadership
+            and are ignored at Level 3 (they still apply at Level 2).
+          </div>
+          <div *ngFor="let w of governanceConfigWarnings" style="font-size:12px;">
+            • {{ w.division_name || w.division_id }} — {{ gateDisplayLabel(w.gate_name) }}:
+            {{ w.approver_display_name || 'Unknown user' }}
+            ({{ w.l3_initiative_count }} Level 3 {{ w.l3_initiative_count === 1 ? 'Initiative' : 'Initiatives' }})
           </div>
         </div>
       </div>
@@ -493,6 +520,18 @@ const LEVEL_LABELS: Record<number, string> = {
                 </app-division-roadmap-themes>
               </div>
 
+              <!-- Contract G4 (D-563): Division default Consulted parties —
+                   attached to every new Initiative at creation. DL/admin edit
+                   (server-enforced; visibility mirrors the DL/Phil posture). -->
+              <div class="oi-zone">
+                <div class="oi-zone-title">Default Consulted</div>
+                <app-division-default-consulteds
+                  [divisionId]="selectedDivision.id"
+                  [canEdit]="isPhil || selectedDivision.owner_user_id === viewerUserId"
+                  [allUsers]="allUsers">
+                </app-division-default-consulteds>
+              </div>
+
             </div>
             <div class="oi-side-foot oi-side-foot-split">
               <!-- Contract 31 follow-on (Phil-only): add a child Division inside this one.
@@ -781,6 +820,34 @@ export class DivisionsComponent implements OnInit {
     this.loadDivisions();
     this.loadUsersOnce();
     this.restoreScreenState();
+    this.loadGovernanceConfigWarnings();
+  }
+
+  // ── Contract G3 (D-570c): L3 sub-leadership config warning banner ──────────
+  governanceConfigWarnings: GovernanceConfigWarning[] = [];
+
+  private loadGovernanceConfigWarnings(): void {
+    this.delivery.getGovernanceConfigWarnings().subscribe({
+      next: (res) => {
+        this.governanceConfigWarnings = (res.success && res.data?.config_warnings) || [];
+        this.cdr.markForCheck();
+      },
+      error: () => { /* advisory banner only — stay quiet on failure */ }
+    });
+  }
+
+  /** Contract G4: viewer identity for the Default Consulted DL edit affordance. */
+  get viewerUserId(): string | null {
+    return this.profile.getCurrentProfile()?.id ?? null;
+  }
+
+  gateDisplayLabel(gate_name: string): string {
+    const labels: Record<string, string> = {
+      brief_review: 'Brief Review', go_to_build: 'Go to Build',
+      go_to_deploy: 'Go to Deploy', go_to_release: 'Go to Release',
+      close_review: 'Close Review'
+    };
+    return labels[gate_name] ?? gate_name;
   }
 
   @HostListener('document:keydown.escape')

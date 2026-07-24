@@ -109,6 +109,13 @@ import { IonicModule }  from '@ionic/angular';
           import('./status-dashboard/initiative-status-dashboard.component')
             .then(c => c.InitiativeStatusDashboardComponent)
       },
+      // Contract G4 (D-564): "Initiatives I'm following" — C/I memberships.
+      {
+        path: 'following',
+        loadComponent: () =>
+          import('./participation/following.component')
+            .then(c => c.FollowingComponent)
+      },
       // D-527 follow-on: Initiative Guide — concept guide / OI Library seed.
       {
         path: 'guide',

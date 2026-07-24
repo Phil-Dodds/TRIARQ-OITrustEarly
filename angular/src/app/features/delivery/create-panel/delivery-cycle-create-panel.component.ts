@@ -35,6 +35,8 @@ import { Subscription } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
 
 import { DeliveryService }           from '../../../core/services/delivery.service';
+// Contract G3 (D-558): five-question sizing at creation + live Governance panel.
+import { InitiativeSizingFormComponent, SizingFormPayload } from '../sizing-form/initiative-sizing-form.component';
 import { UserProfileService }        from '../../../core/services/user-profile.service';
 import { LoadingOverlayComponent }   from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { WorkstreamPickerComponent }         from '../../../shared/pickers/workstream-picker/workstream-picker.component';
@@ -53,7 +55,7 @@ import {
   imports: [
     CommonModule, ReactiveFormsModule, FormsModule, IonicModule,
     LoadingOverlayComponent, WorkstreamPickerComponent, UserPickerComponent,
-    DivisionAssignmentPickerComponent
+    DivisionAssignmentPickerComponent, InitiativeSizingFormComponent
   ],
   template: `
     <!-- D-180: Right panel — Deep Navy header, body with 24px padding -->
@@ -288,6 +290,19 @@ import {
             </div>
             <div *ngIf="aiConsequenceLine" class="cp-gate-note" style="color:#8a5b00;">{{ aiConsequenceLine }}</div>
           </ng-container>
+
+          <!-- 12. Sizing — Contract G3 (D-558): five direct questions, sub-chips
+               advisory only, live Governance panel. Required to create. -->
+          <div class="cp-field">
+            <label class="cp-label">
+              Sizing <span class="cp-required" aria-hidden="true">*</span>
+            </label>
+            <app-initiative-sizing-form
+              [dcsUserId]="selectedDcs?.id ?? null"
+              (payloadChange)="onSizingPayloadChange($event)">
+            </app-initiative-sizing-form>
+            <div *ngIf="sizingError" class="cp-field-error">{{ sizingError }}</div>
+          </div>
 
           <!-- Submission error -->
           <div *ngIf="submitError" class="cp-submit-error" role="alert">
@@ -560,6 +575,11 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
   selectedDol:       User | null = null;
   selectedDolInitials = '';
   selectedDolColor    = '#257099';
+
+  // Contract G3 (D-558): sizing payload from the embedded form. Creation
+  // cannot complete without all five direct answers (AC #1).
+  sizingPayload: SizingFormPayload | null = null;
+  sizingError = '';
 
   private subs = new Subscription();
 
@@ -859,10 +879,24 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
     this.selectedDolColor    = avatarColorFromName(user.display_name || '');
   }
 
+  // Contract G3: sizing form payload tracking.
+  onSizingPayloadChange(payload: SizingFormPayload): void {
+    this.sizingPayload = payload;
+    if (payload.valid) { this.sizingError = ''; }
+    this.cdr.markForCheck();
+  }
+
   // ── Submission ───────────────────────────────────────────────────────────────
   onSubmit(): void {
     this.form.markAllAsTouched();
     if (this.form.invalid || this.submitting) { return; }
+
+    // Contract G3 AC #1: all five direct sizing answers required to create.
+    if (!this.sizingPayload?.valid) {
+      this.sizingError = 'Answer all five sizing questions — sizing derives this Initiative\'s governance level.';
+      this.cdr.markForCheck();
+      return;
+    }
 
     this.submitting  = true;
     this.submitError = '';
@@ -897,12 +931,38 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
     }).subscribe({
       next: (res) => {
         if (res.success && res.data) {
-          this.cycleCreated.emit(res.data);
+          // Contract G3: persist sizing immediately after creation. On failure
+          // the Initiative exists unsized — the D-567 gate interstitial
+          // catches it at its first gate; surface the error either way.
+          const created = res.data;
+          const payload = this.sizingPayload!;
+          this.delivery.upsertInitiativeSizing({
+            delivery_cycle_id: created.delivery_cycle_id,
+            answers: payload.answers,
+            subs:    payload.subs,
+            notes:   payload.notes
+          }).subscribe({
+            next: (sizeRes) => {
+              if (!sizeRes.success) {
+                this.submitError = `Initiative created, but sizing failed to save: ${sizeRes.error ?? 'unknown error'}. ` +
+                                   'Sizing will be required at the first gate.';
+              }
+              this.cycleCreated.emit(created);
+              this.submitting = false;
+              this.cdr.markForCheck();
+            },
+            error: () => {
+              this.submitError = 'Initiative created, but sizing failed to save. Sizing will be required at the first gate.';
+              this.cycleCreated.emit(created);
+              this.submitting = false;
+              this.cdr.markForCheck();
+            }
+          });
         } else {
           this.submitError = res.error ?? 'Create failed. Check permissions and try again.';
+          this.submitting = false;
+          this.cdr.markForCheck();
         }
-        this.submitting = false;
-        this.cdr.markForCheck();
       },
       error: (err: { error?: string }) => {
         this.submitError = err?.error ?? 'Create failed. Check permissions and try again.';

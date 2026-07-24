@@ -188,6 +188,71 @@ Attach-at-creation wiring is G4.
 
 ---
 
+## 1.7 Contract G3 — Sizing UI support (new + modified tools)
+
+**`preview_governance_derivation`** (new) — stateless derivation preview for the
+creation form's live Governance panel. Params: `answers` (all five, validated
+as upsert), `subs?`, `dcs_user_id?`. Returns `{ baseline_level,
+explanation_chips[], alerts[], dcs_trusted }`. Keeps
+`lib/governance-derivation.js` the single source of truth (no client-side
+derivation). Auth: any active user JWT.
+
+**`get_governance_config_warnings`** (new) — Admin → Divisions banner data:
+`gate_approver_configs` rows naming non-leadership people in Divisions with
+live Level-3-effective Initiatives (D-570c). Returns `{ config_warnings:
+[{ division_id, division_name, gate_name, approver_user_id,
+approver_display_name, l3_initiative_count }] }`. Auth: admin JWT.
+
+**`upsert_initiative_sizing`** (modified — D-567/D-562/D-563):
+- Post-Go-to-Build edits: two-call approver confirmation — first call returns
+  `status: 'REQUIRES_APPROVER_CONFIRMATION'` with
+  `{ current_baseline_level, new_baseline_level, message }`; second call with
+  `approver_confirmed: true` executes. Confirming caller must be the approver
+  of a currently awaiting gate (when one exists) or an admin.
+- Level-lowering edits post-GtB notify the awaiting gate approver(s)
+  (email_type `governance_level_lowered`) + `sizing_lowered_level` event.
+- Baseline rising above a set level adds alert `baseline_exceeds_set_level`
+  + event (S-C6 data support).
+- `q2_sub_new_vendor: true` writes an idempotent IT/Infrastructure Informed
+  participation record (set_via `rule`).
+
+**`submit_gate_for_approval`** (modified — D-567): unsized Initiative → the
+non-mutating interstitial `status: 'REQUIRES_SIZING'` (mirrors the skip
+interstitial); Angular interposes the sizing form and re-submits.
+
+**`set_effective_level`** (modified — D-562): a level-lowering set notifies the
+approver(s) of awaiting gates (email + event).
+
+---
+
+## 1.8 Contract G4 — Participation (modified tools)
+
+**`add_participation`** (modified — role-scoped auth, supersedes CC-G1-19):
+`set_via 'self'` = one-tap Informed only (letter I, holder = caller, any active
+user). `'trio'` requires an assigned DCS/EPO/DOL of the cycle; `'approver'`
+the approver of a currently awaiting gate; `'leadership'` the Division Leader;
+`'rule'`/`'division_default'` are server-side paths (external callers need
+admin). Admin/Phil pass all.
+
+**`list_my_participation`** (modified): rows now carry Initiative context —
+`cycle_title`, `current_lifecycle_stage`, `division_id`, `effective_level`
+("Initiatives I'm following" data source).
+
+**`submit_gate_for_approval`** (modified — D-564): the Consulted set derives
+from participation_records C stakes (groups expanded to active members) plus
+the non-null trio. The D-458 array is no longer read (migration 084 retires it).
+
+**`record_gate_decision`** (modified — D-564): Informed holders (user-held +
+group members) receive gate-decision emails (email_type
+`informed_gate_decision`); the decision-maker is excluded; Informed parties
+never appear in waiting-on.
+
+**`create_delivery_cycle`** (modified — D-563): Division default Consulteds
+attach automatically at creation (participation records, set_via
+`division_default`).
+
+---
+
 ## 2. Pre-G1 tool inventory (names only)
 
 Authoritative runtime list: `GET /tools` on each service. Behavior: per-contract

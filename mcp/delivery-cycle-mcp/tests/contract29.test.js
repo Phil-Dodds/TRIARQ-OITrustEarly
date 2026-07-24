@@ -216,21 +216,23 @@ describe('delete_gate_approver_config (D-464)', () => {
 describe('update_delivery_cycle other_consulted/informed (D-458)', () => {
   const { update_delivery_cycle } = require('../src/tools/update_delivery_cycle');
 
-  test('error path: other_consulted_user_ids must be an array', async () => {
+  // Contract G4 (migration 084): the D-458 array params are retired — any
+  // supplied value is rejected with the retirement message.
+  test('error path: other_consulted_user_ids is retired (G4)', async () => {
     const r = await update_delivery_cycle(
       { delivery_cycle_id: 'c1', other_consulted_user_ids: 'not-array' }, DCS
     );
     assert.equal(r.success, false);
-    assert.ok(r.error.includes('Other Consulted'));
-    assert.ok(r.error.toLowerCase().includes('array'));
+    assert.ok(r.error.includes('other_consulted_user_ids'));
+    assert.ok(r.error.toLowerCase().includes('retired'));
   });
 
-  test('error path: other_informed_user_ids with a non-string entry', async () => {
+  test('error path: other_informed_user_ids is retired (G4)', async () => {
     const r = await update_delivery_cycle(
       { delivery_cycle_id: 'c1', other_informed_user_ids: [123] }, DCS
     );
     assert.equal(r.success, false);
-    assert.ok(r.error.includes('Other Informed'));
-    assert.ok(r.error.includes('invalid user id'));
+    assert.ok(r.error.includes('other_informed_user_ids'));
+    assert.ok(r.error.toLowerCase().includes('retired'));
   });
 });

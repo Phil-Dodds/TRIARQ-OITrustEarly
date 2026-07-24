@@ -140,8 +140,87 @@ async function upsertDisplacedApproverConsultation({ gate_record_id, consulted_u
   return { inserted: !insErr, error: insErr ? insErr.message : null };
 }
 
+/**
+ * Contract G4 (D-564): derive the Consulted set from the non-null trio plus
+ * ACTIVE participation_records C stakes — user-held directly, group-held
+ * expanded to active group members. Supersedes the D-458 array read
+ * (deriveConsultedUserIds above is retained only for the migration-era
+ * regression suite; no production path calls it after G4).
+ *
+ * @param {object} cycle - assigned_dcs_user_id / assigned_epo_user_id /
+ *   assigned_dol_user_id + delivery_cycle_id
+ * @returns {Promise<string[]>} ordered, deduplicated user ids
+ */
+async function deriveConsultedUserIdsV2(cycle) {
+  const seen = new Set();
+  const result = [];
+  const push = (id) => { if (id && !seen.has(id)) { seen.add(id); result.push(id); } };
+
+  push(cycle.assigned_dcs_user_id);
+  push(cycle.assigned_epo_user_id);
+  push(cycle.assigned_dol_user_id);
+
+  const { data: stakes } = await supabase
+    .from('participation_records')
+    .select('holder_user_id, holder_group_id')
+    .eq('delivery_cycle_id', cycle.delivery_cycle_id)
+    .eq('letter', 'C')
+    .is('removed_at', null);
+
+  const groupIds = [];
+  for (const s of stakes || []) {
+    if (s.holder_user_id) { push(s.holder_user_id); }
+    else if (s.holder_group_id) { groupIds.push(s.holder_group_id); }
+  }
+
+  if (groupIds.length > 0) {
+    const { data: members } = await supabase
+      .from('specialty_group_members')
+      .select('user_id')
+      .in('group_id', groupIds)
+      .is('deleted_at', null);
+    for (const m of members || []) { push(m.user_id); }
+  }
+
+  return result;
+}
+
+/**
+ * Contract G4: active Informed holder user ids for a cycle — user-held plus
+ * group-member expansion. Feeds gate-decision notifications (never waiting-on).
+ */
+async function deriveInformedUserIds(delivery_cycle_id) {
+  const seen = new Set();
+  const result = [];
+  const push = (id) => { if (id && !seen.has(id)) { seen.add(id); result.push(id); } };
+
+  const { data: stakes } = await supabase
+    .from('participation_records')
+    .select('holder_user_id, holder_group_id')
+    .eq('delivery_cycle_id', delivery_cycle_id)
+    .eq('letter', 'I')
+    .is('removed_at', null);
+
+  const groupIds = [];
+  for (const s of stakes || []) {
+    if (s.holder_user_id) { push(s.holder_user_id); }
+    else if (s.holder_group_id) { groupIds.push(s.holder_group_id); }
+  }
+  if (groupIds.length > 0) {
+    const { data: members } = await supabase
+      .from('specialty_group_members')
+      .select('user_id')
+      .in('group_id', groupIds)
+      .is('deleted_at', null);
+    for (const m of members || []) { push(m.user_id); }
+  }
+  return result;
+}
+
 module.exports = {
   deriveConsultedUserIds,
+  deriveConsultedUserIdsV2,
+  deriveInformedUserIds,
   setupGateConsultations,
   upsertDisplacedApproverConsultation
 };

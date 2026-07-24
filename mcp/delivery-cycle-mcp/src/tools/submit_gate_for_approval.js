@@ -41,7 +41,9 @@ const { computeArtifactSuggestionWarnings } = require('./helpers/artifact-warnin
 // board-trigger helper (CC-G1-18 executed).
 const { resolveGateApproverV2, recordAssignedDualWrite } = require('./helpers/approver');
 const { isBoardTriggeredGate } = require('./helpers/board-trigger');
-const { deriveConsultedUserIds, setupGateConsultations } = require('./helpers/consultations');
+// Contract G4 (D-564): Consulted set now derives from participation_records
+// (trio + C stakes with group expansion) — the D-458 array is retired.
+const { deriveConsultedUserIdsV2, setupGateConsultations } = require('./helpers/consultations');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 // Gate-name display strings — used in event_description and surfaced to UI text.
@@ -103,7 +105,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   // D-424 / Contract 23 Item 3.6: division_id added — used to look up dol_required.
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, workstream_id, division_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, other_consulted_user_ids, jira_epic_key, ai_functionality, ai_delivery_form, ai_audience, ai_board_approved, baseline_level, set_level, oversight_user_id')
+    .select('delivery_cycle_id, cycle_title, workstream_id, division_id, current_lifecycle_stage, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, jira_epic_key, ai_functionality, ai_delivery_form, ai_audience, ai_board_approved, baseline_level, set_level, oversight_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -134,6 +136,35 @@ async function submit_gate_for_approval(params, caller_user_id) {
       error: 'You do not have authority to submit this gate for approval. ' +
              'Only the assigned Domain Capability Strategist, Engineering Product Owner, Domain Outcome Lead, or an Admin can submit gates.'
     };
+  }
+
+  // ── Contract G3 (D-567): sizing required at the next gate ─────────────────
+  // Any initiative without a sizing row must complete sizing before any gate
+  // submission proceeds. Non-mutating interstitial mirroring the skip
+  // pre-check: Angular interposes the sizing form, then re-submits. Runs
+  // before the skip pre-check so a legacy initiative sizes once, first.
+  {
+    const { data: sizingRow, error: sizingErr } = await supabase
+      .from('initiative_sizing')
+      .select('delivery_cycle_id')
+      .eq('delivery_cycle_id', delivery_cycle_id)
+      .maybeSingle();
+    if (sizingErr) {
+      return { success: false, error: `Failed to check sizing state: ${sizingErr.message}` };
+    }
+    if (!sizingRow) {
+      return {
+        success: true,
+        status: 'REQUIRES_SIZING',
+        data: {
+          code:           'REQUIRES_SIZING',
+          submitted_gate: gate_name,
+          message:
+            'Sizing is required before this gate can be submitted. Answer the five sizing ' +
+            'questions — the gate submission will continue once sizing is saved (D-567).'
+        }
+      };
+    }
   }
 
   // ── D-447 / D-448 / D-450: Skip pre-check ─────────────────────────────────
@@ -521,10 +552,11 @@ async function submit_gate_for_approval(params, caller_user_id) {
       event_metadata:    { gate_name }
     });
 
-  // ── WS2 (D-459/D-460): derive Consulted set and create consultation rows ──
-  // Set = non-null DCS/EPO/DOL trio + other_consulted_user_ids, deduplicated.
-  // Submitter row auto-approved (no inbox/email). Idempotent on re-submit.
-  const consultedUserIds = deriveConsultedUserIds(cycle);
+  // ── WS2 (D-459/D-460) + G4 (D-564): derive Consulted set and create
+  // consultation rows. Set = non-null trio + active participation C stakes
+  // (groups expanded to members), deduplicated. Submitter row auto-approved
+  // (no inbox/email). Idempotent on re-submit.
+  const consultedUserIds = await deriveConsultedUserIdsV2(cycle);
   const { nonSubmitterConsultedUserIds, error: consultationError } = await setupGateConsultations({
     gate_record_id:       gate_record.gate_record_id,
     submitted_by_user_id: caller_user_id,

@@ -275,6 +275,36 @@ async function create_delivery_cycle(params, caller_user_id) {
       }
     });
 
+  // ── Contract G4 (D-563): attach Division default Consulteds at creation ────
+  // Like accepted suggestions — visible to the trio via the participation UI.
+  // Non-fatal on failure: the Initiative exists; defaults can be attached later.
+  if (division_id) {
+    const { data: defaults } = await supabase
+      .from('division_default_consulteds')
+      .select('holder_user_id, holder_group_id')
+      .eq('division_id', division_id)
+      .is('deleted_at', null);
+    if (defaults && defaults.length > 0) {
+      const stakeRows = defaults.map(d => ({
+        delivery_cycle_id: cycle_id,
+        letter:            'C',
+        holder_user_id:    d.holder_user_id,
+        holder_group_id:   d.holder_group_id,
+        set_via:           'division_default',
+        set_by_user_id:    caller_user_id
+      }));
+      const { error: defaultsErr } = await supabase
+        .from('participation_records')
+        .insert(stakeRows);
+      if (defaultsErr) {
+        console.error(JSON.stringify({
+          tool_name: 'create_delivery_cycle', step: 'division_default_consulteds',
+          delivery_cycle_id: cycle_id, error: defaultsErr.message
+        }));
+      }
+    }
+  }
+
   return { success: true, data: cycle };
 }
 

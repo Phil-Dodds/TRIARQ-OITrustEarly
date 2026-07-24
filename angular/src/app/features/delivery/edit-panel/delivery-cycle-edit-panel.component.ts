@@ -49,7 +49,7 @@ import { UserPickerComponent }               from '../../../shared/pickers/user-
 import { DivisionAssignmentPickerComponent } from '../../../shared/pickers/division-assignment-picker/division-assignment-picker.component';
 import {
   DeliveryCycle, DeliveryWorkstream, Division, User,
-  TierClassification, McpResponse, EntityUserRef, RoadmapTheme
+  TierClassification, McpResponse, RoadmapTheme
 } from '../../../core/types/database';
 import {
   DivisionTrustGroup,
@@ -230,40 +230,15 @@ function epAvatarColorFromName(name: string): string {
               <div class="ep-hint">Required before Brief Review Gate.</div>
             </div>
 
-            <!-- 6a. Other Consulted (D-458) — multi-select user picker, chips with remove.
-                 Wraps the single-select UserPicker: each Confirm appends to the chips array (deduped). -->
+            <!-- Contract G4 (D-564): the D-458 Other Consulted / Other Informed
+                 array editors are retired (migration 084). Participation is
+                 managed on the Initiative detail panel — Consulted attach and
+                 one-tap Informed live there. -->
             <div class="ep-field">
-              <label class="ep-label">Other Consulted</label>
-              <div class="ep-multi-chip-row">
-                <span *ngFor="let u of otherConsulted" class="ep-entity-chip ep-multi-chip">
-                  <span class="ep-user-avatar"
-                        [style.background]="avatarColor(u.display_name)">{{ avatarInitials(u.display_name) }}</span>
-                  {{ u.display_name }}
-                  <button type="button" class="ep-multi-chip-x"
-                          (click)="removeOtherConsulted(u.id)"
-                          [attr.aria-label]="'Remove ' + (u.display_name || 'user')">✕</button>
-                </span>
-                <button type="button" class="ep-picker-trigger ep-multi-add"
-                        (click)="openConsultedPicker()">+ Add</button>
-              </div>
-              <!-- D-200 Pattern 1 — stone gray sub-text, no icon. Guidance under Other Consulted ONLY. -->
-              <div class="ep-hint">These users will be consulted on all gate submissions for this initiative.</div>
-            </div>
-
-            <!-- 6b. Other Informed (D-458) — same multi-select pattern. No guidance text. -->
-            <div class="ep-field">
-              <label class="ep-label">Other Informed</label>
-              <div class="ep-multi-chip-row">
-                <span *ngFor="let u of otherInformed" class="ep-entity-chip ep-multi-chip">
-                  <span class="ep-user-avatar"
-                        [style.background]="avatarColor(u.display_name)">{{ avatarInitials(u.display_name) }}</span>
-                  {{ u.display_name }}
-                  <button type="button" class="ep-multi-chip-x"
-                          (click)="removeOtherInformed(u.id)"
-                          [attr.aria-label]="'Remove ' + (u.display_name || 'user')">✕</button>
-                </span>
-                <button type="button" class="ep-picker-trigger ep-multi-add"
-                        (click)="openInformedPicker()">+ Add</button>
+              <label class="ep-label">Consulted &amp; Informed</label>
+              <div class="ep-hint">
+                Managed on the Initiative panel — attach Consulted parties and
+                follow as Informed there.
               </div>
             </div>
 
@@ -465,24 +440,8 @@ function epAvatarColorFromName(name: string): string {
       (userSelected)="onDolSelected($event)">
     </app-user-picker>
 
-    <!-- Other Consulted User Picker modal (D-458). Multi-select via repeated single-select;
-         no currentUserId so the list never pre-checks — each Confirm appends a fresh chip. -->
-    <app-user-picker
-      *ngIf="showConsultedPicker"
-      [allUsers]="true"
-      [divisionId]="form.get('division_id')?.value || null"
-      [currentUserId]="null"
-      (userSelected)="onConsultedSelected($event)">
-    </app-user-picker>
-
-    <!-- Other Informed User Picker modal (D-458). -->
-    <app-user-picker
-      *ngIf="showInformedPicker"
-      [allUsers]="true"
-      [divisionId]="form.get('division_id')?.value || null"
-      [currentUserId]="null"
-      (userSelected)="onInformedSelected($event)">
-    </app-user-picker>
+    <!-- Contract G4: the D-458 Other Consulted / Other Informed pickers are
+         retired — participation is managed on the Initiative detail panel. -->
   `,
   styles: [`
     /* Overlay — covers the detail panel content, View stays behind */
@@ -718,13 +677,8 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   selectedDolInitials = '';
   selectedDolColor    = '#257099';
 
-  // D-458: Other Consulted / Other Informed multi-user selections.
-  // Stored as EntityUserRef[] ({id, display_name}) — chips with remove X.
-  // Wraps the single-select UserPicker: each Confirm appends (deduped by id).
-  showConsultedPicker = false;
-  showInformedPicker  = false;
-  otherConsulted: EntityUserRef[] = [];
-  otherInformed:  EntityUserRef[] = [];
+  // Contract G4: D-458 Other Consulted / Other Informed editors retired —
+  // participation is managed on the Initiative detail panel (migration 084).
 
   private subs = new Subscription();
 
@@ -834,11 +788,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       }
     }
 
-    // D-458: Pre-populate Other Consulted / Other Informed from the resolved
-    // {id, display_name} lists returned by get_delivery_cycle. Copied (not aliased)
-    // so the edit state is independent of the input cycle object.
-    this.otherConsulted = (this.cycle.other_consulted_users ?? []).map(u => ({ ...u }));
-    this.otherInformed  = (this.cycle.other_informed_users  ?? []).map(u => ({ ...u }));
+    // Contract G4: D-458 array pre-population removed with the retired editors.
 
     // Store original Tier for D-228 comparison.
     this.originalTier = this.cycle.tier_classification;
@@ -1039,41 +989,13 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     this.selectedDolColor    = epAvatarColorFromName(user.display_name || '');
   }
 
-  // ── Other Consulted / Other Informed (D-458) ─────────────────────────────────
-  // Avatar helpers for the multi-chip rows (template-bound).
+  // Avatar helpers (template-bound elsewhere in this panel).
   avatarInitials(name: string | null): string { return epNameInitials(name || ''); }
   avatarColor(name: string | null): string    { return epAvatarColorFromName(name || ''); }
 
-  openConsultedPicker(): void { this.showConsultedPicker = true; this.cdr.markForCheck(); }
-  openInformedPicker(): void  { this.showInformedPicker  = true; this.cdr.markForCheck(); }
-
-  onConsultedSelected(user: User | null): void {
-    this.showConsultedPicker = false;
-    if (user) { this.otherConsulted = this.appendUnique(this.otherConsulted, user); }
-    this.cdr.markForCheck();
-  }
-
-  onInformedSelected(user: User | null): void {
-    this.showInformedPicker = false;
-    if (user) { this.otherInformed = this.appendUnique(this.otherInformed, user); }
-    this.cdr.markForCheck();
-  }
-
-  removeOtherConsulted(id: string): void {
-    this.otherConsulted = this.otherConsulted.filter(u => u.id !== id);
-    this.cdr.markForCheck();
-  }
-
-  removeOtherInformed(id: string): void {
-    this.otherInformed = this.otherInformed.filter(u => u.id !== id);
-    this.cdr.markForCheck();
-  }
-
-  /** Append the selected user as an EntityUserRef, deduped by id (new array → OnPush). */
-  private appendUnique(list: EntityUserRef[], user: User): EntityUserRef[] {
-    if (list.some(u => u.id === user.id)) { return list; }
-    return [...list, { id: user.id, display_name: user.display_name ?? null }];
-  }
+  // Contract G4 (D-564): the D-458 Other Consulted / Other Informed editors
+  // and their picker plumbing were retired here — participation is managed on
+  // the Initiative detail panel (participation_records, migration 084).
 
   // ── Save ──────────────────────────────────────────────────────────────────────
   onSave(): void {
@@ -1156,18 +1078,9 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       payload.ai_board_approved = newBoard;
     }
 
-    // D-458: Other Consulted / Other Informed — full-array replace, empty clears.
-    // Only included when the id set differs from the originally loaded set.
-    const newConsultedIds = this.otherConsulted.map(u => u.id);
-    const origConsultedIds = (this.cycle.other_consulted_users ?? []).map(u => u.id);
-    if (!this.sameIdSet(newConsultedIds, origConsultedIds)) {
-      payload.other_consulted_user_ids = newConsultedIds;
-    }
-    const newInformedIds = this.otherInformed.map(u => u.id);
-    const origInformedIds = (this.cycle.other_informed_users ?? []).map(u => u.id);
-    if (!this.sameIdSet(newInformedIds, origInformedIds)) {
-      payload.other_informed_user_ids = newInformedIds;
-    }
+    // Contract G4 (D-564): the D-458 arrays are retired (migration 084) —
+    // this panel no longer reads or writes them. Participation is managed on
+    // the Initiative detail panel via participation_records.
 
     // If nothing changed, treat as a cancel (no MCP round-trip needed).
     const changedKeys = Object.keys(payload).filter(k => k !== 'delivery_cycle_id');
@@ -1236,12 +1149,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     return 'No AI Production Board stop for delivered analytics outputs — attach the AI Delivery Requirements Record (data lineage, reproducibility, AI disclosure) before Go to Deploy.';
   }
 
-  /** D-458: order-independent id-set equality for the multi-user fields. */
-  private sameIdSet(a: string[], b: string[]): boolean {
-    if (a.length !== b.length) { return false; }
-    const setB = new Set(b);
-    return a.every(id => setB.has(id));
-  }
+  // Contract G4: sameIdSet helper removed with the retired D-458 array editors.
 
   // B-17: Convert raw Supabase constraint errors to user-friendly messages. Source: Contract 9.
   private friendlyError(raw: string): string {
@@ -1292,12 +1200,8 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       (this.aiFunctionality || null) !== (this.cycle.ai_functionality ?? null) ||
       ((this.aiFunctionality === 'yes' ? this.aiDeliveryForm : '') || null) !== (this.cycle.ai_delivery_form ?? null) ||
       ((this.aiFunctionality === 'yes' ? this.aiAudience : '') || null) !== (this.cycle.ai_audience ?? null) ||
-      (this.aiFunctionality === 'yes' && this.aiBoardApproved) !== (this.cycle.ai_board_approved === true) ||
-      // D-458: multi-user fields differ from the originally loaded id sets.
-      !this.sameIdSet(this.otherConsulted.map(u => u.id),
-                      (this.cycle.other_consulted_users ?? []).map(u => u.id)) ||
-      !this.sameIdSet(this.otherInformed.map(u => u.id),
-                      (this.cycle.other_informed_users ?? []).map(u => u.id))
+      (this.aiFunctionality === 'yes' && this.aiBoardApproved) !== (this.cycle.ai_board_approved === true)
+      // Contract G4: D-458 array dirty-checks removed with the retired editors.
     );
   }
 

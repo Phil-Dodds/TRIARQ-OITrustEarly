@@ -117,6 +117,8 @@ const divisionDefaultConsulteds          = require('./tools/division_default_con
 const gateThread                         = require('./tools/gate_thread');
 const gateConditions                     = require('./tools/gate_conditions');
 const gateApprovals                      = require('./tools/gate_approvals');
+// Contract G3: sizing UI support + admin governance warnings.
+const { get_governance_config_warnings } = require('./tools/governance_config_warnings');
 
 const app  = express();
 const PORT = process.env.PORT || 3003;
@@ -234,6 +236,9 @@ const TOOLS = {
   get_initiative_sizing:              initiativeSizing.get_initiative_sizing,
   upsert_initiative_sizing:           initiativeSizing.upsert_initiative_sizing,
   derive_governance:                  initiativeSizing.derive_governance,
+  // Contract G3
+  preview_governance_derivation:      initiativeSizing.preview_governance_derivation,
+  get_governance_config_warnings,
   // Primitive 2 — governance level + trust + oversight
   set_effective_level:                governanceLevel.set_effective_level,
   clear_effective_level:              governanceLevel.clear_effective_level,

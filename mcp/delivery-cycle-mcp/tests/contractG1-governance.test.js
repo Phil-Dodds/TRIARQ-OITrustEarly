@@ -420,9 +420,10 @@ describe('add_participation', () => {
     assert.equal(r.success, false);
   });
 
-  test('happy path: user-held Consulted stake', async () => {
+  test('happy path: user-held Consulted stake (G4 role-scoped: caller is assigned DCS)', async () => {
     queue = [
-      { data: { delivery_cycle_id: CYC, cycle_title: 'T' }, error: null },
+      { data: { delivery_cycle_id: CYC, cycle_title: 'T', division_id: 'div', assigned_dcs_user_id: CALLER, assigned_epo_user_id: null, assigned_dol_user_id: null }, error: null },
+      { data: { id: CALLER, is_admin: false, is_super_admin: false, is_active: true }, error: null }, // G4 caller role check
       { data: { id: OTHER, display_name: 'Holder', is_active: true }, error: null },
       { data: null, error: null }, // no duplicate
       { data: { record_id: 'rec-1', delivery_cycle_id: CYC, letter: 'C', holder_user_id: OTHER, set_via: 'trio' }, error: null },

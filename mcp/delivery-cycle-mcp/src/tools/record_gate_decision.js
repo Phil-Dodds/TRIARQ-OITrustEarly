@@ -40,7 +40,7 @@ const {
 const { computeArtifactSuggestionWarnings } = require('./helpers/artifact-warnings');
 // Contract 29 WS3 (D-465): Phil super-approver override side-effects.
 const { getPhil } = require('./helpers/phil');
-const { upsertDisplacedApproverConsultation } = require('./helpers/consultations');
+const { upsertDisplacedApproverConsultation, deriveInformedUserIds } = require('./helpers/consultations');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 // D-400: gates whose approval transitions a cycle INTO a counted WIP zone.
@@ -329,6 +329,41 @@ async function record_gate_decision(params, caller_user_id) {
         email_type:       'approver_override'
       });
     }
+  }
+
+  // ── Contract G4 (D-564): Informed parties receive gate decisions via the
+  // existing notification channel. Awareness only — never in waiting-on. The
+  // decision-maker is excluded; failures are non-fatal (decision already stands).
+  try {
+    const informedIds = (await deriveInformedUserIds(delivery_cycle_id))
+      .filter(id => id !== caller_user_id);
+    if (informedIds.length > 0) {
+      const { data: informedRows } = await supabase
+        .from('users')
+        .select('id, display_name, email')
+        .in('id', informedIds)
+        .is('deleted_at', null);
+      const informedRecipients = (informedRows || []).filter(u => u.email && u.is_active !== false)
+        .map(u => ({ email: u.email, display_name: u.display_name }));
+      if (informedRecipients.length > 0) {
+        const decisionWord = decision === 'approved' ? 'approved' : 'returned';
+        await sendGateNotificationEmail({
+          recipients:       informedRecipients,
+          subject:          `${cycle.cycle_title} — ${gateNameDisplay} ${decisionWord}`,
+          initiativeName:   cycle.cycle_title,
+          gateNameDisplay,
+          contextParagraph: `${callerDisplayName} ${decisionWord} ${gateNameDisplay} for ${cycle.cycle_title}. ` +
+                            `You are receiving this as an Informed party on the Initiative.`,
+          delivery_cycle_id,
+          email_type:       'informed_gate_decision'
+        });
+      }
+    }
+  } catch (informedErr) {
+    console.error(JSON.stringify({
+      tool_name: 'record_gate_decision', step: 'informed_notification',
+      delivery_cycle_id, error: informedErr?.message ?? String(informedErr)
+    }));
   }
 
   // ── EPO WIP check (D-400, Contract 20) ────────────────────────────────────

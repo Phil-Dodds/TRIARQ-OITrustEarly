@@ -61,6 +61,7 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
     queue = [
       { data: { ...baseCycle }, error: null },                       // cycle
       { data: { is_admin: true, display_name: 'Phil' }, error: null }, // caller
+      { data: { delivery_cycle_id: 'c1' }, error: null },            // sizing row (G3 D-567 pre-check)
       { data: approved(['brief_review']), error: null },             // predecessors
       { data: { artifact_type_id: 't-cb' }, error: null },           // Context Brief type
       { data: [], error: null },                                     // no attachments
@@ -75,6 +76,7 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
     queue = [
       { data: { ...baseCycle }, error: null },
       { data: { is_admin: true, display_name: 'Phil' }, error: null },
+      { data: { delivery_cycle_id: 'c1' }, error: null },            // sizing row (G3 D-567 pre-check)
       { data: approved(['brief_review']), error: null },
       { data: { artifact_type_id: 't-cb' }, error: null },
       { data: [{ cycle_artifact_id: 'a1' }], error: null },          // Context Brief present
@@ -90,6 +92,7 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
     queue = [
       { data: { ...baseCycle }, error: null },
       { data: { is_admin: true, display_name: 'Phil' }, error: null },
+      { data: { delivery_cycle_id: 'c1' }, error: null },            // sizing row (G3 D-567 pre-check)
       { data: approved(['brief_review']), error: null },
       { data: { artifact_type_id: 't-cb' }, error: null },
       { data: [{ cycle_artifact_id: 'a1' }], error: null },
@@ -105,6 +108,7 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
     queue = [
       { data: { ...baseCycle, ai_functionality: 'yes', ai_delivery_form: 'product_embedded', ai_audience: 'external' }, error: null },
       { data: { is_admin: true, display_name: 'Phil' }, error: null },
+      { data: { delivery_cycle_id: 'c1' }, error: null },            // sizing row (G3 D-567 pre-check)
       { data: approved(['brief_review', 'go_to_build']), error: null },
       { data: null, error: null }                                    // event insert
     ];
@@ -117,6 +121,7 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
     queue = [
       { data: { ...baseCycle, ai_functionality: 'unknown' }, error: null },
       { data: { is_admin: true, display_name: 'Phil' }, error: null },
+      { data: { delivery_cycle_id: 'c1' }, error: null },            // sizing row (G3 D-567 pre-check)
       { data: approved(['brief_review', 'go_to_build']), error: null },
       { data: null, error: null }
     ];
@@ -129,6 +134,7 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
     queue = [
       { data: { ...baseCycle, ai_functionality: 'yes', ai_delivery_form: 'analytics_outputs', ai_audience: 'internal' }, error: null },
       { data: { is_admin: true, display_name: 'Phil' }, error: null },
+      { data: { delivery_cycle_id: 'c1' }, error: null },            // sizing row (G3 D-567 pre-check)
       { data: approved(['brief_review', 'go_to_build', 'go_to_deploy']), error: null },
       { data: null, error: null }
     ];

@@ -43,7 +43,14 @@ import {
   EffectiveSprintCalendar,
   GateDateRuleType,
   SprintAnchor,
-  SetGateDateRuleResult
+  SetGateDateRuleResult,
+  // Contract G1/G3 (D-558/D-562/D-567)
+  InitiativeSizing,
+  GovernanceDerivation,
+  // Contract G4 (D-563/D-564)
+  ParticipationRecord,
+  SpecialtyGroup,
+  DivisionDefaultConsulted
 } from '../types/database';
 import {
   LatestInitiativeStatus,
@@ -212,9 +219,8 @@ export class DeliveryService {
     ai_delivery_form?:       'product_embedded' | 'analytics_outputs' | 'service_agent' | null;
     ai_audience?:            'external' | 'internal' | null;
     ai_board_approved?:      boolean;
-    // Contract 29 / D-458 (WS1): full-array replace; [] clears.
-    other_consulted_user_ids?: string[];
-    other_informed_user_ids?:  string[];
+    // Contract G4: D-458 array params retired (migration 084) — the MCP tool
+    // rejects them; participation is managed via the participation tools.
   }): Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>('delivery', 'update_delivery_cycle', params as Record<string, unknown>);
   }
@@ -704,4 +710,160 @@ export class DeliveryService {
       'delivery', 'delete_roadmap_freeze_date', params as Record<string, unknown>
     );
   }
+
+  // ── Contract G1/G3 — sizing + governance level (D-558, D-562, D-567) ───────
+
+  getInitiativeSizing(params: { delivery_cycle_id: string }):
+    Observable<McpResponse<{ sizing: InitiativeSizing | null; is_sized: boolean }>> {
+    return this.mcp.call<{ sizing: InitiativeSizing | null; is_sized: boolean }>(
+      'delivery', 'get_initiative_sizing', params as unknown as Record<string, unknown>
+    );
+  }
+
+  /** Saves sizing; recomputes + caches baseline. Post-Go-to-Build edits return
+   *  status REQUIRES_APPROVER_CONFIRMATION until approver_confirmed=true (G3). */
+  upsertInitiativeSizing(params: {
+    delivery_cycle_id:   string;
+    answers:             SizingAnswers;
+    subs?:               SizingSubs;
+    notes?:              SizingNotes;
+    approver_confirmed?: boolean;
+  }): Observable<McpResponse<SizingSaveResult>> {
+    return this.mcp.call<SizingSaveResult>(
+      'delivery', 'upsert_initiative_sizing', params as unknown as Record<string, unknown>
+    );
+  }
+
+  deriveGovernance(params: { delivery_cycle_id: string }):
+    Observable<McpResponse<GovernanceDerivation>> {
+    return this.mcp.call<GovernanceDerivation>(
+      'delivery', 'derive_governance', params as unknown as Record<string, unknown>
+    );
+  }
+
+  /** Stateless preview for the creation form's live Governance panel (G3). */
+  previewGovernanceDerivation(params: {
+    answers:      SizingAnswers;
+    subs?:        SizingSubs;
+    dcs_user_id?: string;
+  }): Observable<McpResponse<{
+    baseline_level: 1 | 2 | 3; explanation_chips: string[]; alerts: string[]; dcs_trusted: boolean;
+  }>> {
+    return this.mcp.call<{
+      baseline_level: 1 | 2 | 3; explanation_chips: string[]; alerts: string[]; dcs_trusted: boolean;
+    }>('delivery', 'preview_governance_derivation', params as unknown as Record<string, unknown>);
+  }
+
+  /** Admin → Divisions banner: non-leadership configs in L3 Divisions (G3, D-570c). */
+  getGovernanceConfigWarnings(): Observable<McpResponse<{ config_warnings: GovernanceConfigWarning[] }>> {
+    return this.mcp.call<{ config_warnings: GovernanceConfigWarning[] }>(
+      'delivery', 'get_governance_config_warnings', {}
+    );
+  }
+
+  // ── Contract G4 — participation (D-563/D-564) ───────────────────────────────
+
+  listParticipation(params: { delivery_cycle_id: string; include_removed?: boolean }):
+    Observable<McpResponse<{ participation_records: ParticipationRecord[] }>> {
+    return this.mcp.call<{ participation_records: ParticipationRecord[] }>(
+      'delivery', 'list_participation', params as unknown as Record<string, unknown>
+    );
+  }
+
+  /** "Initiatives I'm following" — the caller's active C/I stakes with Initiative context. */
+  listMyParticipation(): Observable<McpResponse<{ participation_records: ParticipationRecord[] }>> {
+    return this.mcp.call<{ participation_records: ParticipationRecord[] }>(
+      'delivery', 'list_my_participation', {}
+    );
+  }
+
+  addParticipation(params: {
+    delivery_cycle_id: string;
+    letter:            'C' | 'I';
+    holder_user_id?:   string;
+    holder_group_id?:  string;
+    set_via:           'trio' | 'self' | 'rule' | 'division_default' | 'approver' | 'leadership';
+  }): Observable<McpResponse<ParticipationRecord>> {
+    return this.mcp.call<ParticipationRecord>(
+      'delivery', 'add_participation', params as unknown as Record<string, unknown>
+    );
+  }
+
+  /** Note required when the remover is not the holder (D-564). */
+  removeParticipation(params: { record_id: string; note?: string }):
+    Observable<McpResponse<ParticipationRecord>> {
+    return this.mcp.call<ParticipationRecord>(
+      'delivery', 'remove_participation', params as unknown as Record<string, unknown>
+    );
+  }
+
+  listSpecialtyGroups(): Observable<McpResponse<{ specialty_groups: SpecialtyGroup[] }>> {
+    return this.mcp.call<{ specialty_groups: SpecialtyGroup[] }>(
+      'delivery', 'list_specialty_groups', {}
+    );
+  }
+
+  listDivisionDefaultConsulteds(params: { division_id: string }):
+    Observable<McpResponse<{ division_default_consulteds: DivisionDefaultConsulted[] }>> {
+    return this.mcp.call<{ division_default_consulteds: DivisionDefaultConsulted[] }>(
+      'delivery', 'list_division_default_consulteds', params as unknown as Record<string, unknown>
+    );
+  }
+
+  addDivisionDefaultConsulted(params: {
+    division_id: string; holder_user_id?: string; holder_group_id?: string;
+  }): Observable<McpResponse<DivisionDefaultConsulted>> {
+    return this.mcp.call<DivisionDefaultConsulted>(
+      'delivery', 'add_division_default_consulted', params as unknown as Record<string, unknown>
+    );
+  }
+
+  removeDivisionDefaultConsulted(params: { default_consulted_id: string }):
+    Observable<McpResponse<{ default_consulted_id: string; removed: boolean }>> {
+    return this.mcp.call<{ default_consulted_id: string; removed: boolean }>(
+      'delivery', 'remove_division_default_consulted', params as unknown as Record<string, unknown>
+    );
+  }
+}
+
+// ── Contract G3 payload shapes ────────────────────────────────────────────────
+export interface SizingAnswers {
+  q1_investment:      'small' | 'medium' | 'large' | 'xlarge';
+  q2_novelty:         'standard' | 'major';
+  q3_wrongness:       'contained' | 'significant' | 'large_hard';
+  q4_security_impact: boolean;
+  q5_ux:              'standard' | 'critical';
+}
+export interface SizingSubs {
+  q1_sub_engineering?: 'small' | 'medium' | 'large' | 'xlarge';
+  q1_sub_operational?: 'small' | 'medium' | 'large' | 'xlarge';
+  q2_sub_persona?:     'well_known' | 'new';
+  q2_sub_scenarios?:   'highly_studied' | 'in_discovery';
+  q2_sub_technology?:  'standard' | 'new_untried';
+  q2_sub_new_vendor?:  boolean;
+  q3_sub_blast?:       'contained_internal' | 'external_large';
+  q3_sub_correctable?: 'easy' | 'difficult';
+  q5_sub_facing?:      'none' | 'patient' | 'provider_clinical';
+  q5_sub_application?: 'established' | 'new_application';
+}
+export interface SizingNotes {
+  q1_note?: string; q2_note?: string; q3_note?: string; q4_note?: string; q5_note?: string;
+}
+export interface SizingSaveResult {
+  sizing:          InitiativeSizing;
+  baseline_level:  1 | 2 | 3 | null;
+  effective_level: 1 | 2 | 3 | null;
+  alerts:          string[];
+  /** Present on the REQUIRES_APPROVER_CONFIRMATION preview response instead. */
+  current_baseline_level?: 1 | 2 | 3 | null;
+  new_baseline_level?:     1 | 2 | 3 | null;
+  message?:                string;
+}
+export interface GovernanceConfigWarning {
+  division_id:           string;
+  division_name:         string | null;
+  gate_name:             GateName;
+  approver_user_id:      string;
+  approver_display_name: string | null;
+  l3_initiative_count:   number;
 }

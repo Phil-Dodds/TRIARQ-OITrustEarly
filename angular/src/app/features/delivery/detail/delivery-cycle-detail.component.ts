@@ -86,6 +86,10 @@ import {
   ruleChipLabel
 } from '../../../core/utils/sprint-resolution';
 import { EggSpotComponent } from '../../easter-eggs/egg-spot.component';
+// Contract G3 (D-567/D-562): post-creation sizing edit dialog.
+import { SizingEditDialogComponent, SizingEditDialogData } from '../sizing-form/sizing-edit-dialog.component';
+// Contract G4 (D-563/D-564): participation section (replaces D-458 array pills).
+import { InitiativeParticipationSectionComponent } from '../participation/initiative-participation-section.component';
 import { EGG_KEYS }         from '../../../core/constants/easter-egg.constants';
 
 const GATE_LABELS: Record<GateName, string> = {
@@ -119,7 +123,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent, InitiativeStatusUpdatePanelComponent, InitiativeStatusHistoryPanelComponent, EggSpotComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent, InitiativeStatusUpdatePanelComponent, InitiativeStatusHistoryPanelComponent, EggSpotComponent, InitiativeParticipationSectionComponent],
   styles: [`:host { display: block; position: relative; }`],
   template: `
 
@@ -240,8 +244,17 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                            letter-spacing:0.5px;">
                 {{ currentStageLabel || cycle.current_lifecycle_stage }}
               </span>
+              <!-- Contract G3 (D-567): sized Initiatives show the governance
+                   level chip; unsized legacy keeps the tier badge (AC #4). -->
+              <span *ngIf="cycleIsSized"
+                    style="font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
+                           border-radius:999px;padding:3px 10px;background:#257099;color:#fff;"
+                    [title]="levelChipTooltip">
+                {{ levelChipText }}
+              </span>
               <!-- Tier badge — Visual Layout Standards 1.7/3.1: tier colors, 4px radius -->
-              <span [style.background]="tierBadgeBg(cycle.tier_classification)"
+              <span *ngIf="!cycleIsSized"
+                    [style.background]="tierBadgeBg(cycle.tier_classification)"
                     [style.color]="tierBadgeColor(cycle.tier_classification)"
                     style="font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
                            border-radius:4px;padding:3px 8px;">
@@ -751,30 +764,39 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </span>
           </div>
 
-          <!-- Other Consulted — D-458 (WS1). Read-only chips; hidden when empty in View mode. -->
-          <div *ngIf="cycle.other_consulted_users?.length">
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Other Consulted</div>
-            <span *ngFor="let u of cycle.other_consulted_users"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;margin:0 4px 4px 0;
-                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
-              {{ u.display_name || 'Unknown' }}
-            </span>
-          </div>
+          <!-- Contract G4 (D-563/D-564): participation section replaces the
+               D-458 array pill blocks (arrays retired by migration 084). -->
+          <app-initiative-participation-section
+            [deliveryCycleId]="cycle.delivery_cycle_id"
+            [viewerUserId]="viewerUserId"
+            [canAttach]="callerCanSubmitGates"
+            [allUsers]="allUsers">
+          </app-initiative-participation-section>
 
-          <!-- Other Informed — D-458 (WS1). Read-only chips; hidden when empty in View mode. -->
-          <div *ngIf="cycle.other_informed_users?.length">
+          <!-- Contract G3 (D-562/D-567): Governance level for sized Initiatives;
+               legacy tier badge retained for never-sized ones (AC #4). -->
+          <div *ngIf="cycleIsSized">
             <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Other Informed</div>
-            <span *ngFor="let u of cycle.other_informed_users"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;margin:0 4px 4px 0;
-                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
-              {{ u.display_name || 'Unknown' }}
+                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Governance Level</div>
+            <span style="display:inline-block;border-radius:999px;padding:3px 10px;
+                         font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
+                         background:#257099;color:#fff;"
+                  [title]="levelChipTooltip">
+              {{ levelChipText }}
             </span>
+            <div *ngIf="levelAttributionLine"
+                 style="margin-top:4px;font-size:11px;font-style:italic;color:#5A5A5A;">
+              {{ levelAttributionLine }}
+            </div>
+            <button *ngIf="callerCanSubmitGates" type="button"
+                    (click)="openSizingEdit()"
+                    style="margin-top:4px;background:none;border:none;padding:0;
+                           font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;">
+              Edit sizing
+            </button>
           </div>
-
           <!-- Tier — badge chip per Visual Layout Standards 1.7. CC-Decision-2026-04-12-A: Contract 5 restores badge. -->
-          <div>
+          <div *ngIf="!cycleIsSized">
             <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
                         color:var(--triarq-color-text-secondary);margin-bottom:4px;">Tier</div>
             <span *ngIf="cycle.tier_classification"
@@ -3686,6 +3708,63 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   }
 
   /** Gate status font weight per Visual Layout Standards 1.7 */
+  // ── Contract G3 (D-562/D-567): governance level chip + sizing edit ─────────
+
+  /** Contract G4: viewer identity for the participation section (one-tap Informed). */
+  get viewerUserId(): string | null {
+    return this.profileService.getCurrentProfile()?.id ?? null;
+  }
+
+  /** Sized = baseline cached or a set level exists (recompute writes baseline
+   *  on every sizing upsert). Unsized legacy keeps the tier badge (AC #4). */
+  get cycleIsSized(): boolean {
+    return this.cycle?.baseline_level != null || this.cycle?.set_level != null;
+  }
+
+  get effectiveGovernanceLevel(): number | null {
+    return this.cycle?.set_level ?? this.cycle?.baseline_level ?? null;
+  }
+
+  get levelChipText(): string {
+    const level = this.effectiveGovernanceLevel;
+    return level ? `Level ${level}` : 'Unsized';
+  }
+
+  /** D-562 attribution when set diverges from computed; D-570a interim line at L1. */
+  get levelAttributionLine(): string {
+    const c = this.cycle;
+    if (!c || c.set_level == null) { return ''; }
+    if (c.set_level === c.baseline_level) { return ''; }
+    const setter = this.allUsers.find(u => u.id === c.set_level_by_user_id)?.display_name ?? 'leadership';
+    const computed = c.baseline_level != null ? `Level ${c.baseline_level}` : 'unsized';
+    const reason = c.set_level_reason ? ` — ${c.set_level_reason}` : '';
+    return `Level ${c.set_level} — set by ${setter}; computed: ${computed}${reason}`;
+  }
+
+  get levelChipTooltip(): string {
+    // G3 transition state: L1 still routes the standard approver until G5.
+    if (this.effectiveGovernanceLevel === 1) {
+      return 'Trio self-governance arrives with a coming release; until then this gate uses the standard approver.';
+    }
+    return this.levelAttributionLine || 'Governance level derived from the sizing answers.';
+  }
+
+  /** Contract G3: post-creation sizing edit (MCP guards post-GtB edits). */
+  openSizingEdit(): void {
+    if (!this.cycle) { return; }
+    this.dialog.open(SizingEditDialogComponent, {
+      data: {
+        delivery_cycle_id: this.cycle.delivery_cycle_id,
+        cycle_title:       this.cycle.cycle_title,
+        dcs_user_id:       this.cycle.assigned_dcs_user_id ?? null
+      } as SizingEditDialogData,
+      width: '560px',
+      maxWidth: '92vw'
+    }).afterClosed().subscribe(saved => {
+      if (saved && this.cycle) { this.loadCycle(this.cycle.delivery_cycle_id); } // S-008 refresh
+    });
+  }
+
   gateStatusFontWeight(dateStatus: DateStatus): string {
     return dateStatus === 'not_started' ? '400' : '600';
   }
@@ -3819,7 +3898,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
         return [
           { label: 'Scenario document attached',                                   met: hasName(briefArts, 'scenario') },
           { label: 'Outcome Statement set',                                        met: !!c.outcome_statement },
-          { label: 'Tier classification set',                                      met: !!c.tier_classification },
+          // Contract G3 (D-558/D-567): sized Initiatives get the advisory
+          // review question (always amber — a prompt, not a completable check);
+          // unsized legacy keeps the tier row until migration.
+          ...(this.cycleIsSized
+            ? [{ label: 'Do the sizing answers still look right now that the brief is written?', met: false }]
+            : [{ label: 'Tier classification set', met: !!c.tier_classification }]),
         ];
       case 'go_to_deploy':
         return [

@@ -222,6 +222,11 @@ export interface McpResponse<T = unknown> {
   /** Contract 29 WS3 (D-463): submit_gate_for_approval returns the resolved
    *  Accountable approver so the submitter sees who the gate routed to. */
   assigned_approver?: { id: string; display_name: string | null };
+  /** Contract G2 (D-557/D-570): submit_gate_for_approval resolution metadata.
+   *  warnings carries e.g. 'level3_sub_leadership_config_ignored' (D-570c). */
+  effective_level?:  1 | 2 | 3 | null;
+  approver_source?:  string;
+  warnings?:         string[];
 }
 
 // ── Contract 28 / D-447–D-450: skip flow response payloads ───────────────────
@@ -756,6 +761,12 @@ export interface ParticipationRecord {
   // Resolved by list tools.
   holder_display_name?: string | null;
   holder_group_name?:   string | null;
+  // Contract G4: Initiative context joined by list_my_participation
+  // ("Initiatives I'm following").
+  cycle_title?:             string | null;
+  current_lifecycle_stage?: LifecycleStage | null;
+  division_id?:             string | null;
+  effective_level?:         1 | 2 | 3 | null;
 }
 
 /** division_default_consulteds row (migration 082, D-563). */

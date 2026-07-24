@@ -45,6 +45,8 @@ import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/materia
 import { DeliveryService } from '../../../core/services/delivery.service';
 import { UserProfileService } from '../../../core/services/user-profile.service';
 import { GateConsultationSectionComponent } from './gate-consultation-section.component';
+// Contract G3 (D-567/D-558): sizing interstitial + Go to Build confirm step.
+import { InitiativeSizingFormComponent, SizingFormPayload } from '../sizing-form/initiative-sizing-form.component';
 import { GATE_COACHING_SHORT } from '../../../shared/constants/gate-coaching.constants';
 import {
   DeliveryCycle,
@@ -57,7 +59,8 @@ import {
   EpoWipWarning,
   GateDecisionResult,
   GateSkipInterstitialPayload,
-  DeployGateSkipBlockedPayload
+  DeployGateSkipBlockedPayload,
+  InitiativeSizing
 } from '../../../core/types/database';
 
 export interface GateRecordModalData {
@@ -89,7 +92,7 @@ const GATE_LABELS: Record<GateName, string> = {
   selector:        'app-gate-record-modal',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, GateConsultationSectionComponent],
+  imports:         [CommonModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, GateConsultationSectionComponent, InitiativeSizingFormComponent],
   template: `
     <div class="grm-shell" [attr.aria-busy]="processing ? 'true' : null">
 
@@ -433,6 +436,66 @@ const GATE_LABELS: Record<GateName, string> = {
                       type="button"
                       [disabled]="processing"
                       (click)="onCancelSkip()">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONTRACT G3 (D-567): sizing required interstitial ──────────── -->
+        <div *ngIf="confirmMode === 'sizing-required'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              Sizing is required before this gate can be submitted. Answer the
+              five questions — the submission continues once sizing is saved.
+            </div>
+            <app-initiative-sizing-form
+              [dcsUserId]="data.cycle.assigned_dcs_user_id ?? null"
+              (payloadChange)="onSizingPayloadChange($event)">
+            </app-initiative-sizing-form>
+            <div *ngIf="sizingSaveError" class="oi-inline-error" role="alert">
+              <div class="oi-inline-error-primary">{{ sizingSaveError }}</div>
+            </div>
+            <div class="grm-action-row">
+              <button class="grm-btn-primary" type="button"
+                      [disabled]="processing"
+                      (click)="onSaveSizingAndSubmit()">
+                {{ processing && processingAction === 'save-sizing' ? 'Saving…' : 'Save Sizing & Submit Gate' }}
+              </button>
+              <button class="grm-btn-ghost" type="button"
+                      [disabled]="processing"
+                      (click)="onCancelSizing()">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONTRACT G3: Go to Build confirm — re-present the answers ──── -->
+        <div *ngIf="confirmMode === 'sizing-confirm'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              Confirm the sizing answers before submitting Go to Build — do they
+              still look right?
+            </div>
+            <app-initiative-sizing-form
+              [initialSizing]="confirmSizing"
+              [dcsUserId]="data.cycle.assigned_dcs_user_id ?? null"
+              [readOnly]="true"
+              [showGovernancePanel]="false"
+              (payloadChange)="onSizingPayloadChange($event)">
+            </app-initiative-sizing-form>
+            <div class="grm-action-row">
+              <button class="grm-btn-primary" type="button"
+                      [disabled]="processing"
+                      (click)="onConfirmSizingProceed()">
+                Confirm & Submit
+              </button>
+              <button class="grm-btn-ghost" type="button"
+                      [disabled]="processing"
+                      (click)="onCancelSizing()">
                 Cancel
               </button>
             </div>
@@ -786,7 +849,9 @@ export class GateRecordModalComponent {
     | 'skip-interstitial'
     | 'deploy-blocked'
     | 'submitted'                       // Contract 29 WS3 — post-submit approver confirmation
-    | 'backdate-confirm' = 'none';
+    | 'backdate-confirm'
+    | 'sizing-required'                 // Contract G3 (D-567) — migration interstitial
+    | 'sizing-confirm' = 'none';        // Contract G3 — Go to Build answer re-presentation
   /** Contract 29 WS3 (D-463/AC-32): resolved approver shown in the submit confirmation. */
   submittedApprover: { id: string; display_name: string | null } | null = null;
   /** D-489: "Why is this gate ready?" draft — sent with submit, trimmed to null server-side. */
@@ -799,7 +864,19 @@ export class GateRecordModalComponent {
     | 'withdraw'
     | 'confirm-skip'
     | 'backdate'
+    | 'save-sizing'
     | null = null;
+
+  /** Contract G3 (D-567/D-558): sizing interstitial + Go to Build confirm state. */
+  sizingPayload: SizingFormPayload | null = null;
+  sizingSaveError = '';
+  confirmSizing: InitiativeSizing | null = null;   // loaded answers for the GtB re-present
+  private gtbSizingConfirmed = false;
+
+  /** Sized = baseline cached (recompute writes it on every sizing upsert) or a set level exists. */
+  get cycleIsSized(): boolean {
+    return this.data.cycle.baseline_level != null || this.data.cycle.set_level != null;
+  }
 
   /** Contract 28 / D-448 — list of predecessor gates flagged to be marked as
    *  skipped. Populated when submit_gate_for_approval returns
@@ -1053,6 +1130,37 @@ export class GateRecordModalComponent {
    *  interstitial or deploy-blocked state when the backend pre-check finds
    *  unapproved predecessors. Normal path is unchanged. */
   onSubmit(): void {
+    // Contract G3: Go to Build confirmation step — re-present the sizing
+    // answers before submission; proceed = confirm (D-567). Skipped when the
+    // answers were just entered via the sizing interstitial in this session.
+    if (this.data.gateName === 'go_to_build' && this.cycleIsSized && !this.gtbSizingConfirmed) {
+      this.startProcessing('submit');
+      this.delivery.getInitiativeSizing({ delivery_cycle_id: this.data.cycle.delivery_cycle_id })
+        .subscribe({
+          next: (res) => {
+            this.endProcessing();
+            if (res.success && res.data?.sizing) {
+              this.confirmSizing = res.data.sizing;
+              this.confirmMode = 'sizing-confirm';
+            } else {
+              // No sizing row despite level columns — fall through to the
+              // server, which will interpose REQUIRES_SIZING if needed.
+              this.gtbSizingConfirmed = true;
+              this.onSubmit();
+              return;
+            }
+            this.cdr.markForCheck();
+          },
+          error: () => {
+            // Read failure — proceed; the server enforces D-567 regardless.
+            this.endProcessing();
+            this.gtbSizingConfirmed = true;
+            this.onSubmit();
+          }
+        });
+      return;
+    }
+
     this.startProcessing('submit');
 
     const note = this.submissionNoteDraft.trim();
@@ -1063,6 +1171,14 @@ export class GateRecordModalComponent {
       ...(note ? { submission_note: note } : {})
     }).subscribe({
       next: (res) => {
+        // Contract G3 (D-567): sizing interstitial — the Initiative has no
+        // sizing row; interpose the form, then continue in the same flow.
+        if (res.success && res.status === 'REQUIRES_SIZING') {
+          this.endProcessing();
+          this.confirmMode = 'sizing-required';
+          this.cdr.markForCheck();
+          return;
+        }
         // D-448: skip interstitial — non-error response (success:true) that
         // carries gates_to_skip and asks the user to confirm.
         if (res.success && res.status === 'REQUIRES_SKIP_CONFIRMATION') {
@@ -1147,6 +1263,67 @@ export class GateRecordModalComponent {
     this.pendingSkipGates = [];
     this.confirmMode      = 'none';
     this.cdr.markForCheck();
+  }
+
+  // ── Contract G3 (D-567/D-558): sizing interstitial + GtB confirm ───────────
+
+  onSizingPayloadChange(payload: SizingFormPayload): void {
+    this.sizingPayload = payload;
+    if (payload.valid) { this.sizingSaveError = ''; }
+    this.cdr.markForCheck();
+  }
+
+  /** Migration step: save the interposed sizing, then continue the original
+   *  gate submission in the same flow (AC #3). Entering the answers here IS
+   *  the Go to Build confirmation when this gate is Go to Build. */
+  onSaveSizingAndSubmit(): void {
+    if (!this.sizingPayload?.valid) {
+      this.sizingSaveError = 'Answer all five sizing questions to continue.';
+      this.cdr.markForCheck();
+      return;
+    }
+    this.startProcessing('save-sizing');
+    this.delivery.upsertInitiativeSizing({
+      delivery_cycle_id: this.data.cycle.delivery_cycle_id,
+      answers: this.sizingPayload.answers,
+      subs:    this.sizingPayload.subs,
+      notes:   this.sizingPayload.notes
+    }).subscribe({
+      next: (res) => {
+        if (res.success && res.data && !res.status) {
+          // Keep the modal's cycle in sync so cycleIsSized flips (level chip
+          // refresh happens on the parent's post-close reload).
+          this.data.cycle.baseline_level = res.data.baseline_level ?? null;
+          this.gtbSizingConfirmed = true;   // answers just entered = confirmed
+          this.confirmMode = 'none';
+          this.endProcessing();
+          this.onSubmit();                  // submission continues in the same flow
+        } else {
+          this.endProcessing();
+          this.sizingSaveError = res.error ?? res.data?.message ?? 'Sizing save failed. Please try again.';
+          this.cdr.markForCheck();
+        }
+      },
+      error: (err: { error?: string }) => {
+        this.endProcessing();
+        this.sizingSaveError = err.error ?? 'Sizing save failed. Please try again.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  onCancelSizing(): void {
+    this.confirmMode = 'none';
+    this.sizingSaveError = '';
+    this.cdr.markForCheck();
+  }
+
+  /** Go to Build: user confirmed the re-presented answers — proceed = confirm. */
+  onConfirmSizingProceed(): void {
+    this.gtbSizingConfirmed = true;
+    this.confirmMode = 'none';
+    this.cdr.markForCheck();
+    this.onSubmit();
   }
 
   onCloseDeployBlocked(): void {
@@ -1318,7 +1495,7 @@ export class GateRecordModalComponent {
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
   private startProcessing(
-    action: 'submit' | 'approve' | 'return' | 'withdraw' | 'confirm-skip' | 'backdate'
+    action: 'submit' | 'approve' | 'return' | 'withdraw' | 'confirm-skip' | 'backdate' | 'save-sizing'
   ): void {
     this.processing       = true;
     this.processingAction = action;
