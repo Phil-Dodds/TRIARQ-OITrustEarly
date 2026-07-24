@@ -390,8 +390,11 @@ async function record_gate_decision(params, caller_user_id) {
   // Shared computation lives in helpers/artifact-warnings (CC-24-07 follow-up).
   // Wire shape is artifact_type_name[] — preserves the Angular gate-record
   // modal contract. Approval status is unchanged regardless.
+  // Run 2 F-1 fix (Checkpoint 2026-07-23 ruling 2): the param domain is
+  // 'approved'|'returned' — the old `=== 'approve'` comparison never matched,
+  // so suggestion_warnings silently never computed on approval.
   let suggestion_warnings = [];
-  if (decision === 'approve') {
+  if (decision === 'approved') {
     const warningEntries = await computeArtifactSuggestionWarnings(delivery_cycle_id, gate_name);
     suggestion_warnings = warningEntries.map(w => w.artifact_type_name);
   }

@@ -185,13 +185,13 @@ describe('resolveGateApproverV2 — Level 1 transition (D-570a, S-C4)', () => {
   });
 });
 
-describe('resolveGateApproverV2 — Level 3 leadership-only (D-570c, S-C1)', () => {
+describe('resolveGateApproverV2 — Level 3 leadership-only (D-570c, S-C1, Checkpoint CC-G2-01)', () => {
   test('config naming non-leadership → ignored, resolves DL, warning (AC #5)', async () => {
     queue = [
       { data: { approver_user_id: CFG }, error: null },  // config exists
-      { data: { id: CFG, is_super_admin: false }, error: null }, // isLeadership: user row
-      { data: null, error: null },                       // isLeadership: owns no division
-      { data: { owner_user_id: DL }, error: null },      // division
+      { data: { id: CFG, is_super_admin: false }, error: null }, // leadership: user row
+      { data: { id: DIV, owner_user_id: DL, parent_division_id: null }, error: null }, // chain walk: cycle division
+      { data: { owner_user_id: DL }, error: null },      // terminal: division
       { data: { id: DL }, error: null }                  // isLiveUser(DL)
     ];
     const r = await resolveGateApproverV2({
@@ -206,10 +206,10 @@ describe('resolveGateApproverV2 — Level 3 leadership-only (D-570c, S-C1)', () 
   test('oversight naming non-leadership → ignored with same warning class', async () => {
     queue = [
       { data: { id: OVR }, error: null },                        // isLiveUser(oversight)
-      { data: { id: OVR, is_super_admin: false }, error: null }, // isLeadership: user
-      { data: null, error: null },                               // owns no division
+      { data: { id: OVR, is_super_admin: false }, error: null }, // leadership: user row
+      { data: { id: DIV, owner_user_id: DL, parent_division_id: null }, error: null }, // chain walk
       { data: null, error: null },                               // no config
-      { data: { owner_user_id: DL }, error: null },              // division
+      { data: { owner_user_id: DL }, error: null },              // terminal: division
       { data: { id: DL }, error: null }                          // isLiveUser(DL)
     ];
     const r = await resolveGateApproverV2({
@@ -219,11 +219,12 @@ describe('resolveGateApproverV2 — Level 3 leadership-only (D-570c, S-C1)', () 
     assert.ok(r.warnings.includes('level3_sub_leadership_config_ignored'));
   });
 
-  test('oversight naming leadership (a Division owner) is honored at L3', async () => {
+  test('oversight naming an ANCESTOR Division Leader is honored at L3 (CC-G2-01 corrected)', async () => {
     queue = [
       { data: { id: OVR }, error: null },                        // isLiveUser(oversight)
-      { data: { id: OVR, is_super_admin: false }, error: null }, // isLeadership: user
-      { data: { id: 'other-div' }, error: null }                 // owns a division
+      { data: { id: OVR, is_super_admin: false }, error: null }, // leadership: user row
+      { data: { id: DIV, owner_user_id: DL, parent_division_id: 'parent-div' }, error: null }, // chain: own division
+      { data: { id: 'parent-div', owner_user_id: OVR, parent_division_id: null }, error: null } // chain: parent owned by OVR
     ];
     const r = await resolveGateApproverV2({
       cycle: baseCycle({ baseline_level: 3, oversight_user_id: OVR }), gate_name: 'go_to_build'
@@ -231,6 +232,24 @@ describe('resolveGateApproverV2 — Level 3 leadership-only (D-570c, S-C1)', () 
     assert.equal(r.approver_user_id, OVR);
     assert.equal(r.source, 'oversight');
     assert.deepEqual(r.warnings, []);
+  });
+
+  test('a CROSS-DIVISION owner is NOT leadership for this cycle (CC-G2-01 corrected)', async () => {
+    // OVR owns some unrelated Division — the cycle's ancestor chain never
+    // reaches it, so the oversight is ignored with the warning.
+    queue = [
+      { data: { id: OVR }, error: null },                        // isLiveUser(oversight)
+      { data: { id: OVR, is_super_admin: false }, error: null }, // leadership: user row
+      { data: { id: DIV, owner_user_id: DL, parent_division_id: null }, error: null }, // chain: own division only
+      { data: null, error: null },                               // no config
+      { data: { owner_user_id: DL }, error: null },              // terminal: division
+      { data: { id: DL }, error: null }                          // isLiveUser(DL)
+    ];
+    const r = await resolveGateApproverV2({
+      cycle: baseCycle({ baseline_level: 3, oversight_user_id: OVR }), gate_name: 'go_to_build'
+    });
+    assert.equal(r.approver_user_id, DL);
+    assert.ok(r.warnings.includes('level3_sub_leadership_config_ignored'));
   });
 
   test('no config, no oversight → DL directly, no warning', async () => {
@@ -244,6 +263,18 @@ describe('resolveGateApproverV2 — Level 3 leadership-only (D-570c, S-C1)', () 
     });
     assert.equal(r.approver_user_id, DL);
     assert.deepEqual(r.warnings, []);
+  });
+});
+
+describe('F-1 regression (Checkpoint ruling 2) — decision param domain', () => {
+  // Source-assertion style (repo precedent: tools.test.js buildEpoSummaries).
+  // The defect: `decision === 'approve'` never matched the 'approved'|'returned'
+  // domain, so suggestion_warnings never computed on approval.
+  test("record_gate_decision compares 'approved', never bare 'approve'", () => {
+    const fs = require('node:fs');
+    const src = fs.readFileSync(require.resolve('../src/tools/record_gate_decision.js'), 'utf8');
+    assert.ok(!/decision\s*===\s*'approve'/.test(src), "bare 'approve' comparison must not return");
+    assert.match(src, /decision\s*===\s*'approved'/);
   });
 });
 

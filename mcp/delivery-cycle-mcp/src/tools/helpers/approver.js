@@ -79,11 +79,13 @@ async function resolveGateApprover({ division_id, gate_name }) {
 // ── Contract G2 — Approver Resolution v2 (D-557/D-561/D-570) ─────────────────
 
 /**
- * Is this user "leadership" for L3 purposes — owner of any live Division, or
- * Phil? (CC-G2 lean: spec says L3 is leadership-only without defining the
- * boundary; any-Division-owner is the widest defensible reading of DL.)
+ * Is this user "leadership" FOR THIS CYCLE at L3 (Checkpoint 2026-07-23,
+ * CC-G2-01 CORRECTED): Phil (is_super_admin), the cycle's own Division
+ * Leader, or the leader of any ANCESTOR Division in the parent chain.
+ * Owners of Divisions outside the cycle's ancestor chain are NOT leadership
+ * for that cycle. IE joins this set at G8.
  */
-async function isLeadershipUser(user_id) {
+async function isLeadershipForCycle(user_id, division_id) {
   if (!user_id) { return false; }
   const { data: userRow } = await supabase
     .from('users')
@@ -93,14 +95,24 @@ async function isLeadershipUser(user_id) {
     .maybeSingle();
   if (!userRow) { return false; }
   if (userRow.is_super_admin === true) { return true; }
-  const { data: ownedDivision } = await supabase
-    .from('divisions')
-    .select('id')
-    .eq('owner_user_id', user_id)
-    .is('deleted_at', null)
-    .limit(1)
-    .maybeSingle();
-  return !!ownedDivision;
+
+  // Walk the Division parent chain (Trust → Service Line → Functional Team is
+  // 3 levels today; depth-guarded against accidental cycles).
+  let currentDivisionId = division_id;
+  let depth = 0;
+  while (currentDivisionId && depth < 10) {
+    const { data: division } = await supabase
+      .from('divisions')
+      .select('id, owner_user_id, parent_division_id')
+      .eq('id', currentDivisionId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!division) { break; }
+    if (division.owner_user_id === user_id) { return true; }
+    currentDivisionId = division.parent_division_id;
+    depth += 1;
+  }
+  return false;
 }
 
 /** Live (non-deleted) user check shared by v2 tiers. */
@@ -172,7 +184,7 @@ async function resolveGateApproverV2({ cycle, gate_name }) {
         dual_write: true
       };
     }
-    if (await isLeadershipUser(cycle.oversight_user_id)) {
+    if (await isLeadershipForCycle(cycle.oversight_user_id, cycle.division_id)) {
       return {
         approver_user_id: cycle.oversight_user_id,
         source: 'oversight',
@@ -216,7 +228,7 @@ async function resolveGateApproverV2({ cycle, gate_name }) {
             dual_write: true
           };
         }
-      } else if (!(await isLeadershipUser(config.approver_user_id))) {
+      } else if (!(await isLeadershipForCycle(config.approver_user_id, cycle.division_id))) {
         // L3 (D-570c/S-C1): sub-leadership config exists and is ignored.
         if (!warnings.includes('level3_sub_leadership_config_ignored')) {
           warnings.push('level3_sub_leadership_config_ignored');
@@ -279,4 +291,4 @@ async function recordAssignedDualWrite(gate_record_id, approver_user_id) {
   return { written: true, error: null };
 }
 
-module.exports = { resolveGateApprover, resolveGateApproverV2, recordAssignedDualWrite };
+module.exports = { resolveGateApprover, resolveGateApproverV2, recordAssignedDualWrite, isLeadershipForCycle };
