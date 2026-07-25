@@ -58,9 +58,11 @@ function buildDerivationExplanation(sizing, assignedDcsTrusted) {
   }
   if (chips.length > 0) { return chips; }
 
+  // Phil 2026-07-24: the trusted-DCS rule stays silent on screen — never name
+  // a person as untrusted. Both branches get the same neutral explanation.
   chips.push(assignedDcsTrusted === true
-    ? 'All answers small/standard/contained with a trusted DCS → Level 1'
-    : 'All answers small/standard/contained but the assigned DCS is not trusted (or none assigned) → Level 2');
+    ? 'All answers small/standard/contained → Level 1'
+    : 'All answers small/standard/contained → Level 2');
   return chips;
 }
 

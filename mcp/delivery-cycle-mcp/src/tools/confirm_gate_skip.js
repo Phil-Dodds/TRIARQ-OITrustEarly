@@ -186,8 +186,12 @@ async function confirm_gate_skip(params, caller_user_id) {
   // After the skip writes above, the predecessor pre-check inside
   // submit_gate_for_approval will see all earlier gates as 'skipped' or
   // 'approved' and fall through to normal submission.
+  // Phil override (2026-07-24): carry the flag through so an override
+  // submission that routed via the skip interstitial stays an override.
+  // submit_gate_for_approval itself re-verifies the caller is Phil.
   const submissionResult = await submit_gate_for_approval(
-    { delivery_cycle_id, gate_name: submitted_gate },
+    { delivery_cycle_id, gate_name: submitted_gate,
+      ...(params.phil_override === true ? { phil_override: true } : {}) },
     caller_user_id
   );
 

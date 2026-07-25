@@ -179,12 +179,31 @@ async function record_gate_decision(params, caller_user_id) {
   // When no approver configured, any Admin can approve (Build C default).
   const approverUnconfigured = !gate_record.approver_user_id;
 
+  // ── Phil override (Phil 2026-07-24): data-cleanup / testing lever ─────────
+  // phil_override: true routes an approval straight through the single-approver
+  // transition — bypassing L1 consensus collection, open-condition holds, and
+  // the over-returned-consultation reason requirement. Phil-only; the UI
+  // confirms before sending; every use is event-logged.
+  const philOverride = params.phil_override === true;
+  if (philOverride) {
+    if (!isPhil) {
+      return { success: false, error: 'phil_override is available to Phil only.' };
+    }
+    await supabase.from('cycle_event_log').insert({
+      delivery_cycle_id,
+      event_type:        'phil_override',
+      event_description: `Phil override: '${gate_name}' ${decision} bypassing approval rules.`,
+      actor_user_id:     caller_user_id,
+      event_metadata:    { gate_name, action: 'decision_override', decision }
+    });
+  }
+
   // ── Contract G5 (D-557): Level 1 consensus route ───────────────────────────
   // L1 gates awaiting approval collect trio + consulted approvals instead of a
   // single approver decision. D-570a is retired — approver_user_id NULL is the
   // real L1 state; any single return by any collected party returns the gate
   // entirely (Checkpoint ruling 1 clearing semantics).
-  if (gate_record.gate_status === 'awaiting_approval' && isL1ConsensusGate(cycle, gate_record)) {
+  if (gate_record.gate_status === 'awaiting_approval' && !philOverride && isL1ConsensusGate(cycle, gate_record)) {
     const trioIds      = trioIdsOf(cycle);
     const isTrioMember = trioIds.includes(caller_user_id);
     if (!isTrioMember && !isAdmin) {
@@ -366,7 +385,7 @@ async function record_gate_decision(params, caller_user_id) {
       .eq('response', 'declined');
     returnedConsultations = declinedRows || [];
     const overReturnedReason = (params.over_returned_reason ?? params.override_reason ?? '').trim();
-    if (returnedConsultations.length > 0 && !overReturnedReason) {
+    if (returnedConsultations.length > 0 && !overReturnedReason && !philOverride) {
       return {
         success: false,
         error: 'RETURNED_CONSULTATION_REQUIRES_REASON',
@@ -429,7 +448,7 @@ async function record_gate_decision(params, caller_user_id) {
 
   // ── G6 (D-565): open conditions hold the approval — "nearly there — fix
   // these" must be satisfied (or resolved by the approver) before approving.
-  {
+  if (!philOverride) {
     const openConditions = await countOpenConditions(gate_record.gate_record_id);
     if (openConditions.count > 0) {
       return {

@@ -65,9 +65,22 @@ import {
       <app-loading-overlay [visible]="submitting" message="Creating Initiative…"></app-loading-overlay>
 
       <!-- Panel header -->
+      <!-- Phil 2026-07-24: Cancel/Create moved into the sticky header (Edit
+           panel pattern) — the footer buttons were clipping at the viewport
+           bottom on tall forms. -->
       <div class="cp-header">
         <h2 class="cp-title">New Initiative</h2>
-        <button class="cp-close" type="button" (click)="close()" aria-label="Close panel">✕</button>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button type="button" class="cp-btn-cancel" (click)="close()">Cancel</button>
+          <button type="button" class="cp-btn-create" [disabled]="submitting"
+                  (click)="onSubmit()">
+            <ion-spinner *ngIf="submitting" name="crescent"
+                         style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
+            </ion-spinner>
+            {{ submitting ? 'Creating…' : 'Create Initiative' }}
+          </button>
+          <button class="cp-close" type="button" (click)="close()" aria-label="Close panel">✕</button>
+        </div>
       </div>
 
       <!-- Panel body -->
@@ -210,7 +223,6 @@ import {
           <div class="cp-field">
             <label class="cp-label">
               Delivery Workstream
-              <span class="cp-optional-tag"> — recommended</span>
             </label>
             <!-- D-206: guard — show warning instead of picker if Division not selected -->
             <div *ngIf="noDivisionWarning"
@@ -309,19 +321,8 @@ import {
             {{ submitError }}
           </div>
 
-          <!-- Footer -->
-          <div class="cp-footer">
-            <button type="button" class="cp-btn-cancel" (click)="close()">Cancel</button>
-            <!-- D-178 Tier 2: spinner replaces label during submit -->
-            <!-- Fix B-7: button always enabled — validation runs on submit, never gates the button. Source: D-140. -->
-            <button type="submit" class="cp-btn-create"
-                    [disabled]="submitting">
-              <ion-spinner *ngIf="submitting" name="crescent"
-                           style="width:16px;height:16px;vertical-align:middle;margin-right:6px;">
-              </ion-spinner>
-              {{ submitting ? 'Creating…' : 'Create Initiative' }}
-            </button>
-          </div>
+          <!-- Footer buttons moved to the sticky header (Phil 2026-07-24).
+               D-178 Tier 2 spinner + B-7 always-enabled behavior preserved there. -->
         </form>
       </div>
 

@@ -305,6 +305,14 @@ const GATE_LABELS: Record<GateName, string> = {
             <div *ngIf="data.hardStops.length > 0" class="grm-hardstops">
               <div class="grm-hardstops-title">This gate cannot be submitted yet</div>
               <div *ngFor="let stop of data.hardStops" class="grm-hardstops-row">• {{ stop }}</div>
+              <!-- Phil 2026-07-24: cleanup/testing lever — Phil only. -->
+              <button *ngIf="viewerIsPhil"
+                      class="grm-btn-secondary" type="button"
+                      style="margin-top:8px;"
+                      [disabled]="processing"
+                      (click)="confirmMode = 'phil-override-submit'">
+                Submit anyway (Phil override)…
+              </button>
             </div>
             <!-- D-489: submission justification — encouraged, not required -->
             <div class="grm-note-field">
@@ -383,6 +391,15 @@ const GATE_LABELS: Record<GateName, string> = {
             Only the designated approver or Phil can record a decision on this gate.
           </div>
 
+          <!-- Phil 2026-07-24: approve-anything lever — Phil only, confirms first.
+               Bypasses L1 consensus, open conditions, and over-returned reasons. -->
+          <button *ngIf="viewerIsPhil && (record?.gate_status === 'awaiting_approval' || record?.gate_status === 'pending')"
+                  class="grm-btn-secondary" type="button"
+                  [disabled]="processing"
+                  (click)="confirmMode = 'phil-override-approve'">
+            Approve (Phil override)…
+          </button>
+
           <!-- Contract G8 (D-560): the loud IE override — release valve. -->
           <button *ngIf="canShowIeOverride"
                   class="grm-btn-secondary" type="button"
@@ -453,6 +470,46 @@ const GATE_LABELS: Record<GateName, string> = {
                       (click)="cancelConfirm()">
                 Cancel
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONFIRM: Phil override submit (Phil 2026-07-24) ────────────── -->
+        <div *ngIf="confirmMode === 'phil-override-submit'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              <strong>Phil override.</strong> This submits {{ gateLabel }} bypassing every
+              submission rule — sizing, role assignments, artifacts, Jira, and AI checks.
+              The override is recorded in the Initiative's activity log. Continue?
+            </div>
+            <div class="grm-action-row">
+              <button class="grm-btn-primary" type="button" [disabled]="processing"
+                      (click)="onPhilOverrideSubmit()">
+                {{ processing && processingAction === 'submit' ? 'Submitting…' : 'Confirm Override Submit' }}
+              </button>
+              <button class="grm-btn-ghost" type="button" [disabled]="processing"
+                      (click)="cancelConfirm()">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── CONFIRM: Phil override approve (Phil 2026-07-24) ───────────── -->
+        <div *ngIf="confirmMode === 'phil-override-approve'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              <strong>Phil override.</strong> This approves {{ gateLabel }} immediately —
+              bypassing trio consensus, open conditions, and consultation returns — and
+              advances the Initiative. The override is recorded in the activity log. Continue?
+            </div>
+            <div class="grm-action-row">
+              <button class="grm-btn-primary" type="button" [disabled]="processing"
+                      (click)="onPhilOverrideApprove()">
+                {{ processing && processingAction === 'approve' ? 'Approving…' : 'Confirm Override Approval' }}
+              </button>
+              <button class="grm-btn-ghost" type="button" [disabled]="processing"
+                      (click)="cancelConfirm()">Cancel</button>
             </div>
           </div>
         </div>
@@ -952,7 +1009,11 @@ export class GateRecordModalComponent {
     | 'sizing-required'                 // Contract G3 (D-567) — migration interstitial
     | 'sizing-confirm'                  // Contract G3 — Go to Build answer re-presentation
     | 'ie-override'                     // Contract G8 (D-560) — loud override w/ reason
-    | 'over-returned-reason' = 'none';  // Contract G8 (D-569) — reasoning prompt
+    | 'over-returned-reason'            // Contract G8 (D-569) — reasoning prompt
+    | 'phil-override-submit'            // Phil 2026-07-24 — cleanup/testing lever
+    | 'phil-override-approve' = 'none'; // Phil 2026-07-24 — cleanup/testing lever
+  /** Phil override: when armed, submit/skip calls carry phil_override:true. */
+  philOverrideArmed = false;
   /** Contract 29 WS3 (D-463/AC-32): resolved approver shown in the submit confirmation. */
   submittedApprover: { id: string; display_name: string | null } | null = null;
   /** D-489: "Why is this gate ready?" draft — sent with submit, trimmed to null server-side. */
@@ -1148,6 +1209,11 @@ export class GateRecordModalComponent {
     return this.profile.getCurrentProfile()?.id ?? null;
   }
 
+  /** Phil 2026-07-24: viewer is Phil (super admin) — override levers render. */
+  get viewerIsPhil(): boolean {
+    return this.profile.getCurrentProfile()?.is_super_admin === true;
+  }
+
   /** Contract G8 (D-560): viewer holds the IE role (or is Phil). */
   get viewerIsIE(): boolean {
     const p = this.profile.getCurrentProfile();
@@ -1274,7 +1340,8 @@ export class GateRecordModalComponent {
     // Contract G3: Go to Build confirmation step — re-present the sizing
     // answers before submission; proceed = confirm (D-567). Skipped when the
     // answers were just entered via the sizing interstitial in this session.
-    if (this.data.gateName === 'go_to_build' && this.cycleIsSized && !this.gtbSizingConfirmed) {
+    if (this.data.gateName === 'go_to_build' && this.cycleIsSized && !this.gtbSizingConfirmed
+        && !this.philOverrideArmed) {
       this.startProcessing('submit');
       this.delivery.getInitiativeSizing({ delivery_cycle_id: this.data.cycle.delivery_cycle_id })
         .subscribe({
@@ -1309,7 +1376,9 @@ export class GateRecordModalComponent {
       delivery_cycle_id: this.data.cycle.delivery_cycle_id,
       gate_name:         this.data.gateName,
       // D-489: optional justification travels with the submission.
-      ...(note ? { submission_note: note } : {})
+      ...(note ? { submission_note: note } : {}),
+      // Phil 2026-07-24: override armed via the confirmed Phil lever only.
+      ...(this.philOverrideArmed ? { phil_override: true } : {})
     }).subscribe({
       next: (res) => {
         // Contract G3 (D-567): sizing interstitial — the Initiative has no
@@ -1380,7 +1449,8 @@ export class GateRecordModalComponent {
     this.delivery.confirmGateSkip({
       delivery_cycle_id: this.data.cycle.delivery_cycle_id,
       gates_to_skip:     this.pendingSkipGates,
-      submitted_gate:    this.data.gateName
+      submitted_gate:    this.data.gateName,
+      ...(this.philOverrideArmed ? { phil_override: true } : {})
     }).subscribe({
       next: (res) => {
         if (res.success) {
@@ -1557,7 +1627,20 @@ export class GateRecordModalComponent {
     this.performApproval({ over_returned_reason: reason });
   }
 
-  private performApproval(extra: { ie_override?: boolean; override_reason?: string; over_returned_reason?: string }): void {
+  /** Phil 2026-07-24: confirmed override submit — arm the flag, run the flow. */
+  onPhilOverrideSubmit(): void {
+    this.philOverrideArmed = true;
+    this.confirmMode = 'none';
+    this.onSubmit();
+  }
+
+  /** Phil 2026-07-24: confirmed override approval. */
+  onPhilOverrideApprove(): void {
+    this.confirmMode = 'none';
+    this.performApproval({ phil_override: true });
+  }
+
+  private performApproval(extra: { ie_override?: boolean; override_reason?: string; over_returned_reason?: string; phil_override?: boolean }): void {
     this.startProcessing('approve');
 
     const note = this.approveNoteDraft.trim();

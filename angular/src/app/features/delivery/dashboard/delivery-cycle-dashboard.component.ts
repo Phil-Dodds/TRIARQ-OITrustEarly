@@ -132,8 +132,10 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </span>
       </div>
 
-      <!-- Row 2 — Controls: cards | chips | actions. Bottom-aligned per D-298. -->
-      <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:0;">
+      <!-- Row 2 — Controls: cards | chips | actions. Bottom-aligned per D-298.
+           Phil 2026-07-24: flex-wrap added — with the detail panel open the
+           chips group was overlapping the Filters/+ New Initiative buttons. -->
+      <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:0;flex-wrap:wrap;">
 
         <!-- Left: summary cards (compact padding per D-298) -->
         <div style="display:flex;gap:8px;flex-shrink:0;align-items:flex-end;">

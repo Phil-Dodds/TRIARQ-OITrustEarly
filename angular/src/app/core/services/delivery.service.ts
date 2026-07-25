@@ -304,6 +304,8 @@ export class DeliveryService {
     gate_name:         GateName;
     // D-489: optional "Why is this gate ready?" justification.
     submission_note?:  string;
+    // Phil 2026-07-24: Phil-only bypass of all submission rules.
+    phil_override?:    boolean;
   }): Observable<McpResponse<GateRecord>> {
     return this.mcp.call<GateRecord>('delivery', 'submit_gate_for_approval', params as Record<string, unknown>);
   }
@@ -315,6 +317,8 @@ export class DeliveryService {
     delivery_cycle_id: string;
     gates_to_skip:     GateName[];
     submitted_gate:    GateName;
+    // Phil 2026-07-24: carried through to the delegated submit.
+    phil_override?:    boolean;
   }): Observable<McpResponse<GateSkipConfirmResult>> {
     return this.mcp.call<GateSkipConfirmResult>(
       'delivery', 'confirm_gate_skip', params as Record<string, unknown>
@@ -331,10 +335,18 @@ export class DeliveryService {
     override_reason?:  string;
     // Contract G8 (D-569): reasoning when approving over a returned consultation.
     over_returned_reason?: string;
+    // Phil 2026-07-24: Phil-only bypass of approval rules.
+    phil_override?:    boolean;
   }): Observable<McpResponse<GateDecisionResult>> {
     return this.mcp.call<GateDecisionResult>(
       'delivery', 'record_gate_decision', params as Record<string, unknown>
     );
+  }
+
+  /** Phil 2026-07-24: Phil-only — approves every remaining gate in sequence,
+   *  closing the Initiative without completing its gates (cleanup/testing). */
+  forceCloseInitiative(delivery_cycle_id: string): Observable<McpResponse<{ delivery_cycle_id: string; gates_approved: string[] }>> {
+    return this.mcp.call('delivery', 'force_close_initiative', { delivery_cycle_id });
   }
 
   /**

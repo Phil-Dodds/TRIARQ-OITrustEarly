@@ -43,6 +43,7 @@ const { resolveGateApproverV2, recordAssignedDualWrite } = require('./helpers/ap
 // Contract G5 (S-A1): submitter auto-approval on L1 consensus gates.
 const { recordTrioApproval } = require('./helpers/l1-consensus');
 const { isBoardTriggeredGate } = require('./helpers/board-trigger');
+const { isPhil } = require('./helpers/phil');
 // Contract G4 (D-564): Consulted set now derives from participation_records
 // (trio + C stakes with group expansion) — the D-458 array is retired.
 const { deriveConsultedUserIdsV2, setupGateConsultations } = require('./helpers/consultations');
@@ -140,12 +141,32 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
+  // ── Phil override (Phil 2026-07-24): data-cleanup / testing lever ─────────
+  // phil_override: true bypasses every submission rule below (sizing
+  // interstitial, role floors, artifact/Jira/AI hard stops, deploy-skip
+  // block, inactive-workstream block). Phil-only; UI confirms before sending.
+  // Every override submission is event-logged with the flag.
+  let philOverride = false;
+  if (params.phil_override === true) {
+    if (!(await isPhil(caller_user_id))) {
+      return { success: false, error: 'phil_override is available to Phil only.' };
+    }
+    philOverride = true;
+    await supabase.from('cycle_event_log').insert({
+      delivery_cycle_id,
+      event_type:        'phil_override',
+      event_description: `Phil override: '${gate_name}' submitted bypassing submission rules.`,
+      actor_user_id:     caller_user_id,
+      event_metadata:    { gate_name, action: 'submit_override' }
+    });
+  }
+
   // ── Contract G3 (D-567): sizing required at the next gate ─────────────────
   // Any initiative without a sizing row must complete sizing before any gate
   // submission proceeds. Non-mutating interstitial mirroring the skip
   // pre-check: Angular interposes the sizing form, then re-submits. Runs
   // before the skip pre-check so a legacy initiative sizes once, first.
-  {
+  if (!philOverride) {
     const { data: sizingRow, error: sizingErr } = await supabase
       .from('initiative_sizing')
       .select('delivery_cycle_id')
@@ -207,7 +228,9 @@ async function submit_gate_for_approval(params, caller_user_id) {
         g => GATE_NAME_DISPLAY[g] ?? g
       );
 
-      if (gate_name === 'go_to_deploy') {
+      // Phil override: the deploy-skip block relaxes to the normal skip
+      // confirmation — Phil may skip any gate, Deploy included.
+      if (gate_name === 'go_to_deploy' && !philOverride) {
         return {
           success: false,
           error: 'DEPLOY_GATE_SKIP_BLOCKED',
@@ -243,7 +266,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   //   When Workstream is null, submission proceeds; the workstream-active branch is skipped.
 
   // ── D-389: DCS required before brief_review gate ──────────────────────────
-  if (gate_name === 'brief_review' && !cycle.assigned_dcs_user_id) {
+  if (gate_name === 'brief_review' && !cycle.assigned_dcs_user_id && !philOverride) {
     await supabase
       .from('cycle_event_log')
       .insert({
@@ -265,7 +288,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   // ── D-391 + D-424: DOL required before brief_review gate (Division-conditional) ─
   // Contract 23 Item 3.6: if the cycle's Division has dol_required = false,
   // skip the DOL null check entirely. DCS and Workstream pre-checks are unchanged.
-  if (gate_name === 'brief_review' && !cycle.assigned_dol_user_id) {
+  if (gate_name === 'brief_review' && !cycle.assigned_dol_user_id && !philOverride) {
     let dolRequired = true;
     if (cycle.division_id) {
       const { data: divRow } = await supabase
@@ -299,7 +322,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   }
 
   // ── D-390: EPO required before go_to_build gate ───────────────────────────
-  if (gate_name === 'go_to_build' && !cycle.assigned_epo_user_id) {
+  if (gate_name === 'go_to_build' && !cycle.assigned_epo_user_id && !philOverride) {
     await supabase
       .from('cycle_event_log')
       .insert({
@@ -342,7 +365,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   // full trio. D-140 message names the missing role.
   {
     const l1Consensus = ((cycle.set_level ?? cycle.baseline_level) === 1) && !cycle.oversight_user_id;
-    if (l1Consensus) {
+    if (l1Consensus && !philOverride) {
       const missing = [];
       if (!cycle.assigned_dcs_user_id) { missing.push('Domain Capability Strategist'); }
       if (!cycle.assigned_dol_user_id) { missing.push('Domain Outcome Lead'); }
@@ -359,7 +382,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
     }
   }
 
-  if (gate_name === 'go_to_build') {
+  if (gate_name === 'go_to_build' && !philOverride) {
     // Context Brief attached — hard stop (Phil 2026-07-17).
     const { data: cbType } = await supabase
       .from('cycle_artifact_types')
@@ -397,8 +420,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
       if (jiraRequired) {
         return blockGate('no_jira_epic',
           'Cannot submit Go to Build — no Jira epic is linked to this Initiative. ' +
-          'Link the Jira epic in the Initiative edit panel, or ask an Admin to mark ' +
-          'this Division as exempt from the Jira requirement.');
+          'Link the Jira epic in the Initiative edit panel.');
       }
     }
 
@@ -410,7 +432,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
     }
   }
 
-  if (gate_name === 'go_to_deploy') {
+  if (gate_name === 'go_to_deploy' && !philOverride) {
     // AI question must be resolved to Yes or No by Go to Deploy.
     if (cycle.ai_functionality !== 'yes' && cycle.ai_functionality !== 'no') {
       return blockGate('ai_functionality_unresolved',
@@ -437,7 +459,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   }
 
   // G2 (CC-G1-18): board detection sourced from the shared helper.
-  if (gate_name === 'go_to_release' &&
+  if (gate_name === 'go_to_release' && !philOverride &&
       isBoardTriggeredGate(cycle, gate_name) &&
       cycle.ai_board_approved !== true) {
     // Internal AI (embedded or analytics) → Board approval before release.
@@ -487,7 +509,7 @@ async function submit_gate_for_approval(params, caller_user_id) {
   }
 
   // ── Workstream active check (ARCH-23) — only when Workstream assigned ────
-  if (workstream && !workstream.active_status) {
+  if (workstream && !workstream.active_status && !philOverride) {
     const { data: blocked_gate, error: blockErr } = await supabase
       .from('gate_records')
       .update({

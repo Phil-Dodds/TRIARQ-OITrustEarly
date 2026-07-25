@@ -265,12 +265,19 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </div>
             <h3 style="margin:0 0 4px 0;">{{ cycle.cycle_title }}</h3>
             <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
-              {{ cycle.workstream?.workstream_name ?? cycle.workstream_id }}
-              &nbsp;·&nbsp;
-              <!-- Division inherited from workstream. Source: build-c-view-correction-spec-2026-04-09 Section 2.5 -->
-              <span *ngIf="cycle.workstream?.home_division_name">{{ cycle.workstream!.home_division_name }}</span>
-              <span *ngIf="!cycle.workstream?.home_division_name"
-                    style="color:#9E9E9E;font-style:italic;">Not set</span>
+              <!-- Phil 2026-07-24: no-workstream cycles rendered a dangling
+                   "· Not set" (empty name + separator). Guard the whole line. -->
+              <ng-container *ngIf="cycle.workstream; else noWorkstreamLine">
+                {{ cycle.workstream.workstream_name }}
+                &nbsp;·&nbsp;
+                <!-- Division inherited from workstream. Source: build-c-view-correction-spec-2026-04-09 Section 2.5 -->
+                <span *ngIf="cycle.workstream.home_division_name">{{ cycle.workstream!.home_division_name }}</span>
+                <span *ngIf="!cycle.workstream.home_division_name"
+                      style="color:#9E9E9E;font-style:italic;">Not set</span>
+              </ng-container>
+              <ng-template #noWorkstreamLine>
+                <span style="color:#9E9E9E;font-style:italic;">Workstream: Not set</span>
+              </ng-template>
             </div>
 
             <!-- DS/CB moved to Identity zone below Stage Track. D-273. -->
@@ -279,8 +286,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           <!-- Single-row layout right-aligned with the cycle title. Close X lives at
                the rightmost edge so it sits at the same vertical position as the
                title. Source: Contract 12 §3 B-75, B-76; D-348; D-349. -->
+          <!-- Phil 2026-07-24: padding-right clears the sticky ✕ close button
+               (absolute top-right) — Cancel Initiative was rendering under it. -->
           <div style="display:flex;flex-direction:row;align-items:center;
-                      gap:var(--triarq-space-sm);flex-wrap:wrap;flex-shrink:0;">
+                      gap:var(--triarq-space-sm);flex-wrap:wrap;flex-shrink:0;
+                      padding-right:40px;">
 
             <!-- 1. Edit Cycle — opens Edit panel per S-006. Contract 2 2026-04-10. -->
             <button (click)="openEditPanel()"
@@ -344,6 +354,32 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                            border-radius:5px;padding:3px 10px;cursor:pointer;font-weight:500;">
               Cancel Initiative
             </button>
+
+            <!-- 4b. Force-Close — Phil-only cleanup/testing lever (2026-07-24).
+                 Approves every remaining gate in sequence via the shared
+                 approval transition; two-step inline confirm (S-023). -->
+            <button *ngIf="viewerIsPhil && !forceCloseConfirming
+                           && cycle.current_lifecycle_stage !== 'COMPLETE'
+                           && cycle.current_lifecycle_stage !== 'CANCELLED'"
+                    (click)="forceCloseConfirming = true"
+                    style="white-space:nowrap;font-size:11px;color:#E96127;
+                           background:none;border:1px solid #E96127;
+                           border-radius:5px;padding:3px 8px;cursor:pointer;">
+              Force-Close (Phil)…
+            </button>
+            <span *ngIf="forceCloseConfirming"
+                  style="display:flex;align-items:center;gap:6px;font:11px Roboto,sans-serif;color:#B3261E;">
+              Approve ALL remaining gates and close this Initiative?
+              <button (click)="confirmForceClose()" [disabled]="forceCloseBusy"
+                      style="background:#E96127;color:#fff;border:none;border-radius:3px;
+                             padding:2px 8px;font:500 11px Roboto,sans-serif;cursor:pointer;">
+                {{ forceCloseBusy ? 'Closing…' : 'Yes, force-close' }}
+              </button>
+              <button (click)="forceCloseConfirming = false" [disabled]="forceCloseBusy"
+                      style="background:none;border:none;color:#757575;cursor:pointer;font-size:11px;">
+                Cancel
+              </button>
+            </span>
 
             <!-- 5. Un-cancel Initiative — constructive (reverses cancellation). CANCELLED stage only. -->
             <button *ngIf="cycle.current_lifecycle_stage === 'CANCELLED' && !uncancelConfirming"
@@ -2042,6 +2078,9 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       display_name: ['', Validators.required],
       external_url: ['', Validators.required]
     });
+    // Phil 2026-07-24 fix: loadAllUsers() was defined but never invoked —
+    // the participation picker's People optgroup rendered empty (G4 gap).
+    this.loadAllUsers();
     const id = this.cycleId ?? this.route.snapshot.paramMap.get('cycle_id');
     // Contract 29: in route mode (deep link from the Action Queue), read ?gate=
     // to auto-expand the relevant gate after load — reuses the D-345 §8 mechanism.
@@ -3785,6 +3824,38 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return this.levelAttributionLine || 'Governance level derived from the sizing answers.';
   }
 
+  // ── Phil 2026-07-24: force-close lever (Phil-only cleanup/testing) ─────────
+  forceCloseConfirming = false;
+  forceCloseBusy       = false;
+  forceCloseError      = '';
+
+  get viewerIsPhil(): boolean {
+    return this.profileService.getCurrentProfile()?.is_super_admin === true;
+  }
+
+  confirmForceClose(): void {
+    if (!this.cycle || this.forceCloseBusy) { return; }
+    this.forceCloseBusy = true;
+    this.forceCloseError = '';
+    this.delivery.forceCloseInitiative(this.cycle.delivery_cycle_id).subscribe({
+      next: (res) => {
+        this.forceCloseBusy = false;
+        this.forceCloseConfirming = false;
+        if (res.success) {
+          this.loadCycle(this.cycle!.delivery_cycle_id);
+        } else {
+          this.forceCloseError = res.error ?? 'Force-close failed.';
+        }
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.forceCloseBusy = false;
+        this.forceCloseError = err?.error ?? 'Force-close failed.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
   // ── Contract G8 (S-C6/D-562): set-level divergence prompt ──────────────────
   levelPromptBusy = false;
 
@@ -4033,7 +4104,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
         stops.push('No Context Brief is attached. Attach it in the Artifacts section.');
       }
       if (!c.jira_epic_key && this.divisionJiraRequired !== false) {
-        stops.push('No Jira epic is linked. Link it in the Initiative edit panel (or ask an Admin to exempt this Division).');
+        stops.push('No Jira epic is linked. Link it in the Initiative edit panel.');
       }
       if (!c.assigned_epo_user_id) {
         stops.push('No Engineering Product Owner is assigned. Assign an EPO in the Initiative edit panel.');

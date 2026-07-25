@@ -104,7 +104,10 @@ describe('derivation explanation and sizing alerts', () => {
   test('trusted small/standard/contained explains Level 1', () => {
     const chips = buildDerivationExplanation(sizingRow('small', 'standard', 'contained'), true);
     assert.equal(chips.length, 1);
-    assert.match(chips[0], /trusted DCS.*Level 1/);
+    // Phil 2026-07-24: the trusted-DCS rule is silent on screen — the chip is
+    // neutral wording, never naming trust.
+    assert.match(chips[0], /→ Level 1/);
+    assert.doesNotMatch(chips[0], /trust/i);
   });
 
   test('sub_exceeds_answer fires when Q1 sub ranks above the direct answer', () => {

@@ -266,6 +266,17 @@ function epAvatarColorFromName(name: string): string {
               </div>
             </div>
 
+            <!-- Phil 2026-07-24: sizing is deliberately not editable here (it has
+                 its own derivation/confirmation flow) — say so instead of leaving
+                 a gap users read as missing. -->
+            <div class="ep-field">
+              <label class="ep-label">Governance Level &amp; Sizing</label>
+              <div class="ep-hint">
+                Managed on the Initiative panel — use Edit sizing in the
+                Governance Level section there.
+              </div>
+            </div>
+
             <!-- 8. Delivery Workstream (entity picker, re-scopes on Division change) -->
             <!-- B-14 fix: Workstream is optional at edit time per D-165. Removed required asterisk
                  and required validation. Gate-enforcement only (Brief Review gate). Source: D-165. -->
@@ -450,7 +461,9 @@ function epAvatarColorFromName(name: string): string {
        now serves as the sticky scroll container. Source: D-291, Contract 9. */
     .ep-overlay {
       position: absolute; inset: 0;
-      background: rgba(255,255,255,0.98);
+      /* Phil 2026-07-24: solid white — the 0.98 translucency let the detail
+         panel ghost through the empty area below the form (read as a defect). */
+      background: #fff;
       z-index: 10;
       display: flex; flex-direction: column;
       overflow: visible;
