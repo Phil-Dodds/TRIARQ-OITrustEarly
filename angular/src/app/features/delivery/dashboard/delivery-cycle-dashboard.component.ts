@@ -1242,11 +1242,17 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     // Item 4 (Part 3): Restore saved filter/sort state if no drill-down params present.
     // D-175 drill-down takes priority; restoreScreenState() skips if drillDownFromQp is set.
     // Principle 9: skeleton renders while cycles load — restored filters show on first paint.
-    this.restoreScreenState();
+    // Phil 2026-07-25 fix: loadCycles() used to fire here IN PARALLEL with the
+    // async restore. The restore's filtered re-query would paint the correct
+    // list, then the original unfiltered response landed late and stomped it
+    // (last-write-wins). Now: restore settles first, THEN the single load runs
+    // with the restored filters. loadCycles() also carries a generation guard.
+    this.restoreScreenState()
+      .catch(() => { /* restore failure never blocks the load */ })
+      .finally(() => { this.loadCycles(); });
 
     this.loadWorkstreams();
     this.loadDivisions();
-    this.loadCycles();
     this.loadDeliverySummary();
 
     // Subscribe to profile — fires immediately if already loaded, or when it arrives.
@@ -1703,7 +1709,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  /** Phil 2026-07-25: stale-response guard — only the newest in-flight
+   *  loadCycles() response may write the grid. */
+  private loadCyclesGeneration = 0;
+
   private loadCycles(): void {
+    const generation = ++this.loadCyclesGeneration;
     this.loading = true;
     this.cdr.markForCheck();
 
@@ -1716,6 +1727,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
     this.delivery.listCycles(params).subscribe({
       next: (res) => {
+        if (generation !== this.loadCyclesGeneration) { return; } // stale response
         if (res.success && res.data) {
           this.cycles    = Array.isArray(res.data) ? res.data : [];
           this.loadError = '';
@@ -1727,6 +1739,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         this.cdr.markForCheck();
       },
       error: (err: { error?: string }) => {
+        if (generation !== this.loadCyclesGeneration) { return; } // stale response
         this.loadError = err?.error ?? 'Unable to reach the server. Check your connection and try again.';
         this.loading   = false;
         this.cdr.markForCheck();
@@ -1823,16 +1836,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (typeof sort['sortDir'] === 'string') {
       this.sortDir = sort['sortDir'] as 'asc' | 'desc';
     }
-    // Apply restored state to the view.
-    // CC-38 f17 fix: the Division filter is SERVER-side — restoring it after
-    // the initial (unfiltered) loadCycles() left the chip showing a Division
-    // while the grid held all rows, and Apply saw divisionChanged=false so it
-    // never reloaded. A restored Division must re-query the server.
-    if (this.filterDivision) {
-      this.loadCycles();
-    } else {
-      this.applyFilters(false);
-    }
+    // Phil 2026-07-25: no load is triggered from here anymore — ngOnInit runs
+    // the single loadCycles() after this restore settles (fixes the race where
+    // the parallel unfiltered load overwrote the filtered one). The CC-38 f17
+    // server-side Division re-query is preserved because that one load now
+    // starts with filterDivision already restored.
     this.cdr.markForCheck();
   }
 
