@@ -44,6 +44,8 @@ const { confirm_gate_skip }              = require('./tools/confirm_gate_skip');
 const { record_gate_decision }           = require('./tools/record_gate_decision');
 // Phil 2026-07-24 — Phil-only cleanup/testing lever.
 const { force_close_initiative }         = require('./tools/force_close_initiative');
+// Contract GA-1 (D-579) — gate assessment link config.
+const { list_gate_coaching_links, set_gate_coaching_link } = require('./tools/gate_coaching_links');
 const { withdraw_gate_submission }       = require('./tools/withdraw_gate_submission');
 const { list_pending_approvals }         = require('./tools/list_pending_approvals');
 // Contract 30 follow-up — My Actions "Completed" tab.
@@ -166,6 +168,9 @@ const TOOLS = {
   confirm_gate_skip,
   record_gate_decision,
   force_close_initiative,
+  // Contract GA-1 (D-579)
+  list_gate_coaching_links,
+  set_gate_coaching_link,
   withdraw_gate_submission,
   list_pending_approvals,
   list_completed_actions,

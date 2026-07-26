@@ -306,6 +306,8 @@ export class DeliveryService {
     submission_note?:  string;
     // Phil 2026-07-24: Phil-only bypass of all submission rules.
     phil_override?:    boolean;
+    // Contract GA-1 (D-579): submitter self-assessment.
+    assessment?:       { item_key: string; grade: string; comment?: string }[];
   }): Observable<McpResponse<GateRecord>> {
     return this.mcp.call<GateRecord>('delivery', 'submit_gate_for_approval', params as Record<string, unknown>);
   }
@@ -319,6 +321,8 @@ export class DeliveryService {
     submitted_gate:    GateName;
     // Phil 2026-07-24: carried through to the delegated submit.
     phil_override?:    boolean;
+    // Contract GA-1 (D-579): assessment rides through the skip interstitial.
+    assessment?:       { item_key: string; grade: string; comment?: string }[];
   }): Observable<McpResponse<GateSkipConfirmResult>> {
     return this.mcp.call<GateSkipConfirmResult>(
       'delivery', 'confirm_gate_skip', params as Record<string, unknown>
@@ -337,6 +341,8 @@ export class DeliveryService {
     over_returned_reason?: string;
     // Phil 2026-07-24: Phil-only bypass of approval rules.
     phil_override?:    boolean;
+    // Contract GA-1 (D-579): approver / trio-member self-assessment.
+    assessment?:       { item_key: string; grade: string; comment?: string }[];
   }): Observable<McpResponse<GateDecisionResult>> {
     return this.mcp.call<GateDecisionResult>(
       'delivery', 'record_gate_decision', params as Record<string, unknown>
@@ -381,6 +387,8 @@ export class DeliveryService {
     gate_record_id: string;
     response:       ConsultationResponse;
     notes?:         string;
+    // Contract GA-1 (D-579): consulted self-assessment (approving responses).
+    assessment?:    { item_key: string; grade: string; comment?: string }[];
   }): Observable<McpResponse<GateConsultation>> {
     return this.mcp.call<GateConsultation>(
       'delivery', 'record_consultation_response', params as Record<string, unknown>

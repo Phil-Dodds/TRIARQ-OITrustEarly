@@ -45,6 +45,9 @@ require.cache[dbPath] = {
 const l1 = require('../src/tools/helpers/l1-consensus');
 const { record_gate_decision } = require('../src/tools/record_gate_decision');
 const { record_consultation_response } = require('../src/tools/record_consultation_response');
+// GA-1: trio + consulted approvals carry an assessment.
+const { requiredItemKeys } = require('../src/lib/gate-assessment-registry');
+const ga1Assessment = (gate, role) => requiredItemKeys(gate, role).map(k => ({ item_key: k, grade: 'B' }));
 const { submit_gate_for_approval } = require('../src/tools/submit_gate_for_approval');
 
 const DCS = 'dcs-uuid', EPO = 'epo-uuid', DOL = 'dol-uuid', CONS = 'consulted-uuid', OUT = 'outsider-uuid';
@@ -145,6 +148,8 @@ describe('record_gate_decision — L1 consensus route (G5)', () => {
       { data: null, error: null },                                         // dup check — none
       { data: null, error: null },                                         // approval insert
       { data: null, error: null },                                         // gate_trio_approved event
+      { data: null, error: null },                                         // GA-1 assessment self-supersede clear
+      { data: null, error: null },                                         // GA-1 assessment insert
       { data: [
           { approver_user_id: DCS, approval_type: 'trio_member' },
           { approver_user_id: EPO, approval_type: 'trio_member' }
@@ -152,7 +157,8 @@ describe('record_gate_decision — L1 consensus route (G5)', () => {
       { data: [], error: null }                                            // consultations state
     ];
     const r = await record_gate_decision(
-      { delivery_cycle_id: CYC, gate_name: 'brief_review', decision: 'approved' }, EPO);
+      { delivery_cycle_id: CYC, gate_name: 'brief_review', decision: 'approved',
+        assessment: ga1Assessment('brief_review', 'trio_member') }, EPO);
     assert.equal(r.success, true);
     assert.equal(r.data.l1_consensus, true);
     assert.deepEqual(r.data.l1_pending.pending_trio_user_ids, [DOL]);
@@ -167,7 +173,8 @@ describe('record_gate_decision — L1 consensus route (G5)', () => {
       { data: { approval_id: 'a1' }, error: null }                         // dup found
     ];
     const r = await record_gate_decision(
-      { delivery_cycle_id: CYC, gate_name: 'brief_review', decision: 'approved' }, EPO);
+      { delivery_cycle_id: CYC, gate_name: 'brief_review', decision: 'approved',
+        assessment: ga1Assessment('brief_review', 'trio_member') }, EPO);
     assert.equal(r.success, false);
     assert.match(r.error, /already approved/);
   });
@@ -180,6 +187,8 @@ describe('record_gate_decision — L1 consensus route (G5)', () => {
       { data: null, error: null },                                         // dup check
       { data: null, error: null },                                         // approval insert
       { data: null, error: null },                                         // gate_trio_approved event
+      { data: null, error: null },                                         // GA-1 assessment self-supersede clear
+      { data: null, error: null },                                         // GA-1 assessment insert
       { data: [
           { approver_user_id: DCS, approval_type: 'trio_member' },
           { approver_user_id: EPO, approval_type: 'trio_member' },
@@ -198,7 +207,8 @@ describe('record_gate_decision — L1 consensus route (G5)', () => {
       { data: [], error: null }                                            // attached artifacts
     ];
     const r = await record_gate_decision(
-      { delivery_cycle_id: CYC, gate_name: 'brief_review', decision: 'approved' }, DOL);
+      { delivery_cycle_id: CYC, gate_name: 'brief_review', decision: 'approved',
+        assessment: ga1Assessment('brief_review', 'trio_member') }, DOL);
     assert.equal(r.success, true);
     assert.equal(r.data.l1_completed, true);
     assert.equal(r.data.gate_record.gate_status, 'approved');
@@ -237,6 +247,8 @@ describe('record_consultation_response — L1 force (S-A3/S-A4)', () => {
       { data: { id: 'cons1', gate_record_id: GATE, consulted_user_id: CONS, response: 'pending' }, error: null },
       { data: awaitingGate, error: null },
       { data: { id: 'cons1', response: 'approved' }, error: null },        // consultation update
+      { data: null, error: null },                                         // GA-1 assessment self-supersede clear
+      { data: null, error: null },                                         // GA-1 assessment insert
       { data: null, error: null },                                         // G6 condition auto-resolve
       { data: l1Cycle(), error: null },                                    // cycle
       { data: { display_name: 'Consulted Person' }, error: null },         // responder
@@ -258,7 +270,8 @@ describe('record_consultation_response — L1 force (S-A3/S-A4)', () => {
       { data: [], error: null }                                            // attached artifacts
     ];
     const r = await record_consultation_response(
-      { gate_record_id: GATE, response: 'approved' }, CONS);
+      { gate_record_id: GATE, response: 'approved',
+        assessment: ga1Assessment('brief_review', 'consulted') }, CONS);
     assert.equal(r.success, true);
     assert.equal(r.data.l1_gate_approved, true);
   });
@@ -268,10 +281,13 @@ describe('record_consultation_response — L1 force (S-A3/S-A4)', () => {
       { data: { id: 'cons1', gate_record_id: GATE, consulted_user_id: CONS, response: 'pending' }, error: null },
       { data: { ...awaitingGate, approver_user_id: 'approver-x' }, error: null }, // approver set → not L1
       { data: { id: 'cons1', response: 'approved' }, error: null },
+      { data: null, error: null },                                         // GA-1 assessment self-supersede clear
+      { data: null, error: null },                                         // GA-1 assessment insert
       { data: l1Cycle(), error: null }                                     // cycle fetched, isL1 false → done
     ];
     const r = await record_consultation_response(
-      { gate_record_id: GATE, response: 'approved' }, CONS);
+      { gate_record_id: GATE, response: 'approved',
+        assessment: ga1Assessment('brief_review', 'consulted') }, CONS);
     assert.equal(r.success, true);
     assert.equal(r.data.l1_gate_approved, undefined);
   });
@@ -286,7 +302,9 @@ describe('submit_gate_for_approval — L1 assignment floor (G5 AC #5)', () => {
       { data: { dol_required: false }, error: null },                      // D-424 exemption — L1 floor still applies
       { data: null, error: null }                                          // gate_blocked event
     ];
-    const r = await submit_gate_for_approval({ delivery_cycle_id: CYC, gate_name: 'brief_review' }, DCS);
+    const r = await submit_gate_for_approval(
+      { delivery_cycle_id: CYC, gate_name: 'brief_review',
+        assessment: ga1Assessment('brief_review', 'submitter') }, DCS);
     assert.equal(r.success, false);
     assert.match(r.error, /Domain Outcome Lead/);
     assert.match(r.error, /Level 1/);

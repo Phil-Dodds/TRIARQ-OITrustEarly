@@ -12,6 +12,8 @@
 const { supabase } = require('../db');
 // Contract G7 (D-565): single waiting-on computation source.
 const { computeWaitingOnBatch } = require('../lib/waiting-on');
+// Contract GA-1 (D-579): blind-until-decision assessment filtering.
+const { filterForViewer: filterAssessmentsForViewer } = require('./helpers/gate-assessments');
 
 /**
  * @param {object} params
@@ -185,10 +187,26 @@ async function get_delivery_cycle(params, caller_user_id) {
   // approver name is resolved server-side so the modal never has to look it up in
   // a client list that may omit the approver (Phil/admins) — that caused the
   // "Unknown user" Accountable label.
+  // ── Contract GA-1 (D-579): gate assessments + link config ─────────────────
+  // Blind-until-decision: filtered per gate below (own rows only pre-decision;
+  // the approver-in-decision sees all; everyone sees all post-decision).
+  const [{ data: assessmentRows }, { data: coachingLinkRows }] = await Promise.all([
+    supabase.from('gate_assessments')
+      .select('id, gate_key, respondent_user_id, respondent_role, item_key, grade, comment, cleared_by_return_at, created_at')
+      .eq('delivery_cycle_id', delivery_cycle_id)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true }),
+    supabase.from('gate_coaching_links').select('gate_key, url')
+  ]);
+  const gateCoachingLinks = {};
+  (coachingLinkRows || []).forEach(r => { gateCoachingLinks[r.gate_key] = r.url ?? null; });
+
   const gateUserIds = [...new Set(
-    (gate_records || [])
-      .flatMap(gr => [gr.submitted_by_user_id, gr.approver_user_id])
-      .filter(Boolean)
+    [
+      ...(gate_records || [])
+        .flatMap(gr => [gr.submitted_by_user_id, gr.approver_user_id]),
+      ...(assessmentRows || []).map(a => a.respondent_user_id)
+    ].filter(Boolean)
   )];
   const gateUserMap = {};
   if (gateUserIds.length > 0) {
@@ -268,6 +286,20 @@ async function get_delivery_cycle(params, caller_user_id) {
       // G5: L1 consensus metadata for the gate panel.
       ...(isL1Gate ? { l1_consensus: true } : {}),
       ...(l1Waiting ? { l1_waiting_on: l1Waiting } : {}),
+      // GA-1 (D-579): visibility-filtered assessment rows for this gate.
+      assessments: filterAssessmentsForViewer(
+        (assessmentRows || []).filter(a => a.gate_key === gr.gate_name),
+        {
+          viewer_user_id: caller_user_id,
+          gate_status:    gr.gate_status,
+          // The approver-in-decision sees all collected answers (GA-1 §4):
+          // the designated approver, or an Admin acting as the fallback
+          // approver on an unconfigured single-approver gate.
+          viewerIsApprover: gr.gate_status === 'awaiting_approval' &&
+            (gr.approver_user_id === caller_user_id ||
+             (callerIsAdmin && !gr.approver_user_id && !l1Waiting))
+        }
+      ).map(a => ({ ...a, respondent_display_name: gateUserMap[a.respondent_user_id] ?? null })),
       current_user_gate_authority: {
         // can_submit: caller has submit authority AND gate is not in a terminal
         // or in-flight state. 'skipped' is terminal per D-447 — backdate via
@@ -326,6 +358,8 @@ async function get_delivery_cycle(params, caller_user_id) {
       // is served by list_participation (participation_records).
       milestone_dates:  milestone_dates       || [],
       gate_records:     enrichedGateRecords,
+      // GA-1: per-gate "Full best practices" link config (null/blank = hidden).
+      gate_coaching_links: gateCoachingLinks,
       workstream:       workstream ? { ...workstream, home_division_name } : null,
       jira_links:       jira_links            || [],
       // CC-28-3: artifacts now carry joined artifact_type_name and

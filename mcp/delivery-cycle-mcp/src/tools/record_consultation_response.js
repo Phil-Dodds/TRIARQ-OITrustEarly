@@ -23,6 +23,8 @@ const { isL1ConsensusGate, trioIdsOf, getL1CollectedState, clearGateApprovals } 
 const { applyGateApprovalTransition } = require('./record_gate_decision');
 // Contract G6 (D-565): conditions hold gates; returns clear them.
 const { countOpenConditions, clearOpenConditionsOnReturn } = require('./helpers/gate-conditions');
+// Contract GA-1 (D-579): consulted assessment rides with an approving response.
+const { validateOrError: validateAssessmentOrError, saveAssessment, clearActiveAssessments } = require('./helpers/gate-assessments');
 
 const VALID_RESPONSES = ['approved', 'declined', 'declined_post_approval'];
 
@@ -84,6 +86,19 @@ async function record_consultation_response(params, caller_user_id) {
     };
   }
 
+  // ── Contract GA-1 (D-579): consulted self-assessment ───────────────────────
+  // Collected with an APPROVING consultation response only — declines carry
+  // their note instead (GA-1 §3). Items: stakeholders + gate subs; N/A freely.
+  // Validated before the response writes; saved after (non-fatal).
+  let consultedAssessmentItems = null;
+  if (response === 'approved') {
+    const v = validateAssessmentOrError(gate_record.gate_name, 'consulted', params.assessment ?? []);
+    if (!v.ok) {
+      return { success: false, error: `Cannot record your response — ${v.error}` };
+    }
+    consultedAssessmentItems = v.items;
+  }
+
   // ── Update the consultation row ───────────────────────────────────────────
   const { data: updated, error: updateErr } = await supabase
     .from('gate_consultations')
@@ -101,6 +116,21 @@ async function record_consultation_response(params, caller_user_id) {
   }
 
   const gateNameDisplay = GATE_NAME_DISPLAY[gate_record.gate_name] ?? gate_record.gate_name;
+
+  // GA-1: persist the consulted assessment (non-fatal after the response write).
+  if (consultedAssessmentItems) {
+    const savedAssessment = await saveAssessment({
+      delivery_cycle_id: gate_record.delivery_cycle_id, gate_key: gate_record.gate_name,
+      respondent_user_id: caller_user_id, respondent_role: 'consulted',
+      items: consultedAssessmentItems
+    });
+    if (savedAssessment.error) {
+      console.error(JSON.stringify({
+        tool_name: 'record_consultation_response', step: 'save_consulted_assessment',
+        gate_record_id, error: savedAssessment.error
+      }));
+    }
+  }
 
   // ── Contract G6 (D-565, S-B5): consultation_required conditions targeting
   // this consultation auto-resolve the moment the party approves. Non-fatal.
@@ -174,6 +204,8 @@ async function record_consultation_response(params, caller_user_id) {
         await clearGateApprovals(gate_record.gate_record_id, returnEvent?.event_id ?? null);
         // G6 (AC #5): a return clears open conditions with the approvals.
         await clearOpenConditionsOnReturn(gate_record.gate_record_id, caller_user_id);
+        // GA-1 §5: the consulted return stamps the attempt's assessments too.
+        await clearActiveAssessments(gate_record.delivery_cycle_id, gate_record.gate_name, returnEvent?.event_id ?? null);
 
         // S-A2/S-A4: trio notified.
         const trioIds = trioIdsOf(cycle).filter(id => id !== caller_user_id);

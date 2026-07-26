@@ -9,6 +9,9 @@
 'use strict';
 
 const { supabase } = require('../db');
+// Contract GA-1 (CC-GA1 lean): a withdraw clears the attempt's assessments
+// like a return does — the resubmission collects fresh.
+const { clearActiveAssessments } = require('./helpers/gate-assessments');
 
 const GATE_NAME_DISPLAY = {
   brief_review:  'Brief Review',
@@ -103,6 +106,9 @@ async function withdraw_gate_submission(params, caller_user_id) {
       actor_user_id:     caller_user_id,
       event_metadata:    { gate_name }
     });
+
+  // GA-1: stamp the attempt's assessments (never deleted — D-578 posture).
+  await clearActiveAssessments(delivery_cycle_id, gate_name, null);
 
   return {
     success: true,

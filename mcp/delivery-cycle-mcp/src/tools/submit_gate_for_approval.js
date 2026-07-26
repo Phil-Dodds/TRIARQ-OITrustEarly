@@ -44,6 +44,7 @@ const { resolveGateApproverV2, recordAssignedDualWrite } = require('./helpers/ap
 const { recordTrioApproval } = require('./helpers/l1-consensus');
 const { isBoardTriggeredGate } = require('./helpers/board-trigger');
 const { isPhil } = require('./helpers/phil');
+const { validateOrError, saveAssessment } = require('./helpers/gate-assessments');
 // Contract G4 (D-564): Consulted set now derives from participation_records
 // (trio + C stakes with group expansion) — the D-458 array is retired.
 const { deriveConsultedUserIdsV2, setupGateConsultations } = require('./helpers/consultations');
@@ -159,6 +160,27 @@ async function submit_gate_for_approval(params, caller_user_id) {
       actor_user_id:     caller_user_id,
       event_metadata:    { gate_name, action: 'submit_override' }
     });
+  }
+
+  // ── Contract GA-1 (D-579): submitter self-assessment ──────────────────────
+  // Required from genuine participants (assigned trio roles); skipped for
+  // phil_override and for an Admin submitting on behalf (not a collected
+  // party — CC-G5-02 posture). Validated here, before ANY submission work
+  // (twin enforcement, AC #1/#8); saved only after the gate transitions.
+  // Skip-interstitial round-trips re-send the same payload via confirm_gate_skip.
+  const assessmentRequired = !philOverride && (isAssignedDcs || isAssignedEpo || isAssignedDol);
+  let assessmentItems = null;
+  if (assessmentRequired) {
+    const v = validateOrError(gate_name, 'submitter', params.assessment ?? []);
+    if (!v.ok) {
+      return { success: false, error: `Cannot submit ${gateNameDisplay} — ${v.error}` };
+    }
+    assessmentItems = v.items;
+  } else if (Array.isArray(params.assessment) && params.assessment.length > 0 && !philOverride) {
+    // Volunteered by a non-required caller (e.g. Admin) — still validated.
+    const v = validateOrError(gate_name, 'submitter', params.assessment);
+    if (!v.ok) { return { success: false, error: v.error }; }
+    assessmentItems = v.items;
   }
 
   // ── Contract G3 (D-567): sizing required at the next gate ─────────────────
@@ -609,6 +631,21 @@ async function submit_gate_for_approval(params, caller_user_id) {
           event_metadata:    { gate_name, l1_consensus: true, auto_recorded: true }
         });
       }
+    }
+  }
+
+  // GA-1: persist the submitter assessment (non-fatal after the transition).
+  if (assessmentItems) {
+    const saved = await saveAssessment({
+      delivery_cycle_id, gate_key: gate_name,
+      respondent_user_id: caller_user_id, respondent_role: 'submitter',
+      items: assessmentItems
+    });
+    if (saved.error) {
+      console.error(JSON.stringify({
+        tool_name: 'submit_gate_for_approval', step: 'save_assessment',
+        delivery_cycle_id, gate_name, error: saved.error
+      }));
     }
   }
 

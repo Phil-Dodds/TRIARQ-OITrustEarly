@@ -191,7 +191,9 @@ async function confirm_gate_skip(params, caller_user_id) {
   // submit_gate_for_approval itself re-verifies the caller is Phil.
   const submissionResult = await submit_gate_for_approval(
     { delivery_cycle_id, gate_name: submitted_gate,
-      ...(params.phil_override === true ? { phil_override: true } : {}) },
+      ...(params.phil_override === true ? { phil_override: true } : {}),
+      // GA-1: the submitter assessment rides through the skip interstitial.
+      ...(Array.isArray(params.assessment) ? { assessment: params.assessment } : {}) },
     caller_user_id
   );
 

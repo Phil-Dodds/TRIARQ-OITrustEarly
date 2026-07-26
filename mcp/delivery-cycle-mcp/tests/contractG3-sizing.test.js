@@ -46,6 +46,9 @@ require.cache[dbPath] = {
 const sizingTools = require('../src/tools/initiative_sizing');
 const { get_governance_config_warnings } = require('../src/tools/governance_config_warnings');
 const { submit_gate_for_approval } = require('../src/tools/submit_gate_for_approval');
+// GA-1: trio submitters must grade the assessment with every submission.
+const { requiredItemKeys } = require('../src/lib/gate-assessment-registry');
+const ga1Assessment = (gate, role) => requiredItemKeys(gate, role).map(k => ({ item_key: k, grade: 'B' }));
 
 const CALLER = 'caller-uuid', OTHER = 'dcs-uuid', CYC = 'c1', CFG = 'config-uuid', DL = 'dl-uuid';
 
@@ -63,7 +66,8 @@ describe('submit_gate_for_approval — D-567 sizing interstitial (G3)', () => {
       { data: { is_admin: true, display_name: 'Phil' }, error: null },  // caller
       { data: null, error: null }                                       // no sizing row
     ];
-    const res = await submit_gate_for_approval({ delivery_cycle_id: CYC, gate_name: 'brief_review' }, CALLER);
+    const res = await submit_gate_for_approval(
+      { delivery_cycle_id: CYC, gate_name: 'brief_review', assessment: ga1Assessment('brief_review', 'submitter') }, CALLER);
     assert.equal(res.success, true);
     assert.equal(res.status, 'REQUIRES_SIZING');
     assert.equal(res.data.code, 'REQUIRES_SIZING');

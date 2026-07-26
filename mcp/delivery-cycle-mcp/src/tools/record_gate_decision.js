@@ -48,6 +48,8 @@ const {
 } = require('./helpers/l1-consensus');
 // Contract G6 (D-565): open conditions hold approvals; returns clear them.
 const { countOpenConditions, clearOpenConditionsOnReturn } = require('./helpers/gate-conditions');
+// Contract GA-1 (D-579): gate assessments — collection + attempt clearing.
+const { validateOrError: validateAssessmentOrError, saveAssessment, clearActiveAssessments } = require('./helpers/gate-assessments');
 // Contract G8 (D-560): board gates are untouchable by the IE override.
 const { isBoardTriggeredGate } = require('./helpers/board-trigger');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
@@ -252,6 +254,8 @@ async function record_gate_decision(params, caller_user_id) {
       }
       // G6 (AC #5): a return clears open conditions with the approvals.
       await clearOpenConditionsOnReturn(gate_record.gate_record_id, caller_user_id);
+      // GA-1 §5: a return stamps the attempt's assessments (retained, attempt-marked).
+      await clearActiveAssessments(delivery_cycle_id, gate_name, returnEvent?.event_id ?? null);
 
       // S-A2: trio notified (the returner excluded).
       const notifyIds = trioIds.filter(id => id !== caller_user_id);
@@ -281,6 +285,18 @@ async function record_gate_decision(params, caller_user_id) {
       return { success: true, data: { gate_record: returnedGate, stage_advanced: false, l1_consensus: true } };
     }
 
+    // ── Contract GA-1 (D-579): trio-member self-assessment rides with the
+    // trio approval. Required from genuine trio members; an Admin acting on
+    // an L1 gate they are not trio on is on-behalf — skipped (CC-G5-02).
+    let l1AssessmentItems = null;
+    if (isTrioMember) {
+      const v = validateAssessmentOrError(gate_name, 'trio_member', params.assessment ?? []);
+      if (!v.ok) {
+        return { success: false, error: `Cannot approve ${gateNameDisplay} — ${v.error}` };
+      }
+      l1AssessmentItems = v.items;
+    }
+
     // decision === 'approved': record this trio-member approval; finalize only
     // when the collection completes (AC #6).
     const rec = await recordTrioApproval(gate_record.gate_record_id, caller_user_id);
@@ -298,6 +314,21 @@ async function record_gate_decision(params, caller_user_id) {
       actor_user_id:     caller_user_id,
       event_metadata:    { gate_name, l1_consensus: true }
     });
+
+    // GA-1: persist the trio-member assessment (non-fatal after the approval).
+    if (l1AssessmentItems) {
+      const saved = await saveAssessment({
+        delivery_cycle_id, gate_key: gate_name,
+        respondent_user_id: caller_user_id, respondent_role: 'trio_member',
+        items: l1AssessmentItems
+      });
+      if (saved.error) {
+        console.error(JSON.stringify({
+          tool_name: 'record_gate_decision', step: 'save_trio_assessment',
+          delivery_cycle_id, gate_name, error: saved.error
+        }));
+      }
+    }
 
     const state = await getL1CollectedState(gate_record.gate_record_id, cycle);
     if (state.error) {
@@ -442,6 +473,8 @@ async function record_gate_decision(params, caller_user_id) {
     }
     // G6 (AC #5): a return clears open conditions with the approvals.
     await clearOpenConditionsOnReturn(gate_record.gate_record_id, caller_user_id);
+    // GA-1 §5: a return stamps the attempt's assessments (retained, attempt-marked).
+    await clearActiveAssessments(delivery_cycle_id, gate_name, returnEvent?.event_id ?? null);
 
     return { success: true, data: { gate_record: returned_gate, stage_advanced: false } };
   }
@@ -459,6 +492,23 @@ async function record_gate_decision(params, caller_user_id) {
     }
   }
 
+  // ── Contract GA-1 (D-579): approver self-assessment (single-approver route).
+  // Required from the DESIGNATED approver; skipped for IE-override,
+  // phil_override, and an Admin approving via the fallback (on-behalf —
+  // CC-GA1 lean). Validated before the transition; saved after it succeeds.
+  let approverAssessmentItems = null;
+  if (isDesignatedApprover && !ieOverride && !philOverride) {
+    const v = validateAssessmentOrError(gate_name, 'approver', params.assessment ?? []);
+    if (!v.ok) {
+      return { success: false, error: `Cannot approve ${gateNameDisplay} — ${v.error}` };
+    }
+    approverAssessmentItems = v.items;
+  } else if (Array.isArray(params.assessment) && params.assessment.length > 0 && !ieOverride && !philOverride) {
+    const v = validateAssessmentOrError(gate_name, 'approver', params.assessment);
+    if (!v.ok) { return { success: false, error: v.error }; }
+    approverAssessmentItems = v.items;
+  }
+
   // ── Approved: shared approval transition (G5 extraction — also used by the
   // L1 consensus route above and record_consultation_response's L1 last-piece).
   const transition = await applyGateApprovalTransition({
@@ -472,6 +522,21 @@ async function record_gate_decision(params, caller_user_id) {
   });
   if (transition.error) {
     return { success: false, error: transition.error };
+  }
+
+  // GA-1: persist the approver assessment (non-fatal after the transition).
+  if (approverAssessmentItems) {
+    const savedAssessment = await saveAssessment({
+      delivery_cycle_id, gate_key: gate_name,
+      respondent_user_id: caller_user_id, respondent_role: 'approver',
+      items: approverAssessmentItems
+    });
+    if (savedAssessment.error) {
+      console.error(JSON.stringify({
+        tool_name: 'record_gate_decision', step: 'save_approver_assessment',
+        delivery_cycle_id, gate_name, error: savedAssessment.error
+      }));
+    }
   }
 
   // ── Contract G8 loud-override + D-569 marker side effects ──────────────────
