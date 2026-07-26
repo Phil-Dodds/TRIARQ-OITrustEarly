@@ -34,8 +34,9 @@ const GATE_LABEL_BY_KEY: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="ga-root">
+      <!-- Phil 2026-07-26 declutter: the purpose sentence already appears in
+           the modal subtitle — the box leads with the nudge instead. -->
       <div class="ga-header">
-        <span class="ga-purpose">{{ purposeLine }}</span>
         <span class="ga-nudge">{{ nudgeLine }}</span>
         <a *ngIf="linkUrl" class="ga-link" [href]="linkUrl" target="_blank" rel="noopener">
           Full best practices for this gate →

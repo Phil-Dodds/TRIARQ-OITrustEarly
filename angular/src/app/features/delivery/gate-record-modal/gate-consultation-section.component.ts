@@ -183,6 +183,8 @@ export class GateConsultationSectionComponent implements OnChanges {
     const declined = this.consultations.filter(
       c => c.response === 'declined' || c.response === 'declined_post_approval'
     ).length;
+    // Phil 2026-07-26 declutter: zero-count detail is noise until someone reviews.
+    if (reviewed === 0) { return `0 of ${total} reviewed`; }
     return `${reviewed} of ${total} reviewed · ${approved} approved, ${declined} declined`;
   }
 
@@ -191,7 +193,7 @@ export class GateConsultationSectionComponent implements OnChanges {
       case 'approved':               return 'Approved ✓';
       case 'declined':               return 'Declined ✗';
       case 'declined_post_approval': return 'Declined (post-approval)';
-      default:                       return 'Pending ·';
+      default:                       return 'Pending';
     }
   }
 

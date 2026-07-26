@@ -260,7 +260,8 @@ const GATE_LABELS: Record<GateName, string> = {
              class="grm-submitted-meta"
              [title]="record!.submitted_at!">
           Submitted {{ submittedRelative(record!.submitted_at) }}
-          by {{ record!.submitted_by_display_name ?? 'Unknown' }}
+          by {{ record!.submitted_by_display_name ?? 'Unknown' }}<ng-container
+            *ngIf="canShowApproverActions && !record?.l1_consensus"> — awaiting your approval</ng-container>
         </div>
 
         <!-- D-200 Pattern 3: inline error block -->
@@ -378,7 +379,11 @@ const GATE_LABELS: Record<GateName, string> = {
 
           <!-- Contract G7 (D-565 item 4): THE waiting-on line — identical on
                every surface (computed once, server-side). -->
-          <div *ngIf="record?.gate_status === 'awaiting_approval' && (record?.waiting_on || record?.l1_waiting_on)"
+          <!-- Phil 2026-07-26 declutter: suppressed when the viewer IS the
+               single approver — the submitted-meta line already says
+               "awaiting your approval". L1 rosters stay (multi-party). -->
+          <div *ngIf="record?.gate_status === 'awaiting_approval' && (record?.waiting_on || record?.l1_waiting_on)
+                       && !(canShowApproverActions && !record?.l1_consensus)"
                class="grm-meta">
             {{ record?.waiting_on?.line ?? ('Waiting on: ' + l1WaitingLine) }}
           </div>
@@ -390,10 +395,10 @@ const GATE_LABELS: Record<GateName, string> = {
 
           <!-- awaiting_approval (Approver viewing) — Approve + Return -->
           <ng-container *ngIf="canShowApproverActions">
-            <div class="grm-meta">
-              {{ record?.l1_consensus
-                  ? gateLabel + ' collects trio and consulted approvals — yours is pending.'
-                  : gateLabel + ' submitted for your approval.' }}
+            <!-- Phil 2026-07-26 declutter: single-approver duplicate line
+                 removed (submitted-meta covers it); L1 keeps its explainer. -->
+            <div *ngIf="record?.l1_consensus" class="grm-meta">
+              {{ gateLabel + ' collects trio and consulted approvals — yours is pending.' }}
             </div>
             <!-- Contract GA-1 (Phil 2026-07-26): everything BEFORE the Approve
                  button — answers collected so far, then your own assessment.
