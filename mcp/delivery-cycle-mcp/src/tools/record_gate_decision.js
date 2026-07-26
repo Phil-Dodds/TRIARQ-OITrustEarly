@@ -757,7 +757,16 @@ async function applyGateApprovalTransition({
   let stage_advanced = false;
   let new_stage      = cycle.current_lifecycle_stage;
 
-  if (target_stage && cycle.current_lifecycle_stage === prevStageOf(target_stage)) {
+  // Phil ruling 2026-07-26: an approved gate graduates the Initiative to the
+  // stage after the gate from ANY earlier stage — never backwards. The old
+  // `=== prevStageOf(target)` check silently skipped the advance whenever the
+  // team hadn't manually walked the intermediate stages (Spec, Validate, UAT),
+  // stranding stages behind approved gates across the production data.
+  const { STAGE_SEQUENCE } = require('../lifecycle');
+  const curStageIdx    = STAGE_SEQUENCE.indexOf(cycle.current_lifecycle_stage);
+  const targetStageIdx = target_stage ? STAGE_SEQUENCE.indexOf(target_stage) : -1;
+
+  if (target_stage && curStageIdx !== -1 && targetStageIdx > curStageIdx) {
     const { error: advanceErr } = await supabase
       .from('delivery_cycles')
       .update({ current_lifecycle_stage: target_stage })

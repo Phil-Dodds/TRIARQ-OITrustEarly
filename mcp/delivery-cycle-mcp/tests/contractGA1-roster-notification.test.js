@@ -107,6 +107,35 @@ describe('Close Review approval → roster notification (Design 2026-07-25)', ()
     assert.ok(emails.includes('dana@x.com') && emails.includes('evan@x.com') && emails.includes('drew@x.com'), 'trio included');
   });
 
+  test('stage graduates from ANY earlier stage on gate approval (Phil 2026-07-26)', async () => {
+    // go_to_build approved while the cycle sits at DESIGN (Spec never manually
+    // entered) — the old prevStageOf() check silently skipped the advance.
+    const gateRow = { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER };
+    queue = [
+      { data: gateRow, error: null },
+      { data: { ...cycleRow('DESIGN'), assigned_epo_user_id: null }, error: null },
+      { data: { is_admin: false, is_super_admin: false, is_initiative_executive: false, display_name: 'App Rover' }, error: null },
+      { data: [], error: null },                                          // declined consultations
+      { data: [], error: null },                                          // open conditions
+      { data: { ...gateRow, gate_status: 'approved' }, error: null },     // gate update
+      { data: null, error: null },                                        // milestone
+      { data: null, error: null },                                        // stage advance UPDATE
+      { data: null, error: null },                                        // gate_approved event
+      { data: null, error: null },                                        // stage_advanced event
+      { data: [], error: null },                                          // informed stakes
+      { data: [], error: null },                                          // artifact types
+      { data: [], error: null },                                          // attachments
+      { data: null, error: null },                                        // assessment clear
+      { data: null, error: null }                                         // assessment insert
+    ];
+    const r = await record_gate_decision(
+      { delivery_cycle_id: CYC, gate_name: 'go_to_build', decision: 'approved',
+        assessment: ga1Assessment('go_to_build', 'approver') }, APPROVER);
+    assert.equal(r.success, true, r.error);
+    assert.equal(r.data.stage_advanced, true, 'stage must graduate past skipped manual stages');
+    assert.equal(r.data.new_stage ?? r.data.gate_record?.current_lifecycle_stage ?? 'BUILD', 'BUILD');
+  });
+
   test('other gates: no roster email (control)', async () => {
     const gateRow = { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER };
     queue = [
