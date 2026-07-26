@@ -90,4 +90,38 @@ function filterForViewer(rows, { viewer_user_id, gate_status, viewerIsApprover }
   return rows.filter(r => r.respondent_user_id === viewer_user_id);
 }
 
-module.exports = { saveAssessment, validateOrError, clearActiveAssessments, fetchAssessments, filterForViewer };
+const ROSTER_ROLE_LABELS = {
+  submitter: 'Submitter', trio_member: 'Trio member', consulted: 'Consulted', approver: 'Approver'
+};
+
+/**
+ * GA-1 scope addition (Design 2026-07-25): compact text roster for the Close
+ * Review decision notification. Active-attempt rows only; one line per
+ * respondent: "Name (Role): item A · item B — “comment”".
+ * @param {Array} rows       — gate_assessments rows
+ * @param {Object} nameById  — user_id → display_name
+ * @returns {string} multi-line roster ('' when nothing collected)
+ */
+function buildAssessmentRosterText(rows, nameById) {
+  const active = (rows || []).filter(r => !r.cleared_by_return_at);
+  const byUser = new Map();
+  for (const r of active) {
+    const key = r.respondent_user_id + '|' + r.respondent_role;
+    if (!byUser.has(key)) {
+      byUser.set(key, {
+        name: nameById[r.respondent_user_id] || 'Participant',
+        role: ROSTER_ROLE_LABELS[r.respondent_role] || r.respondent_role,
+        parts: []
+      });
+    }
+    const grade = r.grade === 'NA' ? 'N/A' : r.grade;
+    byUser.get(key).parts.push(
+      `${r.item_key} ${grade}${r.comment ? ` (“${r.comment}”)` : ''}`
+    );
+  }
+  return [...byUser.values()]
+    .map(g => `${g.name} (${g.role}): ${g.parts.join(' · ')}`)
+    .join('\n');
+}
+
+module.exports = { saveAssessment, validateOrError, clearActiveAssessments, fetchAssessments, filterForViewer, buildAssessmentRosterText };

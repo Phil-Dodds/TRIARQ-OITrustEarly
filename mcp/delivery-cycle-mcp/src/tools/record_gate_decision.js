@@ -49,7 +49,7 @@ const {
 // Contract G6 (D-565): open conditions hold approvals; returns clear them.
 const { countOpenConditions, clearOpenConditionsOnReturn } = require('./helpers/gate-conditions');
 // Contract GA-1 (D-579): gate assessments — collection + attempt clearing.
-const { validateOrError: validateAssessmentOrError, saveAssessment, clearActiveAssessments } = require('./helpers/gate-assessments');
+const { validateOrError: validateAssessmentOrError, saveAssessment, clearActiveAssessments, fetchAssessments, buildAssessmentRosterText } = require('./helpers/gate-assessments');
 // Contract G8 (D-560): board gates are untouchable by the IE override.
 const { isBoardTriggeredGate } = require('./helpers/board-trigger');
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
@@ -880,6 +880,60 @@ async function applyGateApprovalTransition({
       tool_name: 'record_gate_decision', step: 'informed_notification',
       delivery_cycle_id, error: informedErr?.message ?? String(informedErr)
     }));
+  }
+
+  // ── GA-1 scope addition (Design-locked 2026-07-25): Close Review approval
+  // carries the assessment roster to trio + consulted — the decision closes
+  // the Initiative, so the answers travel to the people rather than waiting
+  // on a closed record. CC-GA1-09 lean: dedicated email with the compact text
+  // roster embedded (no trio+consulted decision email existed to extend).
+  // Other gates unchanged. Non-fatal — the approval already stands.
+  if (gate_name === 'close_review') {
+    try {
+      const [{ rows: assessRows = [] } = {}, { data: consultRows }] = await Promise.all([
+        fetchAssessments(delivery_cycle_id, gate_name),
+        supabase.from('gate_consultations')
+          .select('consulted_user_id')
+          .eq('gate_record_id', gate_record.gate_record_id)
+      ]);
+      const recipientIds = [...new Set([
+        cycle.assigned_dcs_user_id, cycle.assigned_epo_user_id, cycle.assigned_dol_user_id,
+        ...(consultRows || []).map(c => c.consulted_user_id),
+        ...assessRows.map(a => a.respondent_user_id)
+      ].filter(id => id && id !== caller_user_id))];
+      if (recipientIds.length > 0) {
+        const { data: rosterUsers } = await supabase
+          .from('users')
+          .select('id, display_name, email')
+          .in('id', recipientIds.concat(assessRows.map(a => a.respondent_user_id)))
+          .is('deleted_at', null);
+        const nameById = {};
+        (rosterUsers || []).forEach(u => { nameById[u.id] = u.display_name; });
+        const roster = buildAssessmentRosterText(assessRows, nameById);
+        const recipients = (rosterUsers || [])
+          .filter(u => recipientIds.includes(u.id) && u.email)
+          .map(u => ({ email: u.email, display_name: u.display_name }));
+        if (recipients.length > 0) {
+          await sendGateNotificationEmail({
+            recipients,
+            subject:          `${cycle.cycle_title} — Close Review approved · gate assessments`,
+            initiativeName:   cycle.cycle_title,
+            gateNameDisplay,
+            contextParagraph: `${callerDisplayName} approved Close Review for ${cycle.cycle_title} — the Initiative closes. ` +
+                              `Gate assessments collected on this attempt:\n\n` +
+                              (roster || '(no assessments were collected on this gate)') +
+                              `\n\nThe full roster (including prior attempts) is on the gate record in OI Trust.`,
+            delivery_cycle_id,
+            email_type:       'close_review_assessment_roster'
+          });
+        }
+      }
+    } catch (rosterErr) {
+      console.error(JSON.stringify({
+        tool_name: 'record_gate_decision', step: 'close_review_roster_notification',
+        delivery_cycle_id, error: rosterErr?.message ?? String(rosterErr)
+      }));
+    }
   }
 
   // ── EPO WIP check (D-400, Contract 20) ────────────────────────────────────
