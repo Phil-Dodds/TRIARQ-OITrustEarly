@@ -44,6 +44,9 @@ require.cache[dbPath] = {
 const { record_gate_decision } = require('../src/tools/record_gate_decision');
 const { record_consultation_response } = require('../src/tools/record_consultation_response');
 const conditionTools = require('../src/tools/gate_conditions');
+// GA-1: consulted approvals carry an assessment.
+const { requiredItemKeys } = require('../src/lib/gate-assessment-registry');
+const ga1Assessment = (gate, role) => requiredItemKeys(gate, role).map(k => ({ item_key: k, grade: 'B' }));
 
 const APPROVER = 'approver-uuid', OTHER = 'other-uuid', CONS = 'cons-uuid';
 const CYC = 'c1', GATE = 'g1';
@@ -94,11 +97,14 @@ describe('G6 — consultation_required auto-resolve (S-B5)', () => {
       { data: { id: 'cons-row', gate_record_id: GATE, consulted_user_id: CONS, response: 'pending' }, error: null },
       { data: { gate_record_id: GATE, delivery_cycle_id: CYC, gate_name: 'go_to_build', gate_status: 'awaiting_approval', approver_user_id: APPROVER, approver_decision_at: null }, error: null },
       { data: { id: 'cons-row', response: 'approved' }, error: null },     // consultation update
+      { data: null, error: null },                                         // GA-1 assessment self-supersede clear
+      { data: null, error: null },                                         // GA-1 assessment insert
       { data: null, error: null },                                         // condition auto-resolve update
       { data: l2Cycle, error: null }                                       // G5 hook cycle fetch (not L1 → done)
     ];
     const r = await record_consultation_response(
-      { gate_record_id: GATE, response: 'approved' }, CONS);
+      { gate_record_id: GATE, response: 'approved',
+        assessment: ga1Assessment('go_to_build', 'consulted') }, CONS);
     assert.equal(r.success, true);
     assert.equal(queue.length, 0, 'auto-resolve query consumed');
   });

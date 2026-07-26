@@ -49,7 +49,12 @@ import { GateConsultationSectionComponent } from './gate-consultation-section.co
 import { GateThreadConditionsComponent } from './gate-thread-conditions.component';
 // Contract G3 (D-567/D-558): sizing interstitial + Go to Build confirm step.
 import { InitiativeSizingFormComponent, SizingFormPayload } from '../sizing-form/initiative-sizing-form.component';
-import { GATE_COACHING_SHORT, GATE_PURPOSES } from '../../../shared/constants/gate-coaching.constants';
+// GA-1 (D-579): GATE_PURPOSES retired from confirm surfaces — the assessment
+// form's header carries the per-gate purpose sentence instead.
+import { GATE_COACHING_SHORT } from '../../../shared/constants/gate-coaching.constants';
+// Contract GA-1 (D-579): assessment collection + read-only display.
+import { GateAssessmentFormComponent, AssessmentChange } from '../gate-assessment/gate-assessment-form.component';
+import { GateAssessmentDisplayComponent, GateAssessmentRow } from '../gate-assessment/gate-assessment-display.component';
 import {
   DeliveryCycle,
   GateName,
@@ -94,7 +99,7 @@ const GATE_LABELS: Record<GateName, string> = {
   selector:        'app-gate-record-modal',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, GateConsultationSectionComponent, InitiativeSizingFormComponent, GateThreadConditionsComponent],
+  imports:         [CommonModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, GateConsultationSectionComponent, InitiativeSizingFormComponent, GateThreadConditionsComponent, GateAssessmentFormComponent, GateAssessmentDisplayComponent],
   template: `
     <div class="grm-shell" [attr.aria-busy]="processing ? 'true' : null">
 
@@ -194,8 +199,19 @@ const GATE_LABELS: Record<GateName, string> = {
         <app-gate-consultation-section
           [gateRecordId]="record?.gate_record_id ?? null"
           [gateStatus]="record?.gate_status ?? null"
-          [currentUserId]="currentUserId">
+          [currentUserId]="currentUserId"
+          [gateName]="data.gateName"
+          [assessmentLinkUrl]="assessmentLinkUrl">
         </app-gate-consultation-section>
+
+        <!-- Contract GA-1 (D-579): post-decision, all attempt answers are
+             visible to the trio and consulted on the gate record. -->
+        <app-gate-assessment-display
+          *ngIf="(record?.gate_status === 'approved' || record?.gate_status === 'returned')
+                 && (record?.assessments?.length ?? 0) > 0"
+          [rows]="approverVisibleAssessments"
+          title="Gate assessments">
+        </app-gate-assessment-display>
 
         <!-- THREAD & CONDITIONS — Contract G6 (D-565). One line, one tap deep. -->
         <app-gate-thread-conditions
@@ -314,6 +330,17 @@ const GATE_LABELS: Record<GateName, string> = {
                 Submit anyway (Phil override)…
               </button>
             </div>
+            <!-- Contract GA-1 (D-579): submitter self-assessment — required
+                 from genuine trio participants before Submit enables. Hidden
+                 for an Admin submitting on behalf (server skips them too). -->
+            <app-gate-assessment-form
+              *ngIf="viewerIsTrioParticipant"
+              [gateKey]="data.gateName"
+              role="submitter"
+              [linkUrl]="assessmentLinkUrl"
+              [disabled]="processing"
+              (changed)="submitAssessment = $event">
+            </app-gate-assessment-form>
             <!-- D-489: submission justification — encouraged, not required -->
             <div class="grm-note-field">
               <label class="grm-label" for="grm-submission-note">Why is this gate ready?</label>
@@ -326,7 +353,8 @@ const GATE_LABELS: Record<GateName, string> = {
             </div>
             <button class="grm-btn-primary"
                     type="button"
-                    [disabled]="processing || data.hardStops.length > 0"
+                    [disabled]="processing || data.hardStops.length > 0
+                                || (viewerIsTrioParticipant && !submitAssessment.complete)"
                     (click)="onSubmit()">
               {{ processing && processingAction === 'submit'
                   ? (resubmitMode ? 'Re-submitting…' : 'Submitting…')
@@ -446,11 +474,23 @@ const GATE_LABELS: Record<GateName, string> = {
                   ? 'Approving records your Level 1 approval. The gate passes — and the Initiative advances — the moment the last collected party approves.'
                   : 'Approving this gate will advance the Initiative. This cannot be undone without a stage regression.' }}
             </div>
-            <!-- G7 (D-555/D-565 item 5): rotating purposes reminder + one note. -->
-            <div style="margin:6px 0;padding:6px 10px;border-left:3px solid #B9C4CE;
-                        font:italic 11px Roboto,sans-serif;color:#5A5A5A;">
-              {{ approvalPurposeReminder }}
-            </div>
+            <!-- Contract GA-1 (D-579): the rotating GATE_PURPOSES line is
+                 retired — the assessment header carries the gate purpose.
+                 The approver first sees all answers collected so far
+                 (collapsed, one tap), then grades their own. -->
+            <app-gate-assessment-display
+              *ngIf="(record?.assessments?.length ?? 0) > 0"
+              [rows]="approverVisibleAssessments"
+              title="Answers collected so far">
+            </app-gate-assessment-display>
+            <app-gate-assessment-form
+              *ngIf="approveAssessmentRequired"
+              [gateKey]="data.gateName"
+              [role]="record?.l1_consensus ? 'trio_member' : 'approver'"
+              [linkUrl]="assessmentLinkUrl"
+              [disabled]="processing"
+              (changed)="approveAssessment = $event">
+            </app-gate-assessment-form>
             <input type="text" maxlength="500"
                    placeholder="Approver note (optional)"
                    [(ngModel)]="approveNoteDraft" [ngModelOptions]="{standalone: true}"
@@ -460,7 +500,7 @@ const GATE_LABELS: Record<GateName, string> = {
             <div class="grm-action-row">
               <button class="grm-btn-primary"
                       type="button"
-                      [disabled]="processing"
+                      [disabled]="processing || (approveAssessmentRequired && !approveAssessment.complete)"
                       (click)="onApproveConfirm()">
                 {{ processing && processingAction === 'approve' ? 'Approving…' : 'Confirm Approval' }}
               </button>
@@ -1025,14 +1065,37 @@ export class GateRecordModalComponent {
   overReturnedReasonDraft = '';
   overReturnedParties: string[] = [];
 
-  /** G7 (D-555): one of the four purposes, rotated daily per gate — subtle
-   *  rotation against habituation (D-527 architecture). */
-  get approvalPurposeReminder(): string {
-    const day = Math.floor(Date.now() / 86400000);
-    const gateIdx = ['brief_review', 'go_to_build', 'go_to_deploy', 'go_to_release', 'close_review']
-      .indexOf(this.data.gateName);
-    return GATE_PURPOSES[(day + Math.max(gateIdx, 0)) % GATE_PURPOSES.length];
+  // GA-1 (D-579): the G7 rotating approvalPurposeReminder is retired from
+  // this surface — the assessment header carries the per-gate purpose.
+
+  // ── Contract GA-1 (D-579): assessment state ────────────────────────────────
+  submitAssessment:  AssessmentChange = { complete: false, items: [] };
+  approveAssessment: AssessmentChange = { complete: false, items: [] };
+
+  /** Genuine participant = assigned trio member (server requires exactly them). */
+  get viewerIsTrioParticipant(): boolean {
+    const me = this.currentUserId;
+    const c  = this.data.cycle;
+    return !!me && [c.assigned_dcs_user_id, c.assigned_epo_user_id, c.assigned_dol_user_id].includes(me);
   }
+
+  /** Per-gate best-practices link (blank/absent = hidden). */
+  get assessmentLinkUrl(): string | null {
+    return this.data.cycle.gate_coaching_links?.[this.data.gateName] || null;
+  }
+
+  /** Approver-side collection: L1 trio member, or the designated approver.
+   *  Admin fallback / overrides are on-behalf — server skips, form hidden. */
+  get approveAssessmentRequired(): boolean {
+    if (this.record?.l1_consensus) { return this.viewerIsTrioParticipant; }
+    return !!this.record?.approver_user_id && this.record.approver_user_id === this.currentUserId;
+  }
+
+  /** Rows the server already visibility-filtered for this viewer. */
+  get approverVisibleAssessments(): GateAssessmentRow[] {
+    return (this.record?.assessments ?? []) as GateAssessmentRow[];
+  }
+
   processing      = false;
   processingAction:
     | 'submit'
@@ -1378,7 +1441,10 @@ export class GateRecordModalComponent {
       // D-489: optional justification travels with the submission.
       ...(note ? { submission_note: note } : {}),
       // Phil 2026-07-24: override armed via the confirmed Phil lever only.
-      ...(this.philOverrideArmed ? { phil_override: true } : {})
+      ...(this.philOverrideArmed ? { phil_override: true } : {}),
+      // GA-1 (D-579): submitter assessment (genuine participants only).
+      ...(this.viewerIsTrioParticipant && !this.philOverrideArmed
+            ? { assessment: this.submitAssessment.items } : {})
     }).subscribe({
       next: (res) => {
         // Contract G3 (D-567): sizing interstitial — the Initiative has no
@@ -1450,7 +1516,10 @@ export class GateRecordModalComponent {
       delivery_cycle_id: this.data.cycle.delivery_cycle_id,
       gates_to_skip:     this.pendingSkipGates,
       submitted_gate:    this.data.gateName,
-      ...(this.philOverrideArmed ? { phil_override: true } : {})
+      ...(this.philOverrideArmed ? { phil_override: true } : {}),
+      // GA-1: the assessment rides through the skip interstitial round-trip.
+      ...(this.viewerIsTrioParticipant && !this.philOverrideArmed
+            ? { assessment: this.submitAssessment.items } : {})
     }).subscribe({
       next: (res) => {
         if (res.success) {
@@ -1650,6 +1719,9 @@ export class GateRecordModalComponent {
       decision:          'approved',
       // G7 (D-565 item 5): the one approver note field.
       ...(note ? { approver_notes: note } : {}),
+      // GA-1 (D-579): approver / trio-member assessment (overrides skip it).
+      ...(this.approveAssessmentRequired && !extra.ie_override && !extra.phil_override
+            ? { assessment: this.approveAssessment.items } : {}),
       ...extra
     }).subscribe({
       next: (res) => {

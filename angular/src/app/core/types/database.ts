@@ -349,6 +349,8 @@ export interface DeliveryCycle {
   waiting_on?:               { state: string; line: string; days_waiting: number } | null;
   // Contract G9: sizing row joined by list_delivery_cycles (interest filters).
   sizing?:                   InitiativeSizing | null;
+  // Contract GA-1 (D-579): per-gate best-practices link config (null = hidden).
+  gate_coaching_links?:      Record<string, string | null>;
   created_at:              string;
   updated_at:              string;
   deleted_at:              string | null;
@@ -486,6 +488,20 @@ export interface GateRecord {
   created_at:                  string;
   updated_at:                  string;
   // Supplement Section 1: populated by get_delivery_cycle for the calling user
+  // Contract GA-1 (D-579): visibility-filtered assessment rows for this gate
+  // (own rows pre-decision; all rows for the approver-in-decision and
+  // post-decision).
+  assessments?: {
+    id: string;
+    respondent_user_id: string;
+    respondent_display_name?: string | null;
+    respondent_role: 'submitter' | 'trio_member' | 'consulted' | 'approver';
+    item_key: string;
+    grade: 'A' | 'B' | 'C' | 'D' | 'NA';
+    comment: string | null;
+    cleared_by_return_at: string | null;
+    created_at: string;
+  }[];
   // Contract G5 (D-557): L1 consensus gate metadata.
   l1_consensus?: boolean;
   l1_waiting_on?: {

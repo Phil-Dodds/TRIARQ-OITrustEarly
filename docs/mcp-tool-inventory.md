@@ -422,6 +422,20 @@ get_my_acknowledgments_due, status_dashboard_changed_since,
 get_initiative_status_dashboard, trigger_status_refresh,
 get_status_refresh_last_run.
 
+### 1.14 Gate Assessments — Contract GA-1 (D-579)
+New tools: `list_gate_coaching_links` (any authenticated caller),
+`set_gate_coaching_link` (Admin-only; per-gate "Full best practices" URL,
+blank hides the link). Extended tools: `submit_gate_for_approval`,
+`record_gate_decision`, `record_consultation_response`, `confirm_gate_skip`
+accept `assessment: [{item_key, grade(A|B|C|D|NA), comment?}]` — required
+from genuine participants (submitter trio roles, trio-member approvals,
+designated approver, approving consulted parties), validated against
+`lib/gate-assessment-registry.js`, skipped for overrides/on-behalf/returns.
+`get_delivery_cycle` gate records carry visibility-filtered `assessments`
+(blind-until-decision, GA-1 §4) and the cycle carries `gate_coaching_links`.
+Returns/withdraws stamp active rows `cleared_by_return_at` (D-578 posture).
+Table: `gate_assessments` + `gate_coaching_links` (migration 089).
+
 ### division-mcp / document-access-mcp / team-meetings-mcp / initiative-public-mcp
 See each service's `GET /tools` endpoint and contract specs. (Catalog expansion
 for these services: candidate for a later contract.)

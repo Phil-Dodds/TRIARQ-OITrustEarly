@@ -23,11 +23,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DeliveryService } from '../../../core/services/delivery.service';
 import { GateConsultation, ConsultationResponse, GateStatus } from '../../../core/types/database';
+// Contract GA-1 (D-579): consulted assessment collection.
+import { GateAssessmentFormComponent, AssessmentChange } from '../gate-assessment/gate-assessment-form.component';
 
 @Component({
   selector:        'app-gate-consultation-section',
   standalone:      true,
-  imports:         [CommonModule, FormsModule],
+  imports:         [CommonModule, FormsModule, GateAssessmentFormComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section *ngIf="consultations.length > 0" class="gcs-section">
@@ -72,9 +74,22 @@ import { GateConsultation, ConsultationResponse, GateStatus } from '../../../cor
           </label>
           <textarea class="gcs-notes-input" [(ngModel)]="draftNotes" rows="2"
                     placeholder="Optional notes…"></textarea>
+          <!-- Contract GA-1 (D-579): an APPROVING consulted response carries a
+               self-assessment (stakeholders + gate sub-items; N/A freely).
+               Declines carry their note instead — no assessment. -->
+          <app-gate-assessment-form
+            *ngIf="draftResponse === 'approved' && !!gateName"
+            [gateKey]="gateName!"
+            role="consulted"
+            [linkUrl]="assessmentLinkUrl"
+            [disabled]="saving"
+            (changed)="consultedAssessment = $event">
+          </app-gate-assessment-form>
           <div *ngIf="editError" class="gcs-edit-error">{{ editError }}</div>
           <div class="gcs-editor-actions">
-            <button type="button" class="gcs-save" [disabled]="!draftResponse || saving"
+            <button type="button" class="gcs-save"
+                    [disabled]="!draftResponse || saving
+                                || (draftResponse === 'approved' && !consultedAssessment.complete)"
                     (click)="saveEdit(c)">{{ saving ? 'Saving…' : 'Save' }}</button>
             <button type="button" class="gcs-cancel" [disabled]="saving" (click)="cancelEdit()">Cancel</button>
           </div>
@@ -118,6 +133,11 @@ export class GateConsultationSectionComponent implements OnChanges {
   @Input() gateStatus: GateStatus | null = null;
   /** Current user — only their own row gets the Edit affordance. */
   @Input() currentUserId: string | null = null;
+  /** Contract GA-1: gate key + link URL for the consulted assessment. */
+  @Input() gateName: string | null = null;
+  @Input() assessmentLinkUrl: string | null = null;
+
+  consultedAssessment: AssessmentChange = { complete: false, items: [] };
 
   consultations: GateConsultation[] = [];
 
@@ -209,7 +229,10 @@ export class GateConsultationSectionComponent implements OnChanges {
     this.delivery.recordConsultationResponse({
       gate_record_id: this.gateRecordId,
       response:       this.draftResponse,
-      notes:          this.draftNotes.trim() || undefined
+      notes:          this.draftNotes.trim() || undefined,
+      // GA-1: assessment travels with approving responses only.
+      ...(this.draftResponse === 'approved'
+            ? { assessment: this.consultedAssessment.items } : {})
     }).subscribe({
       next: (res) => {
         this.saving = false;
