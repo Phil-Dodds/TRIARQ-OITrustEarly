@@ -219,7 +219,8 @@ const GATE_LABELS: Record<GateName, string> = {
         <app-gate-thread-conditions
           *ngIf="record?.gate_record_id"
           [gateRecordId]="record!.gate_record_id"
-          [canManageConditions]="!!record?.current_user_gate_authority?.can_approve || !!data.callerCanSubmitGates">
+          [canManageConditions]="!!record?.current_user_gate_authority?.can_approve || !!data.callerCanSubmitGates"
+          (openConditionsCount)="philOpenConditions = $event">
         </app-gate-thread-conditions>
 
         <!-- GATE CHECKLIST — hidden entirely when the gate defines none
@@ -429,8 +430,28 @@ const GATE_LABELS: Record<GateName, string> = {
                       (click)="confirmMode = 'return'">
                 Return
               </button>
+              <button *ngIf="showPhilOverrideApprove"
+                      class="grm-btn-secondary" type="button"
+                      style="margin-left:auto;"
+                      [disabled]="processing"
+                      (click)="confirmMode = 'phil-override-approve'">
+                Override: approve without requirements…
+              </button>
             </div>
           </ng-container>
+
+          <!-- Phil 2026-07-26: override lever when NO normal action row renders
+               for Phil (not the approver / not trio) — right-justified, and
+               only when actually needed (showPhilOverrideApprove). -->
+          <div *ngIf="showPhilOverrideApprove && !canShowApproverActions
+                       && !(record?.gate_status === 'pending' && record?.current_user_gate_authority?.can_approve)"
+               class="grm-action-row" style="justify-content:flex-end;">
+            <button class="grm-btn-secondary" type="button"
+                    [disabled]="processing"
+                    (click)="confirmMode = 'phil-override-approve'">
+              Override: approve without requirements…
+            </button>
+          </div>
 
           <!-- awaiting_approval — neither approver nor submitter (read-only) -->
           <div *ngIf="record?.gate_status === 'awaiting_approval'
@@ -440,14 +461,9 @@ const GATE_LABELS: Record<GateName, string> = {
             Only the designated approver or Phil can record a decision on this gate.
           </div>
 
-          <!-- Phil 2026-07-24: approve-anything lever — Phil only, confirms first.
-               Bypasses L1 consensus, open conditions, and over-returned reasons. -->
-          <button *ngIf="viewerIsPhil && (record?.gate_status === 'awaiting_approval' || record?.gate_status === 'pending')"
-                  class="grm-btn-secondary" type="button"
-                  [disabled]="processing"
-                  (click)="confirmMode = 'phil-override-approve'">
-            Approve (override)…
-          </button>
+          <!-- Phil 2026-07-26: the standalone override button moved into the
+               action rows above (same row, right-justified, only when plain
+               Approve can't do the job — showPhilOverrideApprove). -->
 
           <!-- Contract G8 (D-560): the loud IE override — release valve. -->
           <button *ngIf="canShowIeOverride"
@@ -489,6 +505,13 @@ const GATE_LABELS: Record<GateName, string> = {
                       [disabled]="processing"
                       (click)="confirmMode = 'return'">
                 Return
+              </button>
+              <button *ngIf="showPhilOverrideApprove"
+                      class="grm-btn-secondary" type="button"
+                      style="margin-left:auto;"
+                      [disabled]="processing"
+                      (click)="confirmMode = 'phil-override-approve'">
+                Override: approve without requirements…
               </button>
             </div>
           </ng-container>
@@ -1097,6 +1120,21 @@ export class GateRecordModalComponent {
   /** Per-gate best-practices link (blank/absent = hidden). */
   get assessmentLinkUrl(): string | null {
     return this.data.cycle.gate_coaching_links?.[this.data.gateName] || null;
+  }
+
+  /** Open-condition count reported by the thread/conditions child. */
+  philOpenConditions = 0;
+
+  /** Phil 2026-07-26: the override-approve lever renders ONLY when plain
+   *  Approve can't do the job — viewer can't approve normally, an L1 gate is
+   *  still collecting, or open conditions block the approval. */
+  get showPhilOverrideApprove(): boolean {
+    if (!this.viewerIsPhil) { return false; }
+    const s = this.record?.gate_status;
+    if (s !== 'awaiting_approval' && s !== 'pending') { return false; }
+    return !this.record?.current_user_gate_authority?.can_approve
+        || !!this.record?.l1_consensus
+        || this.philOpenConditions > 0;
   }
 
   /** Approver-side collection: L1 trio member, or the designated approver.

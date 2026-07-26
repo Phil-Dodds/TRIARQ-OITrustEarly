@@ -146,6 +146,9 @@ export class GateThreadConditionsComponent implements OnChanges {
   /** Approver / trio / admin — server re-enforces (G6). */
   @Input() canManageConditions = false;
   @Output() conditionsChanged = new EventEmitter<void>();
+  /** Phil 2026-07-26: parent modal needs the open-condition count to decide
+   *  when the override-approve lever is actually needed. */
+  @Output() openConditionsCount = new EventEmitter<number>();
 
   /** Self-loaded — targets for consultation_required conditions. */
   consultations: GateConsultation[] = [];
@@ -194,6 +197,7 @@ export class GateThreadConditionsComponent implements OnChanges {
     this.delivery.listGateConditions({ gate_record_id: this.gateRecordId }).subscribe({
       next: (res) => {
         this.conditions = (res.success && res.data?.gate_conditions) || [];
+        this.openConditionsCount.emit(this.openConditions.length);
         this.cdr.markForCheck();
       },
       error: () => { /* renders empty */ }
