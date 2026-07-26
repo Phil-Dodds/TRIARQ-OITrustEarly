@@ -21,7 +21,11 @@ import { GateConditionRecord, GateConsultation, GateThreadMessage } from '../../
   imports: [CommonModule, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="gtc-root">
+    <!-- Phil 2026-07-26 declutter: the line hides entirely when there is
+         nothing in it AND the viewer can't add anything ("0 messages" on a
+         read-only gate is noise). -->
+    <div class="gtc-root"
+         *ngIf="messages.length > 0 || conditions.length > 0 || canManageConditions">
       <!-- One line + one action first (D-565 UI discipline). -->
       <button type="button" class="gtc-toggle" (click)="expanded = !expanded">
         {{ expanded ? '▾' : '▸' }} Thread & conditions

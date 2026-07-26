@@ -365,7 +365,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     style="white-space:nowrap;font-size:11px;color:#E96127;
                            background:none;border:1px solid #E96127;
                            border-radius:5px;padding:3px 8px;cursor:pointer;">
-              Force-Close (Phil)…
+              Force-Close…
             </button>
             <span *ngIf="forceCloseConfirming"
                   style="display:flex;align-items:center;gap:6px;font:11px Roboto,sans-serif;color:#B3261E;">

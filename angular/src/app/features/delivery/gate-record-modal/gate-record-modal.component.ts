@@ -151,8 +151,10 @@ const GATE_LABELS: Record<GateName, string> = {
           </div>
         </section>
 
-        <!-- MILESTONE DATE -->
-        <section *ngIf="milestone" class="grm-section">
+        <!-- MILESTONE DATE — hidden when no dates exist yet (Phil 2026-07-26:
+             empty "Target: — Actual: —" rows are noise; dates are managed on
+             the Initiative panel). -->
+        <section *ngIf="milestone && (milestone!.target_date || milestone!.actual_date)" class="grm-section">
           <div class="grm-label">Milestone Date</div>
           <div class="grm-milestone">
             <div>
@@ -220,8 +222,9 @@ const GATE_LABELS: Record<GateName, string> = {
           [canManageConditions]="!!record?.current_user_gate_authority?.can_approve || !!data.callerCanSubmitGates">
         </app-gate-thread-conditions>
 
-        <!-- GATE CHECKLIST -->
-        <section class="grm-section">
+        <!-- GATE CHECKLIST — hidden entirely when the gate defines none
+             (Phil 2026-07-26: no "no items" filler). -->
+        <section *ngIf="data.checklist.length > 0" class="grm-section">
           <div class="grm-label">Gate Checklist</div>
           <!-- Two columns to save vertical space. -->
           <div class="grm-checklist-grid">
@@ -234,9 +237,6 @@ const GATE_LABELS: Record<GateName, string> = {
                 {{ item.label }}
               </span>
             </div>
-          </div>
-          <div *ngIf="data.checklist.length === 0" class="grm-checklist-empty">
-            No checklist items defined for this Gate.
           </div>
         </section>
 
@@ -327,7 +327,7 @@ const GATE_LABELS: Record<GateName, string> = {
                       style="margin-top:8px;"
                       [disabled]="processing"
                       (click)="confirmMode = 'phil-override-submit'">
-                Submit anyway (Phil override)…
+                Submit anyway (override)…
               </button>
             </div>
             <!-- Contract GA-1 (D-579): submitter self-assessment — required
@@ -361,7 +361,7 @@ const GATE_LABELS: Record<GateName, string> = {
                   : (resubmitMode ? 'Re-submit for Approval' : 'Submit for Approval') }}
             </button>
             <div *ngIf="!data.callerCanSubmitGates" class="grm-meta">
-              Only the assigned Domain Capability Strategist, Engineering Product Owner, Domain Outcome Lead, or Phil can submit this Gate.
+              Only the assigned Domain Capability Strategist, Engineering Product Owner, Domain Outcome Lead, or an Admin can submit this Gate.
             </div>
           </ng-container>
 
@@ -395,10 +395,26 @@ const GATE_LABELS: Record<GateName, string> = {
                   ? gateLabel + ' collects trio and consulted approvals — yours is pending.'
                   : gateLabel + ' submitted for your approval.' }}
             </div>
+            <!-- Contract GA-1 (Phil 2026-07-26): everything BEFORE the Approve
+                 button — answers collected so far, then your own assessment.
+                 Approve stays disabled until your assessment is complete. -->
+            <app-gate-assessment-display
+              *ngIf="(record?.assessments?.length ?? 0) > 0"
+              [rows]="approverVisibleAssessments"
+              title="Answers collected so far">
+            </app-gate-assessment-display>
+            <app-gate-assessment-form
+              *ngIf="approveAssessmentRequired"
+              [gateKey]="data.gateName"
+              [role]="record?.l1_consensus ? 'trio_member' : 'approver'"
+              [linkUrl]="assessmentLinkUrl"
+              [disabled]="processing"
+              (changed)="approveAssessment = $event">
+            </app-gate-assessment-form>
             <div class="grm-action-row">
               <button class="grm-btn-primary"
                       type="button"
-                      [disabled]="processing"
+                      [disabled]="processing || (approveAssessmentRequired && !approveAssessment.complete)"
                       (click)="confirmMode = 'approve'">
                 Approve
               </button>
@@ -425,7 +441,7 @@ const GATE_LABELS: Record<GateName, string> = {
                   class="grm-btn-secondary" type="button"
                   [disabled]="processing"
                   (click)="confirmMode = 'phil-override-approve'">
-            Approve (Phil override)…
+            Approve (override)…
           </button>
 
           <!-- Contract G8 (D-560): the loud IE override — release valve. -->
@@ -448,10 +464,18 @@ const GATE_LABELS: Record<GateName, string> = {
             <div class="grm-meta">
               This gate was not submitted through the standard approval flow. You can approve or return it directly.
             </div>
+            <app-gate-assessment-form
+              *ngIf="approveAssessmentRequired"
+              [gateKey]="data.gateName"
+              [role]="record?.l1_consensus ? 'trio_member' : 'approver'"
+              [linkUrl]="assessmentLinkUrl"
+              [disabled]="processing"
+              (changed)="approveAssessment = $event">
+            </app-gate-assessment-form>
             <div class="grm-action-row">
               <button class="grm-btn-primary"
                       type="button"
-                      [disabled]="processing"
+                      [disabled]="processing || (approveAssessmentRequired && !approveAssessment.complete)"
                       (click)="confirmMode = 'approve'">
                 Approve
               </button>
@@ -474,23 +498,9 @@ const GATE_LABELS: Record<GateName, string> = {
                   ? 'Approving records your Level 1 approval. The gate passes — and the Initiative advances — the moment the last collected party approves.'
                   : 'Approving this gate will advance the Initiative. This cannot be undone without a stage regression.' }}
             </div>
-            <!-- Contract GA-1 (D-579): the rotating GATE_PURPOSES line is
-                 retired — the assessment header carries the gate purpose.
-                 The approver first sees all answers collected so far
-                 (collapsed, one tap), then grades their own. -->
-            <app-gate-assessment-display
-              *ngIf="(record?.assessments?.length ?? 0) > 0"
-              [rows]="approverVisibleAssessments"
-              title="Answers collected so far">
-            </app-gate-assessment-display>
-            <app-gate-assessment-form
-              *ngIf="approveAssessmentRequired"
-              [gateKey]="data.gateName"
-              [role]="record?.l1_consensus ? 'trio_member' : 'approver'"
-              [linkUrl]="assessmentLinkUrl"
-              [disabled]="processing"
-              (changed)="approveAssessment = $event">
-            </app-gate-assessment-form>
+            <!-- Contract GA-1 (Phil 2026-07-26): the assessment now lives on
+                 the main gate panel BEFORE the Approve button — this confirm
+                 is decision-only (warning + optional note). -->
             <input type="text" maxlength="500"
                    placeholder="Approver note (optional)"
                    [(ngModel)]="approveNoteDraft" [ngModelOptions]="{standalone: true}"
@@ -519,7 +529,7 @@ const GATE_LABELS: Record<GateName, string> = {
           <div class="oi-confirm-icon">⚠</div>
           <div class="oi-confirm-body">
             <div class="oi-confirm-text">
-              <strong>Phil override.</strong> This submits {{ gateLabel }} bypassing every
+              <strong>Override.</strong> This submits {{ gateLabel }} bypassing every
               submission rule — sizing, role assignments, artifacts, Jira, and AI checks.
               The override is recorded in the Initiative's activity log. Continue?
             </div>
@@ -539,7 +549,7 @@ const GATE_LABELS: Record<GateName, string> = {
           <div class="oi-confirm-icon">⚠</div>
           <div class="oi-confirm-body">
             <div class="oi-confirm-text">
-              <strong>Phil override.</strong> This approves {{ gateLabel }} immediately —
+              <strong>Override.</strong> This approves {{ gateLabel }} immediately —
               bypassing trio consensus, open conditions, and consultation returns — and
               advances the Initiative. The override is recorded in the activity log. Continue?
             </div>
@@ -1252,19 +1262,16 @@ export class GateRecordModalComponent {
     return parts.length > 0 ? parts.join(', ') : 'no one — finalizing';
   }
 
+  /** Phil 2026-07-26: no personal names in routing fallbacks. */
   get approverNameOrDefault(): string {
     const id = this.record?.approver_user_id;
     if (id) return this.approverDisplayName(id);
-    return `${this.currentUserDisplayName} (escalation default)`;
+    return 'escalation default';
   }
 
-  /**
-   * B-95: rendered when no Accountable is configured. Resolves the current
-   * user's display name from the auth session via UserProfileService —
-   * never a hardcoded "Phil" string.
-   */
+  /** B-95 amended (Phil 2026-07-26): neutral wording, no name shown. */
   get escalationDefaultLabel(): string {
-    return `${this.currentUserDisplayName} (escalation default — no Accountable configured)`;
+    return 'Escalation default — no Accountable configured';
   }
 
   /** Contract 29 WS2: current user id for the Consulted section's own-row edit. */
