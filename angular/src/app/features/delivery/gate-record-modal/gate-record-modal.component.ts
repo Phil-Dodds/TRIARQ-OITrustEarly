@@ -254,6 +254,62 @@ const GATE_LABELS: Record<GateName, string> = {
           <div class="grm-review-notes">{{ record!.approver_notes }}</div>
         </section>
 
+        <!-- ── CONDITIONS (Phil 2026-07-26): prominent, durable work items.
+             Open ones block approval AND resubmission; resolved/withdrawn
+             stay visible with their fate. -->
+        <section *ngIf="gateConditions.length > 0 && record?.gate_status !== 'approved'"
+                 class="grm-section"
+                 style="border:1px solid #f5a623;border-radius:8px;padding:10px 12px;background:#FFFDF5;">
+          <div class="grm-label" style="color:#B26A00;">
+            {{ openGateConditions.length > 0
+                ? (record?.gate_status === 'returned'
+                    ? 'Returned with conditions — resolve these before resubmitting'
+                    : 'Open conditions — must be resolved before this gate can be approved')
+                : 'Conditions — all addressed' }}
+          </div>
+          <div *ngFor="let c of gateConditions"
+               style="display:flex;align-items:baseline;gap:8px;padding:4px 0;flex-wrap:wrap;">
+            <span [style.color]="c.condition_status === 'open' ? '#f5a623'
+                                  : c.condition_status === 'resolved' ? '#2e7d32' : '#757575'">
+              {{ c.condition_status === 'open' ? '⚠' : c.condition_status === 'resolved' ? '✓' : '⊘' }}
+            </span>
+            <span style="flex:1;min-width:0;font:400 12px/1.4 Roboto,sans-serif;"
+                  [style.text-decoration]="c.condition_status === 'withdrawn' ? 'line-through' : 'none'">
+              {{ c.condition_text }}
+              <span *ngIf="c.resolution_note" style="font-style:italic;color:#5A5A5A;">
+                — {{ c.resolution_note }}</span>
+            </span>
+            <ng-container *ngIf="c.condition_status === 'open'">
+              <button *ngIf="canActOnConditions" type="button" class="grm-btn-secondary"
+                      style="padding:2px 10px;font-size:11px;"
+                      [disabled]="conditionBusyId === c.condition_id"
+                      (click)="resolveCondition(c)">
+                {{ conditionBusyId === c.condition_id ? 'Saving…' : 'Mark resolved' }}
+              </button>
+              <button *ngIf="canWithdrawConditions && withdrawingId !== c.condition_id"
+                      type="button"
+                      style="background:none;border:none;color:#757575;cursor:pointer;font-size:11px;text-decoration:underline;"
+                      (click)="withdrawingId = c.condition_id; withdrawReason = ''">
+                No longer applies…
+              </button>
+              <span *ngIf="withdrawingId === c.condition_id"
+                    style="display:flex;gap:6px;align-items:center;flex-basis:100%;">
+                <input type="text" maxlength="300" placeholder="Why it no longer applies (required)"
+                       [(ngModel)]="withdrawReason" [ngModelOptions]="{standalone: true}"
+                       style="flex:1;border:1px solid #B9C4CE;border-radius:5px;padding:4px 8px;font:400 12px Roboto,sans-serif;" />
+                <button type="button" class="grm-btn-secondary" style="padding:2px 10px;font-size:11px;"
+                        [disabled]="!withdrawReason.trim() || conditionBusyId === c.condition_id"
+                        (click)="confirmWithdraw(c)">
+                  {{ conditionBusyId === c.condition_id ? 'Saving…' : 'Withdraw' }}
+                </button>
+                <button type="button" style="background:none;border:none;color:#757575;cursor:pointer;font-size:11px;"
+                        (click)="withdrawingId = null">Cancel</button>
+              </span>
+            </ng-container>
+          </div>
+          <div *ngIf="conditionActionError" class="oi-field-error">{{ conditionActionError }}</div>
+        </section>
+
         <!-- ── ACTION AREA — context-sensitive by gate state ──────────────── -->
 
         <!-- Submitted-meta (shown above action buttons during awaiting_approval) -->
@@ -353,9 +409,15 @@ const GATE_LABELS: Record<GateName, string> = {
                         [(ngModel)]="submissionNoteDraft"
                         placeholder="Optional — a short justification the approver and consulted parties will see."></textarea>
             </div>
+            <!-- Conditions loop: open conditions block resubmission (server twin). -->
+            <div *ngIf="openGateConditions.length > 0" class="grm-meta" style="color:#B26A00;">
+              {{ openGateConditions.length }} open condition{{ openGateConditions.length === 1 ? '' : 's' }}
+              must be resolved (see the Conditions section above) before this gate can be resubmitted.
+            </div>
             <button class="grm-btn-primary"
                     type="button"
                     [disabled]="processing || data.hardStops.length > 0
+                                || openGateConditions.length > 0
                                 || (viewerIsTrioParticipant && !submitAssessment.complete)"
                     (click)="onSubmit()">
               {{ processing && processingAction === 'submit'
@@ -429,6 +491,12 @@ const GATE_LABELS: Record<GateName, string> = {
                       [disabled]="processing"
                       (click)="confirmMode = 'return'">
                 Return
+              </button>
+              <button class="grm-btn-secondary"
+                      type="button"
+                      [disabled]="processing"
+                      (click)="confirmMode = 'return-with-conditions'">
+                Return with Set Conditions
               </button>
               <button *ngIf="showPhilOverrideApprove"
                       class="grm-btn-secondary" type="button"
@@ -861,6 +929,49 @@ const GATE_LABELS: Record<GateName, string> = {
           </div>
         </div>
 
+        <!-- ── CONFIRM: Return with Set Conditions (Phil 2026-07-26) ──────── -->
+        <div *ngIf="confirmMode === 'return-with-conditions'" class="oi-confirm-warn">
+          <div class="oi-confirm-icon">⚠</div>
+          <div class="oi-confirm-body">
+            <div class="oi-confirm-text">
+              Returning with conditions: the gate goes back to the team, and it
+              cannot be resubmitted until every condition below is marked
+              resolved (or you withdraw it).
+            </div>
+            <label class="grm-label-strong">Return notes <span class="grm-required">*</span></label>
+            <textarea rows="2" class="grm-textarea"
+                      [(ngModel)]="rwcNotes" [ngModelOptions]="{standalone: true}"
+                      [disabled]="processing"
+                      placeholder="The overall message to the team."></textarea>
+            <label class="grm-label-strong" style="margin-top:6px;">Conditions to resolve <span class="grm-required">*</span></label>
+            <div *ngFor="let d of rwcConditionDrafts; let i = index; trackBy: trackByIndex"
+                 style="display:flex;gap:6px;margin:3px 0;">
+              <input type="text" maxlength="500"
+                     [(ngModel)]="rwcConditionDrafts[i]" [ngModelOptions]="{standalone: true}"
+                     [disabled]="processing"
+                     placeholder="What needs fixing — one item per line"
+                     style="flex:1;border:1px solid #B9C4CE;border-radius:5px;padding:5px 8px;font:400 12px Roboto,sans-serif;" />
+              <button *ngIf="rwcConditionDrafts.length > 1" type="button"
+                      style="background:none;border:none;color:#B3261E;cursor:pointer;"
+                      [disabled]="processing"
+                      (click)="removeRwcConditionRow(i)">✕</button>
+            </div>
+            <button type="button"
+                    style="background:none;border:none;color:#257099;cursor:pointer;font-size:12px;text-decoration:underline;padding:0;"
+                    [disabled]="processing"
+                    (click)="addRwcConditionRow()">+ Add another condition</button>
+            <div *ngIf="rwcError" class="oi-field-error">{{ rwcError }}</div>
+            <div class="grm-action-row">
+              <button class="grm-btn-primary" type="button" [disabled]="processing"
+                      (click)="onReturnWithConditionsConfirm()">
+                {{ processing && processingAction === 'return' ? 'Returning…' : 'Return with Conditions' }}
+              </button>
+              <button class="grm-btn-ghost" type="button" [disabled]="processing"
+                      (click)="cancelConfirm()">Cancel</button>
+            </div>
+          </div>
+        </div>
+
         <!-- ── RETURN form (single-step — notes are required) ─────────────── -->
         <form *ngIf="confirmMode === 'return'"
               [formGroup]="returnForm"
@@ -1089,7 +1200,8 @@ export class GateRecordModalComponent {
     | 'ie-override'                     // Contract G8 (D-560) — loud override w/ reason
     | 'over-returned-reason'            // Contract G8 (D-569) — reasoning prompt
     | 'phil-override-submit'            // Phil 2026-07-24 — cleanup/testing lever
-    | 'phil-override-approve' = 'none'; // Phil 2026-07-24 — cleanup/testing lever
+    | 'phil-override-approve'           // Phil 2026-07-24 — cleanup/testing lever
+    | 'return-with-conditions' = 'none'; // Conditions loop (Phil 2026-07-26)
   /** Phil override: when armed, submit/skip calls carry phil_override:true. */
   philOverrideArmed = false;
   /** Contract 29 WS3 (D-463/AC-32): resolved approver shown in the submit confirmation. */
@@ -1124,6 +1236,117 @@ export class GateRecordModalComponent {
 
   /** Open-condition count reported by the thread/conditions child. */
   philOpenConditions = 0;
+
+  // ── Conditions loop (Phil 2026-07-26) ──────────────────────────────────────
+  gateConditions: import('../../../core/types/database').GateConditionRecord[] = [];
+  conditionBusyId: string | null = null;
+  withdrawingId:   string | null = null;
+  withdrawReason = '';
+  conditionActionError = '';
+  /** "Return with Set Conditions" composer state. */
+  rwcNotes = '';
+  rwcConditionDrafts: string[] = [''];
+  rwcError = '';
+
+  get openGateConditions() {
+    return this.gateConditions.filter(c => c.condition_status === 'open');
+  }
+
+  /** Resolve authority mirrors the server: submit-authority holders, the
+   *  approver, or Phil. */
+  get canActOnConditions(): boolean {
+    return this.data.callerCanSubmitGates
+        || !!this.record?.current_user_gate_authority?.can_approve
+        || this.viewerIsPhil;
+  }
+
+  get canWithdrawConditions(): boolean {
+    return this.record?.approver_user_id === this.currentUserId || this.viewerIsPhil;
+  }
+
+  loadConditions(): void {
+    if (!this.record?.gate_record_id) { return; }
+    this.delivery.listGateConditions({ gate_record_id: this.record.gate_record_id }).subscribe({
+      next: (res) => {
+        this.gateConditions = res.data?.gate_conditions ?? [];
+        this.philOpenConditions = this.openGateConditions.length;
+        this.cdr.markForCheck();
+      },
+      error: () => { /* block renders empty */ }
+    });
+  }
+
+  resolveCondition(c: { condition_id: string }): void {
+    if (this.conditionBusyId) { return; }
+    this.conditionBusyId = c.condition_id;
+    this.conditionActionError = '';
+    this.delivery.resolveGateCondition({ condition_id: c.condition_id }).subscribe({
+      next: (res) => {
+        this.conditionBusyId = null;
+        if (!res.success) { this.conditionActionError = res.error ?? 'Could not resolve the condition.'; }
+        this.loadConditions();
+      },
+      error: (err: { error?: string }) => {
+        this.conditionBusyId = null;
+        this.conditionActionError = err?.error ?? 'Could not resolve the condition.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  confirmWithdraw(c: { condition_id: string }): void {
+    const reason = this.withdrawReason.trim();
+    if (!reason || this.conditionBusyId) { return; }
+    this.conditionBusyId = c.condition_id;
+    this.conditionActionError = '';
+    this.delivery.withdrawGateCondition({ condition_id: c.condition_id, reason }).subscribe({
+      next: (res) => {
+        this.conditionBusyId = null;
+        this.withdrawingId = null;
+        this.withdrawReason = '';
+        if (!res.success) { this.conditionActionError = res.error ?? 'Could not withdraw the condition.'; }
+        this.loadConditions();
+      },
+      error: (err: { error?: string }) => {
+        this.conditionBusyId = null;
+        this.conditionActionError = err?.error ?? 'Could not withdraw the condition.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  addRwcConditionRow(): void { this.rwcConditionDrafts.push(''); }
+  removeRwcConditionRow(i: number): void { this.rwcConditionDrafts.splice(i, 1); }
+  trackByIndex(i: number): number { return i; }
+
+  onReturnWithConditionsConfirm(): void {
+    const notes = this.rwcNotes.trim();
+    const conditions = this.rwcConditionDrafts.map(t => t.trim()).filter(Boolean)
+      .map(condition_text => ({ condition_text }));
+    if (!notes) { this.rwcError = 'Return notes are required.'; return; }
+    if (conditions.length === 0) { this.rwcError = 'Add at least one condition — or use plain Return.'; return; }
+    this.rwcError = '';
+    this.startProcessing('return');
+    this.delivery.recordGateDecision({
+      delivery_cycle_id: this.data.cycle.delivery_cycle_id,
+      gate_name:         this.data.gateName,
+      decision:          'returned',
+      approver_notes:    notes,
+      conditions
+    }).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.endProcessing();
+          this.onGateActionComplete('full');
+        } else {
+          this.endProcessing(res.error ?? 'Return failed. Please try again.');
+        }
+      },
+      error: (err: { error?: string }) => {
+        this.endProcessing(err.error ?? 'Return failed. Please try again.');
+      }
+    });
+  }
 
   /** Phil 2026-07-26: the override-approve lever renders ONLY when plain
    *  Approve can't do the job — viewer can't approve normally, an L1 gate is
@@ -1211,6 +1434,10 @@ export class GateRecordModalComponent {
 
     this.record    = data.cycle.gate_records?.find(g => g.gate_name === data.gateName) ?? null;
     this.milestone = data.cycle.milestone_dates?.find(m => m.gate_name === data.gateName) ?? null;
+
+    // Conditions loop (Phil 2026-07-26): the modal owns the prominent
+    // conditions block — loaded here, refreshed after every condition action.
+    this.loadConditions();
 
     this.returnForm = this.fb.group({ approver_notes: [''] });
 

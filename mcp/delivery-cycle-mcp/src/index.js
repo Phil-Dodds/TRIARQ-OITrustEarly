@@ -286,6 +286,7 @@ const TOOLS = {
   add_gate_thread_message:            gateThread.add_gate_thread_message,
   list_gate_thread:                   gateThread.list_gate_thread,
   add_gate_condition:                 gateConditions.add_gate_condition,
+  withdraw_gate_condition:            gateConditions.withdraw_gate_condition,
   resolve_gate_condition:             gateConditions.resolve_gate_condition,
   list_gate_conditions:               gateConditions.list_gate_conditions,
   record_gate_approval:               gateApprovals.record_gate_approval,

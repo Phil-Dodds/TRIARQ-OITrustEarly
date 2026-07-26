@@ -22,7 +22,8 @@ const { GATE_NAME_DISPLAY } = require('./helpers/gates');
 const { isL1ConsensusGate, trioIdsOf, getL1CollectedState, clearGateApprovals } = require('./helpers/l1-consensus');
 const { applyGateApprovalTransition } = require('./record_gate_decision');
 // Contract G6 (D-565): conditions hold gates; returns clear them.
-const { countOpenConditions, clearOpenConditionsOnReturn } = require('./helpers/gate-conditions');
+// Phil ruling 2026-07-26: condition auto-clear on return retired (durable conditions).
+const { countOpenConditions } = require('./helpers/gate-conditions');
 // Contract GA-1 (D-579): consulted assessment rides with an approving response.
 const { validateOrError: validateAssessmentOrError, saveAssessment, clearActiveAssessments } = require('./helpers/gate-assessments');
 
@@ -202,8 +203,7 @@ async function record_consultation_response(params, caller_user_id) {
           .single();
 
         await clearGateApprovals(gate_record.gate_record_id, returnEvent?.event_id ?? null);
-        // G6 (AC #5): a return clears open conditions with the approvals.
-        await clearOpenConditionsOnReturn(gate_record.gate_record_id, caller_user_id);
+        // Phil ruling 2026-07-26: conditions are durable — no auto-clear on return.
         // GA-1 §5: the consulted return stamps the attempt's assessments too.
         await clearActiveAssessments(gate_record.delivery_cycle_id, gate_record.gate_name, returnEvent?.event_id ?? null);
 

@@ -343,6 +343,8 @@ export class DeliveryService {
     phil_override?:    boolean;
     // Contract GA-1 (D-579): approver / trio-member self-assessment.
     assessment?:       { item_key: string; grade: string; comment?: string }[];
+    // Conditions loop (Phil 2026-07-26): conditions attached to a return.
+    conditions?:       { condition_text: string }[];
   }): Observable<McpResponse<GateDecisionResult>> {
     return this.mcp.call<GateDecisionResult>(
       'delivery', 'record_gate_decision', params as Record<string, unknown>
@@ -891,6 +893,14 @@ export class DeliveryService {
     Observable<McpResponse<GateConditionRecord>> {
     return this.mcp.call<GateConditionRecord>(
       'delivery', 'resolve_gate_condition', params as unknown as Record<string, unknown>
+    );
+  }
+
+  /** Conditions loop (Phil 2026-07-26): "no longer applies" — reason required. */
+  withdrawGateCondition(params: { condition_id: string; reason: string }):
+    Observable<McpResponse<GateConditionRecord>> {
+    return this.mcp.call<GateConditionRecord>(
+      'delivery', 'withdraw_gate_condition', params as unknown as Record<string, unknown>
     );
   }
 

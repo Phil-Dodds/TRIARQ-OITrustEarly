@@ -47,7 +47,9 @@ const {
   recordTrioApproval, clearGateApprovals
 } = require('./helpers/l1-consensus');
 // Contract G6 (D-565): open conditions hold approvals; returns clear them.
-const { countOpenConditions, clearOpenConditionsOnReturn } = require('./helpers/gate-conditions');
+// Phil ruling 2026-07-26: clearOpenConditionsOnReturn retired — conditions
+// are durable until resolved or withdrawn (migration 090).
+const { countOpenConditions } = require('./helpers/gate-conditions');
 // Contract GA-1 (D-579): gate assessments — collection + attempt clearing.
 const { validateOrError: validateAssessmentOrError, saveAssessment, clearActiveAssessments, fetchAssessments, buildAssessmentRosterText } = require('./helpers/gate-assessments');
 // Contract G8 (D-560): board gates are untouchable by the IE override.
@@ -252,10 +254,12 @@ async function record_gate_decision(params, caller_user_id) {
           gate_record_id: gate_record.gate_record_id, error: cleared.error
         }));
       }
-      // G6 (AC #5): a return clears open conditions with the approvals.
-      await clearOpenConditionsOnReturn(gate_record.gate_record_id, caller_user_id);
+      // Phil ruling 2026-07-26: conditions are DURABLE — a return no longer
+      // clears them (the G6 auto-wipe is retired; withdraw is the human path).
       // GA-1 §5: a return stamps the attempt's assessments (retained, attempt-marked).
       await clearActiveAssessments(delivery_cycle_id, gate_name, returnEvent?.event_id ?? null);
+      // Conditions loop: conditions attached to this L1 return are created open.
+      await createReturnConditions(gate_record.gate_record_id, delivery_cycle_id, gate_name, params.conditions, caller_user_id);
 
       // S-A2: trio notified (the returner excluded).
       const notifyIds = trioIds.filter(id => id !== caller_user_id);
@@ -471,10 +475,12 @@ async function record_gate_decision(params, caller_user_id) {
         gate_record_id: gate_record.gate_record_id, error: cleared.error
       }));
     }
-    // G6 (AC #5): a return clears open conditions with the approvals.
-    await clearOpenConditionsOnReturn(gate_record.gate_record_id, caller_user_id);
+    // Phil ruling 2026-07-26: conditions are DURABLE — no auto-clear on return.
     // GA-1 §5: a return stamps the attempt's assessments (retained, attempt-marked).
     await clearActiveAssessments(delivery_cycle_id, gate_name, returnEvent?.event_id ?? null);
+    // Conditions loop: "Return with Set Conditions" — attached conditions are
+    // created open and survive until resolved or withdrawn.
+    await createReturnConditions(gate_record.gate_record_id, delivery_cycle_id, gate_name, params.conditions, caller_user_id);
 
     return { success: true, data: { gate_record: returned_gate, stage_advanced: false } };
   }
@@ -1087,6 +1093,42 @@ function prevStageOf(target_stage) {
   const idx = STAGE_SEQUENCE.indexOf(target_stage);
   if (idx <= 0) return null;
   return STAGE_SEQUENCE[idx - 1];
+}
+
+/**
+ * Conditions loop (Phil ruling 2026-07-26): conditions attached to a
+ * "Return with Set Conditions" are created open on the gate. Durable — they
+ * survive the return and block resubmission until resolved or withdrawn.
+ * Non-fatal: the return already stands; failures are server-logged.
+ * @param {Array<{condition_text: string}>} conditions
+ */
+async function createReturnConditions(gate_record_id, delivery_cycle_id, gate_name, conditions, caller_user_id) {
+  if (!Array.isArray(conditions) || conditions.length === 0) { return; }
+  const rows = conditions
+    .map(c => (c && typeof c.condition_text === 'string') ? c.condition_text.trim() : '')
+    .filter(Boolean)
+    .map(text => ({
+      gate_record_id,
+      condition_type: 'general',
+      condition_text: text,
+      set_by_user_id: caller_user_id
+    }));
+  if (rows.length === 0) { return; }
+  const { error } = await supabase.from('gate_conditions').insert(rows);
+  if (error) {
+    console.error(JSON.stringify({
+      tool_name: 'record_gate_decision', step: 'create_return_conditions',
+      gate_record_id, error: error.message
+    }));
+    return;
+  }
+  await supabase.from('cycle_event_log').insert({
+    delivery_cycle_id,
+    event_type:        'gate_returned_with_conditions',
+    event_description: `${GATE_NAME_DISPLAY[gate_name] ?? gate_name} returned with ${rows.length} condition${rows.length === 1 ? '' : 's'} to resolve before resubmission.`,
+    actor_user_id:     caller_user_id,
+    event_metadata:    { gate_record_id, gate_name, condition_count: rows.length }
+  });
 }
 
 module.exports = { record_gate_decision, applyGateApprovalTransition };

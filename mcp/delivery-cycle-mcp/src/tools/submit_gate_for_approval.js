@@ -530,6 +530,23 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
+  // ── Conditions loop (Phil ruling 2026-07-26): open conditions block
+  // resubmission — resolve them (or the approver withdraws them) first.
+  // Phil override bypasses. D-140: the message names every open item.
+  if (!philOverride) {
+    const { data: openCondRows } = await supabase
+      .from('gate_conditions')
+      .select('condition_text')
+      .eq('gate_record_id', gate_record.gate_record_id)
+      .eq('condition_status', 'open');
+    if ((openCondRows ?? []).length > 0) {
+      return blockGate('open_conditions',
+        `Cannot submit ${gateNameDisplay} — ${openCondRows.length} condition${openCondRows.length === 1 ? '' : 's'} from the approver ` +
+        `must be resolved first: ${openCondRows.map(c => `"${c.condition_text}"`).join('; ')}. ` +
+        'Resolve each condition on the gate record, then submit again.');
+    }
+  }
+
   // ── Workstream active check (ARCH-23) — only when Workstream assigned ────
   if (workstream && !workstream.active_status && !philOverride) {
     const { data: blocked_gate, error: blockErr } = await supabase

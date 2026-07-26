@@ -235,4 +235,88 @@ async function list_gate_conditions(params, caller_user_id) {
   return { success: true, data: { gate_conditions: conditions || [] } };
 }
 
-module.exports = { add_gate_condition, resolve_gate_condition, list_gate_conditions };
+/**
+ * Withdraw an open condition — "no longer applies" (Phil ruling 2026-07-26,
+ * migration 090). Reason REQUIRED; never-delete posture: status 'withdrawn',
+ * reason stored on resolution_note, history stays readable in retro.
+ * Authority mirrors resolve: setter, the gate's approver, or Admin.
+ */
+async function withdraw_gate_condition(params, caller_user_id) {
+  const { condition_id, reason } = params;
+  if (!condition_id) {
+    return { success: false, error: 'condition_id is required.' };
+  }
+  if (!reason || !String(reason).trim()) {
+    return { success: false, error: 'A reason is required to withdraw a condition — it is recorded on the gate history.' };
+  }
+
+  const { data: condition, error: conditionErr } = await supabase
+    .from('gate_conditions')
+    .select('condition_id, gate_record_id, condition_status, set_by_user_id')
+    .eq('condition_id', condition_id)
+    .single();
+  if (conditionErr || !condition) {
+    return { success: false, error: 'Gate condition not found.' };
+  }
+  if (condition.condition_status !== 'open') {
+    return { success: false, error: `Only open conditions can be withdrawn — this one is ${condition.condition_status}.` };
+  }
+
+  if (condition.set_by_user_id !== caller_user_id) {
+    const { data: gateRow } = await supabase
+      .from('gate_records')
+      .select('approver_user_id')
+      .eq('gate_record_id', condition.gate_record_id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    const isGateApprover = gateRow?.approver_user_id === caller_user_id;
+    if (!isGateApprover) {
+      const { data: caller } = await supabase
+        .from('users')
+        .select('is_admin, is_super_admin')
+        .eq('id', caller_user_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (caller?.is_admin !== true && caller?.is_super_admin !== true) {
+        return {
+          success: false,
+          error: 'Withdrawing a gate condition requires the condition setter, the gate\'s approver, or an Admin role.'
+        };
+      }
+    }
+  }
+
+  const { data: withdrawn, error: withdrawErr } = await supabase
+    .from('gate_conditions')
+    .update({
+      condition_status:    'withdrawn',
+      resolved_at:         new Date().toISOString(),
+      resolved_by_user_id: caller_user_id,
+      resolution_note:     `Withdrawn — ${String(reason).trim()}`
+    })
+    .eq('condition_id', condition_id)
+    .select()
+    .single();
+  if (withdrawErr) {
+    return { success: false, error: `Failed to withdraw gate condition: ${withdrawErr.message}` };
+  }
+
+  const { data: gateRecord } = await supabase
+    .from('gate_records')
+    .select('delivery_cycle_id, gate_name')
+    .eq('gate_record_id', condition.gate_record_id)
+    .maybeSingle();
+  if (gateRecord) {
+    await supabase.from('cycle_event_log').insert({
+      delivery_cycle_id: gateRecord.delivery_cycle_id,
+      event_type:        'gate_condition_withdrawn',
+      event_description: `Condition withdrawn on ${gateRecord.gate_name} gate — ${String(reason).trim()}`,
+      actor_user_id:     caller_user_id,
+      event_metadata:    { condition_id, gate_record_id: condition.gate_record_id }
+    });
+  }
+
+  return { success: true, data: withdrawn };
+}
+
+module.exports = { add_gate_condition, resolve_gate_condition, withdraw_gate_condition, list_gate_conditions };

@@ -74,7 +74,10 @@ describe('G6 — open conditions hold approvals (AC #3)', () => {
     assert.match(r.error, /open condition/);
   });
 
-  test('return clears open conditions with the approvals (AC #5)', async () => {
+  // Phil ruling 2026-07-26: the G6 AC#5 auto-clear is RETIRED — conditions are
+  // durable across returns. The return still clears approvals + stamps the
+  // GA-1 assessments; conditions are untouched.
+  test('return clears approvals and stamps assessments — conditions survive (2026-07-26 ruling)', async () => {
     queue = [
       { data: { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER }, error: null },
       { data: l2Cycle, error: null },
@@ -82,7 +85,7 @@ describe('G6 — open conditions hold approvals (AC #3)', () => {
       { data: { gate_record_id: GATE, gate_status: 'returned' }, error: null }, // gate update
       { data: { event_id: 'ev1' }, error: null },                          // gate_returned event
       { data: null, error: null },                                         // clear approvals
-      { data: null, error: null }                                          // clear conditions
+      { data: null, error: null }                                          // clear assessments (GA-1)
     ];
     const r = await record_gate_decision(
       { delivery_cycle_id: CYC, gate_name: 'go_to_build', decision: 'returned', approver_notes: 'rework' }, APPROVER);
