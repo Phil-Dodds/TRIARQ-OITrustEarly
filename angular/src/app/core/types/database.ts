@@ -847,7 +847,8 @@ export interface GateConditionRecord {
   condition_type:         'general' | 'consultation_required';
   condition_text:         string;
   target_consultation_id: string | null;
-  condition_status:       'open' | 'resolved';
+  // 'withdrawn' added 2026-07-26 (migration 090) — "no longer applies".
+  condition_status:       'open' | 'resolved' | 'withdrawn';
   set_by_user_id:         string;
   created_at:             string;
   updated_at:             string;
