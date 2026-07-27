@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.62 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.65 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,8 @@
 
 ## Next Available Decision Number
 
-**Next available: D-570**
+**Next available: D-584**
+(Note: the v1.0 governance spec's erroneous "D-575" citations read as D-572; D-575 is legitimately assigned to Continuous Multi-Contract Execution, locked 2026-07-23.)
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -457,21 +458,35 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-551 | Gate Date Rule Model | 2026-07-14 | specced |
 | D-552 | Date Cascade Semantics | 2026-07-14 | specced |
 | D-553 | Sprint Rule Display | 2026-07-14 | specced |
-| D-555 | Gate Purposes and the Decision Severity Principle | 2026-07-19 | not-specced |
-| D-556 | Two Independent Governance Axes | 2026-07-19 | not-specced |
-| D-557 | Governance Levels Defined | 2026-07-19 | specced-partial |
-| D-558 | Sizing Questions and Level Derivation | 2026-07-19 | specced-partial |
-| D-559 | Trust Anchored on the DCS | 2026-07-19 | specced-partial |
-| D-560 | Initiative Executive Role | 2026-07-19 | specced-partial |
-| D-561 | Oversight Field | 2026-07-19 | specced-partial |
-| D-562 | Effective Level: Computed Baseline plus Leadership Set | 2026-07-19 | specced-partial |
-| D-563 | Participation: Interest Profiles, Suggestions, Auto-Attach | 2026-07-19 | specced-partial |
-| D-564 | RACI Completion: Informed, and Consultation's Single Form | 2026-07-19 | specced-partial |
-| D-565 | Gate as Visible Process | 2026-07-19 | specced-partial |
-| D-566 | Cancellation Authority Follows Severity | 2026-07-19 | not-specced |
-| D-567 | Sizing Lifecycle and Migration | 2026-07-19 | specced-partial |
-| D-568 | Gate KPIs: Direction Lock | 2026-07-19 | not-specced |
-| D-569 | Approving Over a Returned Consultation | 2026-07-19 | specced-partial |
+| D-555 | Gate Purposes and the Decision Severity Principle | 2026-07-19 | built |
+| D-556 | Two Independent Governance Axes | 2026-07-19 | built |
+| D-557 | Governance Levels Defined | 2026-07-19 | built |
+| D-558 | Sizing Questions and Level Derivation | 2026-07-19 | built |
+| D-559 | Trust Anchored on the DCS | 2026-07-19 | built |
+| D-560 | Initiative Executive Role | 2026-07-19 | built |
+| D-561 | Oversight Field | 2026-07-19 | built |
+| D-562 | Effective Level: Computed Baseline plus Leadership Set | 2026-07-19 | built |
+| D-563 | Participation: Interest Profiles, Suggestions, Auto-Attach | 2026-07-19 | built |
+| D-564 | RACI Completion: Informed, and Consultation's Single Form | 2026-07-19 | built |
+| D-565 | Gate as Visible Process | 2026-07-19 | built |
+| D-566 | Cancellation Authority Follows Severity | 2026-07-19 | built |
+| D-567 | Sizing Lifecycle and Migration | 2026-07-19 | built |
+| D-568 | Gate KPIs: Direction Lock | 2026-07-19 | built |
+| D-569 | Approving Over a Returned Consultation | 2026-07-19 | built |
+| D-570 | Transition-State Doctrine (Governance Redesign Interim Routing) | 2026-07-23 | built |
+| D-571 | Multi-Contract Spec Persistence (Companion Carriage) | 2026-07-23 | adopted |
+| D-572 | MCP Tool Inventory as Public-Data-API Documentation | 2026-07-23 | built |
+| D-573 | User Status Wins / System Flags Never Recolors (CC-38-31 promoted) | 2026-07-23 | built |
+| D-574 | Rule 34 Amendment — Check Target Current Schema Truth | 2026-07-23 | adopted |
+| D-575 | Continuous Multi-Contract Execution with Single Checkpoint | 2026-07-23 | built |
+| D-576 | D-565 Success-Test Measurement | 2026-07-23 | built |
+| D-577 | L3 Leadership Boundary Correction | 2026-07-23 | built |
+| D-578 | Return Semantics Cleared-Never-Deleted | 2026-07-23 | built |
+| D-579 | Gate Assessments | 2026-07-24 | built |
+| D-580 | Stage Graduation on Gate Approval | 2026-07-26 | built |
+| D-581 | Durable Conditions (supersedes G6 AC#5 + D-578 conditions clause) | 2026-07-26 | built |
+| D-582 | Override Instruments Permanent | 2026-07-26 | built |
+| D-583 | Tier Retirement | 2026-07-26 | locked — build pending |
 
 ---
 

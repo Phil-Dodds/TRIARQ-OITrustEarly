@@ -1,3 +1,5 @@
+
+
 # CLAUDE.md — Pathways OI Trust | v3.3 | June 2026 | CONFIDENTIAL
 
 ---
@@ -28,6 +30,7 @@ Read decision-registry.md for content lookup only. Never claim or assign a D-num
 Violating any of these is an error, not a style preference.
 
 ### Arch-1 — MCP-Only Database Access
+
 All database operations go through MCP servers. No direct Supabase client calls from Angular components or services.
 - NEVER: import @supabase/supabase-js in any Angular component or service
 - NEVER: bypass the MCP layer for "simple" reads
@@ -39,13 +42,16 @@ All database operations go through MCP servers. No direct Supabase client calls 
 **Escalation rule (D-381):** Any direct Supabase access from Angular is an Arch-1 conflict under Rule 2. Flag and STOP — do not implement, do not rationalize, do not record as a CC-decision and proceed. Surface to Design before writing any code. Rule 30 autonomy does not apply to Arch-1 violations or any security boundary decision.
 
 ### Arch-2 — UI as Presentation Layer Only
+
 Angular components render what they receive. No business logic, prompts, or data access in components.
 - NEVER: put prompt text or business rules in any component or service
 
 ### Arch-3 — No Prompts in TypeScript
+
 NEVER put prompt text in TypeScript files, Angular components, or services.
 
 ### Arch-4 — Environment Variables Only
+
 All credentials, keys, and configuration are environment variables. Never hardcode them.
 
 Required environment variables (never in source code):
@@ -57,6 +63,7 @@ Required environment variables (never in source code):
 - NEVER: commit .env files or log environment variable values
 
 ### Arch-5 — JWT Validation on Every MCP Tool Call
+
 Every MCP server validates the Supabase JWT before executing any tool. No tool executes without a valid JWT.
 - Validate JWT as the first operation in every tool handler
 - Return 401 with clear error message on invalid JWT
@@ -64,6 +71,7 @@ Every MCP server validates the Supabase JWT before executing any tool. No tool e
 - NEVER: execute any database operation before JWT validation
 
 ### Arch-6 — Soft Delete Only
+
 Never hard delete records. Set deleted_at timestamp. Records with deleted_at are excluded from all queries by default.
 - Set deleted_at = now() for all delete operations
 - Add WHERE deleted_at IS NULL to every SELECT on soft-deletable tables
@@ -404,7 +412,7 @@ Record the branch state (source-confirmed or reset-required) in the implementati
 
 ### Rule 34 — Schema-First SQL Authoring
 
-Before composing any mutation SQL (UPDATE, DELETE, transaction blocks) or any diagnostic SQL referencing columns beyond a table's primary key, open `types/database.ts` and verify: (1) the correct column names for every column referenced, (2) the primary key column name for every table in scope.
+Before composing any mutation SQL (UPDATE, DELETE, transaction blocks) or any diagnostic SQL referencing columns beyond a table's primary key, open `types/database.ts` PLUS the latest ALTER migrations for any table modified after types generation — never the original CREATE or seed migration — and verify: (1) the correct column names for every column referenced, (2) the primary key column name for every table in scope. (D-574; source: Contract 38 migration 076 v1 failure.)
 
 For operations that DELETE or UPDATE rows referenced by foreign keys — particularly any operation touching `public.users.id` — run an `information_schema.referential_constraints` query first to enumerate all FK columns before composing the mutation.
 
@@ -454,4 +462,64 @@ Every migration that creates a table must include `ENABLE ROW LEVEL SECURITY` in
 
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | June 2026 | v3.3*
+### Rule 39 — Assessment Collection Posture on Gate-Action Tools
+
+GA-1 collection points: any new gate-action tool must decide assessment collection posture (collect / skip) explicitly — registry lives in `lib/gate-assessment-registry.js`, client mirror in `gate-assessment.constants.ts`; keep in sync.
+
+**Conformance test:** Does every new or modified gate-action tool state its assessment collection posture (collect or skip) in the CC-decision or spec section covering it, with the registry and client mirror updated in the same commit when items change? Yes = pass. No = violation.
+
+**Exceptions:** Tools that cannot reach a gate decision or submission path (read-only gate queries) — posture is implicitly skip and need not be stated.
+
+---
+
+### Rule 40 — FIFO Fixture Ripple on Gate-Flow Test Suites
+
+FIFO fixture ripple: adding queries to submit/approve/consult flows shifts every downstream fixture in G3/G5/G6 suites — add new queries as late as possible or document slots.
+
+**Conformance test:** When a change adds a query to a gate submit/approve/consult flow, does the CC-decision or commit note state either (a) the query was added as late as possible in the flow, or (b) the affected FIFO fixture slots and the suites updated? Yes = pass. No = violation.
+
+**Exceptions:** Changes to flows with no FIFO-mocked test coverage.
+
+---
+
+### Rule 41 — Angular Build Log Check Before Declaring a Hang
+
+Angular build failures are frequently reported as "stuck" — npm buffers the error until exit. ALWAYS `> log 2>&1` + check the log's tail/timestamp before assuming a hang; a stale log mtime with an ERROR line = failed fast.
+
+**Conformance test:** Before reporting any `ng build` / npm build as hung or killing it, was the redirected log's tail and mtime inspected? Yes = pass. No = violation.
+
+**Exceptions:** None.
+
+---
+
+### Rule 42 — Confirm Push Before Render Redeploy
+
+Sequencing trap: Phil redeploys Render eagerly. Before saying "ready for Render", confirm the relevant commits are PUSHED to master — a redeploy before the push silently ships the old code.
+
+**Conformance test:** Before any statement that a Render redeploy can proceed, was `git log origin/master` (or equivalent push confirmation) verified to contain the relevant commits? Yes = pass. No = violation.
+
+**Exceptions:** None.
+
+---
+
+### Rule 43 — Stage Graduation via Shared Transition Only (D-580)
+
+Gate stage rule (CC-0726-01): approval graduates current_lifecycle_stage to the gate's target from any earlier stage. Any new approval path must use applyGateApprovalTransition, never a bespoke stage write.
+
+**Conformance test:** Does any new or modified approval path write current_lifecycle_stage outside applyGateApprovalTransition? Yes = violation. No = pass.
+
+**Exceptions:** None. (Forward-only: the shared transition never moves a stage backwards and leaves CANCELLED/unknown stages untouched — that behavior lives inside the transition, not in callers.)
+
+---
+
+### Rule 44 — Never Auto-Clear Gate Conditions (D-581)
+
+Conditions are durable (CC-0726-02): never auto-clear gate_conditions in any new return/reset path; closure is human-only (resolve / withdraw).
+
+**Conformance test:** Does any new or modified return, reset, or resubmission path resolve, clear, or delete gate_conditions rows without an explicit human resolve or withdraw action? Yes = violation. No = pass.
+
+**Exceptions:** None.
+
+---
+
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | July 2026 | v3.5*

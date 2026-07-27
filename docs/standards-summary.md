@@ -1,3 +1,5 @@
+
+
 # Standards Summary — Pathways OI Trust
 docs/standards-summary.md | v2.0 | June 2026 | CONFIDENTIAL
 
@@ -414,6 +416,10 @@ to plain text.
 Picker selections: after selection via picker, selected value renders as chip (with
 remove ✕ for editable fields), not as plain text in an input.
 
+Exemption (ratified 2026-07-23, Contract 38 as-built): presence avatars and
+attribution initials are status indicators, not entity references — they render
+non-tappable and are S-021-exempt; entity chips proper remain tappable.
+
 **Conformance test:** Does any named entity reference render as plain text in a list
 row, detail panel, or form? Yes = violation. All entity references as chips = pass.
 
@@ -743,4 +749,26 @@ are explicitly async. No other exceptions without a locked design decision.
 **Conformance test:** Sortable columns show ↕ hover and ↑/↓ active indicators? Sort control absent from filter panel? Sortable/non-sortable declared in screen's spec? All yes = pass.
 
 **Exceptions:** None.
+
+---
+
+### S-037 — Ellipsis on Form-Opening Commands
+
+**Rule:** Any command whose activation opens a form, panel, or dialog requiring further input carries a trailing ellipsis ("Edit…", "Assign Approver…"). Commands executing immediately, and panel show/hide toggles, carry none. The HIG edit-exception is not adopted.
+
+**Conformance test:** For every actionable label in a contract's touched surfaces, ellipsis present iff activation opens an input surface.
+
+**Exceptions:** None.
+
+**CodeClose-applicable:** Yes — declare S-037 conformance in the CodeClose Verification Pass (Rule 29).
+
+### S-038 — Panel Actions Always Visible
+
+**Rule:** Right-panel action commands (Edit/Save/Cancel/Close and peers) are pinned and visible without scrolling for the panel's full scroll range, using the placement implemented in Contract 38 (as built). Panels must not hide their action set below the fold.
+
+**Conformance test:** At any scroll position of a right panel, the panel's action set is fully visible.
+
+**Exceptions:** None.
+
+**CodeClose-applicable:** Yes — declare S-038 conformance for any contract adding or modifying a right panel.
 
