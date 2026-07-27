@@ -32,6 +32,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-27',
+    contractLabel: 'Contract 39 — Tier Retirement, Cast Lifecycle, Close Review Outcome Verification',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Tier retirement (D-583)',
+        description: 'Tier is fully retired: no badges, filters, sorts, or form fields anywhere. Governance Level (from sizing) is the single governance vocabulary. Historical tier events in activity history render unchanged.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Go to Build — cast confirmation (D-584)',
+        description: 'The Go to Build submission screen shows the consultation cast (party and origin) beside the sizing confirmation; submitting confirms it. After Go to Build, removing a Consulted party requires a note, notifies them, and posts to the gate thread. Adding stays one-tap.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Close Review — outcome verification (D-585)',
+        description: 'Close Review submission requires the actual result, a Met/Not met verdict, and evidence or explanation — including when no Outcome Statement was declared. Approval ratifies the verdict; a not-met close is a passing state with a visible "Closed — outcome not met" marker.'
+      }
+    ]
+  },
+  {
     // Governance redesign GEnd (D-555–D-575): ONE composed entry covering
     // Contracts G2–G10 per the 2026-07-23 checkpoint ruling 4. Ships with the
     // single GEnd production deployment.

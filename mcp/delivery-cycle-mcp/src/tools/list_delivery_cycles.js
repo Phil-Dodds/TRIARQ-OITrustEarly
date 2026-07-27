@@ -35,7 +35,6 @@ const { computeWaitingOnBatch } = require('../lib/waiting-on');
  * @param {string}  [params.lifecycle_stage]
  * @param {string}  [params.workstream_id]
  * @param {boolean} [params.filter_no_workstream]
- * @param {string}  [params.tier_classification]
  * @param {boolean} [params.assigned_to_current_user]
  * @param {string} caller_user_id - from JWT
  */
@@ -46,7 +45,6 @@ async function list_delivery_cycles(params, caller_user_id) {
     lifecycle_stage,
     workstream_id,
     filter_no_workstream,
-    tier_classification,
     assigned_to_current_user,
     include_event_log
   } = params;
@@ -136,10 +134,7 @@ async function list_delivery_cycles(params, caller_user_id) {
     query = query.eq('workstream_id', workstream_id);
   }
 
-  // Apply tier filter
-  if (tier_classification) {
-    query = query.eq('tier_classification', tier_classification);
-  }
+  // D-583 (Contract 39): tier filter retired — filter by Governance Level in the UI.
 
   // D-391: filter to Initiatives where caller is assigned DCS, EPO, or DOL.
   if (assigned_to_current_user) {

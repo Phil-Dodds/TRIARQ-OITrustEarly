@@ -67,7 +67,7 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
       { data: [], error: null },                                     // no attachments
       { data: null, error: null }                                    // gate_blocked event insert
     ];
-    const res = await submit_gate_for_approval({ delivery_cycle_id: 'c1', gate_name: 'go_to_build' }, CALLER);
+    const res = await submit_gate_for_approval({ delivery_cycle_id: 'c1', gate_name: 'go_to_build', cast_confirmed: true }, CALLER);
     assert.equal(res.success, false);
     assert.match(res.error, /Context Brief/);
   });
@@ -83,7 +83,7 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
       { data: { jira_epic_required: true }, error: null },           // division requires Jira
       { data: null, error: null }                                    // event insert
     ];
-    const res = await submit_gate_for_approval({ delivery_cycle_id: 'c1', gate_name: 'go_to_build' }, CALLER);
+    const res = await submit_gate_for_approval({ delivery_cycle_id: 'c1', gate_name: 'go_to_build', cast_confirmed: true }, CALLER);
     assert.equal(res.success, false);
     assert.match(res.error, /Jira epic/);
   });
@@ -99,7 +99,7 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
       { data: { jira_epic_required: false }, error: null },          // Division exempt (migration 074)
       { data: null, error: null }                                    // event insert (AI unanswered block)
     ];
-    const res = await submit_gate_for_approval({ delivery_cycle_id: 'c1', gate_name: 'go_to_build' }, CALLER);
+    const res = await submit_gate_for_approval({ delivery_cycle_id: 'c1', gate_name: 'go_to_build', cast_confirmed: true }, CALLER);
     assert.equal(res.success, false);
     assert.match(res.error, /Includes AI functionality/);
   });
@@ -210,7 +210,7 @@ describe('create_delivery_cycle — CC-38 f14 AI fields at creation', () => {
 
   test('rejects invalid ai_functionality', async () => {
     const res = await create_delivery_cycle(
-      { cycle_title: 'T', division_id: 'd1', tier_classification: 'tier_1', ai_functionality: 'maybe' },
+      { cycle_title: 'T', division_id: 'd1', ai_functionality: 'maybe' },
       CALLER
     );
     assert.equal(res.success, false);

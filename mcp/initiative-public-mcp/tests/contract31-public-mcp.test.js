@@ -87,11 +87,11 @@ describe('list_initiatives', () => {
 
   const cyclesFixture = [
     { delivery_cycle_id: 'i1', cycle_title: 'Alpha', division_id: 'd1', workstream_id: 'w1',
-      tier_classification: 'tier_2', current_lifecycle_stage: 'BUILD', outcome_statement: 'Ship it',
+      set_level: 2, baseline_level: 1, current_lifecycle_stage: 'BUILD', outcome_statement: 'Ship it',
       assigned_dcs_user_id: 'u-dcs', assigned_epo_user_id: null, assigned_dol_user_id: null,
       jira_epic_key: 'PS-1', created_at: '2026-06-01T00:00:00Z' },
     { delivery_cycle_id: 'i2', cycle_title: 'Beta', division_id: 'd1', workstream_id: null,
-      tier_classification: 'tier_1', current_lifecycle_stage: 'PILOT', outcome_statement: null,
+      set_level: null, baseline_level: 1, current_lifecycle_stage: 'PILOT', outcome_statement: null,
       assigned_dcs_user_id: null, assigned_epo_user_id: null, assigned_dol_user_id: null,
       jira_epic_key: null, created_at: '2026-05-01T00:00:00Z' }
   ];
@@ -128,14 +128,23 @@ describe('list_initiatives', () => {
     assert.equal(rows[0].current_stage, 'Build');
   });
 
-  test('tier filter passes through (current_stage humanized)', async () => {
-    const tables = baseTables();
-    tables.delivery_cycles = cyclesFixture.filter(c => c.tier_classification === 'tier_1');
-    const sb = makeSupabase(tables);
-    const rows = await listInitiatives(sb, { tier: 'tier_1' }, { scope_type: 'all' });
+  // D-583 (Contract 39): tier filter replaced by effective Governance Level.
+  test('level filter matches effective level (set ?? baseline); tier absent from payload', async () => {
+    const sb = makeSupabase(baseTables());
+    const rows = await listInitiatives(sb, { level: 1 }, { scope_type: 'all' });
     assert.equal(rows.length, 1);
-    assert.equal(rows[0].tier, 'tier_1');
+    assert.equal(rows[0].level, 1);
     assert.equal(rows[0].current_stage, 'Pilot');
+    assert.ok(!JSON.stringify(rows).includes('tier'));
+  });
+
+  test('level 2 matches set_level override; unfiltered rows carry level', async () => {
+    const sb = makeSupabase(baseTables());
+    const rows = await listInitiatives(sb, { level: 2 }, { scope_type: 'all' });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].level, 2);
+    const all = await listInitiatives(sb, {}, { scope_type: 'all' });
+    assert.deepEqual(all.map(r => r.level).sort(), [1, 2]);
   });
 
 });
@@ -166,7 +175,7 @@ describe('get_initiative', () => {
 
   const goodCycle = {
     delivery_cycle_id: 'i1', cycle_title: 'Alpha', division_id: 'd1', workstream_id: 'w1',
-    tier_classification: 'tier_2', current_lifecycle_stage: 'BUILD', outcome_statement: 'Ship it',
+    set_level: null, baseline_level: 2, current_lifecycle_stage: 'BUILD', outcome_statement: 'Ship it',
     assigned_dcs_user_id: 'u-dcs', assigned_epo_user_id: null, assigned_dol_user_id: null,
     jira_epic_key: 'PS-1', other_consulted_user_ids: ['a', 'b'], other_informed_user_ids: ['c'],
     created_at: '2026-06-01T00:00:00Z', updated_at: '2026-06-02T00:00:00Z'

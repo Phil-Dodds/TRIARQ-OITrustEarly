@@ -193,7 +193,13 @@ async function confirm_gate_skip(params, caller_user_id) {
     { delivery_cycle_id, gate_name: submitted_gate,
       ...(params.phil_override === true ? { phil_override: true } : {}),
       // GA-1: the submitter assessment rides through the skip interstitial.
-      ...(Array.isArray(params.assessment) ? { assessment: params.assessment } : {}) },
+      ...(Array.isArray(params.assessment) ? { assessment: params.assessment } : {}),
+      // Contract 39: cast confirmation (D-584) and the Close Review outcome
+      // verdict block (D-585) ride through the skip interstitial the same way.
+      ...(params.cast_confirmed === true ? { cast_confirmed: true } : {}),
+      ...(typeof params.outcome_verdict  === 'string' ? { outcome_verdict:  params.outcome_verdict }  : {}),
+      ...(typeof params.outcome_actual   === 'string' ? { outcome_actual:   params.outcome_actual }   : {}),
+      ...(typeof params.outcome_evidence === 'string' ? { outcome_evidence: params.outcome_evidence } : {}) },
     caller_user_id
   );
 

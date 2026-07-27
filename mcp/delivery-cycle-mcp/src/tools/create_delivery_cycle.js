@@ -19,7 +19,6 @@
 const { supabase } = require('../db');
 const { GATE_MILESTONE_LABELS, ALL_GATES } = require('../lifecycle');
 
-const VALID_TIERS         = ['tier_1', 'tier_2', 'tier_3'];
 // Contract 19 (D-394): boolean flag checks replace VALID_CREATOR_ROLES; any of these flags grants creation.
 const CREATOR_FLAGS = ['is_admin', 'is_dcs', 'is_epo', 'is_dol', 'is_ce'];
 
@@ -29,7 +28,6 @@ const CREATOR_FLAGS = ['is_admin', 'is_dcs', 'is_epo', 'is_dol', 'is_ce'];
  * @param {string}  [params.cycle_description]
  * @param {string}  params.division_id
  * @param {string}  [params.workstream_id]          — Optional at creation (D-165)
- * @param {string}  params.tier_classification      — 'tier_1' | 'tier_2' | 'tier_3'
  * @param {string}  [params.assigned_dcs_user_id]   — Optional; required before Brief Review (D-389)
  * @param {string}  [params.assigned_epo_user_id]   — Optional; required before Go to Build (D-390)
  * @param {string}  [params.assigned_dol_user_id]   — Optional; required before Brief Review (D-391)
@@ -49,7 +47,6 @@ async function create_delivery_cycle(params, caller_user_id) {
     cycle_description,
     division_id,
     workstream_id,
-    tier_classification,
     assigned_dcs_user_id,
     assigned_epo_user_id,
     assigned_dol_user_id,
@@ -72,8 +69,12 @@ async function create_delivery_cycle(params, caller_user_id) {
   }
   // workstream_id is optional (D-165) — no required check here.
   // If provided, it must exist. Active status is checked at gate submission (ARCH-23).
-  if (!tier_classification) {
-    return { success: false, error: 'tier_classification is required.' };
+  // D-583 (Contract 39): tier is retired. Explicit reject per CC-G4-08 house style.
+  if (params.tier_classification !== undefined) {
+    return {
+      success: false,
+      error: 'tier_classification is retired (D-583) — Initiatives are governed by Governance Level, set at sizing. Remove the parameter.'
+    };
   }
   // Contract 38 f14: AI Governance enums — same domains as update_delivery_cycle.
   if (ai_functionality != null && !['yes', 'no', 'unknown'].includes(ai_functionality)) {
@@ -84,9 +85,6 @@ async function create_delivery_cycle(params, caller_user_id) {
   }
   if (ai_audience != null && !['external', 'internal'].includes(ai_audience)) {
     return { success: false, error: 'ai_audience must be one of: external, internal — or omitted.' };
-  }
-  if (!VALID_TIERS.includes(tier_classification)) {
-    return { success: false, error: 'tier_classification must be one of: tier_1, tier_2, tier_3.' };
   }
   // DCS / EPO / DOL are nullable at creation. Gate enforcement
   // (DCS+DOL → Brief Review, EPO → Go to Build) lives in submit_gate_for_approval.
@@ -183,7 +181,6 @@ async function create_delivery_cycle(params, caller_user_id) {
       cycle_description:       cycle_description || null,
       division_id,
       workstream_id:           workstream_id || null,
-      tier_classification,
       current_lifecycle_stage: 'BRIEF',
       assigned_dcs_user_id:    assigned_dcs_user_id || null,  // D-389: nullable at creation
       assigned_epo_user_id:    assigned_epo_user_id || null,  // D-390: nullable at creation
@@ -262,10 +259,9 @@ async function create_delivery_cycle(params, caller_user_id) {
     .insert({
       delivery_cycle_id: cycle_id,
       event_type:        'cycle_created',
-      event_description: `Initiative "${cycle.cycle_title}" created at ${tier_classification} ${workstreamDesc}.${dcsDesc}${epoDesc}${dolDesc}`,
+      event_description: `Initiative "${cycle.cycle_title}" created ${workstreamDesc}.${dcsDesc}${epoDesc}${dolDesc}`,
       actor_user_id:     caller_user_id,
       event_metadata: {
-        tier_classification,
         workstream_id:        workstream_id        || null,
         workstream_name:      workstream?.workstream_name || null,
         division_id,

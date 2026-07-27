@@ -250,6 +250,8 @@ export interface GateSkipConfirmResult {
 
 // ── Build C — Delivery Cycle types ────────────────────────────────────────────
 
+// D-583 (Contract 39): tier retired. Column kept with historical values until the
+// GEnd+1 column-drop batch; type retained for the optional legacy field below.
 export type TierClassification  = 'tier_1' | 'tier_2' | 'tier_3';
 export type LifecycleStage      = 'BRIEF' | 'DESIGN' | 'SPEC' | 'BUILD' | 'VALIDATE' | 'UAT' | 'PILOT' | 'RELEASE' | 'OUTCOME' | 'COMPLETE' | 'CANCELLED' | 'ON_HOLD';
 export type GateName            = 'brief_review' | 'go_to_build' | 'go_to_deploy' | 'go_to_release' | 'close_review';
@@ -305,7 +307,8 @@ export interface DeliveryCycle {
   cycle_description:       string | null;
   division_id:             string;
   workstream_id:           string | null;  // nullable — D-165: optional at creation, required at Brief Review gate
-  tier_classification:     TierClassification;
+  // D-583: retired — historical values only; never written or displayed. Drops at GEnd+1 batch.
+  tier_classification?:    TierClassification | null;
   current_lifecycle_stage: LifecycleStage;
   outcome_statement:       string | null;
   outcome_set_by_user_id:  string | null;
@@ -485,6 +488,14 @@ export interface GateRecord {
   submitted_by_user_id:        string | null;
   // D-489: submitter's "Why is this gate ready?" — set at submission, immutable after.
   submission_note?:            string | null;
+  // Contract 39 (D-584, migration 091): cast confirmation at Go to Build submission.
+  cast_confirmed_at?:          string | null;
+  cast_confirmed_by?:          string | null;
+  // Contract 39 (D-585, migration 091): Close Review outcome verdict block.
+  // Both verdicts are passing states — not_met carries the loud marker only.
+  outcome_verdict?:            'met' | 'not_met' | null;
+  outcome_actual?:             string | null;
+  outcome_evidence?:           string | null;
   created_at:                  string;
   updated_at:                  string;
   // Supplement Section 1: populated by get_delivery_cycle for the calling user
@@ -650,7 +661,8 @@ export interface PendingApprovalItem {
   waiting_on?:                   { state: string; line: string; days_waiting: number };
   submitted_at:                  string;
   submitted_by_display_name:     string;
-  tier_classification:           TierClassification;
+  // D-583: retired — still present in list_pending_approvals payloads as data only.
+  tier_classification?:          TierClassification | null;
   // Contract 30 / D-472 (WS1.2/WS1.3): gate_records.created_at — drives the
   // My Actions 21-day default filter and ordering on the home card.
   created_at:                    string;

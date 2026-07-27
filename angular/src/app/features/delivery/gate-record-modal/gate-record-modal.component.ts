@@ -60,7 +60,6 @@ import {
   GateName,
   GateRecord,
   CycleMilestoneDate,
-  TierClassification,
   User,
   DateStatus,
   EpoWipWarning,
@@ -108,7 +107,8 @@ const GATE_LABELS: Record<GateName, string> = {
         <div class="grm-titles">
           <div class="grm-title">{{ gateLabel }}</div>
           <div class="grm-subtitle">
-            {{ data.cycle.cycle_title }} · Tier {{ tierShortLabel(data.cycle.tier_classification) }}
+            <!-- D-583 (Contract 39): "· Tier N" suffix retired. -->
+            {{ data.cycle.cycle_title }}
           </div>
           <!-- D-527: one-line gate meaning at read point; unknown label renders nothing.
                "More →" deep-links to the Initiative Guide's section for this gate. -->
@@ -197,12 +197,45 @@ const GATE_LABELS: Record<GateName, string> = {
           <div class="grm-submission-note">{{ record!.submission_note }}</div>
         </section>
 
+        <!-- Contract 39 (D-585): outcome verdict block — read point for the
+             approver (above the assessment items) and the record afterward.
+             Approval ratifies the verdict; return per existing mechanics. -->
+        <section *ngIf="data.gateName === 'close_review' && record?.outcome_verdict
+                        && (record?.gate_status === 'awaiting_approval'
+                            || record?.gate_status === 'approved'
+                            || record?.gate_status === 'returned')"
+                 class="grm-section">
+          <div class="grm-label">Outcome verification</div>
+          <div *ngIf="record!.outcome_verdict === 'not_met' && record!.gate_status === 'approved'"
+               style="display:inline-block;margin:4px 0;padding:3px 10px;border-radius:4px;
+                      background:#FDECEA;color:#C62828;font:600 12px Roboto;">
+            Closed — outcome not met
+          </div>
+          <div class="grm-meta" style="margin-top:4px;">Declared outcome</div>
+          <div class="grm-submission-note">{{ data.cycle.outcome_statement || '— (stated retrospectively below)' }}</div>
+          <div class="grm-meta" style="margin-top:6px;">Actual result</div>
+          <div class="grm-submission-note">{{ record!.outcome_actual }}</div>
+          <div class="grm-meta" style="margin-top:6px;">Verdict</div>
+          <div style="font:500 13px Roboto;"
+               [style.color]="record!.outcome_verdict === 'not_met' ? '#C62828' : '#2E7D32'">
+            {{ record!.outcome_verdict === 'not_met' ? 'Not met — documented' : 'Met — demonstrated' }}
+          </div>
+          <div class="grm-meta" style="margin-top:6px;">
+            {{ record!.outcome_verdict === 'not_met' ? 'What happened' : 'Evidence' }}
+          </div>
+          <div class="grm-submission-note">{{ record!.outcome_evidence }}</div>
+          <div *ngIf="record!.gate_status === 'awaiting_approval'" class="grm-meta" style="margin-top:4px;">
+            Approving this gate ratifies the verdict. If it is unsupported, return the gate.
+          </div>
+        </section>
+
         <!-- CONSULTED — Contract 29 WS2 (D-461). Self-hides when no records. -->
         <app-gate-consultation-section
           [gateRecordId]="record?.gate_record_id ?? null"
           [gateStatus]="record?.gate_status ?? null"
           [currentUserId]="currentUserId"
           [gateName]="data.gateName"
+          [castCommitted]="castCommitted"
           [assessmentLinkUrl]="assessmentLinkUrl">
         </app-gate-consultation-section>
 
@@ -399,6 +432,46 @@ const GATE_LABELS: Record<GateName, string> = {
               [disabled]="processing"
               (changed)="submitAssessment = $event">
             </app-gate-assessment-form>
+            <!-- Contract 39 (D-585): Close Review outcome verification block.
+                 Submission is blocked until actual result, verdict, and
+                 evidence/explanation are populated. Not met is a passing state. -->
+            <div *ngIf="data.gateName === 'close_review'" class="grm-note-field">
+              <div class="grm-label">Outcome verification</div>
+              <div class="grm-meta">
+                Close Review verifies whether this Initiative met the outcome it
+                declared. Not met is an honest close — failed work closes honestly.
+              </div>
+              <div class="grm-label" style="margin-top:8px;">Declared outcome</div>
+              <div class="grm-submission-note">
+                {{ data.cycle.outcome_statement
+                    || 'No Outcome Statement was declared — state the intended outcome retrospectively in the actual result below.' }}
+              </div>
+              <label class="grm-label" for="grm-cr-actual" style="margin-top:8px;display:block;">Actual result</label>
+              <textarea id="grm-cr-actual" class="grm-note-textarea" rows="2"
+                        [disabled]="processing"
+                        [(ngModel)]="crActualDraft"
+                        placeholder="What actually happened against the declared outcome?"></textarea>
+              <div class="grm-label" style="margin-top:8px;">Outcome verdict</div>
+              <div style="display:flex;gap:16px;padding:4px 0;">
+                <label style="font:400 13px Roboto;display:inline-flex;align-items:center;gap:6px;">
+                  <input type="radio" name="cr-verdict" value="met"
+                         [disabled]="processing" [(ngModel)]="crVerdict" /> Met — demonstrated
+                </label>
+                <label style="font:400 13px Roboto;display:inline-flex;align-items:center;gap:6px;">
+                  <input type="radio" name="cr-verdict" value="not_met"
+                         [disabled]="processing" [(ngModel)]="crVerdict" /> Not met — documented
+                </label>
+              </div>
+              <label class="grm-label" for="grm-cr-evidence" style="margin-top:4px;display:block;">
+                {{ crVerdict === 'not_met' ? 'What happened' : 'Where is the result demonstrated' }}
+              </label>
+              <textarea id="grm-cr-evidence" class="grm-note-textarea" rows="2"
+                        [disabled]="processing"
+                        [(ngModel)]="crEvidenceDraft"
+                        [placeholder]="crVerdict === 'not_met'
+                          ? 'Explain what happened — this closes the Initiative honestly.'
+                          : 'Where the result is demonstrated (report, dashboard, metric…).'"></textarea>
+            </div>
             <!-- D-489: submission justification — encouraged, not required -->
             <div class="grm-note-field">
               <label class="grm-label" for="grm-submission-note">Why is this gate ready?</label>
@@ -418,7 +491,8 @@ const GATE_LABELS: Record<GateName, string> = {
                     type="button"
                     [disabled]="processing || data.hardStops.length > 0
                                 || openGateConditions.length > 0
-                                || (viewerIsTrioParticipant && !submitAssessment.complete)"
+                                || (viewerIsTrioParticipant && !submitAssessment.complete)
+                                || !closeReviewBlockComplete"
                     (click)="onSubmit()">
               {{ processing && processingAction === 'submit'
                   ? (resubmitMode ? 'Re-submitting…' : 'Submitting…')
@@ -702,6 +776,27 @@ const GATE_LABELS: Record<GateName, string> = {
               [dcsUserId]="data.cycle.assigned_dcs_user_id ?? null"
               (payloadChange)="onSizingPayloadChange($event)">
             </app-initiative-sizing-form>
+            <!-- Contract 39 (D-584): cast confirmation — the last cheap moment.
+                 Shown beside the D-567 sizing confirmation; proceeding confirms
+                 the cast (one-tap when it's right, not a re-selection). -->
+            <div *ngIf="data.gateName === 'go_to_build'" style="margin-top:10px;">
+              <div class="grm-label">Consultation cast</div>
+              <div class="grm-meta">
+                These parties are Consulted from Go to Build onward. Proceeding
+                confirms the cast; removing a Consulted party after Go to Build
+                requires a note and notifies them.
+              </div>
+              <div *ngFor="let m of castList" style="display:flex;align-items:center;gap:8px;padding:3px 0;">
+                <span style="display:inline-block;padding:3px 10px;border-radius:999px;
+                             background:rgba(37,112,153,0.08);color:#257099;font:400 12px Roboto;">
+                  {{ m.label }}
+                </span>
+                <span style="font:400 11px Roboto;color:#9E9E9E;">{{ m.origin }}</span>
+              </div>
+              <div *ngIf="castList.length === 0" class="grm-meta">
+                No Consulted parties are attached beyond the Initiative trio.
+              </div>
+            </div>
             <div *ngIf="sizingSaveError" class="oi-inline-error" role="alert">
               <div class="oi-inline-error-primary">{{ sizingSaveError }}</div>
             </div>
@@ -735,6 +830,27 @@ const GATE_LABELS: Record<GateName, string> = {
               [showGovernancePanel]="false"
               (payloadChange)="onSizingPayloadChange($event)">
             </app-initiative-sizing-form>
+            <!-- Contract 39 (D-584): cast confirmation — the last cheap moment.
+                 Shown beside the D-567 sizing confirmation; proceeding confirms
+                 the cast (one-tap when it's right, not a re-selection). -->
+            <div *ngIf="data.gateName === 'go_to_build'" style="margin-top:10px;">
+              <div class="grm-label">Consultation cast</div>
+              <div class="grm-meta">
+                These parties are Consulted from Go to Build onward. Proceeding
+                confirms the cast; removing a Consulted party after Go to Build
+                requires a note and notifies them.
+              </div>
+              <div *ngFor="let m of castList" style="display:flex;align-items:center;gap:8px;padding:3px 0;">
+                <span style="display:inline-block;padding:3px 10px;border-radius:999px;
+                             background:rgba(37,112,153,0.08);color:#257099;font:400 12px Roboto;">
+                  {{ m.label }}
+                </span>
+                <span style="font:400 11px Roboto;color:#9E9E9E;">{{ m.origin }}</span>
+              </div>
+              <div *ngIf="castList.length === 0" class="grm-meta">
+                No Consulted parties are attached beyond the Initiative trio.
+              </div>
+            </div>
             <div class="grm-action-row">
               <button class="grm-btn-primary" type="button"
                       [disabled]="processing"
@@ -1218,6 +1334,59 @@ export class GateRecordModalComponent {
   // GA-1 (D-579): the G7 rotating approvalPurposeReminder is retired from
   // this surface — the assessment header carries the per-gate purpose.
 
+  // ── Contract 39 (D-585): Close Review outcome verdict drafts ───────────────
+  crVerdict: '' | 'met' | 'not_met' = '';
+  crActualDraft = '';
+  crEvidenceDraft = '';
+
+  /** D-585: verdict block complete (always true off close_review). */
+  get closeReviewBlockComplete(): boolean {
+    if (this.data.gateName !== 'close_review') { return true; }
+    return !!this.crVerdict && !!this.crActualDraft.trim() && !!this.crEvidenceDraft.trim();
+  }
+
+  // ── Contract 39 (D-584): consultation cast confirmation state ──────────────
+  /** Cast list shown beside the sizing confirmation at Go to Build. */
+  castList: { label: string; origin: string }[] = [];
+  private castLoaded = false;
+
+  /** D-584: cast is committed once Go to Build confirmation is recorded. */
+  get castCommitted(): boolean {
+    const gtb = this.data.cycle.gate_records?.find(g => g.gate_name === 'go_to_build');
+    return !!gtb && (!!gtb.cast_confirmed_at || gtb.gate_status === 'approved' || gtb.gate_status === 'skipped');
+  }
+
+  /** D-584: load the consultation set (trio + C stakes with origin) once. */
+  private loadCastList(): void {
+    if (this.castLoaded) { return; }
+    this.castLoaded = true;
+    const c = this.data.cycle;
+    const nameOf = (id: string | null | undefined) =>
+      id ? (this.data.allUsers.find(u => u.id === id)?.display_name ?? null) : null;
+    const trio: { label: string; origin: string }[] = [];
+    const dcsName = nameOf(c.assigned_dcs_user_id); if (dcsName) { trio.push({ label: dcsName, origin: 'Trio — DCS' }); }
+    const epoName = nameOf(c.assigned_epo_user_id); if (epoName) { trio.push({ label: epoName, origin: 'Trio — EPO' }); }
+    const dolName = nameOf(c.assigned_dol_user_id); if (dolName) { trio.push({ label: dolName, origin: 'Trio — DOL' }); }
+    this.castList = trio;
+    this.delivery.listParticipation({ delivery_cycle_id: c.delivery_cycle_id }).subscribe({
+      next: (res) => {
+        const originLabels: Record<string, string> = {
+          rule: 'Suggestion', division_default: 'Division default', trio: 'Trio add',
+          self: 'Self-request', approver: 'Approver add', leadership: 'Leadership add'
+        };
+        const stakes = (res.data?.participation_records ?? [])
+          .filter(r => r.letter === 'C')
+          .map(r => ({
+            label:  r.holder_display_name || r.holder_group_name || 'Unknown',
+            origin: originLabels[r.set_via] ?? r.set_via
+          }));
+        this.castList = [...trio, ...stakes];
+        this.cdr.markForCheck();
+      },
+      error: () => { /* trio-only list is still a truthful confirmation surface */ }
+    });
+  }
+
   // ── Contract GA-1 (D-579): assessment state ────────────────────────────────
   submitAssessment:  AssessmentChange = { complete: false, items: [] };
   approveAssessment: AssessmentChange = { complete: false, items: [] };
@@ -1690,6 +1859,7 @@ export class GateRecordModalComponent {
             if (res.success && res.data?.sizing) {
               this.confirmSizing = res.data.sizing;
               this.confirmMode = 'sizing-confirm';
+              this.loadCastList();   // D-584: cast panel beside the sizing confirmation
             } else {
               // No sizing row despite level columns — fall through to the
               // server, which will interpose REQUIRES_SIZING if needed.
@@ -1721,7 +1891,15 @@ export class GateRecordModalComponent {
       ...(this.philOverrideArmed ? { phil_override: true } : {}),
       // GA-1 (D-579): submitter assessment (genuine participants only).
       ...(this.viewerIsTrioParticipant && !this.philOverrideArmed
-            ? { assessment: this.submitAssessment.items } : {})
+            ? { assessment: this.submitAssessment.items } : {}),
+      // Contract 39 (D-584): the confirmation screens above were the cast
+      // confirmation — proceeding past them confirms the cast.
+      ...(this.data.gateName === 'go_to_build' ? { cast_confirmed: true } : {}),
+      // Contract 39 (D-585): Close Review outcome verdict block.
+      ...(this.data.gateName === 'close_review' && this.crVerdict
+            ? { outcome_verdict: this.crVerdict,
+                outcome_actual:   this.crActualDraft.trim(),
+                outcome_evidence: this.crEvidenceDraft.trim() } : {})
     }).subscribe({
       next: (res) => {
         // Contract G3 (D-567): sizing interstitial — the Initiative has no
@@ -1729,6 +1907,7 @@ export class GateRecordModalComponent {
         if (res.success && res.status === 'REQUIRES_SIZING') {
           this.endProcessing();
           this.confirmMode = 'sizing-required';
+          this.loadCastList();   // D-584: cast panel beside the sizing form
           this.cdr.markForCheck();
           return;
         }
@@ -1796,7 +1975,13 @@ export class GateRecordModalComponent {
       ...(this.philOverrideArmed ? { phil_override: true } : {}),
       // GA-1: the assessment rides through the skip interstitial round-trip.
       ...(this.viewerIsTrioParticipant && !this.philOverrideArmed
-            ? { assessment: this.submitAssessment.items } : {})
+            ? { assessment: this.submitAssessment.items } : {}),
+      // Contract 39 (D-584/D-585): cast confirmation + outcome verdict ride through.
+      ...(this.data.gateName === 'go_to_build' ? { cast_confirmed: true } : {}),
+      ...(this.data.gateName === 'close_review' && this.crVerdict
+            ? { outcome_verdict: this.crVerdict,
+                outcome_actual:   this.crActualDraft.trim(),
+                outcome_evidence: this.crEvidenceDraft.trim() } : {})
     }).subscribe({
       next: (res) => {
         if (res.success) {
@@ -2135,10 +2320,6 @@ export class GateRecordModalComponent {
    */
   approverDisplayName(userId: string): string {
     return this.data.allUsers.find(u => u.id === userId)?.display_name ?? 'Unknown user';
-  }
-
-  tierShortLabel(tier: TierClassification): string {
-    return tier === 'tier_1' ? '1' : tier === 'tier_2' ? '2' : '3';
   }
 
   submittedRelative(at: string | null | undefined): string {

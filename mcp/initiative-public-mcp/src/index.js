@@ -53,7 +53,8 @@ function buildMcpServer(scope) {
         division_name:   z.string().optional(),
         workstream_name: z.string().optional(),
         lifecycle_stage: z.union([z.string(), z.array(z.string())]).optional(),
-        tier:            z.string().optional(),
+        // D-583: effective Governance Level (set ?? baseline); null = unsized.
+        level:           z.coerce.number().int().min(1).max(3).optional(),
         gate_status:     z.string().optional(),
         next_gate:       z.string().optional()
       }

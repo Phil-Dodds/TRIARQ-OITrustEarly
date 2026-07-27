@@ -68,7 +68,6 @@ import {
   GateName,
   GateStatus,
   GateStateMap,
-  TierClassification,
   LifecycleStage,
   DateStatus,
   // Contract 37 (D-549–D-553)
@@ -254,14 +253,16 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     [title]="levelChipTooltip">
                 {{ levelChipText }}
               </span>
-              <!-- Tier badge — Visual Layout Standards 1.7/3.1: tier colors, 4px radius -->
-              <span *ngIf="!cycleIsSized"
-                    [style.background]="tierBadgeBg(cycle.tier_classification)"
-                    [style.color]="tierBadgeColor(cycle.tier_classification)"
-                    style="font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
-                           border-radius:4px;padding:3px 8px;">
-                Tier {{ tierLabel(cycle.tier_classification) }}
+              <!-- Contract 39 (D-585): not-met close carries a distinct marker.
+                   A passing state — failed work closes honestly (D-573). -->
+              <span *ngIf="closedOutcomeNotMet"
+                    style="font-size:12px;font-weight:600;font-family:Roboto,sans-serif;
+                           border-radius:4px;padding:3px 8px;background:#FDECEA;color:#C62828;"
+                    title="Close Review verdict: the declared outcome was not met. This is an honest close, not a failure state of the record.">
+                Closed — outcome not met
               </span>
+              <!-- D-583 (Contract 39): unsized tier badge retired — unsized Initiatives
+                   show no tier or level chip (D-567 interstitial migrates them at their next gate). -->
             </div>
             <h3 style="margin:0 0 4px 0;">{{ cycle.cycle_title }}</h3>
             <div style="font-size:var(--triarq-text-small);color:var(--triarq-color-text-secondary);">
@@ -819,7 +820,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             [deliveryCycleId]="cycle.delivery_cycle_id"
             [viewerUserId]="viewerUserId"
             [canAttach]="callerCanSubmitGates"
-            [allUsers]="allUsers">
+            [allUsers]="allUsers"
+            [castCommitted]="castCommitted">
           </app-initiative-participation-section>
 
           <!-- Contract G3 (D-562/D-567): Governance level for sized Initiatives;
@@ -866,25 +868,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               Edit sizing
             </button>
           </div>
-          <!-- Tier — badge chip per Visual Layout Standards 1.7. CC-Decision-2026-04-12-A: Contract 5 restores badge. -->
-          <div *ngIf="!cycleIsSized">
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Tier</div>
-            <span *ngIf="cycle.tier_classification"
-                  [style.background]="tierBadgeBg(cycle.tier_classification)"
-                  [style.color]="tierBadgeColor(cycle.tier_classification)"
-                  style="display:inline-block;border-radius:4px;padding:3px 8px;
-                         font-size:12px;font-weight:500;font-family:Roboto,sans-serif;">
-              Tier {{ tierLabel(cycle.tier_classification) }} —
-              {{ cycle.tier_classification === 'tier_1' ? 'Fast Lane' : cycle.tier_classification === 'tier_2' ? 'Structured' : 'Governed' }}
-            </span>
-            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
-            <span *ngIf="!cycle.tier_classification"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Tier: Not set
-            </span>
-          </div>
+          <!-- D-583 (Contract 39): identity-zone Tier field retired. -->
 
           <!-- AI Governance — CC-38 f13. Chip when the Initiative includes AI;
                AI Prod Board status inline. Hidden when No/blank/unknown. -->
@@ -3740,6 +3724,18 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     });
   }
 
+  /** Contract 39 (D-585): close_review approved with a not-met verdict. */
+  get closedOutcomeNotMet(): boolean {
+    const g = this.cycle?.gate_records?.find(r => r.gate_name === 'close_review');
+    return g?.gate_status === 'approved' && g?.outcome_verdict === 'not_met';
+  }
+
+  /** Contract 39 (D-584): cast committed once Go to Build confirmation is recorded. */
+  get castCommitted(): boolean {
+    const g = this.cycle?.gate_records?.find(r => r.gate_name === 'go_to_build');
+    return !!g && (!!g.cast_confirmed_at || g.gate_status === 'approved' || g.gate_status === 'skipped');
+  }
+
   // ── Presentation helpers ───────────────────────────────────────────────────
 
   stagePillBg(stage: LifecycleStage): string {
@@ -3749,29 +3745,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return 'var(--triarq-color-background-subtle)';
   }
 
-  tierPillBg(tier: TierClassification): string {
-    return tier === 'tier_1' ? '#e3f2fd' : tier === 'tier_2' ? '#f3e5f5' : '#e8f5e9';
-  }
-
-  // ── Badge helpers (Visual Layout Standards 1.7/3.1 — 4px radius, not pill) ──
-
-  tierBadgeBg(tier: TierClassification): string {
-    if (tier === 'tier_1') { return '#E3F2FD'; }
-    if (tier === 'tier_2') { return '#E0F2F1'; }
-    return '#FFF3E0'; // tier_3
-  }
-
-  tierBadgeColor(tier: TierClassification): string {
-    if (tier === 'tier_1') { return '#1565C0'; }
-    if (tier === 'tier_2') { return '#00695C'; }
-    return '#E65100'; // tier_3
-  }
-
-  tierLabel(tier: TierClassification): string {
-    if (tier === 'tier_1') { return '1'; }
-    if (tier === 'tier_2') { return '2'; }
-    return '3';
-  }
+  // D-583 (Contract 39): tier badge helpers retired.
 
   // ── Gate status text display (Section 2.4 — display-only per date state model) ──
 
@@ -4027,15 +4001,12 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     const hasName = (list: CycleArtifact[], ...terms: string[]) =>
       list.some(a => terms.some(t => (a.artifact_type_name ?? '').toLowerCase().includes(t)));
 
-    const isTier3 = c.tier_classification === 'tier_3';
-
     // CC-38 follow-on 13 (Phil 2026-07-17): checklist = advisory ambers only.
     // Everything mandatory moved to gateHardStops() + server enforcement in
     // submit_gate_for_approval. Tech Spec and MCP scope items removed from
     // Go to Build (MCP scope removal deferred to Design for a future policy).
-    // isTier3 retired with the removed Tier-3 items — void reference keeps
-    // strict mode quiet without deleting the classification context above.
-    void isTier3; void specArts; void buildArts; void outcomeArts; void pilotArts;
+    // D-583 (Contract 39): isTier3 deleted with tier retirement.
+    void specArts; void buildArts; void outcomeArts; void pilotArts;
 
     const aiYes = c.ai_functionality === 'yes';
     switch (gate) {
@@ -4044,11 +4015,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           { label: 'Scenario document attached',                                   met: hasName(briefArts, 'scenario') },
           { label: 'Outcome Statement set',                                        met: !!c.outcome_statement },
           // Contract G3 (D-558/D-567): sized Initiatives get the advisory
-          // review question (always amber — a prompt, not a completable check);
-          // unsized legacy keeps the tier row until migration.
+          // review question (always amber — a prompt, not a completable check).
+          // D-583 (Contract 39): legacy "Tier classification set" row retired.
           ...(this.cycleIsSized
             ? [{ label: 'Do the sizing answers still look right now that the brief is written?', met: false }]
-            : [{ label: 'Tier classification set', met: !!c.tier_classification }]),
+            : []),
         ];
       case 'go_to_deploy':
         return [
@@ -4132,11 +4103,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     }
 
     return stops;
-  }
-
-  /** Short tier label for gate sub-panel breadcrumb — "1", "2", or "3" */
-  tierShortLabel(tier: TierClassification): string {
-    return tier === 'tier_1' ? '1' : tier === 'tier_2' ? '2' : '3';
   }
 
   /** Resolve approver display name from allUsers list */

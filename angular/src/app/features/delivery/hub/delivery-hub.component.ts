@@ -62,7 +62,7 @@ const HUB_CARDS: HubCard[] = [
     title:       'All Initiatives',
     route:       '/initiatives/list',
     icon:        '≡',
-    description: 'The full list of active Initiatives with filtering by stage, tier, workstream, ' +
+    description: 'The full list of active Initiatives with filtering by stage, workstream, ' +
                  'division, and next gate. Use this when you know the Initiative you are looking ' +
                  'for, or want to apply a combination of filters.'
   },

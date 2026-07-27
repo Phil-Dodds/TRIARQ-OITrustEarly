@@ -436,6 +436,43 @@ designated approver, approving consulted parties), validated against
 Returns/withdraws stamp active rows `cleared_by_return_at` (D-578 posture).
 Table: `gate_assessments` + `gate_coaching_links` (migration 089).
 
+### 1.15 Tier Retirement — Contract 39 (D-583)
+Modified tools:
+- **`create_delivery_cycle`** — `tier_classification` param removed; a supplied
+  value is rejected with an explicit retired-parameter error. No tier is stored;
+  creation event no longer mentions tier.
+- **`update_delivery_cycle`** — `tier_classification` removed from the mutable
+  field set (including the D-228 change-warning path); supplied value rejected
+  with an explicit retired-parameter error (CC-G4-08 house style).
+- **`list_delivery_cycles`** — `tier_classification` filter param removed
+  (silently ignored if supplied); rows still carry the historical column value
+  as data until the GEnd+1 column drop.
+- **`sync_jira_epic`** — no longer pushes `customfield_tier_classification`;
+  historical values already in Jira are left untouched.
+- **initiative-public-mcp `list_initiatives`** — `tier` filter param replaced by
+  `level` (1|2|3; effective Governance Level = set_level ?? baseline_level;
+  `null` = unsized). Response payload: `tier` removed, `level` added. No
+  compatibility shim (no consumers existed).
+- **initiative-public-mcp `get_initiative`** — response `tier` replaced by
+  `level` (same semantics), for schema consistency with `list_initiatives`.
+
+### 1.16 Cast Confirmation & Close Review Outcome Verification — Contract 39 (D-584/D-585)
+Modified tools:
+- **`submit_gate_for_approval`** — Go to Build: submission requires
+  `cast_confirmed: true` (UI shows the consultation set beside the D-567 sizing
+  confirmation); recorded as `cast_confirmed_at`/`cast_confirmed_by` on the gate
+  record (migration 091). Close Review: submission requires `outcome_verdict`
+  ('met'|'not_met'), `outcome_actual` (text), `outcome_evidence` (text); blocked
+  with an explicit error until all three are supplied (D-585 — works with null
+  `outcome_statement`; the actual-result text states the outcome retrospectively).
+- **`record_gate_decision`** — Close Review approval ratifies the recorded
+  verdict; a not-met close logs the distinct "Closed — outcome not met" activity
+  event and remains a passing state.
+- **`remove_participation`** — post-Go-to-Build removal/downgrade of a Consulted
+  stake takes the heavy path (required note + notification) and posts a gate
+  thread activity event visible to the current gate approver (D-584). Adds stay
+  light.
+
 ### division-mcp / document-access-mcp / team-meetings-mcp / initiative-public-mcp
 See each service's `GET /tools` endpoint and contract specs. (Catalog expansion
 for these services: candidate for a later contract.)

@@ -130,7 +130,7 @@ async function record_gate_decision(params, caller_user_id) {
   // ── Fetch gate record (includes approver_user_id for permission check) ────
   const { data: gate_record, error: gateErr } = await supabase
     .from('gate_records')
-    .select('gate_record_id, gate_status, approver_user_id')
+    .select('gate_record_id, gate_status, approver_user_id, outcome_verdict')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .eq('gate_name', gate_name)
     .is('deleted_at', null)
@@ -200,6 +200,19 @@ async function record_gate_decision(params, caller_user_id) {
       actor_user_id:     caller_user_id,
       event_metadata:    { gate_name, action: 'decision_override', decision }
     });
+  }
+
+  // ── Contract 39 (D-585): Close Review never passes with the verdict unanswered ──
+  // Submission enforces the verdict block; this guard covers legacy/override
+  // submissions that reached awaiting_approval without one. Approval ratifies
+  // the recorded verdict (met and not_met are both passing states — D-573).
+  if (gate_name === 'close_review' && decision === 'approved' && !philOverride &&
+      gate_record.outcome_verdict !== 'met' && gate_record.outcome_verdict !== 'not_met') {
+    return {
+      success: false,
+      error: 'Cannot approve Close Review — no outcome verdict is recorded on this submission. ' +
+             'Return the gate so the submitter can complete the outcome verdict block (D-585).'
+    };
   }
 
   // ── Contract G5 (D-557): Level 1 consensus route ───────────────────────────
@@ -794,6 +807,22 @@ async function applyGateApprovalTransition({
       actor_user_id:     caller_user_id,
       event_metadata:    { gate_name, approver_user_id: caller_user_id }
     });
+
+  // ── Contract 39 (D-585): not-met loudness ─────────────────────────────────
+  // A not-met close is a passing state that carries a distinct visible marker
+  // on the activity feed and is queryable as an analytics fact (event_type +
+  // gate_records.outcome_verdict). Failed work closes honestly.
+  if (gate_name === 'close_review' && updated_gate.outcome_verdict === 'not_met') {
+    await supabase
+      .from('cycle_event_log')
+      .insert({
+        delivery_cycle_id,
+        event_type:        'closed_outcome_not_met',
+        event_description: 'Closed — outcome not met.',
+        actor_user_id:     null, // system entry — the approval event above carries the actor
+        event_metadata:    { gate_name, outcome_verdict: 'not_met' }
+      });
+  }
 
   if (stage_advanced) {
     const newStageDisplay = STAGE_DISPLAY[new_stage] ?? new_stage;

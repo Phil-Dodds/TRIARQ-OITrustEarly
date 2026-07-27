@@ -8,6 +8,8 @@
 'use strict';
 
 const { supabase } = require('../db');
+// Contract 39 (D-584): post-Go-to-Build Consulted removal takes the heavy path.
+const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 const VALID_LETTERS = ['C', 'I'];
 const VALID_SET_VIA = ['trio', 'self', 'rule', 'division_default', 'approver', 'leadership'];
@@ -207,6 +209,24 @@ async function remove_participation(params, caller_user_id) {
     return { success: false, error: 'This participation stake has already been removed.' };
   }
 
+  // ── Contract 39 (D-584): is this Initiative past Go to Build? ─────────────
+  // After Go to Build the cast is committed — removing a Consulted stake is
+  // loud (required note, party notified, gate-thread activity event). Before
+  // and at Brief Review the existing light ceremony is unchanged (AC #9).
+  // Rule 40 note: this query precedes the existing removal queries — FIFO
+  // fixture slot documented in the CC-decision.
+  let postGoToBuild = false;
+  if (record.letter === 'C') {
+    const { data: gtbGate } = await supabase
+      .from('gate_records')
+      .select('gate_status')
+      .eq('delivery_cycle_id', record.delivery_cycle_id)
+      .eq('gate_name', 'go_to_build')
+      .is('deleted_at', null)
+      .maybeSingle();
+    postGoToBuild = gtbGate?.gate_status === 'approved' || gtbGate?.gate_status === 'skipped';
+  }
+
   let callerIsHolder = false;
   if (record.holder_user_id) {
     callerIsHolder = record.holder_user_id === caller_user_id;
@@ -225,6 +245,17 @@ async function remove_participation(params, caller_user_id) {
     return {
       success: false,
       error: "A note is required when removing another party's participation stake (D-564)."
+    };
+  }
+
+  // Contract 39 (D-584): after Go to Build the note is required even from the
+  // holder — the committed cast changes loudly in the sensitive direction.
+  if (postGoToBuild && (!note || !String(note).trim())) {
+    return {
+      success: false,
+      error: 'This Initiative is past Go to Build — the consultation cast is committed. ' +
+             'A note explaining the removal is required; the removed party and the current ' +
+             'gate approver will see it (D-584).'
     };
   }
 
@@ -250,6 +281,109 @@ async function remove_participation(params, caller_user_id) {
     actor_user_id:     caller_user_id,
     event_metadata:    { record_id, letter: record.letter, removed_by_holder: callerIsHolder }
   });
+
+  // ── Contract 39 (D-584): post-Go-to-Build heavy path — notify + surface ────
+  // All steps non-fatal after the removal itself (queries appended last —
+  // Rule 40). Adds stay light; only removal/downgrade is the loud direction.
+  if (postGoToBuild) {
+    const trimmedNote = note ? String(note).trim() : '';
+
+    // Resolve caller + cycle context for messages.
+    const { data: removerRow } = await supabase
+      .from('users')
+      .select('display_name')
+      .eq('id', caller_user_id)
+      .maybeSingle();
+    const removerName = removerRow?.display_name ?? 'A user';
+
+    const { data: cycleRow } = await supabase
+      .from('delivery_cycles')
+      .select('cycle_title')
+      .eq('delivery_cycle_id', record.delivery_cycle_id)
+      .maybeSingle();
+    const cycleTitle = cycleRow?.cycle_title ?? 'an Initiative';
+
+    // Notify the removed party (user-held → holder; group-held → active members).
+    let holderLabel = 'Consulted party';
+    const recipients = [];
+    if (record.holder_user_id && record.holder_user_id !== caller_user_id) {
+      const { data: holderRow } = await supabase
+        .from('users')
+        .select('display_name, email')
+        .eq('id', record.holder_user_id)
+        .maybeSingle();
+      if (holderRow) {
+        holderLabel = holderRow.display_name;
+        if (holderRow.email) {
+          recipients.push({ email: holderRow.email, display_name: holderRow.display_name });
+        }
+      }
+    } else if (record.holder_group_id) {
+      const { data: groupRow } = await supabase
+        .from('specialty_groups')
+        .select('group_name')
+        .eq('group_id', record.holder_group_id)
+        .maybeSingle();
+      holderLabel = groupRow?.group_name ?? holderLabel;
+      const { data: members } = await supabase
+        .from('specialty_group_members')
+        .select('user_id')
+        .eq('group_id', record.holder_group_id)
+        .is('deleted_at', null);
+      const memberIds = (members ?? []).map(m => m.user_id).filter(id => id !== caller_user_id);
+      if (memberIds.length > 0) {
+        const { data: memberRows } = await supabase
+          .from('users')
+          .select('display_name, email')
+          .in('id', memberIds)
+          .is('deleted_at', null);
+        for (const m of memberRows ?? []) {
+          if (m.email) { recipients.push({ email: m.email, display_name: m.display_name }); }
+        }
+      }
+    }
+
+    if (recipients.length > 0) {
+      await sendGateNotificationEmail({
+        recipients,
+        subject:          `${cycleTitle} — Consulted participation removed`,
+        initiativeName:   cycleTitle,
+        gateNameDisplay:  'Consultation cast',
+        contextParagraph: `${removerName} removed ${holderLabel} as a Consulted party on ${cycleTitle} ` +
+                          `after Go to Build.${trimmedNote ? ` Note: ${trimmedNote}` : ''}`,
+        delivery_cycle_id: record.delivery_cycle_id,
+        email_type:       'consulted_removed'
+      });
+    }
+
+    // Surface the change to the current gate approver: activity event on the
+    // gate thread of the gate currently awaiting approval (no new approval
+    // requirement — D-584). Skipped when no gate is in flight.
+    const { data: awaitingGate } = await supabase
+      .from('gate_records')
+      .select('gate_record_id')
+      .eq('delivery_cycle_id', record.delivery_cycle_id)
+      .eq('gate_status', 'awaiting_approval')
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    if (awaitingGate) {
+      const { error: threadErr } = await supabase
+        .from('gate_thread_messages')
+        .insert({
+          gate_record_id: awaitingGate.gate_record_id,
+          user_id:        caller_user_id,
+          message_text:   `Consulted party removed after Go to Build: ${holderLabel}.` +
+                          `${trimmedNote ? ` Note: ${trimmedNote}` : ''}`
+        });
+      if (threadErr) {
+        console.error(JSON.stringify({
+          tool_name: 'remove_participation', step: 'gate_thread_activity',
+          record_id, error: threadErr.message
+        }));
+      }
+    }
+  }
 
   return { success: true, data: removed };
 }

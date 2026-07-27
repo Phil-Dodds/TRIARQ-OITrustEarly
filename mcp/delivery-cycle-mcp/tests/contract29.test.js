@@ -235,4 +235,14 @@ describe('update_delivery_cycle other_consulted/informed (D-458)', () => {
     assert.ok(r.error.includes('other_informed_user_ids'));
     assert.ok(r.error.toLowerCase().includes('retired'));
   });
+
+  // Contract 39 (D-583): tier is retired — explicit reject, same house style.
+  test('error path: tier_classification is retired (D-583)', async () => {
+    const r = await update_delivery_cycle(
+      { delivery_cycle_id: 'c1', tier_classification: 'tier_2' }, DCS
+    );
+    assert.equal(r.success, false);
+    assert.ok(r.error.includes('tier_classification'));
+    assert.ok(r.error.toLowerCase().includes('retired'));
+  });
 });

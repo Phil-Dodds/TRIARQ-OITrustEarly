@@ -28,7 +28,7 @@ async function getInitiative(supabase, initiative_id, _scope = { scope_type: 'al
     .from('delivery_cycles')
     .select(`
       delivery_cycle_id, cycle_title, division_id, workstream_id,
-      tier_classification, current_lifecycle_stage, outcome_statement,
+      set_level, baseline_level, current_lifecycle_stage, outcome_statement,
       assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id,
       jira_epic_key, other_consulted_user_ids, other_informed_user_ids,
       created_at, updated_at
@@ -143,7 +143,8 @@ async function getInitiative(supabase, initiative_id, _scope = { scope_type: 'al
     division_short_name:    div?.display_name_short ?? null,
     workstream_name:        ws?.workstream_name ?? null,
     workstream_short_name:  ws?.display_name_short ?? null,
-    tier:                   c.tier_classification,
+    // Effective Governance Level (D-583): set ?? baseline; null = unsized.
+    level:                  c.set_level ?? c.baseline_level ?? null,
     current_stage:          stageLabel(c.current_lifecycle_stage),
     outcome_statement:      c.outcome_statement ?? null,
     dcs_name:               c.assigned_dcs_user_id ? (userMap.get(c.assigned_dcs_user_id) ?? null) : null,

@@ -27,13 +27,19 @@ import { ParticipationRecord, SpecialtyGroup, User } from '../../../core/types/d
       <div>
         <div class="pp-zone-label">Consulted</div>
         <div class="pp-chips">
-          <span *ngFor="let rec of consulted" class="pp-chip">
+          <span *ngFor="let rec of consulted" class="pp-chip"
+                [class.pp-chip--provisional]="!castCommitted"
+                [attr.title]="castCommitted ? null : 'Provisional until the cast is confirmed at Go to Build submission.'">
             {{ rec.holder_display_name || rec.holder_group_name || 'Unknown' }}
             <button *ngIf="canAttach" type="button" class="pp-chip-x"
                     [attr.aria-label]="'Remove ' + (rec.holder_display_name || rec.holder_group_name)"
                     (click)="startRemove(rec)">✕</button>
           </span>
           <span *ngIf="consulted.length === 0" class="pp-empty">Consulted: none yet</span>
+          <!-- Contract 39 (D-584): quiet provisional note — not a warning. -->
+          <span *ngIf="!castCommitted && consulted.length > 0" class="pp-provisional-note">
+            provisional until Go to Build
+          </span>
           <button *ngIf="canAttach" type="button" class="pp-add" (click)="attachOpen = !attachOpen">
             + Add Consulted
           </button>
@@ -108,6 +114,9 @@ import { ParticipationRecord, SpecialtyGroup, User } from '../../../core/types/d
       display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
       border-radius: 999px; background: rgba(37,112,153,0.08); color: #257099; font-size: 12px;
     }
+    /* D-584: provisional = muted chip state, quiet by design (don't scare people). */
+    .pp-chip--provisional { background: rgba(90,90,90,0.06); color: #5A5A5A; border: 1px dashed #C0C0C0; }
+    .pp-provisional-note { font: italic 400 11px Roboto; color: #9E9E9E; }
     .pp-chip--informed { background: rgba(0,39,78,0.06); color: #00274E; }
     .pp-chip-x { background: none; border: none; color: inherit; cursor: pointer; font-size: 11px; padding: 0; }
     .pp-empty { font-style: italic; font-size: 12px; color: #9E9E9E; }
@@ -146,6 +155,8 @@ export class InitiativeParticipationSectionComponent implements OnChanges {
   /** Affordance visibility only — the server enforces role-scoped attach (G4). */
   @Input() canAttach = false;
   @Input() allUsers: User[] = [];
+  /** Contract 39 (D-584): false = consultation cast not yet confirmed at Go to Build. */
+  @Input() castCommitted = true;
   @Output() participationChanged = new EventEmitter<void>();
 
   records: ParticipationRecord[] = [];

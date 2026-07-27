@@ -17,7 +17,6 @@ import {
   CycleArtifactType,
   CycleArtifact,
   JiraLink,
-  TierClassification,
   GateName,
   GateStatus,
   DateStatus,
@@ -181,7 +180,6 @@ export class DeliveryService {
     cycle_description?:       string;
     division_id:              string;
     workstream_id?:           string;          // optional — D-165
-    tier_classification:      TierClassification;
     assigned_dcs_user_id?:    string;          // optional at creation; required before Brief Review gate
     assigned_epo_user_id?:    string;          // optional at creation; required before Go to Build gate
     assigned_dol_user_id?:    string;          // optional — D-391 (new); required before Brief Review gate
@@ -211,7 +209,6 @@ export class DeliveryService {
     division_id?:            string;
     outcome_statement?:      string | null;
     workstream_id?:          string | null;
-    tier_classification?:    TierClassification;
     assigned_dcs_user_id?:   string | null;
     assigned_epo_user_id?:   string | null;
     assigned_dol_user_id?:   string | null;
@@ -238,7 +235,6 @@ export class DeliveryService {
     current_lifecycle_stage?:  string;
     workstream_id?:            string;
     filter_no_workstream?:     boolean;   // D-167: when true, returns only cycles with no workstream
-    tier_classification?:      TierClassification;
     assigned_to_current_user?: boolean;   // D-391: when true, returns only cycles where caller is DCS, EPO, or DOL
     include_event_log?:        boolean;   // D-446: when true, attaches target_date_change_events per cycle
   } = {}): Observable<McpResponse<DeliveryCycle[]>> {
@@ -308,6 +304,12 @@ export class DeliveryService {
     phil_override?:    boolean;
     // Contract GA-1 (D-579): submitter self-assessment.
     assessment?:       { item_key: string; grade: string; comment?: string }[];
+    // Contract 39 (D-584): cast confirmation — required true at go_to_build.
+    cast_confirmed?:   boolean;
+    // Contract 39 (D-585): Close Review outcome verdict block — required at close_review.
+    outcome_verdict?:  'met' | 'not_met';
+    outcome_actual?:   string;
+    outcome_evidence?: string;
   }): Observable<McpResponse<GateRecord>> {
     return this.mcp.call<GateRecord>('delivery', 'submit_gate_for_approval', params as Record<string, unknown>);
   }
@@ -323,6 +325,12 @@ export class DeliveryService {
     phil_override?:    boolean;
     // Contract GA-1 (D-579): assessment rides through the skip interstitial.
     assessment?:       { item_key: string; grade: string; comment?: string }[];
+    // Contract 39 (D-584/D-585): cast confirmation and outcome verdict block
+    // ride through the skip interstitial the same way.
+    cast_confirmed?:   boolean;
+    outcome_verdict?:  'met' | 'not_met';
+    outcome_actual?:   string;
+    outcome_evidence?: string;
   }): Observable<McpResponse<GateSkipConfirmResult>> {
     return this.mcp.call<GateSkipConfirmResult>(
       'delivery', 'confirm_gate_skip', params as Record<string, unknown>

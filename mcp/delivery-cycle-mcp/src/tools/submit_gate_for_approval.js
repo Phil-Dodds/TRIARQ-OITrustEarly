@@ -82,6 +82,13 @@ const RESOLVED_PREDECESSOR_STATUSES = new Set(['approved', 'skipped']);
  * @param {string} [params.submission_note] - D-489: optional "Why is this gate
  *   ready?" free text. Stored on gate_records.submission_note at submission;
  *   not editable afterward (a re-submission is a new submission and overwrites).
+ * @param {boolean} [params.cast_confirmed] - D-584 (Contract 39): go_to_build only.
+ *   Must be true — the submitter confirms the consultation set at submission.
+ *   Recorded as cast_confirmed_at/by on the gate record (migration 091).
+ * @param {string} [params.outcome_verdict] - D-585 (Contract 39): close_review only.
+ *   'met' | 'not_met'. Required with outcome_actual and outcome_evidence.
+ * @param {string} [params.outcome_actual] - D-585: actual result text (required at close_review).
+ * @param {string} [params.outcome_evidence] - D-585: evidence (met) or explanation (not_met).
  * @param {string} caller_user_id - from JWT
  */
 async function submit_gate_for_approval(params, caller_user_id) {
@@ -363,6 +370,48 @@ async function submit_gate_for_approval(params, caller_user_id) {
     };
   }
 
+  // ── Contract 39 (D-584): cast confirmation at Go to Build submission ──────
+  // The "last cheap moment" (D-567 pattern): the submitter confirms the
+  // consultation set as part of submission. One-tap in the UI; the server
+  // blocks until confirmed. Level 1 initiatives record identically (AC #13).
+  const castConfirmed = params.cast_confirmed === true;
+  if (gate_name === 'go_to_build' && !philOverride && !castConfirmed) {
+    return {
+      success: false,
+      error: 'Cannot submit Go to Build — the consultation cast has not been confirmed. ' +
+             'Review the Consulted parties shown on the submission screen and confirm the ' +
+             'cast to proceed (D-584).'
+    };
+  }
+
+  // ── Contract 39 (D-585): Close Review outcome verdict block ───────────────
+  // Close Review verifies the declared outcome. Submission requires: actual
+  // result, verdict (met|not_met — both passing states, D-573), and evidence
+  // or explanation. Works with null outcome_statement — the actual-result
+  // text states the outcome retrospectively; the gate never passes with the
+  // question unconfronted.
+  let outcomeVerdictFields = null;
+  if (gate_name === 'close_review' && !philOverride) {
+    const outcome_verdict  = params.outcome_verdict;
+    const outcome_actual   = (typeof params.outcome_actual === 'string' && params.outcome_actual.trim())
+      ? params.outcome_actual.trim() : null;
+    const outcome_evidence = (typeof params.outcome_evidence === 'string' && params.outcome_evidence.trim())
+      ? params.outcome_evidence.trim() : null;
+    const missing = [];
+    if (outcome_verdict !== 'met' && outcome_verdict !== 'not_met') { missing.push('verdict (met or not_met)'); }
+    if (!outcome_actual)   { missing.push('actual result'); }
+    if (!outcome_evidence) { missing.push(outcome_verdict === 'not_met' ? 'explanation of what happened' : 'evidence of where the result is demonstrated'); }
+    if (missing.length > 0) {
+      return {
+        success: false,
+        error: `Cannot submit Close Review — the outcome verdict block is incomplete: ` +
+               `${missing.join(', ')} required. Close Review verifies whether the Initiative met ` +
+               'the outcome it declared; complete the verdict block to proceed (D-585).'
+      };
+    }
+    outcomeVerdictFields = { outcome_verdict, outcome_actual, outcome_evidence };
+  }
+
   // ── Contract 38 follow-on 13: hard-stop ladder (server-side twin of the UI
   // enforcement — MCP requests that skip the UI still hit these rules).
   // Shared blocker: logs a gate_blocked event and returns the D-140 message.
@@ -602,7 +651,13 @@ async function submit_gate_for_approval(params, caller_user_id) {
       submitted_by_user_id:           caller_user_id,
       approver_user_id:               resolvedApproverId,
       workstream_active_at_clearance: workstream_clearance,
-      submission_note                                        // D-489
+      submission_note,                                       // D-489
+      // Contract 39 (D-584): cast confirmation stamps — go_to_build only.
+      ...(gate_name === 'go_to_build' && castConfirmed
+        ? { cast_confirmed_at: new Date().toISOString(), cast_confirmed_by: caller_user_id }
+        : {}),
+      // Contract 39 (D-585): outcome verdict block — close_review only.
+      ...(outcomeVerdictFields ?? {})
     })
     .eq('gate_record_id', gate_record.gate_record_id)
     .select()

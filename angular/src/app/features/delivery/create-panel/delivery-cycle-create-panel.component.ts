@@ -42,7 +42,7 @@ import { LoadingOverlayComponent }   from '../../../shared/components/loading-ov
 import { WorkstreamPickerComponent }         from '../../../shared/pickers/workstream-picker/workstream-picker.component';
 import { UserPickerComponent }               from '../../../shared/pickers/user-picker/user-picker.component';
 import { DivisionAssignmentPickerComponent } from '../../../shared/pickers/division-assignment-picker/division-assignment-picker.component';
-import { Division, DeliveryWorkstream, DeliveryCycle, TierClassification, User, RoadmapTheme } from '../../../core/types/database';
+import { Division, DeliveryWorkstream, DeliveryCycle, User, RoadmapTheme } from '../../../core/types/database';
 import {
   DivisionTrustGroup,
   groupDivisionsByTrust
@@ -203,21 +203,8 @@ import {
             </div>
           </div>
 
-          <!-- 7. Tier Classification — dropdown per D-191 (locked: not cards, not radio buttons). Source: D-191. -->
-          <div class="cp-field">
-            <label class="cp-label">
-              Tier Classification <span class="cp-required" aria-hidden="true">*</span>
-            </label>
-            <select formControlName="tier_classification" class="cp-input"
-                    [class.cp-input--error]="f['tier_classification'].invalid && f['tier_classification'].touched">
-              <option value="">Select tier</option>
-              <option value="tier_1">Tier 1 — Fast Lane: Workflow changes, config updates, no platform dependencies</option>
-              <option value="tier_2">Tier 2 — Structured: Platform changes, integrations, cross-domain dependencies</option>
-              <option value="tier_3">Tier 3 — Governed: Agent deployments, compliance scope changes, AI Governance Board required</option>
-            </select>
-            <div *ngIf="f['tier_classification'].invalid && f['tier_classification'].touched"
-                 class="cp-field-error">Tier Classification is required.</div>
-          </div>
+          <!-- D-583 (Contract 39): Tier field retired — Initiatives are sized to a
+               Governance Level at their first gate (D-567). -->
 
           <!-- 8. Delivery Workstream (optional per D-165, picker per D-182/CC-002) -->
           <div class="cp-field">
@@ -615,9 +602,6 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
     this.form = this.fb.group({
       division_id:         ['', Validators.required],
       cycle_title:         ['', [Validators.required, Validators.maxLength(120)]],
-      // C19 Part 3e: Tier defaults to Tier 3 — Governed on New Initiative form.
-      // User can change before submit. Edit Initiative does not default — uses saved value.
-      tier_classification: ['tier_3', Validators.required],
       outcome_statement:   [''],
       jira_epic_key:       ['']
     });
@@ -670,7 +654,6 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
       v['division_id'] ||
       v['cycle_title'] ||
       v['outcome_statement'] ||
-      v['tier_classification'] ||
       v['jira_epic_key'] ||
       this.selectedWorkstream ||
       this.selectedDcs ||
@@ -905,14 +888,12 @@ export class DeliveryCycleCreatePanelComponent implements OnInit, OnDestroy, OnC
 
     const v = this.form.value as {
       division_id: string; cycle_title: string;
-      tier_classification: TierClassification;
       outcome_statement: string; jira_epic_key: string;
     };
 
     this.delivery.createCycle({
       cycle_title:         v.cycle_title.trim(),
       division_id:         v.division_id,
-      tier_classification: v.tier_classification,
       // D-165: workstream optional at creation
       ...(this.selectedWorkstream ? { workstream_id: this.selectedWorkstream.workstream_id } : {}),
       // D-174 / D-391: DCS, EPO, DOL nullable at creation; gate pre-checks enforce

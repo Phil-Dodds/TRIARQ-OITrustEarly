@@ -57,7 +57,6 @@ import {
   Division,
   DeliveryWorkstream,
   DeliverySummary,
-  TierClassification,
   LifecycleStage,
   GateName,
   GateStateMap,
@@ -169,13 +168,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             Stage: {{ stageLabelFor(filterStage) }}
             <button (click)="filterStage='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
           </span>
-          <span *ngIf="filterTier"
-                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
-                       border:1.5px solid #257099;color:#257099;border-radius:999px;
-                       padding:4px 12px;font-size:13px;white-space:nowrap;">
-            Tier: {{ filterTier === 'tier_1' ? 'Tier 1 — Fast Lane' : filterTier === 'tier_2' ? 'Tier 2 — Structured' : 'Tier 3 — Governed' }}
-            <button (click)="filterTier='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
-          </span>
+          <!-- D-583 (Contract 39): Tier filter chip retired. -->
           <!-- D-488: Roadmap Theme filter chip. -->
           <span *ngIf="filterThemes.length"
                 style="display:inline-flex;align-items:center;gap:4px;background:#fff;
@@ -555,38 +548,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </div>
           </div>
 
-          <!-- Filter row 5: Tier — accordion -->
-          <div style="border-bottom:1px solid #F0F0F0;">
-            <button (click)="toggleFilterRow('tier')"
-                    style="width:100%;background:none;border:none;cursor:pointer;
-                           display:flex;align-items:center;justify-content:space-between;
-                           padding:14px 20px;font-size:14px;color:#1E1E1E;">
-              <span style="font-weight:500;">Tier</span>
-              <span style="display:flex;align-items:center;gap:8px;">
-                <span *ngIf="stagedTier" style="font-size:12px;color:var(--triarq-color-primary,#257099);">
-                  {{ stagedTier === 'tier_1' ? 'Tier 1 — Fast Lane' : stagedTier === 'tier_2' ? 'Tier 2 — Structured' : 'Tier 3 — Governed' }}
-                </span>
-                <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'tier' ? '▲' : '▼' }}</span>
-              </span>
-            </button>
-            <!-- D-278: absence of selection = no filter. No named "All Tiers" option. Source: Contract 5 Block 3.3. -->
-            <div *ngIf="openFilterRow === 'tier'" style="padding:0 20px 16px;">
-              <div style="display:flex;flex-direction:column;gap:8px;">
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" value="tier_1" [(ngModel)]="stagedTier" />
-                  <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4CAF50;flex-shrink:0;"></span>Tier 1 — Fast Lane
-                </label>
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" value="tier_2" [(ngModel)]="stagedTier" />
-                  <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--triarq-color-sunray,#F2A620);flex-shrink:0;"></span>Tier 2 — Structured
-                </label>
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
-                  <input type="radio" value="tier_3" [(ngModel)]="stagedTier" />
-                  <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--triarq-color-primary,#257099);flex-shrink:0;"></span>Tier 3 — Governed
-                </label>
-              </div>
-            </div>
-          </div>
+          <!-- D-583 (Contract 39): Tier filter row retired. -->
 
           <!-- Filter row: Roadmap Theme — D-488 multi-select. Unthemed = no tag. -->
           <div style="border-bottom:1px solid #F0F0F0;">
@@ -1065,7 +1027,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // On panel open: initialized from applied state. On Apply: copied to applied state + query runs.
   // On Clear All: reset to defaults only. On X: discarded. Source: Contract 4 Block 2, D-268/D-269.
   stagedStage:          string  = '';
-  stagedTier:           string  = '';
   stagedWorkstream:     string  = '';
   stagedGateStatus:     string  = '';
   stagedAssignedPerson: string  = '';
@@ -1099,7 +1060,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   // Filter state (ngModel bindings — not reactive form controls)
   filterStage:              string  = '';
-  filterTier:               string  = '';
   // '__none__' = show cycles with no workstream assigned (D-167)
   filterWorkstream:         string  = '';
   // D-166: division filter — server-side reload when changed
@@ -1142,7 +1102,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   drillDownFromQp = false;  // set true when query params were present on init
 
   // Sort state — D-435 (Contract 24) adds 'next_gate' as a sortable column.
-  sortField: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' | 'next_gate' = 'cycle_title';
+  sortField: 'cycle_title' | 'current_lifecycle_stage' | 'next_gate' = 'cycle_title';
   sortDir:   'asc' | 'desc' = 'asc';
 
   // D-435 (Contract 24): canonical gate sequence used for next-gate sort order.
@@ -1767,7 +1727,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       SCREEN_KEYS.DELIVERY_CYCLES,
       {
         filterStage:           this.filterStage === 'CANCELLED' ? '' : this.filterStage,   // S-009
-        filterTier:            this.filterTier,
+        // D-583 (Contract 39): filterTier no longer persisted; stale saved keys
+        // are ignored on restore and drop out at the next save (CC-39 strip mechanics).
         filterWorkstream:      this.filterWorkstream,
         filterDivision:        this.filterDivision,
         includeChildDivisions: this.includeChildDivisions,
@@ -1797,7 +1758,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     const filter = saved.filter_state ?? {};
     const sort   = saved.sort_state   ?? {};
     if (typeof filter['filterStage']      === 'string') { this.filterStage      = filter['filterStage'] as string; }
-    if (typeof filter['filterTier']       === 'string') { this.filterTier       = filter['filterTier'] as string; }
+    // D-583: 'filterTier' intentionally not restored — stale persisted tier filters are dropped.
     if (typeof filter['filterWorkstream'] === 'string') { this.filterWorkstream = filter['filterWorkstream'] as string; }
     if (typeof filter['filterDivision']   === 'string') { this.filterDivision   = filter['filterDivision'] as string; }
     if (typeof filter['filterNextGate']   === 'string') { this.filterNextGate   = filter['filterNextGate'] as string; }
@@ -1827,10 +1788,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         .filter((v): v is InterestCondition => !!v && typeof v === 'object');
     }
     if (typeof sort['sortField'] === 'string') {
-      const allowed = ['cycle_title', 'current_lifecycle_stage', 'tier_classification', 'next_gate'];
+      // D-583: 'tier_classification' removed — a stale saved tier sort falls back to the default silently.
+      const allowed = ['cycle_title', 'current_lifecycle_stage', 'next_gate'];
       if (allowed.includes(sort['sortField'] as string)) {
         this.sortField = sort['sortField'] as
-          'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' | 'next_gate';
+          'cycle_title' | 'current_lifecycle_stage' | 'next_gate';
       }
     }
     if (typeof sort['sortDir'] === 'string') {
@@ -1930,7 +1892,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       if (c.current_lifecycle_stage === 'CANCELLED' &&
           !this.includeCancelled && this.filterStage !== 'CANCELLED') { return false; }
       if (this.filterStage && c.current_lifecycle_stage !== this.filterStage) { return false; }
-      if (this.filterTier  && c.tier_classification    !== this.filterTier)  { return false; }
 
       // Contract G9 (D-563 Grade 1): interest profile — OR-of-ANDs over
       // sizing answers/subs/notes, Division, stage. Empty profile passes all.
@@ -2033,7 +1994,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       switch (this.sortField) {
         case 'cycle_title':             va = a.cycle_title;             vb = b.cycle_title;             break;
         case 'current_lifecycle_stage': va = a.current_lifecycle_stage; vb = b.current_lifecycle_stage; break;
-        case 'tier_classification':     va = a.tier_classification;     vb = b.tier_classification;     break;
       }
       return this.sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
     });
@@ -2063,7 +2023,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   clearFilters(): void {
     this.filterStage           = '';
-    this.filterTier            = '';
     this.filterWorkstream      = '';
     this.activeWorkstreamTab   = '';
     this.filterNextGate        = '';
@@ -2077,7 +2036,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   clearAllFilters(): void {
     this.filterStage           = '';
-    this.filterTier            = '';
     this.filterWorkstream      = '';
     this.filterNextGate        = '';
     this.filterDcs             = '';
@@ -2102,7 +2060,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  setSort(field: 'cycle_title' | 'current_lifecycle_stage' | 'tier_classification' | 'next_gate'): void {
+  setSort(field: 'cycle_title' | 'current_lifecycle_stage' | 'next_gate'): void {
     if (this.sortField === field) {
       this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
     } else {
@@ -2151,8 +2109,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   sortLabel(): string {
     const labels: Record<string, string> = {
       cycle_title:             'Initiative title',
-      current_lifecycle_stage: 'stage',
-      tier_classification:     'tier'
+      current_lifecycle_stage: 'stage'
     };
     return labels[this.sortField] ?? this.sortField;
   }
@@ -2232,7 +2189,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   get activeFilterCount(): number {
     let n = 0;
     if (this.filterStage)          { n++; }
-    if (this.filterTier)           { n++; }
     if (this.filterWorkstream)     { n++; }
     if (this.filterGateStatus)     { n++; }
     if (this.filterAssignedPerson) { n++; }
@@ -2261,7 +2217,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (!this.showFilterPanel) {
       // Initialize staged from applied when opening
       this.stagedStage          = this.filterStage;
-      this.stagedTier           = this.filterTier;
       this.stagedWorkstream     = this.filterWorkstream;
       this.stagedGateStatus     = this.filterGateStatus;
       this.stagedAssignedPerson = this.filterAssignedPerson;
@@ -2286,7 +2241,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   /** Apply staged filters: copy staged → applied, run query, close panel. S-011. */
   applyFilterPanel(): void {
     this.filterStage          = this.stagedStage;
-    this.filterTier           = this.stagedTier;
     this.filterWorkstream     = this.stagedWorkstream;
     this.filterGateStatus     = this.stagedGateStatus;
     this.filterAssignedPerson = this.stagedAssignedPerson;
@@ -2307,7 +2261,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   /** Clear staged filter state only — no query, panel stays open. S-011. */
   clearStagedFilters(): void {
     this.stagedStage          = '';
-    this.stagedTier           = '';
     this.stagedWorkstream     = '';
     this.stagedGateStatus     = '';
     this.stagedAssignedPerson = '';
@@ -2338,31 +2291,13 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.applyFilters(false);
   }
 
-  // Tier badge helpers removed with the row chip (CC-38-25) — tier remains
-  // filterable and visible on the detail panel.
+  // D-583 (Contract 39): tier retired — badge/filter/sort helpers removed.
 
   /** Safe stage label lookup — accepts plain string for filter chip display. */
   stageLabelFor(stage: string): string {
     return STAGE_LABEL_MAP[stage as LifecycleStage] ?? stage;
   }
 
-  tierPillBg(tier: TierClassification): string {
-    return tier === 'tier_1' ? '#e3f2fd' : tier === 'tier_2' ? '#f3e5f5' : '#e8f5e9';
-  }
-
-  // D-197: Avatar dot color — Tier 1 green, Tier 2 amber, Tier 3 teal (primary)
-  tierDotColor(tier: TierClassification): string {
-    if (tier === 'tier_1') { return '#4CAF50'; }
-    if (tier === 'tier_2') { return 'var(--triarq-color-sunray, #f5a623)'; }
-    return 'var(--triarq-color-primary, #257099)';
-  }
-
-  // D-197: Tier pill color for badge in cycle name column
-  tierPillColor(tier: TierClassification): string {
-    if (tier === 'tier_1') { return '#4CAF50'; }
-    if (tier === 'tier_2') { return 'var(--triarq-color-sunray, #f5a623)'; }
-    return 'var(--triarq-color-primary, #257099)';
-  }
 
   stagePillBg(stage: LifecycleStage): string {
     if (stage === 'COMPLETE')  { return '#e8f5e9'; }

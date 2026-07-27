@@ -35,6 +35,12 @@ import { GateAssessmentFormComponent, AssessmentChange } from '../gate-assessmen
     <section *ngIf="consultations.length > 0" class="gcs-section">
       <div class="gcs-header">
         <span class="gcs-label">Consulted</span>
+        <!-- Contract 39 (D-584): quiet provisional label until Go to Build
+             cast confirmation — progressive disclosure, not a warning. -->
+        <span *ngIf="!castCommitted" class="gcs-provisional"
+              title="Consultation attachments are provisional until the cast is confirmed at Go to Build submission.">
+          provisional until Go to Build
+        </span>
         <span class="gcs-summary">{{ summaryLine }}</span>
       </div>
 
@@ -102,6 +108,8 @@ import { GateAssessmentFormComponent, AssessmentChange } from '../gate-assessmen
     .gcs-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
     .gcs-label { font: 600 10px/1 Roboto; letter-spacing: 0.06em; text-transform: uppercase; color: #5A5A5A; }
     .gcs-summary { font: 400 11px/1.2 Roboto; color: #5A5A5A; }
+    /* D-584: quiet provisional marker — muted italic, no warning styling. */
+    .gcs-provisional { font: italic 400 11px/1.2 Roboto; color: #9E9E9E; }
     .gcs-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 5px 0; }
     .gcs-chip { display: inline-block; padding: 3px 10px; border-radius: 999px; background: rgba(37,112,153,0.08); color: #257099; font: 400 12px Roboto; }
     .gcs-status { font: 500 12px Roboto; }
@@ -135,6 +143,8 @@ export class GateConsultationSectionComponent implements OnChanges {
   @Input() currentUserId: string | null = null;
   /** Contract GA-1: gate key + link URL for the consulted assessment. */
   @Input() gateName: string | null = null;
+  /** Contract 39 (D-584): false = consultation cast not yet confirmed at Go to Build. */
+  @Input() castCommitted = true;
   @Input() assessmentLinkUrl: string | null = null;
 
   consultedAssessment: AssessmentChange = { complete: false, items: [] };

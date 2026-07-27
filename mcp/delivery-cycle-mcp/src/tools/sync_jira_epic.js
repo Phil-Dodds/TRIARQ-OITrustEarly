@@ -65,7 +65,6 @@ async function sync_jira_epic(params, caller_user_id) {
       delivery_cycle_id,
       cycle_title,
       outcome_statement,
-      tier_classification,
       cycle_description
     `)
     .eq('delivery_cycle_id', delivery_cycle_id)
@@ -127,9 +126,8 @@ async function sync_jira_epic(params, caller_user_id) {
   if (contextBriefArtifact?.external_url) {
     fields['customfield_context_brief_link'] = contextBriefArtifact.external_url;
   }
-  if (cycle.tier_classification) {
-    fields['customfield_tier_classification'] = cycle.tier_classification;
-  }
+  // D-583 (Contract 39): tier retired — the tier custom field is no longer pushed.
+  // Historical values already in Jira are left untouched.
   if (cycle.cycle_description) {
     fields['customfield_capabilities_equation'] = cycle.cycle_description;
   }

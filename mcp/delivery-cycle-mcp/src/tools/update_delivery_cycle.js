@@ -19,15 +19,12 @@
 const { supabase } = require('../db');
 const { recomputeBaselineForCycle } = require('../lib/governance-derivation');
 
-const VALID_TIERS = ['tier_1', 'tier_2', 'tier_3'];
-
 // Mutable fields accepted by this tool and their display labels for event log.
 const MUTABLE_FIELD_LABELS = {
   cycle_title:             'Initiative Title',
   division_id:             'Division',
   outcome_statement:       'Outcome Statement',
   workstream_id:           'Delivery Workstream',
-  tier_classification:     'Tier Classification',
   assigned_dcs_user_id:    'Assigned Domain Capability Strategist',
   assigned_epo_user_id:    'Assigned Engineering Product Owner',
   assigned_dol_user_id:    'Assigned Domain Outcome Lead',
@@ -51,6 +48,9 @@ const VALID_AI_AUDIENCE      = ['external', 'internal'];
 const ARRAY_USER_FIELDS = new Set([]);
 const RETIRED_D458_FIELDS = ['other_consulted_user_ids', 'other_informed_user_ids'];
 
+// Contract 39 (D-583): tier is retired — Governance Level replaces it.
+const RETIRED_D583_FIELDS = ['tier_classification'];
+
 /**
  * @param {object} params
  * @param {string}  params.delivery_cycle_id          — Required
@@ -58,7 +58,6 @@ const RETIRED_D458_FIELDS = ['other_consulted_user_ids', 'other_informed_user_id
  * @param {string}  [params.division_id]              — Optional
  * @param {string|null} [params.outcome_statement]    — Optional; null clears the field
  * @param {string|null} [params.workstream_id]        — Optional; null clears the field (D-165)
- * @param {string}  [params.tier_classification]      — Optional; 'tier_1'|'tier_2'|'tier_3'
  * @param {string|null} [params.assigned_dcs_user_id] — Optional; null clears (D-389)
  * @param {string|null} [params.assigned_epo_user_id] — Optional; null clears (D-390)
  * @param {string|null} [params.assigned_dol_user_id] — Optional; null clears (D-391)
@@ -85,6 +84,16 @@ async function update_delivery_cycle(params, caller_user_id) {
     };
   }
 
+  // ── Contract 39 (D-583): reject writes to retired tier_classification ─────
+  const retiredTierSupplied = RETIRED_D583_FIELDS.filter(f => fields[f] !== undefined);
+  if (retiredTierSupplied.length > 0) {
+    return {
+      success: false,
+      error: 'tier_classification is retired (D-583) — Initiatives are governed by ' +
+             'Governance Level, set at sizing, not through this tool.'
+    };
+  }
+
   // ── Validate that at least one mutable field was supplied ─────────────────
   const suppliedFields = Object.keys(fields).filter(k => k in MUTABLE_FIELD_LABELS);
   if (suppliedFields.length === 0) {
@@ -98,12 +107,6 @@ async function update_delivery_cycle(params, caller_user_id) {
     }
     if (String(fields.cycle_title).length > 120) {
       return { success: false, error: 'cycle_title must be 120 characters or fewer.' };
-    }
-  }
-
-  if (fields.tier_classification !== undefined) {
-    if (!VALID_TIERS.includes(fields.tier_classification)) {
-      return { success: false, error: 'tier_classification must be one of: tier_1, tier_2, tier_3.' };
     }
   }
 
@@ -170,7 +173,7 @@ async function update_delivery_cycle(params, caller_user_id) {
   // ── Fetch current Initiative record ────────────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, cycle_status, division_id, workstream_id, tier_classification, outcome_statement, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, jira_epic_key, other_consulted_user_ids, other_informed_user_ids, ai_functionality, ai_delivery_form, ai_audience, ai_board_approved')
+    .select('delivery_cycle_id, cycle_title, cycle_status, division_id, workstream_id, outcome_statement, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, jira_epic_key, other_consulted_user_ids, other_informed_user_ids, ai_functionality, ai_delivery_form, ai_audience, ai_board_approved')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();

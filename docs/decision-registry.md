@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.65 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.66 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,7 +8,7 @@
 
 ## Next Available Decision Number
 
-**Next available: D-584**
+**Next available: D-586**
 (Note: the v1.0 governance spec's erroneous "D-575" citations read as D-572; D-575 is legitimately assigned to Continuous Multi-Contract Execution, locked 2026-07-23.)
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
@@ -486,7 +486,9 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-580 | Stage Graduation on Gate Approval | 2026-07-26 | built |
 | D-581 | Durable Conditions (supersedes G6 AC#5 + D-578 conditions clause) | 2026-07-26 | built |
 | D-582 | Override Instruments Permanent | 2026-07-26 | built |
-| D-583 | Tier Retirement | 2026-07-26 | locked — build pending |
+| D-583 | Tier Retirement | 2026-07-26 | specced |
+| D-584 | Cast Lifecycle: Light Until Go to Build, Serious After | 2026-07-27 | specced |
+| D-585 | Close Review Is Outcome Verification | 2026-07-27 | specced |
 
 ---
 

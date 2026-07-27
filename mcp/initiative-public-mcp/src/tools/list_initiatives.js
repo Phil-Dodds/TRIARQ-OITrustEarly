@@ -17,7 +17,8 @@ const { stageLabel, deriveNextGate } = require('../helpers/format-helpers');
  * @param {string} [filters.division_name]   - partial, case-insensitive
  * @param {string} [filters.workstream_name] - partial, case-insensitive
  * @param {string|string[]} [filters.lifecycle_stage] - exact on current_lifecycle_stage
- * @param {string} [filters.tier]            - tier_1 | tier_2 | tier_3
+ * @param {number|string} [filters.level]    - 1 | 2 | 3 — effective Governance Level
+ *                                             (set_level ?? baseline_level; null = unsized)
  * @param {string} [filters.gate_status]     - filters on next gate's status
  * @param {string} [filters.next_gate]       - raw gate name the Initiative is waiting on
  * @param {object} [scope] - { scope_type, division_ids } from api-key auth
@@ -28,7 +29,7 @@ async function listInitiatives(supabase, filters = {}, scope = { scope_type: 'al
     .from('delivery_cycles')
     .select(`
       delivery_cycle_id, cycle_title, division_id, workstream_id,
-      tier_classification, current_lifecycle_stage, outcome_statement,
+      set_level, baseline_level, current_lifecycle_stage, outcome_statement,
       assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id,
       jira_epic_key, created_at
     `)
@@ -40,8 +41,8 @@ async function listInitiatives(supabase, filters = {}, scope = { scope_type: 'al
     query = query.in('division_id', scope.division_ids);
   }
 
-  // Cheap exact filters pushed to SQL.
-  if (filters.tier) { query = query.eq('tier_classification', filters.tier); }
+  // D-583 (Contract 39): level filter — effective level = set_level ?? baseline_level.
+  // COALESCE semantics can't be a single .eq, so this filters in JS below.
   if (filters.lifecycle_stage) {
     query = Array.isArray(filters.lifecycle_stage)
       ? query.in('current_lifecycle_stage', filters.lifecycle_stage)
@@ -117,7 +118,8 @@ async function listInitiatives(supabase, filters = {}, scope = { scope_type: 'al
       division_short_name:    div?.display_name_short ?? null,
       workstream_name:        ws?.workstream_name ?? null,
       workstream_short_name:  ws?.display_name_short ?? null,
-      tier:                   c.tier_classification,
+      // Effective Governance Level (D-583): set ?? baseline; null = unsized.
+      level:                  c.set_level ?? c.baseline_level ?? null,
       current_stage:          stageLabel(c.current_lifecycle_stage),
       outcome_statement:      c.outcome_statement ?? null,
       dcs_name:               c.assigned_dcs_user_id ? (userMap.get(c.assigned_dcs_user_id) ?? null) : null,
@@ -135,6 +137,10 @@ async function listInitiatives(supabase, filters = {}, scope = { scope_type: 'al
 
   // ── JS filters (name partial-match + next-gate filters) ───────────────────
   const ci = (hay, needle) => (hay || '').toLowerCase().includes(needle.toLowerCase());
+  if (filters.level !== undefined && filters.level !== null) {
+    const wantedLevel = Number(filters.level);
+    shaped = shaped.filter(r => r.level === wantedLevel);
+  }
   if (filters.division_name)   { shaped = shaped.filter(r => ci(r.division_name, filters.division_name) || ci(r.division_short_name, filters.division_name)); }
   if (filters.workstream_name) { shaped = shaped.filter(r => ci(r.workstream_name, filters.workstream_name) || ci(r.workstream_short_name, filters.workstream_name)); }
   if (filters.next_gate)       { shaped = shaped.filter(r => r._next_gate_raw === filters.next_gate); }

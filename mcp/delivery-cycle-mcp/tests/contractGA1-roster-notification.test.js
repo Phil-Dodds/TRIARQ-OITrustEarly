@@ -64,7 +64,8 @@ describe('roster text builder', () => {
 describe('Close Review approval → roster notification (Design 2026-07-25)', () => {
 
   test('close_review approve sends the roster email to trio + consulted', async () => {
-    const gateRow = { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER };
+    // D-585 (Contract 39): close_review approval requires a recorded verdict.
+    const gateRow = { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER, outcome_verdict: 'met' };
     queue = [
       { data: gateRow, error: null },                                     // gate
       { data: cycleRow('OUTCOME'), error: null },                         // cycle
@@ -110,7 +111,8 @@ describe('Close Review approval → roster notification (Design 2026-07-25)', ()
   test('stage graduates from ANY earlier stage on gate approval (Phil 2026-07-26)', async () => {
     // go_to_build approved while the cycle sits at DESIGN (Spec never manually
     // entered) — the old prevStageOf() check silently skipped the advance.
-    const gateRow = { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER };
+    // D-585 (Contract 39): close_review approval requires a recorded verdict.
+    const gateRow = { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER, outcome_verdict: 'met' };
     queue = [
       { data: gateRow, error: null },
       { data: { ...cycleRow('DESIGN'), assigned_epo_user_id: null }, error: null },
@@ -137,7 +139,8 @@ describe('Close Review approval → roster notification (Design 2026-07-25)', ()
   });
 
   test('other gates: no roster email (control)', async () => {
-    const gateRow = { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER };
+    // D-585 (Contract 39): close_review approval requires a recorded verdict.
+    const gateRow = { gate_record_id: GATE, gate_status: 'awaiting_approval', approver_user_id: APPROVER, outcome_verdict: 'met' };
     queue = [
       { data: gateRow, error: null },
       { data: cycleRow('PILOT'), error: null },

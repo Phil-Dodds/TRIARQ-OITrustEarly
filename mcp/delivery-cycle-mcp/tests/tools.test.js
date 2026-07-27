@@ -98,7 +98,7 @@ describe('create_delivery_cycle', () => {
   test('error path: missing cycle_title', async () => {
     const { create_delivery_cycle } = require('../src/tools/create_delivery_cycle');
     const result = await create_delivery_cycle(
-      { division_id: 'div-1', workstream_id: 'ws-1', tier_classification: 'tier_1' },
+      { division_id: 'div-1', workstream_id: 'ws-1' },
       DS_ID
     );
     assert.equal(result.success, false);
@@ -108,21 +108,22 @@ describe('create_delivery_cycle', () => {
   test('error path: missing division_id', async () => {
     const { create_delivery_cycle } = require('../src/tools/create_delivery_cycle');
     const result = await create_delivery_cycle(
-      { cycle_title: 'Test Cycle', workstream_id: 'ws-1', tier_classification: 'tier_1' },
+      { cycle_title: 'Test Cycle', workstream_id: 'ws-1' },
       DS_ID
     );
     assert.equal(result.success, false);
     assert.ok(result.error.includes('division_id'));
   });
 
-  test('error path: invalid tier_classification', async () => {
+  // D-583 (Contract 39): tier retired — supplying it is an explicit reject.
+  test('error path: retired tier_classification param rejected', async () => {
     const { create_delivery_cycle } = require('../src/tools/create_delivery_cycle');
     const result = await create_delivery_cycle(
-      { cycle_title: 'Test', division_id: 'div-1', workstream_id: 'ws-1', tier_classification: 'tier_4' },
+      { cycle_title: 'Test', division_id: 'div-1', workstream_id: 'ws-1', tier_classification: 'tier_1' },
       DS_ID
     );
     assert.equal(result.success, false);
-    assert.ok(result.error.includes('tier_classification'));
+    assert.match(result.error, /retired \(D-583\)/);
   });
 
   // D-165: workstream_id is OPTIONAL at creation (assigned later from the

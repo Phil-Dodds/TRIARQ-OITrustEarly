@@ -49,7 +49,7 @@ import { UserPickerComponent }               from '../../../shared/pickers/user-
 import { DivisionAssignmentPickerComponent } from '../../../shared/pickers/division-assignment-picker/division-assignment-picker.component';
 import {
   DeliveryCycle, DeliveryWorkstream, Division, User,
-  TierClassification, McpResponse, RoadmapTheme
+  McpResponse, RoadmapTheme
 } from '../../../core/types/database';
 import {
   DivisionTrustGroup,
@@ -242,29 +242,7 @@ function epAvatarColorFromName(name: string): string {
               </div>
             </div>
 
-            <!-- 7. Tier Classification (dropdown in Edit — not option cards; spec 2.3 note 4) -->
-            <!-- B-24 fix: required asterisk removed — Tier is required at creation only.
-                 In Edit the cycle already has a Tier. Source: D-165, Contract 9. -->
-            <div class="ep-field">
-              <label class="ep-label">Tier Classification</label>
-              <select formControlName="tier_classification" class="ep-input"
-                      (change)="onTierChange()">
-                <option value="">— Select Tier —</option>
-                <option value="tier_1">Tier 1 — Fast Lane</option>
-                <option value="tier_2">Tier 2 — Structured</option>
-                <option value="tier_3">Tier 3 — Governed</option>
-              </select>
-              <!-- B-38: S-025 Pattern 1 guidance text. Source: Contract 10 §3 B-38. -->
-              <div class="ep-hint">
-                Tier 1: workflow changes. Tier 2: platform changes. Tier 3: agent deployments or compliance scope changes.
-              </div>
-              <div *ngIf="f['tier_classification'].invalid && f['tier_classification'].touched"
-                   class="ep-field-error">Tier Classification is required.</div>
-              <!-- D-228: amber non-blocking warning when Tier changed on cycle with gate records -->
-              <div *ngIf="showTierChangeWarning" class="ep-amber-note">
-                Changing Tier may affect gate requirements. Existing gate records are not modified.
-              </div>
-            </div>
+            <!-- D-583 (Contract 39): Tier dropdown retired — Governance Level replaces tier. -->
 
             <!-- Phil 2026-07-24: sizing is deliberately not editable here (it has
                  its own derivation/confirmation flow) — say so instead of leaving
@@ -668,9 +646,7 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
   // Inline notes.
   approverChangeNote = ''; // Stubbed — CC-Decision-2026-04-10-E.
 
-  // D-228: shown when Tier changed on a cycle that already has gate records.
-  showTierChangeWarning = false;
-  private originalTier: TierClassification = '' as TierClassification;
+  // D-583 (Contract 39): D-228 tier-change warning retired with the Tier field.
 
   // DCS entity picker state (D-389, D-182).
   showDcsPicker       = false;
@@ -732,7 +708,6 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       cycle_title:         [this.cycle.cycle_title,         [Validators.required, Validators.maxLength(120)]],
       division_id:         [this.cycle.division_id,          Validators.required],
       outcome_statement:   [this.cycle.outcome_statement ?? ''],
-      tier_classification: [this.cycle.tier_classification,  Validators.required],
       jira_epic_key:       [this.cycle.jira_epic_key        ?? '']
     });
 
@@ -803,8 +778,6 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
 
     // Contract G4: D-458 array pre-population removed with the retired editors.
 
-    // Store original Tier for D-228 comparison.
-    this.originalTier = this.cycle.tier_classification;
 
     // Load accessible divisions for the Division dropdown.
     this.loadDivisions();
@@ -892,16 +865,6 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       }
     }
 
-    this.cdr.markForCheck();
-  }
-
-  // ── Tier change — D-228 ───────────────────────────────────────────────────────
-  onTierChange(): void {
-    const currentTier = this.form.get('tier_classification')?.value;
-    this.showTierChangeWarning =
-      this.cycleHasGateRecords &&
-      currentTier !== '' &&
-      currentTier !== this.originalTier;
     this.cdr.markForCheck();
   }
 
@@ -1024,7 +987,6 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       cycle_title:         string;
       division_id:         string;
       outcome_statement:   string;
-      tier_classification: TierClassification;
       jira_epic_key:       string;
     };
 
@@ -1046,9 +1008,6 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
     const newWorkstreamId = this.selectedWorkstream?.workstream_id ?? null;
     if (newWorkstreamId !== (this.cycle.workstream_id ?? null)) {
       payload.workstream_id = newWorkstreamId;
-    }
-    if (v.tier_classification !== this.cycle.tier_classification) {
-      payload.tier_classification = v.tier_classification;
     }
     // DCS / EPO / DOL from picker state (no longer form controls).
     const newDcsId = this.selectedDcs?.id ?? null;
@@ -1201,7 +1160,6 @@ export class DeliveryCycleEditPanelComponent implements OnInit, OnDestroy, OnCha
       f['cycle_title']         !== this.cycle.cycle_title ||
       f['division_id']         !== this.cycle.division_id ||
       f['outcome_statement']   !== (this.cycle.outcome_statement   ?? '') ||
-      f['tier_classification'] !== this.cycle.tier_classification ||
       f['jira_epic_key']       !== (this.cycle.jira_epic_key       ?? '') ||
       (this.selectedWorkstream?.workstream_id ?? null) !== (this.cycle.workstream_id ?? null) ||
       (this.selectedDcs?.id ?? null) !== (this.cycle.assigned_dcs_user_id ?? null) ||

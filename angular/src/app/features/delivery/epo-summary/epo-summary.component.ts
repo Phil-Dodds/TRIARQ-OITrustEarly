@@ -248,7 +248,6 @@ interface EpoRowView {
         <div class="es-grid es-grid-header">
           <span>Initiative</span>
           <span>Stage</span>
-          <span>Tier</span>
         </div>
         <ng-container *ngIf="cycles.length > 0; else zoneEmpty">
           <div *ngFor="let c of cycles; trackBy: trackByCycleId"
@@ -256,7 +255,6 @@ interface EpoRowView {
                (click)="openCycle(c.delivery_cycle_id)">
             <span class="es-cycle-title">{{ c.cycle_title }}</span>
             <span class="es-meta">{{ c.current_lifecycle_stage }}</span>
-            <span class="es-meta">{{ tierLabel(c.tier_classification) }}</span>
           </div>
         </ng-container>
         <ng-template #zoneEmpty>
@@ -312,7 +310,7 @@ interface EpoRowView {
     .es-section { margin-top: var(--triarq-space-md); }
     .es-section-header { font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 4px; background: rgba(37,112,153,0.06); color: var(--triarq-color-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
     .es-section-amber { background: rgba(245,166,35,0.12); color: #b07000; }
-    .es-grid { display: grid; grid-template-columns: 3fr 1.2fr 1fr; gap: var(--triarq-space-sm); padding: 8px 12px; align-items: center; font-size: var(--triarq-text-small); }
+    .es-grid { display: grid; grid-template-columns: 3fr 1.2fr; gap: var(--triarq-space-sm); padding: 8px 12px; align-items: center; font-size: var(--triarq-text-small); }
     .es-grid-header { font-weight: 500; color: var(--triarq-color-text-secondary); border-bottom: 2px solid var(--triarq-color-border); }
     .es-grid-row { border-bottom: 1px solid var(--triarq-color-border); cursor: pointer; }
     .es-grid-row:hover { background: var(--triarq-color-background-subtle); }
@@ -531,10 +529,7 @@ export class EpoSummaryComponent implements OnInit, OnDestroy {
     return r.pre_build_exceeded || r.build_exceeded || r.post_deploy_exceeded;
   }
 
-  tierLabel(tier?: string | null): string {
-    if (!tier) return '—';
-    return tier.replace('tier_', 'Tier ');
-  }
+  // D-583 (Contract 39): tier meta line retired.
 
   // ── Expansion ─────────────────────────────────────────────────────────────
 
