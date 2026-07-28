@@ -228,21 +228,27 @@ async function upsert_initiative_sizing(params, caller_user_id) {
     }
   }
 
-  const row = {
-    delivery_cycle_id,
-    ...directValues,
-    ...subValues,
-    ...noteValues,
-    ...(existing
-      ? { updated_by_user_id: caller_user_id, updated_at: new Date().toISOString() }
-      : { answered_by_user_id: caller_user_id, answered_at: new Date().toISOString() })
-  };
-
-  const { data: saved, error: saveErr } = await supabase
-    .from('initiative_sizing')
-    .upsert(row, { onConflict: 'delivery_cycle_id' })
-    .select()
-    .single();
+  // Split UPDATE vs INSERT rather than a single write-or-conflict: Supabase's
+  // conflict-write issues INSERT ... ON CONFLICT DO UPDATE, so an edit (existing
+  // row) that omits the NOT NULL answered_by_user_id fails the INSERT clause
+  // before conflict resolution. A true UPDATE sets only the changed fields and
+  // preserves the original answerer's provenance; INSERT stamps it on first answer.
+  const answerFields = { ...directValues, ...subValues, ...noteValues };
+  let saved, saveErr;
+  if (existing) {
+    ({ data: saved, error: saveErr } = await supabase
+      .from('initiative_sizing')
+      .update({ ...answerFields, updated_by_user_id: caller_user_id, updated_at: new Date().toISOString() })
+      .eq('delivery_cycle_id', delivery_cycle_id)
+      .select()
+      .single());
+  } else {
+    ({ data: saved, error: saveErr } = await supabase
+      .from('initiative_sizing')
+      .insert({ delivery_cycle_id, ...answerFields, answered_by_user_id: caller_user_id, answered_at: new Date().toISOString() })
+      .select()
+      .single());
+  }
 
   if (saveErr) {
     return { success: false, error: `Failed to save sizing: ${saveErr.message}` };

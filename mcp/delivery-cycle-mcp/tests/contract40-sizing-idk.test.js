@@ -63,4 +63,14 @@ describe('WS2 (D-598): save-tool accepts idk on Q1/Q2/Q3 only', () => {
     assert.match(src, /q3_wrongness:\s*\[[^\]]*'idk'/);
     assert.doesNotMatch(src, /q5_ux:\s*\[[^\]]*'idk'/);
   });
+
+  // Regression (2026-07-28): editing an already-sized initiative failed with
+  // "null value in answered_by_user_id" because .upsert() issues INSERT ...
+  // ON CONFLICT and the edit branch omitted the NOT NULL answered_by. The save
+  // must branch UPDATE (existing) vs INSERT (new), never upsert.
+  test('sizing save branches update/insert — no upsert (answered_by NOT NULL trap)', () => {
+    assert.doesNotMatch(src, /\.upsert\(/, 'initiative_sizing save must not use .upsert()');
+    assert.match(src, /if \(existing\)[\s\S]*\.update\(/);
+    assert.match(src, /answered_by_user_id:\s*caller_user_id/);
+  });
 });
