@@ -24,7 +24,9 @@ import {
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { IonicModule }  from '@ionic/angular';
-import { DeliveryService } from '../../../core/services/delivery.service';
+import { DeliveryService, MyRaciEntry } from '../../../core/services/delivery.service';
+import { UserProfileService } from '../../../core/services/user-profile.service';
+import { RaciGlyphsComponent } from '../../../shared/components/raci-glyphs/raci-glyphs.component';
 import { DeliveryCycle, LifecycleStage, GateName, DateStatus } from '../../../core/types/database';
 
 // D-419 walkback chain — first gate with non-default status wins the row dot.
@@ -54,7 +56,7 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
   selector: 'app-my-delivery-cycles-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, IonicModule],
+  imports: [CommonModule, RouterModule, IonicModule, RaciGlyphsComponent],
   template: `
     <div class="oi-card oi-home-card">
       <div style="display:flex;align-items:center;justify-content:space-between;
@@ -106,6 +108,13 @@ const TERMINAL: LifecycleStage[] = ['COMPLETE', 'CANCELLED'];
             <span style="display:inline-block;width:9px;height:9px;border-radius:50%;flex-shrink:0;"
                   [style.background]="statusDotColor(cycle)"
                   [title]="statusDotLabel(cycle)"></span>
+            <!-- Contract 40 WS5 (D-599): RACI glyphs — the letters you hold. -->
+            <app-raci-glyphs style="flex-shrink:0;"
+              [raci]="raciByCycle.get(cycle.delivery_cycle_id)"
+              [deliveryCycleId]="cycle.delivery_cycle_id"
+              [busy]="followBusyId === cycle.delivery_cycle_id"
+              (toggleI)="toggleFollow(cycle.delivery_cycle_id)">
+            </app-raci-glyphs>
           </div>
 
         </div>
@@ -146,8 +155,14 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
 
   constructor(
     private readonly delivery: DeliveryService,
+    private readonly profile:  UserProfileService,
     private readonly cdr:      ChangeDetectorRef
   ) {}
+
+  // Contract 40 WS5 (D-599): RACI glyphs on the My Initiatives card.
+  raciByCycle = new Map<string, MyRaciEntry>();
+  followBusyId: string | null = null;
+  private myInformedByCycle = new Map<string, string>();
 
   ngOnInit(): void {
     this.delivery.listCycles({ assigned_to_current_user: true }).subscribe({
@@ -163,6 +178,7 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
           active.sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''));
           this.totalActive  = active.length;
           this.activeCycles = active.slice(0, this.MAX_SHOWN);
+          this.loadRaci();
         }
         this.loading = false;
         this.cdr.markForCheck();
@@ -171,6 +187,45 @@ export class MyDeliveryCyclesCardComponent implements OnInit {
         this.loading = false;
         this.cdr.markForCheck();
       }
+    });
+  }
+
+  private loadRaci(): void {
+    const ids = this.activeCycles.map(c => c.delivery_cycle_id);
+    if (ids.length === 0) { return; }
+    this.delivery.getMyRaci({ cycle_ids: ids }).subscribe({
+      next: (res) => {
+        this.raciByCycle.clear();
+        for (const [id, e] of Object.entries(res.data ?? {})) { this.raciByCycle.set(id, e as MyRaciEntry); }
+        this.cdr.markForCheck();
+      },
+      error: () => { /* glyphs degrade to hollow-i; non-blocking */ }
+    });
+    this.delivery.listMyParticipation().subscribe({
+      next: (res) => {
+        const me = this.profile.getCurrentProfile()?.id;
+        this.myInformedByCycle.clear();
+        for (const r of res.data?.participation_records ?? []) {
+          if (r.letter === 'I' && r.holder_user_id === me) { this.myInformedByCycle.set(r.delivery_cycle_id, r.record_id); }
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { /* non-blocking */ }
+    });
+  }
+
+  toggleFollow(cycleId: string): void {
+    const me = this.profile.getCurrentProfile()?.id;
+    if (!me || this.followBusyId) { return; }
+    this.followBusyId = cycleId;
+    this.cdr.markForCheck();
+    const existing = this.myInformedByCycle.get(cycleId);
+    const call = existing
+      ? this.delivery.removeParticipation({ record_id: existing })
+      : this.delivery.addParticipation({ delivery_cycle_id: cycleId, letter: 'I', holder_user_id: me, set_via: 'self' });
+    call.subscribe({
+      next: () => { this.followBusyId = null; this.loadRaci(); },
+      error: () => { this.followBusyId = null; this.cdr.markForCheck(); }
     });
   }
 

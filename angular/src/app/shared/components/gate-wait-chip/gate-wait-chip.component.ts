@@ -21,7 +21,7 @@ export interface GateWaitState {
   line: string;
   days_waiting: number;
   open_condition_count?: number;
-  gate_name?: GateName;
+  gate_name?: GateName | string;
 }
 
 @Component({

@@ -49,6 +49,8 @@ import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { StageTrackComponent }  from '../stage-track/stage-track.component';
 import { GateWaitChipComponent } from '../../../shared/components/gate-wait-chip/gate-wait-chip.component';
+import { RaciGlyphsComponent } from '../../../shared/components/raci-glyphs/raci-glyphs.component';
+import { MyRaciEntry } from '../../../core/services/delivery.service';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 // D-290: Create Cycle form moved to right panel component. Source: D-290.
@@ -108,7 +110,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, FormsModule, IonicModule, StageTrackComponent, GateWaitChipComponent, LoadingOverlayComponent, DeliveryCycleDetailComponent, DeliveryCycleCreatePanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, IonicModule, StageTrackComponent, GateWaitChipComponent, RaciGlyphsComponent, LoadingOverlayComponent, DeliveryCycleDetailComponent, DeliveryCycleCreatePanelComponent],
   template: `
     <!-- S-006: flex container — grid left, detail panel right when cycle selected -->
     <div style="display:flex;align-items:flex-start;min-height:100%;">
@@ -760,18 +762,18 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
           <!-- Col 2: Cycle Name — 3-line clamp + Tier badge. CC-Decision-2026-04-12-A: Contract 5 restores Tier badge (D-264 overridden). -->
           <div>
-            <!-- Post-GEnd correction (Phil 2026-07-24): one-tap Follow star on
-                 the row — D-564's patrol gesture without opening the panel.
-                 stopPropagation keeps the row's open-panel tap intact. -->
-            <button type="button"
-                    (click)="$event.stopPropagation(); toggleFollow(cycle)"
-                    [disabled]="followBusyId === cycle.delivery_cycle_id"
-                    [title]="isFollowing(cycle) ? 'Following (Informed) — tap to stop' : 'Follow this Initiative (Informed)'"
-                    [style.color]="isFollowing(cycle) ? '#F2A620' : '#B9C4CE'"
-                    style="float:right;background:none;border:none;cursor:pointer;
-                           font-size:16px;line-height:1;padding:0 0 0 6px;">
-              {{ isFollowing(cycle) ? '★' : '☆' }}
-            </button>
+            <!-- Contract 40 WS5 (D-599): RACI glyphs — only the letters the
+                 caller holds (R,A,C,I order); the hollow-i is the ever-present
+                 follow affordance, replacing the old standalone star. The
+                 I glyph toggles Following (D-564 patrol gesture). -->
+            <span style="float:right;padding-left:6px;">
+              <app-raci-glyphs
+                [raci]="raciByCycle.get(cycle.delivery_cycle_id)"
+                [deliveryCycleId]="cycle.delivery_cycle_id"
+                [busy]="followBusyId === cycle.delivery_cycle_id"
+                (toggleI)="toggleFollow(cycle)">
+              </app-raci-glyphs>
+            </span>
             <!-- D-488: "[Theme] · [Name]" prefix when a Roadmap Theme is set. -->
             <div style="font-size:14px;font-weight:600;color:#1E1E1E;
                         display:-webkit-box;-webkit-line-clamp:3;
@@ -1703,6 +1705,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
           this.cycles    = Array.isArray(res.data) ? res.data : [];
           this.loadError = '';
           this.applyFilters();
+          this.loadMyRaci();   // Contract 40 WS5 (D-599): glyphs for the loaded set
         } else {
           this.loadError = res.error ?? 'Initiatives could not be loaded.';
         }
@@ -1823,6 +1826,25 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   private myInformedByCycle = new Map<string, string>();
   followBusyId: string | null = null;
 
+  // Contract 40 WS5 (D-599): per-initiative RACI letters the caller holds.
+  raciByCycle = new Map<string, MyRaciEntry>();
+
+  /** Load the caller's RACI letters for the currently loaded cycles. */
+  loadMyRaci(): void {
+    const ids = this.cycles.map(c => c.delivery_cycle_id);
+    if (ids.length === 0) { this.raciByCycle.clear(); return; }
+    this.delivery.getMyRaci({ cycle_ids: ids }).subscribe({
+      next: (res) => {
+        this.raciByCycle.clear();
+        for (const [id, entry] of Object.entries(res.data ?? {})) {
+          this.raciByCycle.set(id, entry as MyRaciEntry);
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { /* glyphs degrade to the hollow-i default; non-blocking */ }
+    });
+  }
+
   isFollowing(cycle: DeliveryCycle): boolean {
     return this.myInformedByCycle.has(cycle.delivery_cycle_id);
   }
@@ -1861,7 +1883,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
           set_via: 'self'
         });
     call.subscribe({
-      next: () => { this.followBusyId = null; this.loadMyFollowing(); },
+      next: () => { this.followBusyId = null; this.loadMyFollowing(); this.loadMyRaci(); },
       error: () => { this.followBusyId = null; this.cdr.markForCheck(); }
     });
   }

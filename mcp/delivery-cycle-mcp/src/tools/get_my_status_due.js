@@ -15,7 +15,8 @@ const CADENCE_LABEL = { weekly: 'Weekly', triweekly: 'Triweekly', monthly: 'Mont
 async function get_my_status_due(_params, caller_user_id) {
   const { data: cycles, error } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, division_id, status_due_at, latest_status_update_id')
+    // Contract 40 WS4/WS6 (D-587/D-588): level + trio for waiting-on rollup.
+    .select('delivery_cycle_id, cycle_title, division_id, status_due_at, latest_status_update_id, baseline_level, set_level, oversight_user_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
     .is('deleted_at', null)
     .eq('status_overdue', true)
     .not('current_lifecycle_stage', 'in', '(COMPLETE,CANCELLED)')
@@ -26,6 +27,27 @@ async function get_my_status_due(_params, caller_user_id) {
   }
   if (!cycles || cycles.length === 0) {
     return { success: true, data: [] };
+  }
+
+  // ── Contract 40 WS4/WS6 (D-587/D-588): Gate Wait Chip + attention sort data.
+  // waiting_on for the awaiting gate; has_returned_gate for the attention set.
+  const { computeWaitingOnBatch } = require('../lib/waiting-on');
+  const statusCycleIds = cycles.map(c => c.delivery_cycle_id);
+  const { data: statusGateRows } = await supabase
+    .from('gate_records')
+    .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, approver_user_id, submitted_at')
+    .in('delivery_cycle_id', statusCycleIds)
+    .is('deleted_at', null);
+  const cyclesByIdForWaiting = {};
+  for (const c of cycles) { cyclesByIdForWaiting[c.delivery_cycle_id] = c; }
+  const waitingOnByGate = await computeWaitingOnBatch(statusGateRows || [], cyclesByIdForWaiting);
+  const waitingOnByCycle = {};
+  const returnedByCycle  = {};
+  for (const g of (statusGateRows || [])) {
+    if (waitingOnByGate[g.gate_record_id] && !waitingOnByCycle[g.delivery_cycle_id]) {
+      waitingOnByCycle[g.delivery_cycle_id] = { ...waitingOnByGate[g.gate_record_id], gate_name: g.gate_name };
+    }
+    if (g.gate_status === 'returned') { returnedByCycle[g.delivery_cycle_id] = true; }
   }
 
   // Division names.
@@ -60,7 +82,10 @@ async function get_my_status_due(_params, caller_user_id) {
     division_name:  divisionName[c.division_id] || null,
     last_saved_at:  c.latest_status_update_id ? (savedAtById[c.latest_status_update_id] || null) : null,
     cadence:        cadenceByDivision[c.division_id] || null,
-    status_due_at:  c.status_due_at
+    status_due_at:  c.status_due_at,
+    // Contract 40 WS4/WS6: Gate Wait Chip state + attention-sort inputs.
+    waiting_on:        waitingOnByCycle[c.delivery_cycle_id] ?? null,
+    has_returned_gate: returnedByCycle[c.delivery_cycle_id] === true
   }));
 
   return { success: true, data };

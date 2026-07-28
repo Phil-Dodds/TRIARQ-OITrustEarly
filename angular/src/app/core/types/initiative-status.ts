@@ -103,6 +103,12 @@ export interface MyStatusDueRow {
   last_saved_at: string | null;
   cadence:       string | null;
   status_due_at: string | null;
+  // Contract 40 WS4/WS6 (D-587/D-588): Gate Wait Chip state + attention sort.
+  waiting_on?: {
+    state: string; line: string; days_waiting: number;
+    open_condition_count?: number; gate_name?: string;
+  } | null;
+  has_returned_gate?: boolean;
 }
 
 export interface MyAcknowledgmentDueRow {

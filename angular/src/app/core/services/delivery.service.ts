@@ -817,6 +817,14 @@ export class DeliveryService {
     );
   }
 
+  /** Contract 40 WS5 (D-599): per-initiative RACI letters the caller holds. */
+  getMyRaci(params: { cycle_ids: string[] }):
+    Observable<McpResponse<Record<string, MyRaciEntry>>> {
+    return this.mcp.call<Record<string, MyRaciEntry>>(
+      'delivery', 'get_my_raci', params as unknown as Record<string, unknown>
+    );
+  }
+
   addParticipation(params: {
     delivery_cycle_id: string;
     letter:            'C' | 'I';
@@ -1061,6 +1069,16 @@ export interface AllPendingGateRow {
 }
 
 // ── Contract G3 payload shapes ────────────────────────────────────────────────
+/** Contract 40 WS5 (D-599): the caller's RACI letters on one initiative. */
+export interface MyRaciEntry {
+  r: boolean;
+  a: boolean;
+  c: boolean;
+  i: boolean;
+  c_provisional: boolean;
+  a_gate_name: GateName | null;
+}
+
 export interface SizingAnswers {
   // Contract 40 WS2 (D-598): 'idk' is a first-class answer on Q1/Q2/Q3.
   q1_investment:      'small' | 'medium' | 'large' | 'xlarge' | 'idk';

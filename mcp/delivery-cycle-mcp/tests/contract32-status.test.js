@@ -347,6 +347,7 @@ describe('get_my_status_due', () => {
   test('happy — overdue Initiatives with cadence + last saved', async () => {
     queue = [
       { data: [{ delivery_cycle_id: CYC, cycle_title: 'Alpha', division_id: 'div', status_due_at: '2026-07-01T00:00:00Z', latest_status_update_id: UPD }], error: null }, // cycles
+      { data: [], error: null },                                                             // Contract 40 WS4/WS6: gate_records (no awaiting → no waiting-on sub-queries)
       { data: [{ id: 'div', division_name: 'Cardiology' }], error: null },                 // divisions
       { data: { cadence: 'weekly' }, error: null },                                          // rpc cadence
       { data: [{ id: UPD, saved_at: '2026-06-20T00:00:00Z' }], error: null }                 // updates

@@ -28,6 +28,7 @@ const { create_delivery_cycle }          = require('./tools/create_delivery_cycl
 const { update_delivery_cycle }          = require('./tools/update_delivery_cycle');
 const { get_delivery_cycle }             = require('./tools/get_delivery_cycle');
 const { list_delivery_cycles }           = require('./tools/list_delivery_cycles');
+const { get_my_raci }                    = require('./tools/get_my_raci');
 const { advance_cycle_stage }            = require('./tools/advance_cycle_stage');
 const { reverse_cycle_stage }            = require('./tools/reverse_cycle_stage');
 const { set_cycle_on_hold }              = require('./tools/set_cycle_on_hold');
@@ -153,6 +154,7 @@ const TOOLS = {
   update_delivery_cycle,
   get_delivery_cycle,
   list_delivery_cycles,
+  get_my_raci,
   advance_cycle_stage,
   reverse_cycle_stage,
   set_cycle_on_hold,

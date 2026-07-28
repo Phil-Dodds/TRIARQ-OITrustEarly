@@ -24,6 +24,10 @@ import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-s
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 import { InitiativeStatusUpdatePanelComponent } from '../status-panel/initiative-status-update-panel.component';
 import { MyStatusDueRow, MyAcknowledgmentDueRow } from '../../../core/types/initiative-status';
+import { GateWaitChipComponent } from '../../../shared/components/gate-wait-chip/gate-wait-chip.component';
+import { RaciGlyphsComponent } from '../../../shared/components/raci-glyphs/raci-glyphs.component';
+import { MyRaciEntry } from '../../../core/services/delivery.service';
+import { UserProfileService } from '../../../core/services/user-profile.service';
 
 type DueSort = 'initiative' | 'division' | 'last_update' | 'cadence' | 'next_meeting';
 type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
@@ -32,7 +36,7 @@ type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
   selector: 'app-my-initiative-status',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, IonicModule, DeliveryCycleDetailComponent, InitiativeStatusUpdatePanelComponent],
+  imports: [CommonModule, IonicModule, DeliveryCycleDetailComponent, InitiativeStatusUpdatePanelComponent, GateWaitChipComponent, RaciGlyphsComponent],
   template: `
     <!-- Refresh strip — only while a status tab is visible. -->
     <div *ngIf="visibleTab" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-bottom:8px;">
@@ -65,16 +69,31 @@ type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
               <th (click)="sortDue('last_update')">Last Update {{ dueArrow('last_update') }}</th>
               <th (click)="sortDue('cadence')">Cadence {{ dueArrow('cadence') }}</th>
               <th (click)="sortDue('next_meeting')">Next Meeting {{ dueArrow('next_meeting') }}</th>
+              <!-- Contract 40 WS4/WS5/WS6: governance state + your RACI letters. -->
+              <th>Governance</th>
               <th>Update Status</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let r of dueRowsSorted">
+            <tr *ngFor="let r of dueRowsSorted" [class.mis-attention]="isAttentionRow(r)">
               <td><a class="mis-link" (click)="openDetail(r.initiative_id)">{{ r.cycle_title }}</a></td>
               <td>{{ r.division_name || '—' }}</td>
               <td>{{ r.last_saved_at ? formatDateTime(r.last_saved_at) : 'Never' }}</td>
               <td>{{ r.cadence || '—' }}</td>
               <td>{{ nextMeeting(r.status_due_at) }}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <app-gate-wait-chip *ngIf="r.waiting_on"
+                    [waitingOn]="r.waiting_on" [deliveryCycleId]="r.initiative_id" returnTo="actions">
+                  </app-gate-wait-chip>
+                  <app-raci-glyphs
+                    [raci]="raciByCycle.get(r.initiative_id)"
+                    [deliveryCycleId]="r.initiative_id"
+                    [busy]="followBusyId === r.initiative_id"
+                    (toggleI)="toggleFollow(r.initiative_id)">
+                  </app-raci-glyphs>
+                </div>
+              </td>
               <td><button class="oi-btn-secondary mis-sm" (click)="openUpdate(r.initiative_id, r.cycle_title)">Update Status…</button></td>
             </tr>
           </tbody>
@@ -146,6 +165,8 @@ type AckSort = 'initiative' | 'division' | 'updated_by' | 'updated_at';
                     cursor:pointer; user-select:none; color:var(--triarq-color-text-secondary); font-weight:500; }
     .mis-table td { padding:8px; border-bottom:1px solid var(--triarq-color-fog,#f4f4f4); }
     .mis-link { color:var(--triarq-color-primary,#257099); cursor:pointer; }
+    /* WS6 (D-588): attention rows — D-200 Pattern 2 amber band, sorted to top. */
+    .mis-attention td { background: rgba(242,166,32,0.08); box-shadow: inset 3px 0 0 #F2A620; }
     .mis-sm { font-size:11px; padding:3px 8px; }
     .mis-empty { padding:16px; color:#5A5A5A; font-style:italic; }
     .mis-foot { padding:8px; font-size:12px; color:var(--triarq-color-text-secondary); }
@@ -179,8 +200,59 @@ export class MyInitiativeStatusComponent implements OnInit {
   constructor(
     private readonly delivery:    DeliveryService,
     private readonly screenState: ScreenStateService,
+    private readonly profile:     UserProfileService,
     private readonly cdr:         ChangeDetectorRef
   ) {}
+
+  // Contract 40 WS5/WS6 (D-599): RACI glyphs on the Updates Due rows.
+  raciByCycle = new Map<string, MyRaciEntry>();
+  followBusyId: string | null = null;
+  private myInformedByCycle = new Map<string, string>();
+
+  private loadDueRaci(): void {
+    const ids = this.dueRows.map(r => r.initiative_id);
+    if (ids.length === 0) { this.raciByCycle.clear(); return; }
+    this.delivery.getMyRaci({ cycle_ids: ids }).subscribe({
+      next: (res) => {
+        this.raciByCycle.clear();
+        for (const [id, e] of Object.entries(res.data ?? {})) { this.raciByCycle.set(id, e as MyRaciEntry); }
+        this.cdr.markForCheck();
+      },
+      error: () => { /* glyphs degrade to hollow-i; non-blocking */ }
+    });
+    this.delivery.listMyParticipation().subscribe({
+      next: (res) => {
+        const me = this.profile.getCurrentProfile()?.id;
+        this.myInformedByCycle.clear();
+        for (const r of res.data?.participation_records ?? []) {
+          if (r.letter === 'I' && r.holder_user_id === me) { this.myInformedByCycle.set(r.delivery_cycle_id, r.record_id); }
+        }
+        this.cdr.markForCheck();
+      },
+      error: () => { /* non-blocking */ }
+    });
+  }
+
+  /** WS5: toggle the Informed self-stake from the row glyph. */
+  toggleFollow(cycleId: string): void {
+    const me = this.profile.getCurrentProfile()?.id;
+    if (!me || this.followBusyId) { return; }
+    this.followBusyId = cycleId;
+    this.cdr.markForCheck();
+    const existing = this.myInformedByCycle.get(cycleId);
+    const call = existing
+      ? this.delivery.removeParticipation({ record_id: existing })
+      : this.delivery.addParticipation({ delivery_cycle_id: cycleId, letter: 'I', holder_user_id: me, set_via: 'self' });
+    call.subscribe({
+      next: () => { this.followBusyId = null; this.loadDueRaci(); },
+      error: () => { this.followBusyId = null; this.cdr.markForCheck(); }
+    });
+  }
+
+  /** WS6 (D-588): a row demands attention when it has open conditions or a returned gate. */
+  isAttentionRow(r: MyStatusDueRow): boolean {
+    return r.waiting_on?.state === 'condition_open' || r.has_returned_gate === true;
+  }
 
   ngOnInit(): void {
     this.screenState.restore(SCREEN_KEYS.MY_INITIATIVE_STATUS_DUE).then(s => {
@@ -211,7 +283,7 @@ export class MyInitiativeStatusComponent implements OnInit {
       }
     };
     this.delivery.getMyStatusDue().subscribe({
-      next: (res) => { this.dueRows = (res.success && res.data) ? res.data : []; done(); },
+      next: (res) => { this.dueRows = (res.success && res.data) ? res.data : []; this.loadDueRaci(); done(); },
       error: () => { this.dueRows = []; done(); }
     });
     this.delivery.getMyAcknowledgmentsDue().subscribe({
@@ -277,7 +349,13 @@ export class MyInitiativeStatusComponent implements OnInit {
         case 'next_meeting': return r.status_due_at || '';
       }
     };
-    return [...this.dueRows].sort((a, b) => key(a).localeCompare(key(b)) * dir);
+    // Contract 40 WS6 (D-588): attention rows (open conditions OR returned gate)
+    // sort to the top regardless of the column sort; the rest follow in order.
+    return [...this.dueRows].sort((a, b) => {
+      const aa = this.isAttentionRow(a), ab = this.isAttentionRow(b);
+      if (aa !== ab) { return aa ? -1 : 1; }
+      return key(a).localeCompare(key(b)) * dir;
+    });
   }
 
   get ackRowsSorted(): MyAcknowledgmentDueRow[] {
