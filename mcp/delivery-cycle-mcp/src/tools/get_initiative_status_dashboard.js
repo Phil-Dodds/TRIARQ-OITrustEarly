@@ -49,7 +49,7 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
 
   let query = supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, division_id, current_lifecycle_stage, status_overdue, latest_status_update_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
+    .select('delivery_cycle_id, cycle_title, division_id, current_lifecycle_stage, status_overdue, latest_status_update_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id, baseline_level, set_level')
     .is('deleted_at', null)
     .not('current_lifecycle_stage', 'in', '(COMPLETE,CANCELLED)');
   if (scopeIds) { query = query.in('division_id', scopeIds); }
@@ -115,7 +115,9 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
   // the next gate (awaiting_approval → chip on the dashboard).
   const { data: gateRows } = await supabase
     .from('gate_records')
-    .select('delivery_cycle_id, gate_name, gate_status')
+    // Contract 40 WS4 (D-587): gate_record_id/approver/submitted_at feed the
+    // Gate Wait Chip's waiting-on computation.
+    .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, approver_user_id, submitted_at')
     .in('delivery_cycle_id', cycles.map(c => c.delivery_cycle_id))
     .is('deleted_at', null);
   const gateStatusByCycle = {};
@@ -123,6 +125,18 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
   for (const g of (gateRows || [])) {
     (gateStatusByCycle[g.delivery_cycle_id] = gateStatusByCycle[g.delivery_cycle_id] || {})[g.gate_name] = g.gate_status;
     (gateRowsByCycle[g.delivery_cycle_id] = gateRowsByCycle[g.delivery_cycle_id] || []).push(g);
+  }
+
+  // ── Contract 40 WS4 (D-587): waiting-on rollup for the Gate Wait Chip ──────
+  const { computeWaitingOnBatch } = require('../lib/waiting-on');
+  const cyclesByIdForWaiting = {};
+  for (const c of cycles) { cyclesByIdForWaiting[c.delivery_cycle_id] = c; }
+  const waitingOnByGate = await computeWaitingOnBatch(gateRows || [], cyclesByIdForWaiting);
+  const waitingOnByCycle = {};
+  for (const g of (gateRows || [])) {
+    if (waitingOnByGate[g.gate_record_id] && !waitingOnByCycle[g.delivery_cycle_id]) {
+      waitingOnByCycle[g.delivery_cycle_id] = { ...waitingOnByGate[g.gate_record_id], gate_name: g.gate_name };
+    }
   }
 
   // ── CC-38 f25 (N+1 fix): batch what computeNeedsReviewReasons used to
@@ -190,6 +204,8 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
       next_gate_pending_approval: nextGate
         ? (gateStatusByCycle[c.delivery_cycle_id]?.[nextGate.gate_name] === 'awaiting_approval')
         : false,
+      // Contract 40 WS4 (D-587): Gate Wait Chip state (null when nothing awaiting).
+      waiting_on:              waitingOnByCycle[c.delivery_cycle_id] ?? null,
       // D-510: Team column — same fields the Initiatives Grid renders
       assigned_dcs_user_id:    c.assigned_dcs_user_id,
       assigned_epo_user_id:    c.assigned_epo_user_id,

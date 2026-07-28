@@ -88,13 +88,16 @@ async function computeWaitingOnBatch(gateRecords, cyclesById) {
         result[g.gate_record_id] = {
           state: 'condition_open',
           line:  `Waiting on: consultation (condition) — ${who}`,
-          days_waiting: days
+          days_waiting: days,
+          // Contract 40 WS4 (D-587): count drives the Gate Wait Chip "N open conditions".
+          open_condition_count: openConditions.length
         };
       } else {
         result[g.gate_record_id] = {
           state: 'condition_open',
           line:  `Waiting on: ${openConditions.length} open condition${openConditions.length === 1 ? '' : 's'}`,
-          days_waiting: days
+          days_waiting: days,
+          open_condition_count: openConditions.length
         };
       }
       continue;

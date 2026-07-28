@@ -350,6 +350,125 @@ async function list_pending_approvals(_params, caller_user_id) {
     }
   }
 
+  // ── Contract 40 WS3 (D-590): open_conditions rows ────────────────────────
+  // A gate with ≥1 open condition surfaces an actionable row to every party who
+  // must act: the initiative trio (DCS/EPO/DOL) plus any party named by a
+  // consultation_required condition on that gate. The trio does the work and
+  // signals via the thread; the setter/approver/Admin still resolve (D-591).
+  // Rows clear when the last condition on the gate closes (resolved/withdrawn).
+  // Build C scale — no pagination; conditions are rare.
+  {
+    const { data: openConds } = await supabase
+      .from('gate_conditions')
+      .select('condition_id, gate_record_id, condition_type, target_consultation_id')
+      .eq('condition_status', 'open');
+
+    if (openConds && openConds.length > 0) {
+      // Group open conditions by gate: count + the consultation targets.
+      const byGate = {};
+      for (const cnd of openConds) {
+        const g = byGate[cnd.gate_record_id] || { count: 0, consultationTargets: [] };
+        g.count++;
+        if (cnd.condition_type === 'consultation_required' && cnd.target_consultation_id) {
+          g.consultationTargets.push(cnd.target_consultation_id);
+        }
+        byGate[cnd.gate_record_id] = g;
+      }
+      const condGateIds = Object.keys(byGate);
+
+      // Load the affected gate records (open conditions live on awaiting or
+      // returned gates) and their cycles for trio routing + display.
+      const { data: condGates } = await supabase
+        .from('gate_records')
+        .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, submitted_at')
+        .in('gate_record_id', condGateIds)
+        .is('deleted_at', null);
+
+      const condCycleIds = [...new Set((condGates || []).map(g => g.delivery_cycle_id))];
+      const condCycleMap = {};
+      if (condCycleIds.length > 0) {
+        const { data: condCycles } = await supabase
+          .from('delivery_cycles')
+          .select('delivery_cycle_id, cycle_title, division_id, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
+          .in('delivery_cycle_id', condCycleIds)
+          .is('deleted_at', null);
+        (condCycles || []).forEach(c => { condCycleMap[c.delivery_cycle_id] = c; });
+      }
+
+      // Resolve consultation targets → consulted_user_id, so a consultation_required
+      // condition routes its named party too.
+      const allTargets = [...new Set(
+        Object.values(byGate).flatMap(g => g.consultationTargets)
+      )];
+      const consultUserByTarget = {};
+      if (allTargets.length > 0) {
+        const { data: targetRows } = await supabase
+          .from('gate_consultations')
+          .select('id, consulted_user_id')
+          .in('id', allTargets);
+        (targetRows || []).forEach(r => { consultUserByTarget[r.id] = r.consulted_user_id; });
+      }
+
+      // Resolve division short names + cycle titles need division lookup.
+      const condDivisionIds = [...new Set(
+        Object.values(condCycleMap).map(c => c.division_id).filter(Boolean)
+      )];
+      const condDivisionMap = {};
+      if (condDivisionIds.length > 0) {
+        const { data: condDivs } = await supabase
+          .from('divisions')
+          .select('id, division_name, display_name_short')
+          .in('id', condDivisionIds)
+          .is('deleted_at', null);
+        (condDivs || []).forEach(d => { condDivisionMap[d.id] = d; });
+      }
+
+      const nowMs = Date.now();
+      for (const g of condGates || []) {
+        const c = condCycleMap[g.delivery_cycle_id];
+        if (!c) { continue; }   // soft-deleted initiative — no ghost row
+        const info = byGate[g.gate_record_id];
+        const isTrio = [c.assigned_dcs_user_id, c.assigned_epo_user_id, c.assigned_dol_user_id]
+          .includes(caller_user_id);
+        const isConsultationParty = info.consultationTargets
+          .some(t => consultUserByTarget[t] === caller_user_id);
+        if (!isTrio && !isConsultationParty) { continue; }   // caller not routed
+
+        const d = condDivisionMap[c.division_id] || {};
+        const daysWaiting = g.submitted_at
+          ? Math.floor((nowMs - Date.parse(g.submitted_at)) / 86400000)
+          : 0;
+        items.push({
+          gate_record_id:                g.gate_record_id,
+          delivery_cycle_id:             g.delivery_cycle_id,
+          cycle_title:                   c.cycle_title || '',
+          division_display_name_short:   d.display_name_short || d.division_name || '',
+          workstream_display_name_short: '',
+          gate_name:                     g.gate_name,
+          gate_name_display:             GATE_NAME_DISPLAY[g.gate_name] || g.gate_name,
+          gate_status:                   g.gate_status,
+          item_type:                     'open_conditions',
+          submitted_at:                  g.submitted_at,
+          submitted_by_display_name:     '',
+          approver_display_name:         null,
+          approver_decision_at:          null,
+          created_at:                    g.submitted_at,
+          gate_target_date:              null,
+          submission_note:               null,
+          // WS3 columns: # open conditions + days waiting.
+          open_condition_count:          info.count,
+          days_waiting:                  daysWaiting,
+          assigned_dcs_user_id:          c.assigned_dcs_user_id ?? null,
+          assigned_epo_user_id:          c.assigned_epo_user_id ?? null,
+          assigned_dol_user_id:          c.assigned_dol_user_id ?? null,
+          assigned_dcs_display_name:     null,
+          assigned_epo_display_name:     null,
+          assigned_dol_display_name:     null
+        });
+      }
+    }
+  }
+
   // Newest-submitted first.
   items.sort((a, b) => {
     const ta = a.submitted_at ? Date.parse(a.submitted_at) : 0;

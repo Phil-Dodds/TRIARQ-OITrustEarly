@@ -48,6 +48,7 @@ import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
 import { StageTrackComponent }  from '../stage-track/stage-track.component';
+import { GateWaitChipComponent } from '../../../shared/components/gate-wait-chip/gate-wait-chip.component';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 // D-290: Create Cycle form moved to right panel component. Source: D-290.
@@ -107,7 +108,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, FormsModule, IonicModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleDetailComponent, DeliveryCycleCreatePanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, IonicModule, StageTrackComponent, GateWaitChipComponent, LoadingOverlayComponent, DeliveryCycleDetailComponent, DeliveryCycleCreatePanelComponent],
   template: `
     <!-- S-006: flex container — grid left, detail panel right when cycle selected -->
     <div style="display:flex;align-items:flex-start;min-height:100%;">
@@ -845,6 +846,13 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                 {{ digest }}<span style="opacity:0.6;"> · {{ statusDigestAge(cycle) }}{{ statusDigestAsOf(cycle) }}</span>
               </div>
             </div>
+            <!-- Contract 40 WS4 (D-587): Gate Wait Chip — waiting-on substance. -->
+            <app-gate-wait-chip *ngIf="cycle.waiting_on"
+              style="display:inline-block;margin-top:4px;"
+              [waitingOn]="cycle.waiting_on"
+              [deliveryCycleId]="cycle.delivery_cycle_id"
+              returnTo="initiatives">
+            </app-gate-wait-chip>
           </div>
 
           <!-- Col 6: Team — EPO / Workstream / DCS / DOL stacked chips. D-265, D-389/D-390/D-391: null values collapse.

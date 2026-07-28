@@ -349,7 +349,12 @@ export interface DeliveryCycle {
   oversight_set_via?:        'default' | 'manual' | null;
   oversight_set_by_user_id?: string | null;
   // Contract G7: rolled-up waiting-on line (list rows; null = nothing awaiting).
-  waiting_on?:               { state: string; line: string; days_waiting: number } | null;
+  // Contract 40 WS4 (D-587): the Gate Wait Chip reads state + open_condition_count
+  // + days_waiting; gate_name deep-links to the awaiting gate (D-345 auto-expand).
+  waiting_on?:               {
+    state: string; line: string; days_waiting: number;
+    open_condition_count?: number; gate_name?: GateName;
+  } | null;
   // Contract G9: sizing row joined by list_delivery_cycles (interest filters).
   sizing?:                   InitiativeSizing | null;
   // Contract GA-1 (D-579): per-gate best-practices link config (null = hidden).
@@ -656,7 +661,13 @@ export interface PendingApprovalItem {
   gate_status:                   GateStatus;
   // Contract G10 (D-566): 'cancel_request' rows route a trio cancel request
   // to the authority's queue; resolution happens on the Initiative panel.
-  item_type:                     'accountable' | 'consulted' | 'trio_member_approval' | 'cancel_request';
+  // Contract 40 WS3 (D-590): 'open_conditions' rows route a gate's open
+  // conditions to the trio + consultation_required parties (a distinct tab,
+  // never mixed into the approvals list).
+  item_type:                     'accountable' | 'consulted' | 'trio_member_approval' | 'cancel_request' | 'open_conditions';
+  // Contract 40 WS3 (D-590): open_conditions row columns.
+  open_condition_count?:         number;
+  days_waiting?:                 number;
   // Contract G7 (D-565 item 4): the single waiting-on line for queue rollups.
   waiting_on?:                   { state: string; line: string; days_waiting: number };
   submitted_at:                  string;

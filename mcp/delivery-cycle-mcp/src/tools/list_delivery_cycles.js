@@ -316,7 +316,9 @@ async function list_delivery_cycles(params, caller_user_id) {
   const waitingOnByCycle = {};
   for (const g of allGateRows) {
     if (waitingOnByGate[g.gate_record_id] && !waitingOnByCycle[g.delivery_cycle_id]) {
-      waitingOnByCycle[g.delivery_cycle_id] = waitingOnByGate[g.gate_record_id];
+      // Contract 40 WS4 (D-587): carry the awaiting gate_name so the Gate Wait
+      // Chip can deep-link to that gate (auto-expand, D-345).
+      waitingOnByCycle[g.delivery_cycle_id] = { ...waitingOnByGate[g.gate_record_id], gate_name: g.gate_name };
     }
   }
 

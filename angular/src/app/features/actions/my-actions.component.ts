@@ -22,16 +22,17 @@ import { DeliveryService }      from '../../core/services/delivery.service';
 import { PendingApprovalItem, CompletedActionItem } from '../../core/types/database';
 import { ActionsListComponent }          from './actions-list.component';
 import { CompletedActionsListComponent } from './completed-actions-list.component';
+import { GateConditionsListComponent }   from './gate-conditions-list.component';
 import { MyInitiativeStatusComponent }   from '../delivery/my-initiative-status/my-initiative-status.component';
 import { EggSpotComponent }              from '../easter-eggs/egg-spot.component';
 import { EGG_KEYS }                      from '../../core/constants/easter-egg.constants';
 
-type ActiveTab = 'open' | 'completed' | 'due' | 'ack';
+type ActiveTab = 'open' | 'completed' | 'due' | 'ack' | 'conditions';
 
 @Component({
   selector:        'app-my-actions',
   standalone:      true,
-  imports:         [CommonModule, ActionsListComponent, CompletedActionsListComponent, MyInitiativeStatusComponent, EggSpotComponent],
+  imports:         [CommonModule, ActionsListComponent, CompletedActionsListComponent, GateConditionsListComponent, MyInitiativeStatusComponent, EggSpotComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="ma-page">
@@ -49,6 +50,15 @@ type ActiveTab = 'open' | 'completed' | 'due' | 'ack';
                 (click)="selectTab('open')">
           Approve Initiative Gates
           <span *ngIf="openCount > 0" class="ma-tab-badge">{{ openCount }}</span>
+        </button>
+        <!-- Contract 40 WS3 (D-590): a verb-first tab for gate conditions the
+             caller must address. Approvals-only stays in the first tab. -->
+        <button class="ma-tab" role="tab"
+                [class.ma-tab--active]="activeTab === 'conditions'"
+                [attr.aria-selected]="activeTab === 'conditions'"
+                (click)="selectTab('conditions')">
+          Address Gate Conditions
+          <span *ngIf="conditionCount > 0" class="ma-tab-badge">{{ conditionCount }}</span>
         </button>
         <button class="ma-tab" role="tab"
                 [class.ma-tab--active]="activeTab === 'due'"
@@ -80,6 +90,8 @@ type ActiveTab = 'open' | 'completed' | 'due' | 'ack';
         [items]="openItems" [loading]="loadingOpen"></app-actions-list>
       <app-completed-actions-list *ngIf="activeTab === 'completed'"
         [items]="completedItems" [loading]="loadingCompleted"></app-completed-actions-list>
+      <app-gate-conditions-list *ngIf="activeTab === 'conditions'"
+        [items]="conditionItems" [loading]="loadingOpen"></app-gate-conditions-list>
 
       <!-- Always mounted so its counts populate the Updates Due / Needs
            Acknowledgment badges even before those tabs are opened; the grid
@@ -129,6 +141,9 @@ export class MyActionsComponent implements OnInit {
   loadingCompleted = true;
   openItems: PendingApprovalItem[] = [];
   completedItems: CompletedActionItem[] = [];
+  // Contract 40 WS3 (D-590): open_conditions rows live in their own tab, never
+  // in the approvals list.
+  conditionItems: PendingApprovalItem[] = [];
 
   // Counts emitted by the embedded status component (D-484).
   dueCount = 0;
@@ -141,8 +156,11 @@ export class MyActionsComponent implements OnInit {
     private readonly cdr:      ChangeDetectorRef
   ) {}
 
-  /** Approve-gates badge — pending items count. */
+  /** Approve-gates badge — pending items count (approvals only). */
   get openCount(): number { return this.openItems.length; }
+
+  /** Address-conditions badge — open_conditions rows count. */
+  get conditionCount(): number { return this.conditionItems.length; }
 
   /** Which status grid the embedded component renders (null on gate tabs). */
   get statusVisibleTab(): 'due' | 'ack' | null {
@@ -168,10 +186,17 @@ export class MyActionsComponent implements OnInit {
 
   ngOnInit(): void {
     const tab = this.route.snapshot.queryParamMap.get('tab');
-    if (tab === 'completed' || tab === 'due' || tab === 'ack') { this.activeTab = tab; }
+    if (tab === 'completed' || tab === 'due' || tab === 'ack' || tab === 'conditions') { this.activeTab = tab; }
 
     this.delivery.listPendingApprovals().subscribe({
-      next: res => { this.openItems = (res.success && res.data) ? res.data : []; this.loadingOpen = false; this.cdr.markForCheck(); },
+      next: res => {
+        const all = (res.success && res.data) ? res.data : [];
+        // WS3: split approvals from open_conditions — the tabs are separate.
+        this.openItems      = all.filter(i => i.item_type !== 'open_conditions');
+        this.conditionItems = all.filter(i => i.item_type === 'open_conditions');
+        this.loadingOpen = false;
+        this.cdr.markForCheck();
+      },
       error: () => { this.loadingOpen = false; this.cdr.markForCheck(); }
     });
     this.delivery.listCompletedActions().subscribe({

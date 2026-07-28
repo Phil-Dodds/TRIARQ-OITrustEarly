@@ -122,6 +122,23 @@ async function add_gate_condition(params, caller_user_id) {
     event_metadata:    { condition_id: condition.condition_id, gate_record_id, condition_type: type }
   });
 
+  // ── Contract 40 WS3(c) (D-590/D-565): auto-post the condition to the gate ──
+  // thread so the full conversation — including conditions — lives in one place,
+  // attributed to the setter. Non-fatal: the condition already exists.
+  const { error: threadErr } = await supabase
+    .from('gate_thread_messages')
+    .insert({
+      gate_record_id,
+      user_id:      caller_user_id,
+      message_text: `Condition set: ${String(text).trim()}`
+    });
+  if (threadErr) {
+    console.error(JSON.stringify({
+      tool_name: 'add_gate_condition', step: 'gate_thread_autopost',
+      gate_record_id, error: threadErr.message
+    }));
+  }
+
   return { success: true, data: condition };
 }
 

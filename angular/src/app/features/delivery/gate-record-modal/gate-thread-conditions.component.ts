@@ -53,23 +53,28 @@ import { GateConditionRecord, GateConsultation, GateThreadMessage } from '../../
           </div>
           <div *ngIf="conditions.length === 0" class="gtc-empty">No conditions on this gate.</div>
 
-          <div *ngIf="canManageConditions" class="gtc-add-row">
-            <select class="gtc-select-narrow" [(ngModel)]="newConditionType" [disabled]="busy">
-              <option value="general">General</option>
-              <option value="consultation_required" [disabled]="pendingConsultations.length === 0">
-                Consultation required
-              </option>
-            </select>
-            <select *ngIf="newConditionType === 'consultation_required'"
-                    class="gtc-select-narrow" [(ngModel)]="newConditionTarget" [disabled]="busy">
-              <option value="">Choose the consultation…</option>
-              <option *ngFor="let cons of pendingConsultations" [value]="cons.id">{{ cons.display_name }}</option>
-            </select>
-            <input class="gtc-input" type="text" maxlength="400"
-                   placeholder="Nearly there — what needs fixing?"
-                   [(ngModel)]="newConditionText" [disabled]="busy" />
-            <button type="button" class="gtc-btn" [disabled]="busy || !canAddCondition"
-                    (click)="addCondition()">Add</button>
+          <div *ngIf="canManageConditions" class="gtc-add-block">
+            <!-- Contract 40 WS3(a) (D-590): make the "gate waits here" semantics
+                 explicit — a condition holds the gate and blocks approval. -->
+            <div class="gtc-add-label">Add condition — gate waits here; approval blocked until resolved</div>
+            <div class="gtc-add-row">
+              <select class="gtc-select-narrow" [(ngModel)]="newConditionType" [disabled]="busy">
+                <option value="general">General</option>
+                <option value="consultation_required" [disabled]="pendingConsultations.length === 0">
+                  Consultation required
+                </option>
+              </select>
+              <select *ngIf="newConditionType === 'consultation_required'"
+                      class="gtc-select-narrow" [(ngModel)]="newConditionTarget" [disabled]="busy">
+                <option value="">Choose the consultation…</option>
+                <option *ngFor="let cons of pendingConsultations" [value]="cons.id">{{ cons.display_name }}</option>
+              </select>
+              <input class="gtc-input" type="text" maxlength="400"
+                     placeholder="Nearly there — what needs fixing?"
+                     [(ngModel)]="newConditionText" [disabled]="busy" />
+              <button type="button" class="gtc-btn" [disabled]="busy || !canAddCondition"
+                      (click)="addCondition()">Add</button>
+            </div>
           </div>
         </div>
 
@@ -122,7 +127,9 @@ import { GateConditionRecord, GateConsultation, GateThreadMessage } from '../../
     .gtc-cond-note { font-style: italic; color: #5A5A5A; }
     .gtc-link { background: none; border: none; color: #257099; cursor: pointer; font-size: 11px; text-decoration: underline; }
     .gtc-empty { font: italic 11px Roboto, sans-serif; color: #9E9E9E; }
-    .gtc-add-row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .gtc-add-block { margin-top: 6px; }
+    .gtc-add-label { font: 500 11px Roboto, sans-serif; color: #B26A00; margin-bottom: 4px; }
+    .gtc-add-row { display: flex; gap: 6px; flex-wrap: wrap; }
     .gtc-select-narrow { border: 1px solid #B9C4CE; border-radius: 5px; padding: 5px 6px; font-size: 11px; }
     .gtc-input { flex: 1; min-width: 160px; border: 1px solid #B9C4CE; border-radius: 5px; padding: 6px 10px; font-size: 12px; }
     .gtc-btn {
