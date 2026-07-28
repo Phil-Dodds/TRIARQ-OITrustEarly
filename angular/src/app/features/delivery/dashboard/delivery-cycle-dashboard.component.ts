@@ -682,6 +682,11 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               <input type="checkbox" [(ngModel)]="includeCancelled" (ngModelChange)="applyFilters(false)" />
               Include cancelled Initiatives
             </label>
+            <!-- Contract 40 follow-on (CC-40-H): complete reveal, same posture. -->
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;margin-top:10px;">
+              <input type="checkbox" [(ngModel)]="includeComplete" (ngModelChange)="applyFilters(false)" />
+              Include complete Initiatives
+            </label>
             <div style="font-size:11px;font-style:italic;color:#757575;margin-top:4px;padding-left:24px;">
               Applies immediately; resets off on every load.
             </div>
@@ -1210,6 +1215,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
 
   /** CC-38-41 / S-009: cancelled reveal — session-local, never persisted. */
   includeCancelled = false;
+  // Contract 40 follow-on (CC-40-H): reveal COMPLETE Initiatives. Off by default,
+  // never persisted (mirrors includeCancelled / S-009 posture).
+  includeComplete = false;
 
   // D-253 memoization: person list and workstream list caches — stable array references for template *ngFor.
   // Getters that return new objects on every call cause OnPush CD to loop → page freeze.
@@ -1981,6 +1989,11 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       // or an explicit stage filter of CANCELLED. Reveal never persists.
       if (c.current_lifecycle_stage === 'CANCELLED' &&
           !this.includeCancelled && this.filterStage !== 'CANCELLED') { return false; }
+      // Contract 40 follow-on (CC-40-H): COMPLETE excluded by default too —
+      // mirrors the cancelled reveal (own toggle, revealed by an explicit
+      // COMPLETE stage filter, never persists).
+      if (c.current_lifecycle_stage === 'COMPLETE' &&
+          !this.includeComplete && this.filterStage !== 'COMPLETE') { return false; }
       if (this.filterStage && c.current_lifecycle_stage !== this.filterStage) { return false; }
 
       // Contract G9 (D-563 Grade 1): interest profile — OR-of-ANDs over
