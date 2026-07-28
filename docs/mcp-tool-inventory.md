@@ -473,6 +473,34 @@ Modified tools:
   thread activity event visible to the current gate approver (D-584). Adds stay
   light.
 
+### 1.17 Governance Visibility & Sizing — Contract 40 (D-587/D-588/D-589/D-590/D-596/D-598/D-599)
+New tool:
+- **`get_my_raci`** — read-only. Params: `{ cycle_ids: string[] }`. Returns
+  `cycle_id → { r, a, c, i, c_provisional, a_gate_name }` for the caller: R =
+  trio membership; A = resolved next-gate approver (stored when submitted, live
+  D-557 chain pre-submission; absent for Level 1 / closed / unsized); C =
+  active Consulted participation stake (direct or via group), `c_provisional`
+  until the Go to Build cast is committed (D-593); I = active Informed
+  self-stake. Auth: any authenticated caller (self-scoped). (D-599 / WS5.)
+
+Modified tools:
+- **`confirm_gate_skip`** — now forwards `submission_note` through the
+  delegate; D-596 parity restored for every submit-time param (WS1).
+- **`upsert_initiative_sizing` / `preview_governance_derivation` /
+  `derive_governance`** — accept `idk` on Q1/Q2/Q3 (derives Large/Major/
+  Significant → Level 2 floor); Q4/Q5 unchanged (WS2, migration 092).
+- **`add_gate_condition`** — auto-posts the condition text to the gate thread,
+  attributed to the setter; no email (WS3).
+- **`list_pending_approvals`** — emits `open_conditions` item rows routed to the
+  trio + `consultation_required` parties (open_condition_count, days_waiting),
+  cleared when conditions close (WS3). `item_type` remains JS-assembled — no
+  schema change.
+- **`list_delivery_cycles` / `get_initiative_status_dashboard` /
+  `get_my_status_due`** — carry the `waiting_on` rollup (state, line,
+  days_waiting, open_condition_count, gate_name) for the Gate Wait Chip;
+  `get_my_status_due` also carries `has_returned_gate` for the attention sort
+  (WS4/WS6).
+
 ### division-mcp / document-access-mcp / team-meetings-mcp / initiative-public-mcp
 See each service's `GET /tools` endpoint and contract specs. (Catalog expansion
 for these services: candidate for a later contract.)

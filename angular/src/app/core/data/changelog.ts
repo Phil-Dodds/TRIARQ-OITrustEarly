@@ -32,6 +32,42 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-28',
+    contractLabel: 'Contract 40 — Governance Visibility, Sizing Honesty, RACI Glyphs',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'Sizing — "I don\'t know"',
+        description: 'Sizing questions 1–3 now accept "I don\'t know" — a real answer (treated as the cautious value, so the initiative sizes to Level 2) distinct from leaving it blank. Questions 4 and 5 offer "Not sure", which resolves to the safe choice and flags the specialist. An unknown answer gently re-prompts at Brief Review and Go to Build.'
+      },
+      {
+        audience:    'All',
+        surface:     'Gate Wait Chip',
+        description: 'The next-gate chip on lists and dashboards now says what a gate is actually waiting on: "N open conditions", "Awaiting consultation: …", or "Awaiting approval · Nd". Tapping it opens the gate.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Address Gate Conditions',
+        description: 'A new My Actions tab lists gates where you have open conditions to resolve, with a count and days waiting. Setting a condition now posts it to the gate thread and notifies the trio in-app (no email); the gate waits until conditions are resolved.'
+      },
+      {
+        audience:    'All',
+        surface:     'RACI participation glyphs',
+        description: 'Each initiative row shows only the roles you personally hold — R (trio), A (you approve the next gate), C (consulted), I (informed) — with a one-tap "i" to follow any initiative. Consulted shows provisional until Go to Build.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'My Initiative Status attention',
+        description: 'Initiatives with open conditions or a returned gate now sort to the top of your status list with an amber band, carrying the same Gate Wait Chip and RACI glyphs.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Close Review — not-met lessons flag',
+        description: 'When an initiative closes Not met, the Close Review lessons item now shows an amber line with the declared → actual outcome, linking to the verdict.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-27',
     contractLabel: 'Contract 39 — Tier Retirement, Cast Lifecycle, Close Review Outcome Verification',
     items: [
