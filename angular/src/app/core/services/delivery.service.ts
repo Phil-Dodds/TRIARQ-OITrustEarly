@@ -321,6 +321,8 @@ export class DeliveryService {
     delivery_cycle_id: string;
     gates_to_skip:     GateName[];
     submitted_gate:    GateName;
+    // Contract 40 WS1 (D-489/D-596): submission note rides the skip delegate.
+    submission_note?:  string;
     // Phil 2026-07-24: carried through to the delegated submit.
     phil_override?:    boolean;
     // Contract GA-1 (D-579): assessment rides through the skip interstitial.
@@ -1060,9 +1062,10 @@ export interface AllPendingGateRow {
 
 // ── Contract G3 payload shapes ────────────────────────────────────────────────
 export interface SizingAnswers {
-  q1_investment:      'small' | 'medium' | 'large' | 'xlarge';
-  q2_novelty:         'standard' | 'major';
-  q3_wrongness:       'contained' | 'significant' | 'large_hard';
+  // Contract 40 WS2 (D-598): 'idk' is a first-class answer on Q1/Q2/Q3.
+  q1_investment:      'small' | 'medium' | 'large' | 'xlarge' | 'idk';
+  q2_novelty:         'standard' | 'major' | 'idk';
+  q3_wrongness:       'contained' | 'significant' | 'large_hard' | 'idk';
   q4_security_impact: boolean;
   q5_ux:              'standard' | 'critical';
 }

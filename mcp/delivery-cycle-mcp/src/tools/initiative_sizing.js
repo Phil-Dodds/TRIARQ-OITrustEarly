@@ -18,10 +18,13 @@ const { sendGateNotificationEmail } = require('./helpers/notification-email');
 
 const DIRECT_ANSWER_COLUMNS = ['q1_investment', 'q2_novelty', 'q3_wrongness', 'q4_security_impact', 'q5_ux'];
 
+// Contract 40 WS2 (D-598): 'idk' ("I don't know") is a first-class answer on
+// Q1/Q2/Q3 — distinct from unanswered (null). Q4/Q5 and all sub-chips do NOT
+// accept idk (an unsure Q4/Q5 resolves to Yes/Critical on the client).
 const ANSWER_ALLOWED_VALUES = {
-  q1_investment: ['small', 'medium', 'large', 'xlarge'],
-  q2_novelty:    ['standard', 'major'],
-  q3_wrongness:  ['contained', 'significant', 'large_hard'],
+  q1_investment: ['small', 'medium', 'large', 'xlarge', 'idk'],
+  q2_novelty:    ['standard', 'major', 'idk'],
+  q3_wrongness:  ['contained', 'significant', 'large_hard', 'idk'],
   q5_ux:         ['standard', 'critical']
 };
 

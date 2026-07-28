@@ -1972,6 +1972,8 @@ export class GateRecordModalComponent {
       delivery_cycle_id: this.data.cycle.delivery_cycle_id,
       gates_to_skip:     this.pendingSkipGates,
       submitted_gate:    this.data.gateName,
+      // Contract 40 WS1 (D-489/D-596): submission note rides the skip path too.
+      ...(this.submissionNoteDraft.trim() ? { submission_note: this.submissionNoteDraft.trim() } : {}),
       ...(this.philOverrideArmed ? { phil_override: true } : {}),
       // GA-1: the assessment rides through the skip interstitial round-trip.
       ...(this.viewerIsTrioParticipant && !this.philOverrideArmed

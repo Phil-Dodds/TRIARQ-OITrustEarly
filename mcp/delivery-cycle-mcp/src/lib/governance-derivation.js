@@ -19,14 +19,23 @@
  * @returns {1|2|3}
  */
 function deriveBaselineLevel(sizing, assignedDcsTrusted) {
+  // Contract 40 WS2 (D-598): "I don't know" is a first-class answer on Q1/Q2/Q3.
+  // It derives to the cautious value — Q1 idk → Large, Q2 idk → Major, Q3 idk →
+  // Significant — each of which is a Level 2 floor. So any IDK forces Level 2
+  // minimum: Level 1 requires Small AND Standard AND Contained, all affirmatively
+  // answered. No IDK mapping reaches Level 3 (that needs an explicit X-Large /
+  // Large-or-hard answer).
   if (sizing.q1_investment === 'xlarge' || sizing.q3_wrongness === 'large_hard') {
     return 3;
   }
   if (
     sizing.q1_investment === 'medium' ||
     sizing.q1_investment === 'large' ||
+    sizing.q1_investment === 'idk' ||       // idk → Large (Level 2 floor)
     sizing.q2_novelty === 'major' ||
-    sizing.q3_wrongness === 'significant'
+    sizing.q2_novelty === 'idk' ||          // idk → Major (Level 2 floor)
+    sizing.q3_wrongness === 'significant' ||
+    sizing.q3_wrongness === 'idk'           // idk → Significant (Level 2 floor)
   ) {
     return 2;
   }
@@ -47,13 +56,20 @@ function buildDerivationExplanation(sizing, assignedDcsTrusted) {
   }
   if (chips.length > 0) { return chips; }
 
-  if (sizing.q1_investment === 'medium' || sizing.q1_investment === 'large') {
+  // Contract 40 WS2 (D-598): IDK attributes as "Not yet known (treated as …)".
+  if (sizing.q1_investment === 'idk') {
+    chips.push('Q1 Investment: Not yet known (treated as Large) → Level 2');
+  } else if (sizing.q1_investment === 'medium' || sizing.q1_investment === 'large') {
     chips.push(`Q1 Investment is ${sizing.q1_investment === 'medium' ? 'Medium' : 'Large'} → Level 2`);
   }
-  if (sizing.q2_novelty === 'major') {
+  if (sizing.q2_novelty === 'idk') {
+    chips.push('Q2 Novelty: Not yet known (treated as Major) → Level 2');
+  } else if (sizing.q2_novelty === 'major') {
     chips.push('Q2 Novelty is Major → Level 2');
   }
-  if (sizing.q3_wrongness === 'significant') {
+  if (sizing.q3_wrongness === 'idk') {
+    chips.push('Q3 If-wrong: Not yet known (treated as Significant) → Level 2');
+  } else if (sizing.q3_wrongness === 'significant') {
     chips.push('Q3 If-wrong is Significant → Level 2');
   }
   if (chips.length > 0) { return chips; }
@@ -66,8 +82,9 @@ function buildDerivationExplanation(sizing, assignedDcsTrusted) {
   return chips;
 }
 
-// Q1 rank order for the sub_exceeds_answer alert.
-const Q1_RANK = { small: 1, medium: 2, large: 3, xlarge: 4 };
+// Q1 rank order for the sub_exceeds_answer alert. Contract 40 WS2: idk ranks as
+// Large (its derived-equivalent) so a sub above Large still alerts under IDK.
+const Q1_RANK = { small: 1, medium: 2, large: 3, xlarge: 4, idk: 3 };
 
 /**
  * Guide/alert signals for a sizing row (spec 2.5, upsert_initiative_sizing).

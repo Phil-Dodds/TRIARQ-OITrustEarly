@@ -8,9 +8,11 @@
 import { DeliveryCycle, InitiativeSizing, LifecycleStage } from '../types/database';
 
 export interface InterestCondition {
-  q1_investment?:      'small' | 'medium' | 'large' | 'xlarge' | '';
-  q2_novelty?:         'standard' | 'major' | '';
-  q3_wrongness?:       'contained' | 'significant' | 'large_hard' | '';
+  // Contract 40 WS2 (D-598): 'idk' is a filterable value on Q1/Q2/Q3. A set like
+  // {Large, X-Large, IDK} is expressed as three OR'd conditions (OR-of-ANDs).
+  q1_investment?:      'small' | 'medium' | 'large' | 'xlarge' | 'idk' | '';
+  q2_novelty?:         'standard' | 'major' | 'idk' | '';
+  q3_wrongness?:       'contained' | 'significant' | 'large_hard' | 'idk' | '';
   q4_security_impact?: 'yes' | 'no' | '';
   q5_ux?:              'standard' | 'critical' | '';
   q2_sub_new_vendor?:  'yes' | 'no' | '';

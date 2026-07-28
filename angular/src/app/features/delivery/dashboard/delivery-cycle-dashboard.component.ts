@@ -271,16 +271,19 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <option value="">Q1: any</option><option value="small">Q1 Small</option>
             <option value="medium">Q1 Medium</option><option value="large">Q1 Large</option>
             <option value="xlarge">Q1 X-Large</option>
+            <option value="idk">Q1 I don't know</option>
           </select>
           <select [(ngModel)]="cond.q2_novelty" (ngModelChange)="onInterestConditionChange()"
                   style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">
             <option value="">Q2: any</option><option value="standard">Q2 Standard</option>
             <option value="major">Q2 Major</option>
+            <option value="idk">Q2 I don't know</option>
           </select>
           <select [(ngModel)]="cond.q3_wrongness" (ngModelChange)="onInterestConditionChange()"
                   style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">
             <option value="">Q3: any</option><option value="contained">Q3 Contained</option>
             <option value="significant">Q3 Significant</option><option value="large_hard">Q3 Large/Hard</option>
+            <option value="idk">Q3 I don't know</option>
           </select>
           <select [(ngModel)]="cond.q4_security_impact" (ngModelChange)="onInterestConditionChange()"
                   style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:11px;">

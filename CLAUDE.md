@@ -522,4 +522,14 @@ Conditions are durable (CC-0726-02): never auto-clear gate_conditions in any new
 
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | July 2026 | v3.5*
+### Rule 45 — Skip-Delegate Parameter Pass-Through (D-596)
+
+Every submit-time parameter accepted by `submit_gate_for_approval` must be forwarded through the `confirm_gate_skip` delegate call. A skip-routed submission must be indistinguishable from a direct submission in every stored effect (submission note, assessment, cast confirmation, outcome verdict). When a new submit-time parameter is added to `submit_gate_for_approval`, it is added to the skip delegate forward in the same change.
+
+**Conformance test:** Does every parameter read from `params` by `submit_gate_for_approval` appear in the `confirm_gate_skip` delegate forward? Yes = pass. Any accepted submit-time param absent from the forward = violation.
+
+**Exceptions:** None.
+
+---
+
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | July 2026 | v3.6*

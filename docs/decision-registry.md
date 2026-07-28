@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.66 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.67 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,8 +8,9 @@
 
 ## Next Available Decision Number
 
-**Next available: D-586**
+**Next available: D-600**
 (Note: the v1.0 governance spec's erroneous "D-575" citations read as D-572; D-575 is legitimately assigned to Continuous Multi-Contract Execution, locked 2026-07-23.)
+D-586 through D-599: allocated 2026-07-27 session (Contract 39 CC ratification + Contract 40 visibility/sizing/RACI). D-591–D-596 ratify Contract 39 CC-decisions and CLAUDE.md Candidate #1. D-597 superseded by D-599 same session (retained, not reused).
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -486,9 +487,23 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-580 | Stage Graduation on Gate Approval | 2026-07-26 | built |
 | D-581 | Durable Conditions (supersedes G6 AC#5 + D-578 conditions clause) | 2026-07-26 | built |
 | D-582 | Override Instruments Permanent | 2026-07-26 | built |
-| D-583 | Tier Retirement | 2026-07-26 | specced |
-| D-584 | Cast Lifecycle: Light Until Go to Build, Serious After | 2026-07-27 | specced |
-| D-585 | Close Review Is Outcome Verification | 2026-07-27 | specced |
+| D-583 | Tier Retirement | 2026-07-26 | built |
+| D-584 | Cast Lifecycle: Light Until Go to Build, Serious After | 2026-07-27 | built |
+| D-585 | Close Review Is Outcome Verification | 2026-07-27 | built |
+| D-586 | Executive Pending Gates Rename (amends D-560) | 2026-07-27 | specced |
+| D-587 | Gate Wait Chip (upgrades D-518) | 2026-07-27 | specced |
+| D-588 | My Initiative Status Attention Treatment | 2026-07-27 | specced |
+| D-589 | Not-Met Lessons Flag (completes D-585 WS3 §4) | 2026-07-27 | specced |
+| D-590 | Conditions Visibility (extends D-581) | 2026-07-27 | specced |
+| D-591 | Condition Resolve Authority Clarification (clarifies D-581) | 2026-07-27 | built (clarification) |
+| D-592 | Persisted Filter Strip-by-Omission (ratifies CC-39-01) | 2026-07-27 | built (Contract 39) |
+| D-593 | Provisional Participation Visual Treatment (ratifies CC-39-05/CC-39-02) | 2026-07-27 | built (Contract 39) |
+| D-594 | Cast Confirmation UX (ratifies CC-39-05; implements D-584) | 2026-07-27 | built (Contract 39) |
+| D-595 | Close Review Approval Guard and Not-Met Loudness (ratifies CC-39-06; implements D-585) | 2026-07-27 | built (Contract 39) |
+| D-596 | Skip-Delegate Parameter Pass-Through Rule (ratifies CLAUDE.md Candidate #1) | 2026-07-27 | specced (CLAUDE.md) |
+| D-597 | Grid Participation Glyphs (superseded by D-599 same session) | 2026-07-27 | superseded |
+| D-598 | "I Don't Know" on Sizing Questions (amends D-558) | 2026-07-27 | specced |
+| D-599 | RACI Participation Glyphs (supersedes D-597) | 2026-07-27 | specced |
 
 ---
 

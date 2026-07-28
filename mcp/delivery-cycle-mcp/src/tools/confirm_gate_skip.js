@@ -189,8 +189,16 @@ async function confirm_gate_skip(params, caller_user_id) {
   // Phil override (2026-07-24): carry the flag through so an override
   // submission that routed via the skip interstitial stays an override.
   // submit_gate_for_approval itself re-verifies the caller is Phil.
+  // Contract 40 WS1 (D-596): EVERY submit-time param accepted by
+  // submit_gate_for_approval must ride the skip delegate. Enumerated set:
+  // submission_note (D-489), phil_override, assessment (GA-1/D-579),
+  // cast_confirmed (D-584), outcome_verdict/outcome_actual/outcome_evidence
+  // (D-585). submission_note was the dropped param this WS restores.
   const submissionResult = await submit_gate_for_approval(
     { delivery_cycle_id, gate_name: submitted_gate,
+      // D-489 (Contract 40 WS1): submission note — previously dropped on the
+      // skip path, so a skip-routed submission lost its opening thread message.
+      ...(typeof params.submission_note === 'string' ? { submission_note: params.submission_note } : {}),
       ...(params.phil_override === true ? { phil_override: true } : {}),
       // GA-1: the submitter assessment rides through the skip interstitial.
       ...(Array.isArray(params.assessment) ? { assessment: params.assessment } : {}),

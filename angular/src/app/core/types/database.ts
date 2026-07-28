@@ -743,17 +743,18 @@ export interface GateApproverConfig {
 /** initiative_sizing row (migration 080, D-558). No row = not yet sized (D-567). */
 export interface InitiativeSizing {
   delivery_cycle_id:   string;
-  q1_investment:       'small' | 'medium' | 'large' | 'xlarge';
+  // Contract 40 WS2 (D-598): 'idk' is a first-class answer on Q1/Q2/Q3 (subs unchanged).
+  q1_investment:       'small' | 'medium' | 'large' | 'xlarge' | 'idk';
   q1_sub_engineering:  'small' | 'medium' | 'large' | 'xlarge' | null;
   q1_sub_operational:  'small' | 'medium' | 'large' | 'xlarge' | null;
   q1_note:             string | null;
-  q2_novelty:          'standard' | 'major';
+  q2_novelty:          'standard' | 'major' | 'idk';
   q2_sub_persona:      'well_known' | 'new' | null;
   q2_sub_scenarios:    'highly_studied' | 'in_discovery' | null;
   q2_sub_technology:   'standard' | 'new_untried' | null;
   q2_sub_new_vendor:   boolean | null;
   q2_note:             string | null;
-  q3_wrongness:        'contained' | 'significant' | 'large_hard';
+  q3_wrongness:        'contained' | 'significant' | 'large_hard' | 'idk';
   q3_sub_blast:        'contained_internal' | 'external_large' | null;
   q3_sub_correctable:  'easy' | 'difficult' | null;
   q3_note:             string | null;

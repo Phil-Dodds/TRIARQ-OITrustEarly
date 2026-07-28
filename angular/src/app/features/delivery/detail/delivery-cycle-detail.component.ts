@@ -2138,6 +2138,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           this.loadLatestStatus(cycleId); // Contract 32 (WS2): Current Status section
           this.loadEffectiveSprintCalendar(res.data.division_id); // Contract 37 (D-550)
           this.loadDivisionRequirements(res.data.division_id);    // CC-38 f13: DOL/Jira gate exemptions
+          this.loadSizingIdk(cycleId);                            // Contract 40 WS2 (D-598): Brief Review glance IDK reprompt
           // B-69: Stage Track scrollIntoView (B-61) and panel mount sometimes leave
           // an ambient text selection on Gate Record content. Clear it once on load.
           if (typeof window !== 'undefined') {
@@ -2160,6 +2161,28 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
         this.loading   = false;
         this.cdr.markForCheck();
       }
+    });
+  }
+
+  // Contract 40 WS2 (D-598): Q1/Q2/Q3 labels still holding an IDK answer — drives
+  // the non-blocking Brief Review glance reprompt. Empty when none / unsized.
+  sizingIdkQuestions: string[] = [];
+
+  private loadSizingIdk(cycleId: string): void {
+    this.sizingIdkQuestions = [];
+    if (!this.cycleIsSized) { return; }
+    this.delivery.getInitiativeSizing({ delivery_cycle_id: cycleId }).subscribe({
+      next: (res) => {
+        const s = res.data?.sizing;
+        if (!s) { return; }
+        const idk: string[] = [];
+        if (s.q1_investment === 'idk') { idk.push('Q1 Investment'); }
+        if (s.q2_novelty === 'idk')    { idk.push('Q2 Novelty'); }
+        if (s.q3_wrongness === 'idk')  { idk.push('Q3 If-wrong'); }
+        this.sizingIdkQuestions = idk;
+        this.cdr.markForCheck();
+      },
+      error: () => { /* advisory reprompt only — stay quiet on read failure */ }
     });
   }
 
@@ -4019,6 +4042,10 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           // D-583 (Contract 39): legacy "Tier classification set" row retired.
           ...(this.cycleIsSized
             ? [{ label: 'Do the sizing answers still look right now that the brief is written?', met: false }]
+            : []),
+          // Contract 40 WS2 (D-598): non-blocking IDK reprompt at the Brief Review glance.
+          ...(this.sizingIdkQuestions.length
+            ? [{ label: `Still unknown, or can you size it now? (${this.sizingIdkQuestions.join(', ')})`, met: false }]
             : []),
         ];
       case 'go_to_deploy':

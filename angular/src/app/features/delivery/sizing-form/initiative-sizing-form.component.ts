@@ -54,6 +54,12 @@ interface SubGroup   { key: keyof SizingSubs; label: string; options: ChipOption
                   (click)="selectAnswer(q.key, opt.value)">{{ opt.label }}</button>
         </div>
 
+        <!-- Contract 40 WS2 (D-598): IDK re-prompt — non-blocking invitation.
+             Renders at the Go to Build confirmation (readOnly) and while sizing. -->
+        <div class="sz-idk-reprompt" *ngIf="isIdk(q.key)">
+          Not yet known (treated as {{ idkTreatedAs(q.key) }}). Still unknown, or can you size it now?
+        </div>
+
         <ng-container *ngIf="q.subs.length > 0 && (!readOnly || hasSubValues(q))">
           <div class="sz-sub-block" *ngFor="let sub of q.subs">
             <span class="sz-sub-label">{{ sub.label }}</span>
@@ -182,6 +188,9 @@ interface SubGroup   { key: keyof SizingSubs; label: string; options: ChipOption
     .sz-gov-level { font: 700 16px Roboto, sans-serif; color: #00274E; }
     .sz-gov-chip { font: 400 12px Roboto, sans-serif; color: #00274E; }
     .sz-gov-pending { font: italic 11px Roboto, sans-serif; color: #5A5A5A; }
+    /* Contract 40 WS2 (D-598): IDK reprompt — quiet invitation, not a block.
+       Stone italic, no amber (IDK is a valid answer; D-548 amber-means-attend). */
+    .sz-idk-reprompt { font: italic 11px Roboto, sans-serif; color: #5A5A5A; margin-top: 2px; }
     /* D-200 Pattern 2 — advisory amber, never a block. */
     .sz-alert {
       border-left: 3px solid #F2A620; background: rgba(242, 166, 32, 0.08);
@@ -283,7 +292,8 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
       label: 'Q1 — How big is the investment?',
       options: [
         { value: 'small', label: 'Small' }, { value: 'medium', label: 'Medium' },
-        { value: 'large', label: 'Large' }, { value: 'xlarge', label: 'X-Large' }
+        { value: 'large', label: 'Large' }, { value: 'xlarge', label: 'X-Large' },
+        { value: 'idk', label: "I don't know" }   // D-598: derives as Large (Level 2 floor)
       ],
       subs: [
         { key: 'q1_sub_engineering', label: 'Engineering effort', options: [
@@ -298,7 +308,8 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
       key: 'q2_novelty', noteKey: 'q2_note',
       label: 'Q2 — How novel is this work?',
       options: [
-        { value: 'standard', label: 'Standard' }, { value: 'major', label: 'Major novelty' }
+        { value: 'standard', label: 'Standard' }, { value: 'major', label: 'Major novelty' },
+        { value: 'idk', label: "I don't know" }   // D-598: derives as Major (Level 2 floor)
       ],
       subs: [
         { key: 'q2_sub_persona', label: 'Persona', options: [
@@ -315,7 +326,8 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
       options: [
         { value: 'contained', label: 'Contained' },
         { value: 'significant', label: 'Significant' },
-        { value: 'large_hard', label: 'Large / hard to correct' }
+        { value: 'large_hard', label: 'Large / hard to correct' },
+        { value: 'idk', label: "I don't know" }   // D-598: derives as Significant (Level 2 floor)
       ],
       subs: [
         { key: 'q3_sub_blast', label: 'Blast radius', options: [
@@ -327,13 +339,19 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
     {
       key: 'q4_security_impact', noteKey: 'q4_note',
       label: 'Q4 — Security impact?',
-      options: [ { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' } ],
+      // D-598: "Not sure" resolves to Yes (routing-positive) — no distinct stored
+      // state; it fires the Security specialist suggestion via the Yes value.
+      options: [ { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' },
+                 { value: 'unsure', label: 'Not sure' } ],
       subs: []
     },
     {
       key: 'q5_ux', noteKey: 'q5_note',
       label: 'Q5 — UX involvement?',
-      options: [ { value: 'standard', label: 'Standard' }, { value: 'critical', label: 'Critical' } ],
+      // D-598: "Not sure" resolves to Critical (routing-positive) — fires the UX
+      // specialist suggestion via the Critical value; no distinct stored state.
+      options: [ { value: 'standard', label: 'Standard' }, { value: 'critical', label: 'Critical' },
+                 { value: 'unsure', label: 'Not sure' } ],
       subs: [
         { key: 'q5_sub_facing', label: 'Facing', options: [
           { value: 'none', label: 'None' }, { value: 'patient', label: 'Patient' },
@@ -400,7 +418,11 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
 
   selectAnswer(key: keyof SizingAnswers, value: string): void {
     if (key === 'q4_security_impact') {
-      (this.answers as unknown as Record<string, unknown>)[key] = value === 'true';
+      // D-598: "Not sure" (unsure) resolves to Yes — no distinct stored state.
+      (this.answers as unknown as Record<string, unknown>)[key] = value === 'true' || value === 'unsure';
+    } else if (key === 'q5_ux' && value === 'unsure') {
+      // D-598: "Not sure" resolves to Critical (routing-positive).
+      this.answers.q5_ux = 'critical';
     } else {
       (this.answers as unknown as Record<string, unknown>)[key] = value;
     }
@@ -442,6 +464,16 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
   isAnswerSelected(key: keyof SizingAnswers, value: string): boolean {
     if (key === 'q4_security_impact') { return this.answers[key] === (value === 'true'); }
     return this.answers[key] === (value as never);
+  }
+
+  // Contract 40 WS2 (D-598): IDK reprompt helpers. Only Q1/Q2/Q3 carry idk.
+  isIdk(key: keyof SizingAnswers): boolean {
+    return this.answers[key] === ('idk' as never);
+  }
+  idkTreatedAs(key: keyof SizingAnswers): string {
+    return key === 'q1_investment' ? 'Large'
+      : key === 'q2_novelty' ? 'Major'
+      : key === 'q3_wrongness' ? 'Significant' : '';
   }
 
   private onAnyChange(): void {
