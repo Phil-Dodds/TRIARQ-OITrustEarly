@@ -8,7 +8,14 @@
 'use strict';
 
 const { supabase } = require('../db');
-const { GATE_REQUIRED_TO_ENTER, TERMINAL_STAGES, nextStage } = require('../lifecycle');
+const { GATE_REQUIRED_TO_ENTER, TERMINAL_STAGES, nextStage, STAGE_SEQUENCE } = require('../lifecycle');
+
+// Contract 40 follow-on (CC-40-I): an assigned EPO is required to advance INTO
+// Build or any later stage (Phil 2026-07-28). The EPO is accountable for the
+// build phase (D-390 already requires an EPO to submit the Go to Build gate);
+// this extends the same floor to the stage advance itself. Earlier advances
+// (Brief→Design→Spec) do not require an EPO.
+const EPO_REQUIRED_FROM_STAGE = 'BUILD';
 
 /**
  * @param {object} params
@@ -25,7 +32,7 @@ async function advance_cycle_stage(params, caller_user_id) {
   // ── Fetch cycle ───────────────────────────────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, workstream_id')
+    .select('delivery_cycle_id, cycle_title, current_lifecycle_stage, workstream_id, assigned_epo_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .single();
@@ -50,23 +57,42 @@ async function advance_cycle_stage(params, caller_user_id) {
     };
   }
 
-  // ── Workstream active check ────────────────────────────────────────────────
-  const { data: workstream, error: wsErr } = await supabase
-    .from('delivery_workstreams')
-    .select('workstream_name, active_status')
-    .eq('workstream_id', cycle.workstream_id)
-    .is('deleted_at', null)
-    .single();
-
-  if (wsErr || !workstream) {
-    return { success: false, error: 'Assigned Workstream not found. Cannot advance stage.' };
-  }
-
-  if (!workstream.active_status) {
+  // ── EPO floor (CC-40-I) — required to enter Build or any later stage ───────
+  // Replaces the former hard workstream-presence requirement. D-140 message
+  // names the block and how to clear it.
+  const targetIdx = STAGE_SEQUENCE.indexOf(target_stage);
+  const epoFloorIdx = STAGE_SEQUENCE.indexOf(EPO_REQUIRED_FROM_STAGE);
+  if (targetIdx >= epoFloorIdx && !cycle.assigned_epo_user_id) {
     return {
       success: false,
-      error: `Stage advance blocked: the ${workstream.workstream_name} workstream is inactive. A Division Admin must reactivate it before this cycle can advance.`
+      error: `Cannot advance to ${target_stage} — no Engineering Product Owner is assigned. ` +
+             `An EPO must be named before this Initiative enters ${EPO_REQUIRED_FROM_STAGE}. ` +
+             `An Admin or the trio can assign an EPO in the Initiative edit panel.`
     };
+  }
+
+  // ── Workstream active check — only when a Workstream is assigned ──────────
+  // D-165 / Contract 19 Part 3b: Workstream is optional. A null Workstream no
+  // longer blocks advancement (this was the stale ARCH-12 requirement). When
+  // one IS assigned, ARCH-23 still blocks advance on an inactive Workstream.
+  if (cycle.workstream_id) {
+    const { data: workstream, error: wsErr } = await supabase
+      .from('delivery_workstreams')
+      .select('workstream_name, active_status')
+      .eq('workstream_id', cycle.workstream_id)
+      .is('deleted_at', null)
+      .single();
+
+    if (wsErr || !workstream) {
+      return { success: false, error: 'Assigned Workstream not found or has been deleted. Reassign a valid Workstream or clear it, then advance.' };
+    }
+
+    if (!workstream.active_status) {
+      return {
+        success: false,
+        error: `Stage advance blocked: the ${workstream.workstream_name} workstream is inactive. A Division Admin must reactivate it before this cycle can advance.`
+      };
+    }
   }
 
   // ── Gate check — if target stage requires a gate, verify it is approved ───
