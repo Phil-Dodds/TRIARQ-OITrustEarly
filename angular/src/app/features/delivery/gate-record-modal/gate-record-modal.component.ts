@@ -204,7 +204,7 @@ const GATE_LABELS: Record<GateName, string> = {
                         && (record?.gate_status === 'awaiting_approval'
                             || record?.gate_status === 'approved'
                             || record?.gate_status === 'returned')"
-                 class="grm-section">
+                 id="grm-verdict-block" class="grm-section">
           <div class="grm-label">Outcome verification</div>
           <div *ngIf="record!.outcome_verdict === 'not_met' && record!.gate_status === 'approved'"
                style="display:inline-block;margin:4px 0;padding:3px 10px;border-radius:4px;
@@ -245,6 +245,8 @@ const GATE_LABELS: Record<GateName, string> = {
           *ngIf="(record?.gate_status === 'approved' || record?.gate_status === 'returned')
                  && (record?.assessments?.length ?? 0) > 0"
           [rows]="approverVisibleAssessments"
+          [notMetFlag]="closeReviewNotMetFlag"
+          (verdictLinkClick)="scrollToVerdictBlock()"
           title="Gate assessments">
         </app-gate-assessment-display>
 
@@ -1343,6 +1345,23 @@ export class GateRecordModalComponent {
   get closeReviewBlockComplete(): boolean {
     if (this.data.gateName !== 'close_review') { return true; }
     return !!this.crVerdict && !!this.crActualDraft.trim() && !!this.crEvidenceDraft.trim();
+  }
+
+  /** Contract 40 WS7 (D-589): declared → actual flag for a Not-met close. Null
+   *  otherwise (no static line on met/unanswered — D-548 amber-means-attend). */
+  get closeReviewNotMetFlag(): { declared: string; actual: string } | null {
+    if (this.data.gateName !== 'close_review') { return null; }
+    if (this.record?.outcome_verdict !== 'not_met') { return null; }
+    return {
+      declared: this.data.cycle.outcome_statement || '(no declared outcome)',
+      actual:   this.record?.outcome_actual || '(not recorded)'
+    };
+  }
+
+  /** WS7: bring the outcome verdict block into view from the not-met flag. */
+  scrollToVerdictBlock(): void {
+    if (typeof document === 'undefined') { return; }
+    document.getElementById('grm-verdict-block')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   // ── Contract 39 (D-584): consultation cast confirmation state ──────────────
