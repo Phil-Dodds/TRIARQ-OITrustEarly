@@ -1021,21 +1021,15 @@ const GATE_LABELS: Record<GateName, string> = {
           </div>
         </div>
 
-        <!-- Contract 24 (AC-18 / D-437): post-approval warnings block.
-             D-200 Pattern 2 (amber, non-blocking). Renders when the just-
-             recorded approval came back with wip_warning or suggestion_warnings.
-             Approver clicks Acknowledge to close + refresh. -->
+        <!-- Contract 24 (AC-18 / D-437): post-approval WIP alert.
+             D-200 Pattern 2 (amber). Contract 40 follow-on (CC-40-J): the
+             artifact "typically attached" reminder was removed from this step —
+             it no longer holds the modal after approval. WIP alert only. -->
         <div *ngIf="confirmMode === 'post-approve-warning'" class="oi-warn-pattern2">
           <div class="oi-warn-icon">⚠</div>
           <div class="oi-warn-body">
             <div class="oi-warn-text" *ngIf="postApproveWipWarning">
               <strong>WIP alert:</strong> {{ postApproveWipWarning.message }}
-            </div>
-            <div class="oi-warn-text" *ngIf="postApproveSuggestions.length > 0">
-              <strong>Typically attached before {{ gateLabel }}:</strong>
-              {{ postApproveSuggestions.join(', ') }}.
-              <br>
-              <span style="color:#5A5A5A;">Approving without these is permitted — this is a reminder.</span>
             </div>
             <div class="grm-action-row">
               <button class="grm-btn-primary"
@@ -2220,15 +2214,19 @@ export class GateRecordModalComponent {
         }
         if (res.success) {
           this.endProcessing();
-          // Contract 24 (AC-18 / D-437): if the response carries warnings,
-          // hold the modal open in post-approve-warning state until the
-          // approver acknowledges. Otherwise close + full refresh per D-345.
+          // Contract 24 (AC-18 / D-437): hold the modal open for the WIP alert
+          // only. Contract 40 follow-on (CC-40-J, Phil 2026-07-28): the artifact
+          // "typically attached" reminder no longer holds the modal after
+          // approval — approval is already recorded, so a post-hoc acknowledge
+          // on a non-blocking nudge is pure ceremony. Suggestions still ride the
+          // server response (unchanged) and surface at submit time; they just no
+          // longer gate the close here. The EPO WIP alert is an operational
+          // signal and still requires acknowledgement.
           const result: GateDecisionResult | undefined = res.data ?? undefined;
           const hasWipWarning  = !!result?.wip_warning;
-          const hasSuggestions = (result?.suggestion_warnings ?? []).length > 0;
-          if (hasWipWarning || hasSuggestions) {
+          if (hasWipWarning) {
             this.postApproveWipWarning  = result?.wip_warning ?? null;
-            this.postApproveSuggestions = result?.suggestion_warnings ?? [];
+            this.postApproveSuggestions = [];
             this.confirmMode            = 'post-approve-warning';
             this.cdr.markForCheck();
           } else {
