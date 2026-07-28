@@ -46,6 +46,7 @@ import { ActivatedRoute, RouterModule, Router } from '@angular/router';
 import { IonicModule }                 from '@ionic/angular';
 
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
+import { CelebrationSprayComponent } from '../../../shared/components/celebration-spray/celebration-spray.component';
 import { EggSpotComponent }  from '../../easter-eggs/egg-spot.component';
 import { EGG_KEYS }          from '../../../core/constants/easter-egg.constants';
 import { DeliveryService }   from '../../../core/services/delivery.service';
@@ -80,7 +81,7 @@ const PAGE_SIZE = 50;
   selector:        'app-gates-approved',
   standalone:      true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports:         [CommonModule, RouterModule, IonicModule, DeliveryCycleDetailComponent, EggSpotComponent],
+  imports:         [CommonModule, RouterModule, IonicModule, DeliveryCycleDetailComponent, CelebrationSprayComponent, EggSpotComponent],
   template: `
     <div class="ga-flex">
     <div class="ga-shell" [class.ga-shell-with-panel]="!!selectedCycleId">
@@ -93,10 +94,17 @@ const PAGE_SIZE = 50;
             {{ personFilterUserId ? 'Filtered to your approvals.' : '' }}
           </p>
         </div>
-        <button class="ga-filter-btn" type="button" (click)="openFilters()">
-          Filters <span *ngIf="activeFilterCount" class="ga-filter-badge">{{ activeFilterCount }}</span>
-        </button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <!-- Delight: spray a random heart / TRIARQ Q / Easter egg across the screen. -->
+          <button class="ga-spray-btn" type="button" (click)="spray.fire()"
+                  aria-label="Celebrate" title="Celebrate 🎉">🎉</button>
+          <button class="ga-filter-btn" type="button" (click)="openFilters()">
+            Filters <span *ngIf="activeFilterCount" class="ga-filter-badge">{{ activeFilterCount }}</span>
+          </button>
+        </div>
       </div>
+
+      <app-celebration-spray #spray></app-celebration-spray>
 
       <!-- S-012 active filter chips -->
       <div *ngIf="activeFilterCount" class="ga-chips-bar">
@@ -257,6 +265,11 @@ const PAGE_SIZE = 50;
                  justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .ga-filter-btn { font-size: 11px; padding: 3px 10px; border: 1px solid var(--triarq-color-border, #e0e0e0);
                      border-radius: 5px; background: #fff; cursor: pointer; color: #1E1E1E; }
+    /* Delight spray trigger — small, quiet, a little bounce on hover. */
+    .ga-spray-btn { font-size: 14px; line-height: 1; padding: 3px 8px; border: 1px solid var(--triarq-color-border, #e0e0e0);
+                    border-radius: 5px; background: #fff; cursor: pointer; }
+    .ga-spray-btn:hover { transform: scale(1.12) rotate(-6deg); }
+    .ga-spray-btn:active { transform: scale(.95); }
     .ga-filter-badge { background: var(--triarq-color-primary, #257099); color: #fff; border-radius: 999px;
                        padding: 0 6px; font-size: 11px; margin-left: 4px; }
     .ga-chips-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
