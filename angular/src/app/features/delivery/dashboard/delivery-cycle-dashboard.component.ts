@@ -180,6 +180,14 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             Theme: {{ themeChipLabel }}
             <button (click)="filterThemes=[];applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
           </span>
+          <!-- Contract 40 follow-on (CC-40-G): My Role (RACI) filter chip. -->
+          <span *ngIf="filterMyRoles.length"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            My role: {{ myRolesChipLabel }}
+            <button (click)="filterMyRoles=[];applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
           <!-- D-279: chip shows "None assigned" or Division · Workstream short name. CC-Decision-2026-04-12-E. -->
           <span *ngIf="filterWorkstream"
                 style="display:inline-flex;align-items:center;gap:4px;background:#fff;
@@ -555,6 +563,29 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           </div>
 
           <!-- D-583 (Contract 39): Tier filter row retired. -->
+
+          <!-- Filter row: My Role (RACI) — Contract 40 follow-on (CC-40-G). Multi-select,
+               OR semantics; mirrors the WS5 glyphs (R,A,C,I) the caller holds. -->
+          <div style="border-bottom:1px solid #F0F0F0;">
+            <button (click)="toggleFilterRow('myrole')"
+                    style="width:100%;background:none;border:none;cursor:pointer;
+                           display:flex;align-items:center;justify-content:space-between;
+                           padding:14px 20px;font-size:14px;color:#1E1E1E;">
+              <span style="font-weight:500;">My Role</span>
+              <span style="display:flex;align-items:center;gap:8px;">
+                <span *ngIf="stagedMyRoles.length" style="font-size:12px;color:var(--triarq-color-primary,#257099);">
+                  {{ stagedMyRoles.length }} selected
+                </span>
+                <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'myrole' ? '▲' : '▼' }}</span>
+              </span>
+            </button>
+            <div *ngIf="openFilterRow === 'myrole'" style="padding:0 20px 16px;display:flex;flex-direction:column;gap:8px;">
+              <label *ngFor="let role of myRoleOptions" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                <input type="checkbox" [checked]="stagedMyRoles.includes(role.key)" (change)="toggleStagedMyRole(role.key)" />
+                {{ role.label }}
+              </label>
+            </div>
+          </div>
 
           <!-- Filter row: Roadmap Theme — D-488 multi-select. Unthemed = no tag. -->
           <div style="border-bottom:1px solid #F0F0F0;">
@@ -1095,6 +1126,25 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       ? this.stagedThemes.filter(t => t !== id)
       : [...this.stagedThemes, id];
     this.cdr.markForCheck();
+  }
+
+  // Contract 40 follow-on (CC-40-G): My Role (RACI) filter. Client-side over the
+  // WS5 raciByCycle map already loaded for the grid — no server change.
+  filterMyRoles:            string[] = [];
+  stagedMyRoles:            string[] = [];
+  readonly myRoleOptions: { key: string; label: string }[] = [
+    { key: 'r', label: 'R — Responsible (my trio)' },
+    { key: 'a', label: 'A — Accountable (I approve the next gate)' },
+    { key: 'c', label: 'C — Consulted' },
+    { key: 'i', label: 'I — Following (Informed)' }
+  ];
+  toggleStagedMyRole(key: string): void {
+    this.stagedMyRoles = this.stagedMyRoles.includes(key)
+      ? this.stagedMyRoles.filter(k => k !== key)
+      : [...this.stagedMyRoles, key];
+  }
+  get myRolesChipLabel(): string {
+    return this.filterMyRoles.map(k => k.toUpperCase()).join(', ');
   }
 
   get themeChipLabel(): string {
@@ -1753,6 +1803,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         filterGateStatus:      this.filterGateStatus,
         filterAssignedPerson:  this.filterAssignedPerson,
         filterThemes:          this.filterThemes,           // D-488 / D-171
+        filterMyRoles:         this.filterMyRoles,          // CC-40-G / D-171
         // G9 (D-563): interest profile remembered per-user per-screen.
         interestConditions:    this.interestConditions
       },
@@ -1795,6 +1846,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     // D-488: theme multi-select persists per D-171.
     if (Array.isArray(filter['filterThemes'])) {
       this.filterThemes = (filter['filterThemes'] as unknown[]).filter((v): v is string => typeof v === 'string');
+    }
+    if (Array.isArray(filter['filterMyRoles'])) {
+      this.filterMyRoles = (filter['filterMyRoles'] as unknown[]).filter((v): v is string => typeof v === 'string');
     }
     // G9 (D-563): interest profile restore.
     if (Array.isArray(filter['interestConditions'])) {
@@ -1839,6 +1893,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         for (const [id, entry] of Object.entries(res.data ?? {})) {
           this.raciByCycle.set(id, entry as MyRaciEntry);
         }
+        // CC-40-G: the My Role filter reads raciByCycle — re-apply once it lands
+        // (raci loads after the initial applyFilters()). No persist.
+        if (this.filterMyRoles.length) { this.applyFilters(false); }
         this.cdr.markForCheck();
       },
       error: () => { /* glyphs degrade to the hollow-i default; non-blocking */ }
@@ -1936,6 +1993,14 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
           ? (!c.roadmap_theme_id || this.filterThemes.includes(c.roadmap_theme_id))
           : (!!c.roadmap_theme_id && this.filterThemes.includes(c.roadmap_theme_id));
         if (!matches) { return false; }
+      }
+
+      // CC-40-G: My Role (RACI) — OR over selected letters against the loaded
+      // raci map. A cycle with no raci entry matches nothing when the filter is on.
+      if (this.filterMyRoles.length) {
+        const raci = this.raciByCycle.get(c.delivery_cycle_id);
+        const holds = !!raci && this.filterMyRoles.some(k => (raci as unknown as Record<string, boolean>)[k] === true);
+        if (!holds) { return false; }
       }
 
       // D-167: workstream filter — '__none__' shows cycles with no workstream assigned
@@ -2077,6 +2142,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterGateStatus      = '';
     this.filterAssignedPerson  = '';
     this.filterDivision        = '';
+    this.filterMyRoles         = [];   // CC-40-G
+    this.stagedMyRoles         = [];
     this.includeChildDivisions = true;   // Phil 2026-06-15: children-by-default
     this.loadCycles();
   }
@@ -2227,6 +2294,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (this.filterAssignedPerson) { n++; }
     if (this.filterDivision)       { n++; }
     if (this.filterThemes.length)  { n++; }   // D-488
+    if (this.filterMyRoles.length) { n++; }   // CC-40-G
     return n;
   }
 
@@ -2256,6 +2324,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       this.stagedDivision       = this.filterDivision;
       this.stagedIncludeChildren = this.includeChildDivisions;
       this.stagedThemes         = [...this.filterThemes];   // D-488
+      this.stagedMyRoles        = [...this.filterMyRoles];  // CC-40-G
       this.openFilterRow        = '';
       // Restore scope activator state from applied filter values. CC-Decision-2026-04-12-E/F.
       this.wsScope     = (this.filterWorkstream && this.filterWorkstream !== '__none__') ? 'normal' : (this.filterWorkstream === '__none__' ? 'none_terminal' : '');
@@ -2278,6 +2347,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterGateStatus     = this.stagedGateStatus;
     this.filterAssignedPerson = this.stagedAssignedPerson;
     this.filterThemes         = [...this.stagedThemes];   // D-488
+    this.filterMyRoles        = [...this.stagedMyRoles];  // CC-40-G
     // Division filter is server-side — reload if it changed
     const divisionChanged     = this.filterDivision !== this.stagedDivision || this.includeChildDivisions !== this.stagedIncludeChildren;
     this.filterDivision       = this.stagedDivision;
@@ -2299,6 +2369,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.stagedAssignedPerson = '';
     this.stagedDivision       = '';
     this.stagedThemes         = [];   // D-488
+    this.stagedMyRoles        = [];   // CC-40-G
     this.stagedIncludeChildren = true;   // Phil 2026-06-15: children-by-default
     this.openFilterRow        = '';
     this.wsScope              = '';  // CC-Decision-2026-04-12-E
