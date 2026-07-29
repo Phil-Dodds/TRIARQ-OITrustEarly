@@ -45,6 +45,7 @@ import { DeliveryService }         from '../../../core/services/delivery.service
 import { McpService }              from '../../../core/services/mcp.service';
 import { UserProfileService }      from '../../../core/services/user-profile.service';
 import { StageTrackComponent, LIFECYCLE_TRACK } from '../stage-track/stage-track.component';
+import { SprintSelectComponent } from '../../../shared/components/sprint-select/sprint-select.component';
 import { LoadingOverlayComponent }          from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DeliveryCycleEditPanelComponent }  from '../edit-panel/delivery-cycle-edit-panel.component';
 import { InitiativeStatusUpdatePanelComponent }  from '../status-panel/initiative-status-update-panel.component';
@@ -124,7 +125,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent, InitiativeStatusUpdatePanelComponent, InitiativeStatusHistoryPanelComponent, EggSpotComponent, InitiativeParticipationSectionComponent, CancelRequestBannerComponent],
+  imports: [CommonModule, RouterModule, ReactiveFormsModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, SprintSelectComponent, LoadingOverlayComponent, DeliveryCycleEditPanelComponent, InitiativeStatusUpdatePanelComponent, InitiativeStatusHistoryPanelComponent, EggSpotComponent, InitiativeParticipationSectionComponent, CancelRequestBannerComponent],
   styles: [`:host { display: block; position: relative; }`],
   template: `
 
@@ -1031,11 +1032,13 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
                 <!-- Sprint mode: sprint dropdown + Start/End + ±days (§7.1) -->
                 <ng-container *ngIf="dateRuleMode === 'sprint'">
-                  <select [(ngModel)]="ruleSprintId" class="oi-input"
-                          style="width:100%;font-size:12px;padding:3px 6px;margin-bottom:3px;">
-                    <option value="">Select sprint…</option>
-                    <option *ngFor="let s of effectiveSprints" [value]="s.sprint_id">{{ sprintOptionLabel(s) }}</option>
-                  </select>
+                  <!-- Contract 40 follow-on (CC-40-K): custom Sprint picker —
+                       past sprints lighter, older ones under "Older Sprints…". -->
+                  <app-sprint-select
+                    style="display:block;margin-bottom:3px;"
+                    [sprints]="effectiveSprints"
+                    [(selectedId)]="ruleSprintId">
+                  </app-sprint-select>
                   <div style="display:flex;gap:3px;align-items:center;">
                     <select [(ngModel)]="ruleAnchor" class="oi-input" style="font-size:12px;padding:3px 6px;flex:1;">
                       <option value="start">Start</option>
