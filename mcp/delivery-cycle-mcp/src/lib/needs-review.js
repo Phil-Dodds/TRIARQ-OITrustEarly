@@ -159,18 +159,8 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
   // panel's gates table, not the reason list.
   if (anyAtRisk) { reasons.push('At Risk'); }
 
-  // 5) Next gate has no target date — nothing to track against, so the row
-  // can never surface as slipped or at-risk on dates. Callers must include
-  // target_date in the milestones they pass.
-  const nextGate = resolveNextGate(milestones || []);
-  if (nextGate && !nextGate.target_date) {
-    reasons.push('Missing Target Date');
-  }
-
-  // 6) Missing Deploy Date mid-flight (Phil 2026-07-16, CC-38-37): Brief
-  // Review passed, Go to Deploy not yet resolved, and the Deploy milestone has
-  // neither a target nor an actual date — the initiative is in motion with no
-  // deploy commitment. Distinct from (5), which only watches the NEXT gate.
+  // Gate records (governance approval status) — used by (5) next-gate
+  // resolution (CC-40-L: gate-records is the single source of truth) and (6).
   let gateRows = prefetch.gateRows;
   if (gateRows === undefined) {
     const res = await supabase
@@ -180,6 +170,20 @@ async function computeNeedsReviewReasons(supabase, cycle, latestUpdate, mileston
       .is('deleted_at', null);
     gateRows = res.data;
   }
+
+  // 5) Next gate has no target date — nothing to track against, so the row
+  // can never surface as slipped or at-risk on dates. Callers must include
+  // target_date in the milestones they pass. CC-40-L: next gate resolves from
+  // gate-records approval status, consistent with the list + status dashboard.
+  const nextGate = resolveNextGate(milestones || [], gateRows || []);
+  if (nextGate && !nextGate.target_date) {
+    reasons.push('Missing Target Date');
+  }
+
+  // 6) Missing Deploy Date mid-flight (Phil 2026-07-16, CC-38-37): Brief
+  // Review passed, Go to Deploy not yet resolved, and the Deploy milestone has
+  // neither a target nor an actual date — the initiative is in motion with no
+  // deploy commitment. Distinct from (5), which only watches the NEXT gate.
   const gs = {};
   for (const g of (gateRows || [])) { gs[g.gate_name] = g.gate_status; }
   const briefPassed  = gs.brief_review === 'approved' || gs.brief_review === 'skipped';

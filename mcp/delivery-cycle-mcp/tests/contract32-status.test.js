@@ -432,7 +432,10 @@ describe('get_initiative_status_dashboard', () => {
       { data: [{ id: UPD, supersedes_update_id: null, saved_at: '2026-06-20T00:00:00Z' }], error: null }, // chain roots
       { data: [{ id: DOL, display_name: 'Dana' }], error: null },                 // author + team names
       { data: [{ delivery_cycle_id: CYC, gate_name: 'go_to_build', date_status: 'on_track', milestone_label: 'Build Start', target_date: null }], error: null }, // milestones
-      { data: [{ delivery_cycle_id: CYC, gate_name: 'go_to_build', gate_status: 'awaiting_approval' }], error: null } // gate_records
+      // CC-40-L: next gate resolves from gate-records approval — a BUILD-stage
+      // cycle has brief_review approved, so the next gate is go_to_build.
+      { data: [{ delivery_cycle_id: CYC, gate_name: 'brief_review', gate_status: 'approved' },
+               { delivery_cycle_id: CYC, gate_name: 'go_to_build', gate_status: 'awaiting_approval' }], error: null } // gate_records
     ]; // needs-review cadence rpc falls through to the null fallback
     const r = await get_initiative_status_dashboard({}, DOL);
     assert.equal(r.success, true);

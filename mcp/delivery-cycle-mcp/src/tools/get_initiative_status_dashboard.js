@@ -186,7 +186,12 @@ async function get_initiative_status_dashboard(params, caller_user_id) {
     const isTrioAuthor = latest ? trio.includes(latest.saved_by) : null;
 
     const div = divisionById[c.division_id] || {};
-    const nextGate = resolveNextGate(milestonesByCycle[c.delivery_cycle_id] || []);
+    // CC-40-L: resolve the next gate from gate-records approval status (governance
+    // truth), consistent with the list headline + Gate Wait Chip.
+    const nextGate = resolveNextGate(
+      milestonesByCycle[c.delivery_cycle_id] || [],
+      gateRowsByCycle[c.delivery_cycle_id] || []
+    );
 
     rows.push({
       initiative_id:           c.delivery_cycle_id,
