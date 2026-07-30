@@ -294,6 +294,10 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                     style="background:var(--triarq-color-background-subtle);
                            color:var(--triarq-color-text-secondary);">No role</span>
             </ng-template>
+            <!-- IE is not a functional role (excluded from ALL_ROLE_FLAGS) — render explicitly. -->
+            <span class="um-pill" *ngIf="user.is_initiative_executive"
+                  [style.background]="flagPillBg('is_initiative_executive')"
+                  [style.color]="flagPillColor('is_initiative_executive')">IE</span>
           </span>
           <span>
             <span class="um-pill"
@@ -509,8 +513,36 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                           [style.color]="flagPillColor(flag)">
                       {{ flagAbbrev(flag) }}
                     </span>
+                    <span class="um-pill" *ngIf="selectedUser.is_initiative_executive"
+                          [style.background]="flagPillBg('is_initiative_executive')"
+                          [style.color]="flagPillColor('is_initiative_executive')">IE</span>
                   </span>
                 </div>
+              </div>
+
+              <!-- Initiative Executive — Phil/super_admin only (D-560/D-464).
+                   Company-wide leadership grant; set via delivery-cycle-mcp
+                   set_initiative_executive, NOT update_user. Non-super-admins
+                   don't see this control. -->
+              <div class="oi-zone" *ngIf="viewerIsSuperAdmin">
+                <div class="oi-zone-title">Initiative Executive</div>
+                <div style="font-size:12px;color:var(--triarq-color-text-secondary);margin-bottom:8px;">
+                  Initiative Executives are leadership across every Division — eligible approvers
+                  on any initiative and monitors of all pending gates. Reserved to Phil.
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span class="um-pill"
+                        [style.background]="selectedUser.is_initiative_executive ? flagPillBg('is_initiative_executive') : 'var(--triarq-color-background-subtle)'"
+                        [style.color]="selectedUser.is_initiative_executive ? flagPillColor('is_initiative_executive') : 'var(--triarq-color-text-secondary)'">
+                    {{ selectedUser.is_initiative_executive ? 'Initiative Executive' : 'Not an Initiative Executive' }}
+                  </span>
+                  <button type="button" class="oi-btn-secondary"
+                          [disabled]="ieBusy"
+                          (click)="toggleInitiativeExecutive(!selectedUser.is_initiative_executive)">
+                    {{ ieBusy ? 'Saving…' : (selectedUser.is_initiative_executive ? 'Revoke' : 'Grant Initiative Executive') }}
+                  </button>
+                </div>
+                <div class="oi-err" *ngIf="ieError" style="margin-top:6px;">{{ ieError }}</div>
               </div>
 
               <!-- Divisions zone — D-417: hierarchical tree picker replaces flat list.
@@ -771,6 +803,10 @@ export class UsersComponent implements OnInit {
   // D-429 / Contract 23 Item 6.2 — Initiative Activity zone in User View panel.
   // Visible only to Admin viewers. Lazily loads last 10 events for selectedUser.
   viewerIsAdmin            = false;
+  // IE grant is Phil/super_admin only (set_initiative_executive enforces it too).
+  viewerIsSuperAdmin       = false;
+  ieBusy                   = false;
+  ieError                  = '';
   viewedUserActivity:    InitiativeActivityEntry[] = [];
   loadingViewedActivity  = false;
 
@@ -806,6 +842,38 @@ export class UsersComponent implements OnInit {
 
     // D-429 §6.2 — Initiative Activity zone is Admin-only.
     this.viewerIsAdmin = this.profile.getCurrentProfile()?.is_admin === true;
+    // IE grant control is Phil/super_admin only.
+    this.viewerIsSuperAdmin = this.profile.getCurrentProfile()?.is_super_admin === true;
+  }
+
+  /** Phil-only: grant/revoke Initiative Executive via delivery-cycle-mcp
+   *  (set_initiative_executive — separate authority from update_user). Server
+   *  re-enforces super_admin; success returns the confirmed flag value. */
+  toggleInitiativeExecutive(granted: boolean): void {
+    if (!this.selectedUser || this.ieBusy) { return; }
+    const userId = this.selectedUser.id;
+    this.ieBusy = true; this.ieError = '';
+    this.cdr.markForCheck();
+    this.delivery.setInitiativeExecutive({ user_id: userId, granted }).subscribe({
+      next: (res) => {
+        if (res.success && res.data) {
+          if (this.selectedUser && this.selectedUser.id === userId) {
+            this.selectedUser = { ...this.selectedUser, is_initiative_executive: res.data.is_initiative_executive };
+          }
+          this.successMsg = res.data.is_initiative_executive
+            ? 'Granted Initiative Executive.' : 'Revoked Initiative Executive.';
+          setTimeout(() => { this.successMsg = ''; this.cdr.markForCheck(); }, 4000);
+          this.loadUsers();   // refresh grid pills
+        } else {
+          this.ieError = res.error ?? 'Could not update Initiative Executive.';
+        }
+        this.ieBusy = false; this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.ieError = err?.error ?? 'Could not update Initiative Executive.';
+        this.ieBusy = false; this.cdr.markForCheck();
+      }
+    });
   }
 
   /** D-429 §6.2: load last 10 Initiative events for the viewed user.
