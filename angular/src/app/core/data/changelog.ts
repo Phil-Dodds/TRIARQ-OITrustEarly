@@ -32,6 +32,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-29',
+    contractLabel: 'Contract 40 follow-on — Approver Setup & Governance Reach',
+    items: [
+      {
+        audience:    'Admin',
+        surface:     'Initiative Executive setup',
+        description: 'Phil can now grant or revoke Initiative Executive from a user\'s page in User Management. An Initiative Executive is leadership across every Division — they see all pending gates and can set the approver on any initiative. The IE badge shows on the user list.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Division Approvers',
+        description: 'Divisions now have an Approvers list (Admin → Divisions), chosen from the Division\'s members. These people become selectable as an initiative\'s approver. Automatic gate routing is unchanged — this only widens who a leader can choose.'
+      },
+      {
+        audience:    'All',
+        surface:     'Set approver — scoped picker',
+        description: 'The "Set approver…" picker on an initiative now lists only eligible people: the Division\'s Approvers and Leader, leaders of parent Divisions, and Initiative Executives — instead of every user. If none exist it points you to Admin → Divisions.'
+      },
+      {
+        audience:    'All',
+        surface:     'All Pending Gates',
+        description: 'Restyled to match the standard grid look. The inline Reassign button is gone — change an approver from the initiative\'s "Set approver…" control instead (also removed from the My Actions queue and the Initiative grid).'
+      }
+    ]
+  },
+  {
     date:          '2026-07-28',
     contractLabel: 'Contract 40 — Governance Visibility, Sizing Honesty, RACI Glyphs',
     items: [
