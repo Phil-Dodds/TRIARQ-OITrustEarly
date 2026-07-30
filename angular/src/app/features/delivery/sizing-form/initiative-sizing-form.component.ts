@@ -339,19 +339,21 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
     {
       key: 'q4_security_impact', noteKey: 'q4_note',
       label: 'Q4 — Security impact?',
-      // D-598: "Not sure" resolves to Yes (routing-positive) — no distinct stored
-      // state; it fires the Security specialist suggestion via the Yes value.
-      options: [ { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' },
-                 { value: 'unsure', label: 'Not sure' } ],
+      // "Not sure" REMOVED (Phil 2026-07-30). q4_security_impact is a boolean —
+      // there is no state in which "Not sure" can be stored, so selecting it
+      // wrote Yes and highlighted the Yes chip, making the option look broken.
+      // Q1–Q3 keep "I don't know" because 'idk' is a real stored value there.
+      options: [ { value: 'true', label: 'Yes' }, { value: 'false', label: 'No' } ],
       subs: []
     },
     {
       key: 'q5_ux', noteKey: 'q5_note',
       label: 'Q5 — UX involvement?',
-      // D-598: "Not sure" resolves to Critical (routing-positive) — fires the UX
-      // specialist suggestion via the Critical value; no distinct stored state.
-      options: [ { value: 'standard', label: 'Standard' }, { value: 'critical', label: 'Critical' },
-                 { value: 'unsure', label: 'Not sure' } ],
+      // "Not sure" REMOVED (Phil 2026-07-30) — same reason as Q4: q5_ux is
+      // standard|critical only, so "Not sure" wrote Critical and highlighted the
+      // Critical chip. Nothing is lost: choosing Critical directly fires the
+      // same UX specialist suggestion.
+      options: [ { value: 'standard', label: 'Standard' }, { value: 'critical', label: 'Critical' } ],
       subs: [
         { key: 'q5_sub_facing', label: 'Facing', options: [
           { value: 'none', label: 'None' }, { value: 'patient', label: 'Patient' },
@@ -418,11 +420,9 @@ export class InitiativeSizingFormComponent implements OnInit, OnDestroy {
 
   selectAnswer(key: keyof SizingAnswers, value: string): void {
     if (key === 'q4_security_impact') {
-      // D-598: "Not sure" (unsure) resolves to Yes — no distinct stored state.
-      (this.answers as unknown as Record<string, unknown>)[key] = value === 'true' || value === 'unsure';
-    } else if (key === 'q5_ux' && value === 'unsure') {
-      // D-598: "Not sure" resolves to Critical (routing-positive).
-      this.answers.q5_ux = 'critical';
+      // Boolean field — the chip values are the strings 'true' / 'false'.
+      // The former 'unsure' branch is gone with the chip (Phil 2026-07-30).
+      (this.answers as unknown as Record<string, unknown>)[key] = value === 'true';
     } else {
       (this.answers as unknown as Record<string, unknown>)[key] = value;
     }
