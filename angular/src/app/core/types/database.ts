@@ -363,6 +363,10 @@ export interface DeliveryCycle {
   sizing?:                   InitiativeSizing | null;
   // Contract GA-1 (D-579): per-gate best-practices link config (null = hidden).
   gate_coaching_links?:      Record<string, string | null>;
+  /** Contract 40 follow-on (Phil 2026-07-30): gate_name → missing artifact type
+   *  names. Advisory only — never blocks submission or approval. Surfaced as an
+   *  amber panel to both submitter and approver in the gate modal. */
+  artifact_warnings_by_gate?: Record<string, string[]>;
   created_at:              string;
   updated_at:              string;
   deleted_at:              string | null;

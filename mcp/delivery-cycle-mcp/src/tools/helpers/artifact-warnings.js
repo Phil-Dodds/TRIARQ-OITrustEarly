@@ -11,6 +11,12 @@
 //   gate_warning_behavior='primary_only'          — warn only when current gate sequence = primary_gate sequence
 //   gate_warning_behavior='primary_and_subsequent' — warn when current gate sequence >= primary_gate sequence
 //
+// Contract 40 follow-on (Phil 2026-07-30, migration 096): gate_warning_through
+// puts an optional UPPER bound on 'primary_and_subsequent' — warn from
+// primary_gate through that gate, then stop. NULL = unbounded (prior
+// behaviour). Lets a Brief-stage artifact stay loud through Go to Deploy
+// without nagging at Close Review.
+//
 // Inactive types and types already attached to the Initiative are excluded.
 
 'use strict';
@@ -57,7 +63,13 @@ function computeWarnings(artifactTypes, attachedTypeIds, currentGateName) {
         return currentSeq === primarySeq;
       }
       if (t.gate_warning_behavior === 'primary_and_subsequent') {
-        return currentSeq >= primarySeq;
+        if (currentSeq < primarySeq) { return false; }
+        // Contract 40 follow-on: optional upper bound. An unrecognised value
+        // is treated as unbounded rather than silencing the warning — failing
+        // loud is correct for an advisory signal.
+        const throughSeq = GATE_SEQUENCE[t.gate_warning_through];
+        if (throughSeq !== undefined && currentSeq > throughSeq) { return false; }
+        return true;
       }
       return false;
     })
@@ -84,7 +96,7 @@ async function computeArtifactSuggestionWarnings(delivery_cycle_id, currentGateN
 
   const { data: types, error: typesErr } = await supabase
     .from('cycle_artifact_types')
-    .select('artifact_type_id, artifact_type_name, primary_gate, gate_warning_behavior, active_status')
+    .select('artifact_type_id, artifact_type_name, primary_gate, gate_warning_behavior, gate_warning_through, active_status')
     .eq('active_status', true)
     .neq('gate_warning_behavior', 'none');
   if (typesErr || !types || types.length === 0) {
@@ -106,8 +118,51 @@ async function computeArtifactSuggestionWarnings(delivery_cycle_id, currentGateN
   return computeWarnings(types, attachedTypeIds, currentGateName);
 }
 
+/**
+ * Contract 40 follow-on (Phil 2026-07-30): compute the missing-artifact
+ * warnings for ALL FIVE gates in one pair of queries, for the READ path.
+ *
+ * The submitter has always seen these in the submit response, and the approver
+ * in the decision response — both AFTER acting. Phil's ruling is that both
+ * parties should see omissions while the gate is still open, so the gate modal
+ * needs them on load. Computing per-gate would be five round trips; this
+ * fetches once and evaluates the shared rule five times.
+ *
+ * @param {string} delivery_cycle_id
+ * @returns {Promise<Record<string, string[]>>} gate_name → artifact_type_name[]
+ */
+async function computeArtifactWarningsByGate(delivery_cycle_id) {
+  const empty = {
+    brief_review: [], go_to_build: [], go_to_deploy: [],
+    go_to_release: [], close_review: []
+  };
+
+  const { data: types, error: typesErr } = await supabase
+    .from('cycle_artifact_types')
+    .select('artifact_type_id, artifact_type_name, primary_gate, gate_warning_behavior, gate_warning_through, active_status')
+    .eq('active_status', true)
+    .neq('gate_warning_behavior', 'none');
+  if (typesErr || !types || types.length === 0) { return empty; }
+
+  const { data: attached, error: attachedErr } = await supabase
+    .from('cycle_artifacts')
+    .select('artifact_type_id')
+    .eq('delivery_cycle_id', delivery_cycle_id)
+    .in('artifact_type_id', types.map(t => t.artifact_type_id))
+    .is('deleted_at', null);
+  if (attachedErr) { return empty; }
+
+  const attachedTypeIds = new Set((attached || []).map(a => a.artifact_type_id));
+  const out = {};
+  for (const gate of Object.keys(empty)) {
+    out[gate] = computeWarnings(types, attachedTypeIds, gate).map(w => w.artifact_type_name);
+  }
+  return out;
+}
+
 module.exports = {
   GATE_SEQUENCE,
   computeWarnings,
-  computeArtifactSuggestionWarnings
+  computeArtifactSuggestionWarnings,
+  computeArtifactWarningsByGate
 };

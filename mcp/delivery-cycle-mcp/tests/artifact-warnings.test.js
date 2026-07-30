@@ -17,12 +17,13 @@ const {
 } = require('../src/tools/helpers/artifact-warnings');
 
 // Convenience: build a candidate type
-function type({ id, name, primary, behavior, active = true }) {
+function type({ id, name, primary, behavior, active = true, through = null }) {
   return {
     artifact_type_id:      id,
     artifact_type_name:    name,
     primary_gate:          primary,
     gate_warning_behavior: behavior,
+    gate_warning_through:  through,
     active_status:         active
   };
 }
@@ -123,5 +124,68 @@ describe('computeWarnings — return shape', () => {
     const t = type({ id:'t7', name:'Rollback Plan', primary:'close_review', behavior:'primary_only' });
     const out = computeWarnings([t], new Set(), 'close_review');
     assert.deepEqual(out, [{ artifact_type_id:'t7', artifact_type_name:'Rollback Plan' }]);
+  });
+});
+
+// ── Contract 40 follow-on (Phil 2026-07-30): gate_warning_through upper bound ──
+describe('computeWarnings — gate_warning_through window', () => {
+  // Context Brief as configured by migration 096: brief_review → go_to_deploy.
+  const cb = type({
+    id: 'cb', name: 'Context Brief', primary: 'brief_review',
+    behavior: 'primary_and_subsequent', through: 'go_to_deploy'
+  });
+
+  const fires = (gate) => computeWarnings([cb], new Set(), gate).length === 1;
+
+  test('fires at the primary gate (brief_review)', () => {
+    assert.equal(fires('brief_review'), true);
+  });
+
+  test('fires mid-window (go_to_build)', () => {
+    assert.equal(fires('go_to_build'), true);
+  });
+
+  test('fires at the boundary gate itself (go_to_deploy)', () => {
+    assert.equal(fires('go_to_deploy'), true);
+  });
+
+  test('does NOT fire past the boundary (go_to_release)', () => {
+    assert.equal(fires('go_to_release'), false);
+  });
+
+  test('does NOT fire past the boundary (close_review)', () => {
+    assert.equal(fires('close_review'), false);
+  });
+
+  test('null through = unbounded (prior D-438 behaviour preserved)', () => {
+    const unbounded = { ...cb, gate_warning_through: null };
+    assert.equal(computeWarnings([unbounded], new Set(), 'close_review').length, 1);
+  });
+
+  test('unrecognised through value is treated as unbounded, not silent', () => {
+    const bogus = { ...cb, gate_warning_through: 'not_a_gate' };
+    assert.equal(computeWarnings([bogus], new Set(), 'close_review').length, 1);
+  });
+
+  test('through is ignored for primary_only behaviour', () => {
+    const primaryOnly = { ...cb, gate_warning_behavior: 'primary_only', gate_warning_through: 'close_review' };
+    assert.equal(computeWarnings([primaryOnly], new Set(), 'go_to_build').length, 0);
+    assert.equal(computeWarnings([primaryOnly], new Set(), 'brief_review').length, 1);
+  });
+
+  test('already-attached artifact never warns inside the window', () => {
+    assert.equal(computeWarnings([cb], new Set(['cb']), 'go_to_build').length, 0);
+  });
+
+  // Scenario Journeys as configured by migration 096: go_to_build → go_to_deploy.
+  test('Scenario Journeys is silent at brief_review, loud at go_to_build', () => {
+    const sj = type({
+      id: 'sj', name: 'Scenario Journeys', primary: 'go_to_build',
+      behavior: 'primary_and_subsequent', through: 'go_to_deploy'
+    });
+    assert.equal(computeWarnings([sj], new Set(), 'brief_review').length, 0);
+    assert.equal(computeWarnings([sj], new Set(), 'go_to_build').length, 1);
+    assert.equal(computeWarnings([sj], new Set(), 'go_to_deploy').length, 1);
+    assert.equal(computeWarnings([sj], new Set(), 'go_to_release').length, 0);
   });
 });

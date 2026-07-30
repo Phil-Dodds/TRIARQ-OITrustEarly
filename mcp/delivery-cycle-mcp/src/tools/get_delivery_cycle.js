@@ -14,6 +14,9 @@ const { supabase } = require('../db');
 const { computeWaitingOnBatch } = require('../lib/waiting-on');
 // Contract GA-1 (D-579): blind-until-decision assessment filtering.
 const { filterForViewer: filterAssessmentsForViewer } = require('./helpers/gate-assessments');
+// Contract 40 follow-on (Phil 2026-07-30): missing-artifact warnings on the READ
+// path so submitter AND approver see omissions while the gate is still open.
+const { computeArtifactWarningsByGate } = require('./helpers/artifact-warnings');
 
 /**
  * @param {object} params
@@ -357,6 +360,16 @@ async function get_delivery_cycle(params, caller_user_id) {
     roadmap_theme_name = themeRow?.name ?? null;
   }
 
+  // Contract 40 follow-on (Phil 2026-07-30): advisory missing-artifact warnings
+  // per gate. Never throws into the read — an empty map degrades to "no
+  // warnings shown", which is safer than failing the whole detail load.
+  let artifactWarningsByGate = {};
+  try {
+    artifactWarningsByGate = await computeArtifactWarningsByGate(delivery_cycle_id);
+  } catch (_err) {
+    artifactWarningsByGate = {};
+  }
+
   return {
     success: true,
     data: {
@@ -377,6 +390,10 @@ async function get_delivery_cycle(params, caller_user_id) {
       // is served by list_participation (participation_records).
       milestone_dates:  milestone_dates       || [],
       gate_records:     enrichedGateRecords,
+      // Contract 40 follow-on (Phil 2026-07-30): gate_name → missing artifact
+      // type names. Advisory only; never blocks. Drives the amber panel shown
+      // to both submitter and approver in the gate modal.
+      artifact_warnings_by_gate: artifactWarningsByGate,
       // GA-1: per-gate "Full best practices" link config (null/blank = hidden).
       gate_coaching_links: gateCoachingLinks,
       workstream:       workstream ? { ...workstream, home_division_name } : null,

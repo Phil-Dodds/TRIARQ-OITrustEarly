@@ -32,6 +32,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-30',
+    contractLabel: 'Contract 40 follow-on — Framing Documents as Loud Suggestions',
+    items: [
+      {
+        audience:    'Trio',
+        surface:     'Context Brief no longer blocks Go to Build',
+        description: 'A missing Context Brief no longer stops a Go to Build submission. Instead it shows as an amber "recommended document not attached" warning on the gate — at Brief Review, Go to Build, and Go to Deploy — and stops warning after that. Scenario Journeys works the same way from Go to Build. Both the person submitting and the person approving see the same warning while the gate is open, so an omission is a conversation rather than a wall.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-29',
     contractLabel: 'Contract 40 follow-on — Approver Setup & Governance Reach',
     items: [

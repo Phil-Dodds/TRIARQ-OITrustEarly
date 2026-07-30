@@ -79,6 +79,10 @@ export interface GateRecordModalData {
   // Submit disabled with a D-140 explanation. Mirrors the server-side ladder
   // in submit_gate_for_approval (double enforcement).
   hardStops:            string[];
+  /** Contract 40 follow-on (Phil 2026-07-30): missing recommended artifacts for
+   *  THIS gate. Advisory — rendered as an amber panel and shown to whoever opens
+   *  the gate, submitter or approver. Never disables an action. */
+  artifactWarnings:     string[];
 }
 
 export type GateRecordModalResult =
@@ -402,6 +406,21 @@ const GATE_LABELS: Record<GateName, string> = {
               </button>
             </div>
           </ng-container>
+
+          <!-- Contract 40 follow-on (Phil 2026-07-30): missing recommended
+               artifacts — amber, advisory, never blocking. Placed OUTSIDE the
+               submit/approve blocks deliberately so the submitter AND the
+               approver both see the same omissions while the gate is open.
+               Replaces the Context Brief hard stop at Go to Build. -->
+          <div *ngIf="data.artifactWarnings.length > 0" class="grm-artifact-warn">
+            <div class="grm-artifact-warn-title">
+              ⚠ Recommended document{{ data.artifactWarnings.length === 1 ? '' : 's' }} not attached
+            </div>
+            <div *ngFor="let name of data.artifactWarnings" class="grm-artifact-warn-row">• {{ name }}</div>
+            <div class="grm-artifact-warn-foot">
+              This does not block the gate. Attach in the Artifacts section, or proceed and note why it is not needed.
+            </div>
+          </div>
 
           <!-- Not yet active — advancement guidance, no action -->
           <div *ngIf="!record && isNotYetActive" class="grm-meta">
@@ -1215,6 +1234,18 @@ const GATE_LABELS: Record<GateName, string> = {
     }
     .grm-hardstops-title { font-weight: 600; margin-bottom: 4px; }
     .grm-hardstops-row { margin-top: 2px; line-height: 1.4; }
+    /* Contract 40 follow-on: amber advisory band — deliberately the same
+       banded grammar as the red hard-stop block, in warning amber, so the
+       visual weight reads as "loud but not blocking". */
+    .grm-artifact-warn {
+      border-left: 3px solid var(--triarq-color-warning, #F2A620);
+      background: rgba(242,166,32,0.10);
+      border-radius: 0 5px 5px 0; padding: 8px 10px; margin-bottom: 8px;
+      font-size: 12px; color: #8a5b00;
+    }
+    .grm-artifact-warn-title { font-weight: 600; margin-bottom: 4px; }
+    .grm-artifact-warn-row { margin-top: 2px; line-height: 1.4; }
+    .grm-artifact-warn-foot { margin-top: 5px; font-style: italic; opacity: 0.85; }
     .grm-review-notes {
       background: var(--triarq-color-background-subtle); border-radius: 6px;
       padding: 8px 12px; font-size: 12px;

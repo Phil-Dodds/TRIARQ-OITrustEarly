@@ -57,19 +57,26 @@ const approved = (names) => names.map(g => ({ gate_name: g, gate_status: 'approv
 describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
   beforeEach(() => { queue = []; capturedUpdates = []; });
 
-  test('go_to_build blocked when no Context Brief attached', async () => {
+  // Contract 40 follow-on (Phil 2026-07-30): the Context Brief hard stop was
+  // REMOVED — it is now a loud advisory warning across Brief Review → Go to
+  // Deploy (migration 096 + artifact-warnings helper), shown to submitter and
+  // approver alike. This test now guards the reversal: a missing Context Brief
+  // must NOT block, so submission falls straight through to the Jira stop.
+  test('go_to_build NOT blocked by a missing Context Brief — falls through to the Jira stop', async () => {
     queue = [
       { data: { ...baseCycle }, error: null },                       // cycle
       { data: { is_admin: true, display_name: 'Phil' }, error: null }, // caller
       { data: { delivery_cycle_id: 'c1' }, error: null },            // sizing row (G3 D-567 pre-check)
       { data: approved(['brief_review']), error: null },             // predecessors
-      { data: { artifact_type_id: 't-cb' }, error: null },           // Context Brief type
-      { data: [], error: null },                                     // no attachments
+      // NO Context Brief type / attachment lookups any more — removed with the stop.
+      { data: { jira_epic_required: true }, error: null },           // Division requires Jira
       { data: null, error: null }                                    // gate_blocked event insert
     ];
     const res = await submit_gate_for_approval({ delivery_cycle_id: 'c1', gate_name: 'go_to_build', cast_confirmed: true }, CALLER);
     assert.equal(res.success, false);
-    assert.match(res.error, /Context Brief/);
+    // The block reached is Jira — proving Context Brief no longer gates.
+    assert.match(res.error, /Jira epic/);
+    assert.doesNotMatch(res.error, /Context Brief/);
   });
 
   test('go_to_build blocked on missing Jira epic when Division requires it', async () => {
@@ -78,8 +85,10 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
       { data: { is_admin: true, display_name: 'Phil' }, error: null },
       { data: { delivery_cycle_id: 'c1' }, error: null },            // sizing row (G3 D-567 pre-check)
       { data: approved(['brief_review']), error: null },
-      { data: { artifact_type_id: 't-cb' }, error: null },
-      { data: [{ cycle_artifact_id: 'a1' }], error: null },          // Context Brief present
+      // Contract 40 follow-on: Context Brief type/attachment slots removed
+      // (hard stop deleted — Rule 40 FIFO fixture ripple). Previously these two
+      // stale slots were being consumed as the Division lookup, so this test
+      // passed for the wrong reason.
       { data: { jira_epic_required: true }, error: null },           // division requires Jira
       { data: null, error: null }                                    // event insert
     ];
@@ -94,8 +103,8 @@ describe('submit_gate_for_approval — CC-38 f13 hard-stop ladder', () => {
       { data: { is_admin: true, display_name: 'Phil' }, error: null },
       { data: { delivery_cycle_id: 'c1' }, error: null },            // sizing row (G3 D-567 pre-check)
       { data: approved(['brief_review']), error: null },
-      { data: { artifact_type_id: 't-cb' }, error: null },
-      { data: [{ cycle_artifact_id: 'a1' }], error: null },
+      // Contract 40 follow-on: Context Brief type/attachment slots removed
+      // (hard stop deleted — Rule 40 FIFO fixture ripple).
       { data: { jira_epic_required: false }, error: null },          // Division exempt (migration 074)
       { data: null, error: null }                                    // event insert (AI unanswered block)
     ];

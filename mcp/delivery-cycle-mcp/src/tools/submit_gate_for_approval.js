@@ -454,26 +454,13 @@ async function submit_gate_for_approval(params, caller_user_id) {
   }
 
   if (gate_name === 'go_to_build' && !philOverride) {
-    // Context Brief attached — hard stop (Phil 2026-07-17).
-    const { data: cbType } = await supabase
-      .from('cycle_artifact_types')
-      .select('artifact_type_id')
-      .eq('artifact_type_name', 'Context Brief')
-      .single();
-    if (cbType) {
-      const { data: cbArtifacts } = await supabase
-        .from('cycle_artifacts')
-        .select('cycle_artifact_id')
-        .eq('delivery_cycle_id', delivery_cycle_id)
-        .eq('artifact_type_id', cbType.artifact_type_id)
-        .is('deleted_at', null)
-        .limit(1);
-      if (!cbArtifacts || cbArtifacts.length === 0) {
-        return blockGate('no_context_brief',
-          'Cannot submit Go to Build — no Context Brief is attached to this Initiative. ' +
-          'Attach the Context Brief document in the Artifacts section, then submit again.');
-      }
-    }
+    // Context Brief hard stop REMOVED (Phil 2026-07-30). It blocked Go to Build
+    // from 2026-07-17. Now a loud advisory warning across Brief Review → Go to
+    // Deploy, driven by cycle_artifact_types (migration 096) and surfaced to
+    // BOTH submitter and approver via the shared artifact-warnings helper.
+    // Scenario Journeys gets the same treatment from Go to Build. Do not
+    // reintroduce a per-artifact hard stop here — configure the warning window
+    // in the artifact type instead.
 
     // Jira epic linked — hard stop unless the Division is configured with
     // jira_epic_required = false (migration 074).

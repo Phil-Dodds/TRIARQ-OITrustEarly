@@ -3123,7 +3123,11 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
       checklist:            this.gateChecklist(gate),
       // CC-38 f13: unmet hard requirements — modal disables Submit and lists
       // them; server re-enforces in submit_gate_for_approval.
-      hardStops:            this.gateHardStops(gate)
+      hardStops:            this.gateHardStops(gate),
+      // Contract 40 follow-on (Phil 2026-07-30): advisory missing-artifact list
+      // for this gate, computed server-side from the artifact type's warning
+      // window (migration 096). Same list regardless of who opens the gate.
+      artifactWarnings:     this.cycle?.artifact_warnings_by_gate?.[gate] ?? []
     };
 
     this.gateModalOpen = true;
@@ -4142,9 +4146,6 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     (c.artifact_types ?? []).forEach(t => {
       typeIdToGate[t.artifact_type_id] = (t.primary_gate ?? null) as (GateName | null);
     });
-    const hasContextBrief = (c.artifacts ?? []).some(a =>
-      (a.artifact_type_name ?? '').toLowerCase().includes('context brief') && a.external_url);
-
     if (gate === 'brief_review') {
       if (!c.assigned_dcs_user_id) {
         stops.push('No Domain Capability Strategist is assigned. Assign a DCS in the Initiative edit panel.');
@@ -4155,9 +4156,9 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     }
 
     if (gate === 'go_to_build') {
-      if (!hasContextBrief) {
-        stops.push('No Context Brief is attached. Attach it in the Artifacts section.');
-      }
+      // Context Brief is no longer a hard stop (Phil 2026-07-30) — it is now a
+      // loud advisory warning across Brief Review → Go to Deploy, rendered from
+      // artifact_warnings_by_gate. Server twin removed in the same change.
       if (!c.jira_epic_key && this.divisionJiraRequired !== false) {
         stops.push('No Jira epic is linked. Link it in the Initiative edit panel.');
       }
