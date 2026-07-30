@@ -44,7 +44,10 @@ import { DeliveryService, QuarterDeployGoal } from '../../../core/services/deliv
     </div>
   `,
   styles: [`
-    .qdg-card { border: 1px solid #DDE5EA; border-radius: 10px; padding: 16px 20px; background: #fff; }
+    /* CC-38-21 home-card standard height (Phil 2026-07-28: match the other cards). */
+    :host { display: block; }
+    .qdg-card { border: 1px solid #DDE5EA; border-radius: 10px; padding: 16px 20px; background: #fff;
+      height: 340px; overflow-y: auto; box-sizing: border-box; }
     .qdg-title {
       font: 500 12px Roboto, sans-serif; text-transform: uppercase;
       letter-spacing: 0.05em; color: #5A5A5A; margin-bottom: 8px;

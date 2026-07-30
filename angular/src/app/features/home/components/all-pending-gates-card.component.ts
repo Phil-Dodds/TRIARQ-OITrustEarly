@@ -23,9 +23,12 @@ import { DeliveryService } from '../../../core/services/delivery.service';
     </div>
   `,
   styles: [`
+    /* CC-38-21 home-card standard height (Phil 2026-07-28: match the other cards). */
+    :host { display: block; }
     .apgc-card {
       border: 1px solid #DDE5EA; border-radius: 10px; padding: 16px 20px;
       background: #fff; cursor: pointer;
+      height: 340px; overflow-y: auto; box-sizing: border-box;
     }
     .apgc-card:hover { background: #F7FAFC; }
     .apgc-title {
