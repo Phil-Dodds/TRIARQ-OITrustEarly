@@ -348,6 +348,10 @@ export interface DeliveryCycle {
   oversight_user_id?:        string | null;
   oversight_set_via?:        'default' | 'manual' | null;
   oversight_set_by_user_id?: string | null;
+  // Contract 40 (CC-40-N): joined oversight approver name + DL/IE/Phil authority
+  // flag for the Identity governance controls (get_delivery_cycle).
+  oversight_display_name?:   string | null;
+  caller_can_set_governance?: boolean;
   // Contract G7: rolled-up waiting-on line (list rows; null = nothing awaiting).
   // Contract 40 WS4 (D-587): the Gate Wait Chip reads state + open_condition_count
   // + days_waiting; gate_name deep-links to the awaiting gate (D-345 auto-expand).

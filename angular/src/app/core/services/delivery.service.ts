@@ -986,6 +986,22 @@ export class DeliveryService {
     );
   }
 
+  // ── Per-initiative approver (oversight, D-561; CC-40-N) — DL/IE/Phil ────────
+  /** Name the initiative's approver (oversight). Also marks it as overseen. */
+  setOversight(params: { delivery_cycle_id: string; user_id: string }):
+    Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>(
+      'delivery', 'set_oversight', params as unknown as Record<string, unknown>
+    );
+  }
+  /** Clear the named approver — approval falls back to the D-557 defaults. */
+  clearOversight(params: { delivery_cycle_id: string }):
+    Observable<McpResponse<DeliveryCycle>> {
+    return this.mcp.call<DeliveryCycle>(
+      'delivery', 'clear_oversight', params as unknown as Record<string, unknown>
+    );
+  }
+
   // ── Contract G8 — Initiative Executive (D-560) ──────────────────────────────
 
   /** Phil-only grant/revoke. */

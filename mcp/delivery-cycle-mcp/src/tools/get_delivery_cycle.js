@@ -82,16 +82,18 @@ async function get_delivery_cycle(params, caller_user_id) {
   // populated. Mirror the list_delivery_cycles pattern (B-28 fix, Contract 9).
   let cycle_division_name = null;
   let cycle_division_display_name_short = null;
+  let cycle_division_owner_user_id = null;   // CC-40-N: DL authority for governance controls
   if (cycle.division_id) {
     const { data: cycleDivRow } = await supabase
       .from('divisions')
-      .select('division_name, display_name_short')
+      .select('division_name, display_name_short, owner_user_id')
       .eq('id', cycle.division_id)
       .is('deleted_at', null)
       .single();
     if (cycleDivRow) {
       cycle_division_name = cycleDivRow.division_name;
       cycle_division_display_name_short = cycleDivRow.display_name_short;
+      cycle_division_owner_user_id = cycleDivRow.owner_user_id ?? null;
     }
   }
 
@@ -135,25 +137,39 @@ async function get_delivery_cycle(params, caller_user_id) {
     cycle.assigned_dcs_user_id,
     cycle.assigned_epo_user_id,
     cycle.assigned_dol_user_id,
+    cycle.oversight_user_id,               // CC-40-N: named approver (oversight, D-561)
     caller_user_id,
     ...artifactAttacherIds
   ].filter(Boolean);
 
   let userMap = {};
   let callerIsAdmin = false;
+  let callerIsSuperAdmin = false;
+  let callerIsIE = false;
   if (userIdsToResolve.length > 0) {
     const { data: userRows } = await supabase
       .from('users')
-      .select('id, display_name, is_admin')
+      .select('id, display_name, is_admin, is_super_admin, is_initiative_executive')
       .in('id', [...new Set(userIdsToResolve)])
       .is('deleted_at', null);
     if (userRows) {
       userRows.forEach(u => {
         userMap[u.id] = u.display_name;
-        if (u.id === caller_user_id) { callerIsAdmin = u.is_admin === true; }
+        if (u.id === caller_user_id) {
+          callerIsAdmin      = u.is_admin === true;
+          callerIsSuperAdmin = u.is_super_admin === true;
+          callerIsIE         = u.is_initiative_executive === true;
+        }
       });
     }
   }
+  // CC-40-N: who may set the governance Level (set_effective_level) and the
+  // approver (set_oversight) on this Initiative — the Division Leader, an IE,
+  // or Phil. Mirrors governance_level.js loadCycleWithLeadershipCheck; the
+  // tools re-verify server-side regardless.
+  const caller_can_set_governance =
+    callerIsSuperAdmin || callerIsIE ||
+    (cycle_division_owner_user_id != null && cycle_division_owner_user_id === caller_user_id);
 
   // ── CC-28-3: enrich artifacts with joined artifact_type_name + attached_by_display_name ──
   // The Angular CycleArtifact type declares both as optional "Joined" fields.
@@ -354,6 +370,9 @@ async function get_delivery_cycle(params, caller_user_id) {
       assigned_dcs_display_name: cycle.assigned_dcs_user_id ? (userMap[cycle.assigned_dcs_user_id] ?? null) : null,
       assigned_epo_display_name: cycle.assigned_epo_user_id ? (userMap[cycle.assigned_epo_user_id] ?? null) : null,
       assigned_dol_display_name: cycle.assigned_dol_user_id ? (userMap[cycle.assigned_dol_user_id] ?? null) : null,
+      // CC-40-N: named approver (oversight, D-561) + DL/IE/Phil authority flag.
+      oversight_display_name:    cycle.oversight_user_id ? (userMap[cycle.oversight_user_id] ?? null) : null,
+      caller_can_set_governance,
       // Contract G4: D-458 resolved participant lists removed — participation
       // is served by list_participation (participation_records).
       milestone_dates:  milestone_dates       || [],

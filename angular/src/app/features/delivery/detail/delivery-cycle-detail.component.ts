@@ -730,181 +730,122 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       <!-- D-181: tappable chips. 2-column grid. Unset values: dashed-border chip italic gray.    -->
       <div class="oi-card" style="margin-bottom:var(--triarq-space-md);">
         <div style="font-weight:500;margin-bottom:var(--triarq-space-sm);">Identity</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--triarq-space-sm);">
-
-          <!-- Division -->
+        <!-- CC-40-N (Phil 2026-07-28): Identity reorganised — slim top row, then two
+             aligned columns: trio (DCS/DOL/EPO) left; Approver + Level, then
+             Consulted/Informed, right. Values bold. DL/IE/Phil set Level + Approver. -->
+        <div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:14px;">
           <div>
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Division</div>
-            <span *ngIf="cycle.division_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:12px;">
-              {{ cycle.division_name }}
-            </span>
-            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
-            <span *ngIf="!cycle.division_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Division: Not set
-            </span>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--triarq-color-text-secondary);margin-bottom:4px;">Division</div>
+            <span *ngIf="cycle.division_name" style="display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:12px;font-weight:700;">{{ cycle.division_name }}</span>
+            <span *ngIf="!cycle.division_name" style="display:inline-block;padding:3px 10px;border-radius:999px;border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">Division: Not set</span>
           </div>
-
-          <!-- Workstream -->
           <div>
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Workstream</div>
-            <!-- D-203: display_name_short preferred; fallback to workstream_name when null. Source: Contract 5 Block 2.4. -->
-            <span *ngIf="cycle.workstream?.workstream_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:12px;">
-              {{ cycle.workstream!.display_name_short ?? cycle.workstream!.workstream_name }}
-            </span>
-            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
-            <span *ngIf="!cycle.workstream?.workstream_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Workstream: Not set
-            </span>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--triarq-color-text-secondary);margin-bottom:4px;">Workstream</div>
+            <span *ngIf="cycle.workstream?.workstream_name" style="display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(90,90,90,0.08);color:#5A5A5A;font-size:12px;font-weight:700;">{{ cycle.workstream!.display_name_short ?? cycle.workstream!.workstream_name }}</span>
+            <span *ngIf="!cycle.workstream?.workstream_name" style="display:inline-block;padding:3px 10px;border-radius:999px;border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">Workstream: Not set</span>
           </div>
-
-          <!-- DCS (Domain Capability Strategist) — D-389 -->
           <div>
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Domain Capability Strategist</div>
-            <span *ngIf="cycle.assigned_dcs_display_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
-              {{ cycle.assigned_dcs_display_name }}
-            </span>
-            <span *ngIf="!cycle.assigned_dcs_display_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Domain Capability Strategist: Unassigned
-            </span>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--triarq-color-text-secondary);margin-bottom:4px;">Jira Epic</div>
+            <span *ngIf="jiraLink?.jira_epic_key" style="display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(37,112,153,0.08);color:#257099;font-size:12px;font-weight:700;">{{ jiraLink!.jira_epic_key }}</span>
+            <span *ngIf="!jiraLink?.jira_epic_key" style="display:inline-block;padding:3px 10px;border-radius:999px;border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">Jira Epic: Not linked</span>
           </div>
-
-          <!-- EPO (Engineering Product Owner) — D-390 -->
-          <div>
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Engineering Product Owner</div>
-            <span *ngIf="cycle.assigned_epo_display_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
-              {{ cycle.assigned_epo_display_name }}
-            </span>
-            <span *ngIf="!cycle.assigned_epo_display_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Engineering Product Owner: Unassigned
-            </span>
-          </div>
-
-          <!-- DOL (Domain Outcome Lead) — D-391 -->
-          <div>
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Domain Outcome Lead</div>
-            <span *ngIf="cycle.assigned_dol_display_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
-              {{ cycle.assigned_dol_display_name }}
-            </span>
-            <span *ngIf="!cycle.assigned_dol_display_name"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Domain Outcome Lead: Unassigned
-            </span>
-          </div>
-
-          <!-- Contract G4 (D-563/D-564): participation section replaces the
-               D-458 array pill blocks (arrays retired by migration 084). -->
-          <app-initiative-participation-section
-            [deliveryCycleId]="cycle.delivery_cycle_id"
-            [viewerUserId]="viewerUserId"
-            [canAttach]="callerCanSubmitGates"
-            [allUsers]="allUsers"
-            [castCommitted]="castCommitted">
-          </app-initiative-participation-section>
-
-          <!-- Contract G3 (D-562/D-567): Governance level for sized Initiatives;
-               legacy tier badge retained for never-sized ones (AC #4). -->
-          <div *ngIf="cycleIsSized">
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Governance Level</div>
-            <span style="display:inline-block;border-radius:999px;padding:3px 10px;
-                         font-size:12px;font-weight:500;font-family:Roboto,sans-serif;
-                         background:#257099;color:#fff;"
-                  [title]="levelChipTooltip">
-              {{ levelChipText }}
-            </span>
-            <div *ngIf="levelAttributionLine"
-                 style="margin-top:4px;font-size:11px;font-style:italic;color:#5A5A5A;">
-              {{ levelAttributionLine }}
-            </div>
-            <!-- Contract G8 (S-C6/D-562): baseline rose above the set level —
-                 the setter (or leadership) confirms or releases. Never silent. -->
-            <div *ngIf="showSetLevelDivergencePrompt"
-                 style="margin-top:6px;padding:8px 10px;border-left:3px solid #F2A620;
-                        background:rgba(242,166,32,0.08);font:400 12px Roboto,sans-serif;color:#1a1a1a;">
-              The computed baseline (Level {{ cycle!.baseline_level }}) has risen above the set
-              Level {{ cycle!.set_level }}. Confirm the set level or release it to the baseline.
-              <div style="display:flex;gap:8px;margin-top:6px;">
-                <button type="button" [disabled]="levelPromptBusy"
-                        (click)="confirmSetLevel()"
-                        style="background:#257099;border:none;border-radius:5px;padding:5px 12px;
-                               font:500 12px Roboto,sans-serif;color:#fff;cursor:pointer;">
-                  {{ levelPromptBusy ? 'Saving…' : 'Confirm Level ' + cycle!.set_level }}
-                </button>
-                <button type="button" [disabled]="levelPromptBusy"
-                        (click)="releaseSetLevel()"
-                        style="background:none;border:1px solid #B9C4CE;border-radius:5px;padding:5px 12px;
-                               font:500 12px Roboto,sans-serif;color:#00274E;cursor:pointer;">
-                  Release to baseline
-                </button>
-              </div>
-            </div>
-            <button *ngIf="callerCanSubmitGates" type="button"
-                    (click)="openSizingEdit()"
-                    style="margin-top:4px;background:none;border:none;padding:0;
-                           font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;">
-              Edit sizing
-            </button>
-          </div>
-          <!-- D-583 (Contract 39): identity-zone Tier field retired. -->
-
-          <!-- AI Governance — CC-38 f13. Chip when the Initiative includes AI;
-               AI Prod Board status inline. Hidden when No/blank/unknown. -->
           <div *ngIf="cycle.ai_functionality === 'yes'">
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">AI Governance</div>
-            <span style="display:inline-block;border-radius:4px;padding:3px 8px;font-size:12px;
-                         font-weight:500;background:rgba(126,87,194,0.10);color:#4A2F80;"
-                  [attr.title]="aiChipTooltip">
-              {{ cycle.ai_delivery_form === 'analytics_outputs' ? 'AI · Analytics' : 'AI' }}
-              <ng-container *ngIf="cycle.ai_audience"> · {{ cycle.ai_audience === 'external' ? 'External' : 'Internal' }}</ng-container>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--triarq-color-text-secondary);margin-bottom:4px;">AI Governance</div>
+            <span style="display:inline-block;border-radius:4px;padding:3px 8px;font-size:12px;font-weight:700;background:rgba(126,87,194,0.10);color:#4A2F80;" [attr.title]="aiChipTooltip">
+              {{ cycle.ai_delivery_form === 'analytics_outputs' ? 'AI · Analytics' : 'AI' }}<ng-container *ngIf="cycle.ai_audience"> · {{ cycle.ai_audience === 'external' ? 'External' : 'Internal' }}</ng-container>
             </span>
-            <span *ngIf="aiBoardGateId"
-                  [style.background]="cycle.ai_board_approved ? 'rgba(37,112,153,0.08)' : 'rgba(242,166,32,0.12)'"
-                  [style.color]="cycle.ai_board_approved ? '#257099' : '#8a5b00'"
-                  style="display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;margin-left:6px;">
+            <span *ngIf="aiBoardGateId" [style.background]="cycle.ai_board_approved ? 'rgba(37,112,153,0.08)' : 'rgba(242,166,32,0.12)'" [style.color]="cycle.ai_board_approved ? '#257099' : '#8a5b00'" style="display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;margin-left:6px;">
               {{ cycle.ai_board_approved ? 'AI Prod Board: Approved' : 'AI Prod Board: Approval pending' }}
             </span>
           </div>
+        </div>
 
-          <!-- Jira Epic Link -->
-          <div>
-            <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
-                        color:var(--triarq-color-text-secondary);margin-bottom:4px;">Jira Epic</div>
-            <span *ngIf="jiraLink?.jira_epic_key"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         background:rgba(37,112,153,0.08);color:#257099;font-size:12px;">
-              {{ jiraLink!.jira_epic_key }}
-            </span>
-            <!-- B-9 fix: prefix field label on empty states. Source: D-184. -->
-            <span *ngIf="!jiraLink?.jira_epic_key"
-                  style="display:inline-block;padding:3px 10px;border-radius:999px;
-                         border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">
-              Jira Epic: Not linked
-            </span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--triarq-space-md);align-items:start;">
+
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--triarq-color-text-secondary);margin-bottom:4px;">Domain Capability Strategist</div>
+              <span *ngIf="cycle.assigned_dcs_display_name" style="display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(37,112,153,0.08);color:#257099;font-size:12px;font-weight:700;">{{ cycle.assigned_dcs_display_name }}</span>
+              <span *ngIf="!cycle.assigned_dcs_display_name" style="display:inline-block;padding:3px 10px;border-radius:999px;border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">Domain Capability Strategist: Unassigned</span>
+            </div>
+            <div>
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--triarq-color-text-secondary);margin-bottom:4px;">Domain Outcome Lead</div>
+              <span *ngIf="cycle.assigned_dol_display_name" style="display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(37,112,153,0.08);color:#257099;font-size:12px;font-weight:700;">{{ cycle.assigned_dol_display_name }}</span>
+              <span *ngIf="!cycle.assigned_dol_display_name" style="display:inline-block;padding:3px 10px;border-radius:999px;border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">Domain Outcome Lead: Unassigned</span>
+            </div>
+            <div>
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--triarq-color-text-secondary);margin-bottom:4px;">Engineering Product Owner</div>
+              <span *ngIf="cycle.assigned_epo_display_name" style="display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(37,112,153,0.08);color:#257099;font-size:12px;font-weight:700;">{{ cycle.assigned_epo_display_name }}</span>
+              <span *ngIf="!cycle.assigned_epo_display_name" style="display:inline-block;padding:3px 10px;border-radius:999px;border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">Engineering Product Owner: Unassigned</span>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div style="display:flex;gap:20px;align-items:flex-start;">
+
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--triarq-color-text-secondary);margin-bottom:4px;">Approver</div>
+                <span *ngIf="cycle.oversight_user_id" style="display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(37,112,153,0.08);color:#257099;font-size:12px;font-weight:700;">{{ cycle.oversight_display_name || 'Named approver' }}</span>
+                <span *ngIf="!cycle.oversight_user_id" style="display:inline-block;padding:3px 10px;border-radius:999px;border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">Follows defaults</span>
+                <ng-container *ngIf="cycle.caller_can_set_governance">
+                  <div *ngIf="!showApproverEdit" style="display:flex;gap:10px;">
+                    <button type="button" style="background:none;border:none;padding:0;margin-top:4px;font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;" (click)="startApproverEdit()">Set approver…</button>
+                    <button type="button" *ngIf="cycle.oversight_user_id" style="background:none;border:none;padding:0;margin-top:4px;font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;" [disabled]="govBusy" (click)="clearApprover()">Clear</button>
+                  </div>
+                  <div *ngIf="showApproverEdit" style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
+                    <select [(ngModel)]="approverEditUserId" style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:12px;">
+                      <option value="">Select a person…</option>
+                      <option *ngFor="let u of activeUsersForApprover" [value]="u.id">{{ u.display_name }}</option>
+                    </select>
+                    <div style="display:flex;gap:6px;">
+                      <button type="button" style="background:#257099;border:none;border-radius:5px;padding:4px 10px;font-size:12px;color:#fff;cursor:pointer;" [disabled]="!approverEditUserId || govBusy" (click)="saveApprover()">{{ govBusy ? 'Saving…' : 'Save' }}</button>
+                      <button type="button" style="background:none;border:1px solid #B9C4CE;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;" [disabled]="govBusy" (click)="showApproverEdit=false">Cancel</button>
+                    </div>
+                    <div style="font-size:10px;color:#8a5b00;">Naming an approver marks this Initiative as overseen (may raise a Level 1 to Level 2).</div>
+                  </div>
+                </ng-container>
+              </div>
+
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--triarq-color-text-secondary);margin-bottom:4px;">Governance Level</div>
+                <span *ngIf="cycleIsSized" style="display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;background:#257099;color:#fff;" [title]="levelChipTooltip">{{ levelChipText }}</span>
+                <span *ngIf="!cycleIsSized" style="display:inline-block;padding:3px 10px;border-radius:999px;border:1px dashed #C0C0C0;color:#9E9E9E;font-style:italic;font-size:12px;">Not sized</span>
+                <div *ngIf="levelAttributionLine" style="margin-top:4px;font-size:11px;font-style:italic;color:#5A5A5A;">{{ levelAttributionLine }}</div>
+                <div *ngIf="showSetLevelDivergencePrompt" style="margin-top:6px;padding:8px 10px;border-left:3px solid #F2A620;background:rgba(242,166,32,0.08);font:400 12px Roboto,sans-serif;color:#1a1a1a;">
+                  The computed baseline (Level {{ cycle!.baseline_level }}) has risen above the set Level {{ cycle!.set_level }}. Confirm the set level or release it to the baseline.
+                  <div style="display:flex;gap:8px;margin-top:6px;">
+                    <button type="button" [disabled]="levelPromptBusy" (click)="confirmSetLevel()" style="background:#257099;border:none;border-radius:5px;padding:5px 12px;font:500 12px Roboto,sans-serif;color:#fff;cursor:pointer;">{{ levelPromptBusy ? 'Saving…' : 'Confirm Level ' + cycle!.set_level }}</button>
+                    <button type="button" [disabled]="levelPromptBusy" (click)="releaseSetLevel()" style="background:none;border:1px solid #B9C4CE;border-radius:5px;padding:5px 12px;font:500 12px Roboto,sans-serif;color:#00274E;cursor:pointer;">Release to baseline</button>
+                  </div>
+                </div>
+                <ng-container *ngIf="cycle.caller_can_set_governance">
+                  <div *ngIf="!showLevelEdit" style="display:flex;gap:10px;">
+                    <button type="button" style="background:none;border:none;padding:0;margin-top:4px;font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;" (click)="startLevelEdit()">Set level…</button>
+                    <button type="button" *ngIf="cycle.set_level != null" style="background:none;border:none;padding:0;margin-top:4px;font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;" [disabled]="govBusy" (click)="clearLevel()">Clear override</button>
+                  </div>
+                  <div *ngIf="showLevelEdit" style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
+                    <div style="display:flex;gap:4px;">
+                      <button type="button" *ngFor="let lv of levelOptions" (click)="levelEditValue=lv" [style.background]="levelEditValue===lv ? '#257099' : '#fff'" [style.color]="levelEditValue===lv ? '#fff' : '#1E1E1E'" style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;">L{{ lv }}</button>
+                    </div>
+                    <input type="text" maxlength="300" [(ngModel)]="levelEditReason" placeholder="Reason (required)" style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:12px;" />
+                    <div style="display:flex;gap:6px;">
+                      <button type="button" style="background:#257099;border:none;border-radius:5px;padding:4px 10px;font-size:12px;color:#fff;cursor:pointer;" [disabled]="!levelEditValue || !levelEditReason.trim() || govBusy" (click)="saveLevel()">{{ govBusy ? 'Saving…' : 'Save' }}</button>
+                      <button type="button" style="background:none;border:1px solid #B9C4CE;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;" [disabled]="govBusy" (click)="showLevelEdit=false">Cancel</button>
+                    </div>
+                  </div>
+                </ng-container>
+                <button *ngIf="callerCanSubmitGates" type="button" (click)="openSizingEdit()" style="background:none;border:none;padding:0;margin-top:4px;font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;">Edit sizing</button>
+              </div>
+
+            </div>
+
+            <app-initiative-participation-section
+              [deliveryCycleId]="cycle.delivery_cycle_id"
+              [viewerUserId]="viewerUserId"
+              [canAttach]="callerCanSubmitGates"
+              [allUsers]="allUsers"
+              [castCommitted]="castCommitted">
+            </app-initiative-participation-section>
           </div>
 
         </div>
@@ -3908,6 +3849,70 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     }).afterClosed().subscribe(saved => {
       if (saved && this.cycle) { this.loadCycle(this.cycle.delivery_cycle_id); } // S-008 refresh
     });
+  }
+
+  // ── CC-40-N: DL/IE/Phil governance controls (set Level + Approver) ─────────
+  // Level → set_effective_level/clear_effective_level (D-562); Approver →
+  // set_oversight/clear_oversight (D-561). Authority gated server-side + by the
+  // caller_can_set_governance flag from get_delivery_cycle.
+  showLevelEdit = false;
+  readonly levelOptions: (1 | 2 | 3)[] = [1, 2, 3];
+  levelEditValue: 1 | 2 | 3 | null = null;
+  levelEditReason = '';
+  showApproverEdit = false;
+  approverEditUserId = '';
+  govBusy = false;
+
+  get activeUsersForApprover(): User[] {
+    return (this.allUsers ?? []).filter(u => u.is_active !== false);
+  }
+
+  startLevelEdit(): void {
+    this.levelEditValue = (this.cycle?.set_level ?? this.cycle?.baseline_level ?? null) as 1 | 2 | 3 | null;
+    this.levelEditReason = '';
+    this.showLevelEdit = true;
+    this.cdr.markForCheck();
+  }
+  private govReload(): void {
+    this.govBusy = false;
+    this.showLevelEdit = false;
+    this.showApproverEdit = false;
+    if (this.cycle) { this.loadCycle(this.cycle.delivery_cycle_id); }   // S-008
+    this.cdr.markForCheck();
+  }
+  saveLevel(): void {
+    if (!this.cycle || !this.levelEditValue || !this.levelEditReason.trim() || this.govBusy) { return; }
+    this.govBusy = true; this.cdr.markForCheck();
+    this.delivery.setEffectiveLevel({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      level: this.levelEditValue, reason: this.levelEditReason.trim()
+    }).subscribe({ next: () => this.govReload(), error: () => { this.govBusy = false; this.cdr.markForCheck(); } });
+  }
+  clearLevel(): void {
+    if (!this.cycle || this.govBusy) { return; }
+    this.govBusy = true; this.cdr.markForCheck();
+    this.delivery.clearEffectiveLevel({
+      delivery_cycle_id: this.cycle.delivery_cycle_id,
+      reason: this.levelEditReason.trim() || 'Override cleared to baseline'
+    }).subscribe({ next: () => this.govReload(), error: () => { this.govBusy = false; this.cdr.markForCheck(); } });
+  }
+  startApproverEdit(): void {
+    this.approverEditUserId = this.cycle?.oversight_user_id ?? '';
+    this.showApproverEdit = true;
+    this.cdr.markForCheck();
+  }
+  saveApprover(): void {
+    if (!this.cycle || !this.approverEditUserId || this.govBusy) { return; }
+    this.govBusy = true; this.cdr.markForCheck();
+    this.delivery.setOversight({
+      delivery_cycle_id: this.cycle.delivery_cycle_id, user_id: this.approverEditUserId
+    }).subscribe({ next: () => this.govReload(), error: () => { this.govBusy = false; this.cdr.markForCheck(); } });
+  }
+  clearApprover(): void {
+    if (!this.cycle || this.govBusy) { return; }
+    this.govBusy = true; this.cdr.markForCheck();
+    this.delivery.clearOversight({ delivery_cycle_id: this.cycle.delivery_cycle_id })
+      .subscribe({ next: () => this.govReload(), error: () => { this.govBusy = false; this.cdr.markForCheck(); } });
   }
 
   gateStatusFontWeight(dateStatus: DateStatus): string {
