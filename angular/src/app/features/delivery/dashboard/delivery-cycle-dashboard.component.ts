@@ -51,6 +51,10 @@ import { StageTrackComponent }  from '../stage-track/stage-track.component';
 import { GateWaitChipComponent } from '../../../shared/components/gate-wait-chip/gate-wait-chip.component';
 import { RaciGlyphsComponent } from '../../../shared/components/raci-glyphs/raci-glyphs.component';
 import { MyRaciEntry } from '../../../core/services/delivery.service';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import {
+  ReassignApproverDialogComponent, ReassignApproverDialogData
+} from '../../../shared/components/reassign-approver-dialog/reassign-approver-dialog.component';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 // D-290: Create Cycle form moved to right panel component. Source: D-290.
@@ -110,7 +114,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, FormsModule, IonicModule, StageTrackComponent, GateWaitChipComponent, RaciGlyphsComponent, LoadingOverlayComponent, DeliveryCycleDetailComponent, DeliveryCycleCreatePanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, GateWaitChipComponent, RaciGlyphsComponent, LoadingOverlayComponent, DeliveryCycleDetailComponent, DeliveryCycleCreatePanelComponent],
   template: `
     <!-- S-006: flex container — grid left, detail panel right when cycle selected -->
     <div style="display:flex;align-items:flex-start;min-height:100%;">
@@ -179,6 +183,14 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                        padding:4px 12px;font-size:13px;white-space:nowrap;">
             Theme: {{ themeChipLabel }}
             <button (click)="filterThemes=[];applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <!-- CC-40-Q: Approver filter chip. -->
+          <span *ngIf="filterApprover"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Approver: {{ filterApprover === 'me' ? 'Me' : approverNameById(filterApprover) }}
+            <button (click)="filterApprover='';stagedApprover='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
           </span>
           <!-- Contract 40 follow-on (CC-40-G): My Role (RACI) filter chip. -->
           <span *ngIf="filterMyRoles.length"
@@ -587,6 +599,37 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             </div>
           </div>
 
+          <!-- Filter row: Approver — CC-40-Q. Filtering by approver reveals the
+               narrow Approver-initials column + reassign on each row. -->
+          <div style="border-bottom:1px solid #F0F0F0;">
+            <button (click)="toggleFilterRow('approver')"
+                    style="width:100%;background:none;border:none;cursor:pointer;
+                           display:flex;align-items:center;justify-content:space-between;
+                           padding:14px 20px;font-size:14px;color:#1E1E1E;">
+              <span style="font-weight:500;">Approver</span>
+              <span style="display:flex;align-items:center;gap:8px;">
+                <span *ngIf="stagedApprover" style="font-size:12px;color:var(--triarq-color-primary,#257099);">
+                  {{ stagedApprover === 'me' ? 'Me' : approverNameById(stagedApprover) }}
+                </span>
+                <span style="font-size:12px;color:#9E9E9E;">{{ openFilterRow === 'approver' ? '▲' : '▼' }}</span>
+              </span>
+            </button>
+            <div *ngIf="openFilterRow === 'approver'" style="padding:0 20px 16px;display:flex;flex-direction:column;gap:8px;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                <input type="radio" name="apprfilter" value="" [(ngModel)]="stagedApprover" /> Any approver
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                <input type="radio" name="apprfilter" value="me" [(ngModel)]="stagedApprover" /> Me (I'm the approver)
+              </label>
+              <label *ngFor="let a of approverOptions" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                <input type="radio" name="apprfilter" [value]="a.id" [(ngModel)]="stagedApprover" /> {{ a.name }}
+              </label>
+              <div *ngIf="approverOptions.length === 0" style="font-size:12px;color:#9E9E9E;font-style:italic;">
+                Approvers load once the list is on screen.
+              </div>
+            </div>
+          </div>
+
           <!-- Filter row: Roadmap Theme — D-488 multi-select. Unthemed = no tag. -->
           <div style="border-bottom:1px solid #F0F0F0;">
             <button (click)="toggleFilterRow('theme')"
@@ -742,6 +785,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
       <!-- D-196: headers always shown even when no rows.                             -->
       <!-- D-298: sticky top:0 — column labels stay visible on scroll. Source: D-298. -->
       <div *ngIf="!loading"
+           [style.grid-template-columns]="gridCols"
            style="display:grid;
                   grid-template-columns:88px 180px 1fr 140px minmax(160px,1.2fr) 110px;
                   gap:8px;padding:8px 16px;
@@ -764,6 +808,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
         </span>
         <span>Headline</span>
         <span>Team</span>
+        <!-- CC-40-Q: narrow Approver-initials column — only while filtering by approver. -->
+        <span *ngIf="showApproverColumn">Appr</span>
       </div>
 
       <!-- ── Cycle rows — 6-column (Contract 4: D-264 tier dot/badge removed, D-265 TEAM, D-267 Stage+Headline) ── -->
@@ -774,6 +820,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
           (click)="openCyclePanel(cycle.delivery_cycle_id)"
           [style.background]="selectedCycleId === cycle.delivery_cycle_id ? '#E8F0FE' : ''"
           [style.border-left]="selectedCycleId === cycle.delivery_cycle_id ? '3px solid var(--triarq-color-primary,#257099)' : '3px solid transparent'"
+          [style.grid-template-columns]="gridCols"
           style="display:grid;
                  grid-template-columns:88px 180px 1fr 140px minmax(160px,1.2fr) 110px;
                  gap:8px;padding:16px;
@@ -934,6 +981,23 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             <span *ngIf="!cycle.assigned_epo_display_name && !cycle.assigned_dcs_display_name && !cycle.assigned_dol_display_name
                          && !(filterWorkstream && (cycle.workstream?.workstream_name || workstreamName(cycle.workstream_id ?? '')))"
                   style="color:#9E9E9E;font-style:italic;font-size:11px;">—</span>
+          </div>
+
+          <!-- Col 7 (CC-40-Q): Approver initials + reassign — only while filtering by approver. -->
+          <div *ngIf="showApproverColumn" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px;">
+            <span *ngIf="approverInitials(cycle) as ini"
+                  [title]="raciByCycle.get(cycle.delivery_cycle_id)?.a_approver_display_name || ''"
+                  style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
+                         border-radius:999px;background:rgba(0,39,78,0.10);color:#00274E;font:700 10px Roboto;">
+              {{ ini }}
+            </span>
+            <span *ngIf="!approverInitials(cycle)" style="color:#9E9E9E;font-size:11px;">—</span>
+            <button type="button"
+                    (click)="$event.stopPropagation(); reassignApprover(cycle)"
+                    title="Reassign approver"
+                    style="background:none;border:none;color:#257099;font:500 10px Roboto;cursor:pointer;text-decoration:underline;padding:0;">
+              Reassign
+            </button>
           </div>
 
         </div>
@@ -1236,8 +1300,48 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     private readonly route:        ActivatedRoute,
     private readonly router:       Router,
     private readonly screenState:  ScreenStateService,
+    private readonly dialog:       MatDialog,
     private readonly cdr:          ChangeDetectorRef
   ) {}
+
+  // ── CC-40-Q: Approver filter + narrow initials column + reassign ───────────
+  filterApprover = '';   // '' = any, 'me', or a user id
+  stagedApprover = '';
+  private readonly BASE_GRID_COLS = '88px 180px 1fr 140px minmax(160px,1.2fr) 110px';
+
+  get showApproverColumn(): boolean { return !!this.filterApprover; }
+  get gridCols(): string { return this.showApproverColumn ? `${this.BASE_GRID_COLS} 84px` : this.BASE_GRID_COLS; }
+
+  /** Distinct resolved approvers across the loaded rows (for the filter list). */
+  get approverOptions(): { id: string; name: string }[] {
+    const byId = new Map<string, string>();
+    for (const e of this.raciByCycle.values()) {
+      if (e.a_approver_user_id && e.a_approver_display_name) { byId.set(e.a_approver_user_id, e.a_approver_display_name); }
+    }
+    return [...byId.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  approverNameById(id: string): string {
+    return this.approverOptions.find(a => a.id === id)?.name ?? id;
+  }
+  approverInitials(cycle: DeliveryCycle): string {
+    const name = this.raciByCycle.get(cycle.delivery_cycle_id)?.a_approver_display_name;
+    if (!name) { return ''; }
+    return name.split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
+  }
+  reassignApprover(cycle: DeliveryCycle): void {
+    const raci = this.raciByCycle.get(cycle.delivery_cycle_id);
+    this.dialog.open(ReassignApproverDialogComponent, {
+      data: {
+        delivery_cycle_id: cycle.delivery_cycle_id,
+        cycle_title: cycle.cycle_title,
+        gate_name_display: raci?.a_gate_name ?? null,
+        current_approver_name: raci?.a_approver_display_name ?? null
+      } as ReassignApproverDialogData,
+      width: '420px', maxWidth: '92vw'
+    }).afterClosed().subscribe(result => {
+      if (result?.reassigned) { this.loadMyRaci(); }   // refresh the resolved approver
+    });
+  }
 
   ngOnInit(): void {
     // Post-GEnd (Phil 2026-07-24): my Informed stakes for the row Follow stars.
@@ -1812,6 +1916,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         filterAssignedPerson:  this.filterAssignedPerson,
         filterThemes:          this.filterThemes,           // D-488 / D-171
         filterMyRoles:         this.filterMyRoles,          // CC-40-G / D-171
+        filterApprover:        this.filterApprover,         // CC-40-Q / D-171
         // G9 (D-563): interest profile remembered per-user per-screen.
         interestConditions:    this.interestConditions
       },
@@ -1858,6 +1963,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (Array.isArray(filter['filterMyRoles'])) {
       this.filterMyRoles = (filter['filterMyRoles'] as unknown[]).filter((v): v is string => typeof v === 'string');
     }
+    if (typeof filter['filterApprover'] === 'string') { this.filterApprover = filter['filterApprover'] as string; }
     // G9 (D-563): interest profile restore.
     if (Array.isArray(filter['interestConditions'])) {
       this.interestConditions = (filter['interestConditions'] as unknown[])
@@ -1901,9 +2007,9 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         for (const [id, entry] of Object.entries(res.data ?? {})) {
           this.raciByCycle.set(id, entry as MyRaciEntry);
         }
-        // CC-40-G: the My Role filter reads raciByCycle — re-apply once it lands
-        // (raci loads after the initial applyFilters()). No persist.
-        if (this.filterMyRoles.length) { this.applyFilters(false); }
+        // CC-40-G/Q: the My Role + Approver filters read raciByCycle — re-apply
+        // once it lands (raci loads after the initial applyFilters()). No persist.
+        if (this.filterMyRoles.length || this.filterApprover) { this.applyFilters(false); }
         this.cdr.markForCheck();
       },
       error: () => { /* glyphs degrade to the hollow-i default; non-blocking */ }
@@ -2014,6 +2120,13 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
         const raci = this.raciByCycle.get(c.delivery_cycle_id);
         const holds = !!raci && this.filterMyRoles.some(k => (raci as unknown as Record<string, boolean>)[k] === true);
         if (!holds) { return false; }
+      }
+
+      // CC-40-Q: Approver filter — 'me' or a specific approver user id.
+      if (this.filterApprover) {
+        const appr = this.raciByCycle.get(c.delivery_cycle_id)?.a_approver_user_id ?? null;
+        const want = this.filterApprover === 'me' ? (this.profile.getCurrentProfile()?.id ?? '') : this.filterApprover;
+        if (appr !== want) { return false; }
       }
 
       // D-167: workstream filter — '__none__' shows cycles with no workstream assigned
@@ -2157,6 +2270,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterDivision        = '';
     this.filterMyRoles         = [];   // CC-40-G
     this.stagedMyRoles         = [];
+    this.filterApprover        = '';   // CC-40-Q
+    this.stagedApprover        = '';
     this.includeChildDivisions = true;   // Phil 2026-06-15: children-by-default
     this.loadCycles();
   }
@@ -2308,6 +2423,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (this.filterDivision)       { n++; }
     if (this.filterThemes.length)  { n++; }   // D-488
     if (this.filterMyRoles.length) { n++; }   // CC-40-G
+    if (this.filterApprover)       { n++; }   // CC-40-Q
     return n;
   }
 
@@ -2338,6 +2454,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
       this.stagedIncludeChildren = this.includeChildDivisions;
       this.stagedThemes         = [...this.filterThemes];   // D-488
       this.stagedMyRoles        = [...this.filterMyRoles];  // CC-40-G
+      this.stagedApprover       = this.filterApprover;     // CC-40-Q
       this.openFilterRow        = '';
       // Restore scope activator state from applied filter values. CC-Decision-2026-04-12-E/F.
       this.wsScope     = (this.filterWorkstream && this.filterWorkstream !== '__none__') ? 'normal' : (this.filterWorkstream === '__none__' ? 'none_terminal' : '');
@@ -2361,6 +2478,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.filterAssignedPerson = this.stagedAssignedPerson;
     this.filterThemes         = [...this.stagedThemes];   // D-488
     this.filterMyRoles        = [...this.stagedMyRoles];  // CC-40-G
+    this.filterApprover       = this.stagedApprover;     // CC-40-Q
     // Division filter is server-side — reload if it changed
     const divisionChanged     = this.filterDivision !== this.stagedDivision || this.includeChildDivisions !== this.stagedIncludeChildren;
     this.filterDivision       = this.stagedDivision;
@@ -2383,6 +2501,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.stagedDivision       = '';
     this.stagedThemes         = [];   // D-488
     this.stagedMyRoles        = [];   // CC-40-G
+    this.stagedApprover       = '';   // CC-40-Q
     this.stagedIncludeChildren = true;   // Phil 2026-06-15: children-by-default
     this.openFilterRow        = '';
     this.wsScope              = '';  // CC-Decision-2026-04-12-E

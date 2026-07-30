@@ -14,7 +14,7 @@
 // Source: D-472, D-468, D-181, D-203, D-346, S-011/S-012/S-013, S-036, D-171.
 
 import {
-  Component, Input, OnChanges, ChangeDetectionStrategy, ChangeDetectorRef
+  Component, Input, Output, EventEmitter, OnChanges, ChangeDetectionStrategy, ChangeDetectorRef
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
@@ -187,8 +187,14 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
           <a *ngSwitchCase="'cancel-request'" class="ga-action-btn"
              [routerLink]="['/initiatives', item.delivery_cycle_id]"
              [queryParams]="{ returnTo: returnTo }">Review Cancel Request</a>
-          <a *ngSwitchDefault class="ga-action-btn" [routerLink]="['/initiatives', item.delivery_cycle_id]"
-             [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">Approve / Deny</a>
+          <span *ngSwitchDefault class="ga-action-cell">
+            <a class="ga-action-btn" [routerLink]="['/initiatives', item.delivery_cycle_id]"
+               [queryParams]="{ gate: item.gate_name, returnTo: returnTo }">Approve / Deny</a>
+            <!-- CC-40-Q: reassign this gate to another approver (single-approver gates).
+                 Authority (DL/IE/Phil) is enforced server-side. -->
+            <button *ngIf="item.item_type === 'accountable'" type="button" class="ga-reassign"
+                    (click)="reassignRequested.emit(item)">Reassign…</button>
+          </span>
         </ng-container>
       </div>
 
@@ -238,6 +244,9 @@ type SortField = 'gate' | 'initiative' | 'division' | 'submitted' | 'due';
     .ga-init-chip { color:var(--triarq-color-primary,#257099);text-decoration:none;white-space:normal;overflow-wrap:anywhere;min-width:0; }
     .ga-init-chip:hover { text-decoration:underline; }
     .ga-action-btn { display:inline-block;background:var(--triarq-color-primary,#257099);color:#fff;border-radius:5px;padding:4px 12px;font-size:12px;text-decoration:none;text-align:center;white-space:nowrap; }
+    .ga-action-cell { display:inline-flex;align-items:center;gap:8px; }
+    .ga-reassign { background:none;border:1px solid #B9C4CE;border-radius:5px;padding:3px 10px;font:500 11px Roboto;color:#257099;cursor:pointer;white-space:nowrap; }
+    .ga-reassign:hover { background:rgba(37,112,153,0.08); }
     /* Consulted decision text — stone for approved, Oravive for returned. */
     .ga-decision { font-size:11px;color:var(--triarq-color-stone,#8a9ba8);line-height:1.3; }
     .ga-decision--returned { color:var(--triarq-color-oravive,#E96127); }
@@ -255,6 +264,8 @@ export class ActionsListComponent implements OnChanges {
   /** All pending items — both Accountable and Consulted. Treated uniformly. */
   @Input() items: PendingApprovalItem[] = [];
   @Input() loading = true;
+  /** CC-40-Q: request to reassign this gate's approver (parent opens the dialog). */
+  @Output() reassignRequested = new EventEmitter<PendingApprovalItem>();
   /** Where the detail returns on exit — this is the Open tab. */
   readonly returnTo = '/actions';
 

@@ -96,25 +96,26 @@ async function get_my_raci(params, caller_user_id) {
       return !g || (g.gate_status !== 'approved' && g.gate_status !== 'skipped');
     }) || null;
 
-    // A — accountable for the next gate.
+    // A — accountable for the next gate. CC-40-Q: capture the resolved approver
+    // identity (not just whether it's the caller) so the Initiative grid can
+    // show who the approver is + reassign from there.
     let a = false;
     let aGateName = null;
+    let approverId = null;
     const effectiveLevel = c.set_level ?? c.baseline_level ?? null;
     const closed = c.current_lifecycle_stage === 'COMPLETE' || c.current_lifecycle_stage === 'CANCELLED';
     const l1SelfGov = effectiveLevel === 1 && !c.oversight_user_id;
     // A is absent for Level 1 (no external approver), closed, unsized (null level).
     if (nextGateName && !closed && !l1SelfGov && effectiveLevel != null) {
       const g = gates[nextGateName];
-      let approverId = g?.approver_user_id ?? null;
+      approverId = g?.approver_user_id ?? null;
       if (!approverId) {
         // Pre-submission: run the D-557 chain live (accepted cost, D-599).
         const res = await resolveGateApproverV2({ cycle: c, gate_name: nextGateName });
         approverId = res?.approver_user_id ?? null;
       }
-      if (approverId && approverId === caller_user_id) {
-        a = true;
-        aGateName = nextGateName;
-      }
+      aGateName = nextGateName;
+      if (approverId && approverId === caller_user_id) { a = true; }
     }
 
     // C — consulted; provisional until the Go to Build cast is committed (D-593).
@@ -122,16 +123,29 @@ async function get_my_raci(params, caller_user_id) {
     const castCommitted = !!gtb && (!!gtb.cast_confirmed_at ||
       gtb.gate_status === 'approved' || gtb.gate_status === 'skipped');
 
-    // Only emit an entry when the caller holds at least one letter (I is always
-    // renderable via the hollow-i affordance client-side, so absence is fine).
     result[c.delivery_cycle_id] = {
       r,
       a,
       c: stake.c,
       i: stake.i,
       c_provisional: stake.c && !castCommitted,
-      a_gate_name: aGateName
+      a_gate_name: a ? aGateName : null,   // glyph tap target only when the caller is A
+      a_approver_user_id: approverId       // resolved approver (any person); name filled below
     };
+  }
+
+  // CC-40-Q: resolve approver display names in one lookup.
+  const approverIds = [...new Set(Object.values(result).map(r => r.a_approver_user_id).filter(Boolean))];
+  if (approverIds.length > 0) {
+    const { data: appUsers } = await supabase
+      .from('users').select('id, display_name').in('id', approverIds).is('deleted_at', null);
+    const nameById = {};
+    (appUsers || []).forEach(u => { nameById[u.id] = u.display_name; });
+    for (const entry of Object.values(result)) {
+      entry.a_approver_display_name = entry.a_approver_user_id ? (nameById[entry.a_approver_user_id] ?? null) : null;
+    }
+  } else {
+    for (const entry of Object.values(result)) { entry.a_approver_display_name = null; }
   }
 
   return { success: true, data: result };

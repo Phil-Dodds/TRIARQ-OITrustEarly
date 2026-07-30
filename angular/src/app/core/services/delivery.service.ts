@@ -1096,6 +1096,10 @@ export interface MyRaciEntry {
   i: boolean;
   c_provisional: boolean;
   a_gate_name: GateName | null;
+  // CC-40-Q: the resolved next-gate approver (any person) — for the grid's
+  // Approver filter + initials column + reassign. Null on L1/closed/unsized.
+  a_approver_user_id?: string | null;
+  a_approver_display_name?: string | null;
 }
 
 export interface SizingAnswers {

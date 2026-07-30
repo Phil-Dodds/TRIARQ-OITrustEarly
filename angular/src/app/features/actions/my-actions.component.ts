@@ -23,6 +23,10 @@ import { PendingApprovalItem, CompletedActionItem } from '../../core/types/datab
 import { ActionsListComponent }          from './actions-list.component';
 import { CompletedActionsListComponent } from './completed-actions-list.component';
 import { GateConditionsListComponent }   from './gate-conditions-list.component';
+import { MatDialog, MatDialogModule }    from '@angular/material/dialog';
+import {
+  ReassignApproverDialogComponent, ReassignApproverDialogData
+} from '../../shared/components/reassign-approver-dialog/reassign-approver-dialog.component';
 import { MyInitiativeStatusComponent }   from '../delivery/my-initiative-status/my-initiative-status.component';
 import { EggSpotComponent }              from '../easter-eggs/egg-spot.component';
 import { EGG_KEYS }                      from '../../core/constants/easter-egg.constants';
@@ -32,7 +36,7 @@ type ActiveTab = 'open' | 'completed' | 'due' | 'ack' | 'conditions';
 @Component({
   selector:        'app-my-actions',
   standalone:      true,
-  imports:         [CommonModule, ActionsListComponent, CompletedActionsListComponent, GateConditionsListComponent, MyInitiativeStatusComponent, EggSpotComponent],
+  imports:         [CommonModule, MatDialogModule, ActionsListComponent, CompletedActionsListComponent, GateConditionsListComponent, MyInitiativeStatusComponent, EggSpotComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="ma-page">
@@ -87,7 +91,8 @@ type ActiveTab = 'open' | 'completed' | 'due' | 'ack' | 'conditions';
       </div>
 
       <app-actions-list *ngIf="activeTab === 'open'"
-        [items]="openItems" [loading]="loadingOpen"></app-actions-list>
+        [items]="openItems" [loading]="loadingOpen"
+        (reassignRequested)="onReassign($event)"></app-actions-list>
       <app-completed-actions-list *ngIf="activeTab === 'completed'"
         [items]="completedItems" [loading]="loadingCompleted"></app-completed-actions-list>
       <app-gate-conditions-list *ngIf="activeTab === 'conditions'"
@@ -153,8 +158,38 @@ export class MyActionsComponent implements OnInit {
     private readonly delivery: DeliveryService,
     private readonly route:    ActivatedRoute,
     private readonly router:   Router,
+    private readonly dialog:   MatDialog,
     private readonly cdr:      ChangeDetectorRef
   ) {}
+
+  /** CC-40-Q: reassign a gate's approver from the approval queue. On success the
+   *  gate leaves this queue (re-routed), so reload the pending list. */
+  onReassign(item: PendingApprovalItem): void {
+    this.dialog.open(ReassignApproverDialogComponent, {
+      data: {
+        delivery_cycle_id: item.delivery_cycle_id,
+        cycle_title: item.cycle_title,
+        gate_name_display: item.gate_name_display,
+        current_approver_name: item.approver_display_name ?? null
+      } as ReassignApproverDialogData,
+      width: '420px', maxWidth: '92vw'
+    }).afterClosed().subscribe(result => {
+      if (result?.reassigned) { this.reloadOpen(); }
+    });
+  }
+
+  private reloadOpen(): void {
+    this.loadingOpen = true; this.cdr.markForCheck();
+    this.delivery.listPendingApprovals().subscribe({
+      next: res => {
+        const all = (res.success && res.data) ? res.data : [];
+        this.openItems      = all.filter(i => i.item_type !== 'open_conditions');
+        this.conditionItems = all.filter(i => i.item_type === 'open_conditions');
+        this.loadingOpen = false; this.cdr.markForCheck();
+      },
+      error: () => { this.loadingOpen = false; this.cdr.markForCheck(); }
+    });
+  }
 
   /** Approve-gates badge — pending items count (approvals only). */
   get openCount(): number { return this.openItems.length; }
