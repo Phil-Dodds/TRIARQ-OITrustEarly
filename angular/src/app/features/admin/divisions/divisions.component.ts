@@ -52,7 +52,7 @@ import { DivisionRoadmapThemesComponent }   from './division-roadmap-themes.comp
 import { DivisionDefaultConsultedsComponent } from './division-default-consulteds.component';
 import { UserPickerComponent }         from '../../../shared/pickers/user-picker/user-picker.component';
 import { UserProfileService }          from '../../../core/services/user-profile.service';
-import { Division, User, SprintCalendar } from '../../../core/types/database';
+import { Division, User, SprintCalendar, DivisionApprover } from '../../../core/types/database';
 import {
   ALL_ROLE_FLAGS,
   ROLE_FLAG_ABBREVIATIONS,
@@ -500,6 +500,57 @@ const LEVEL_LABELS: Record<number, string> = {
                 </div>
               </div>
 
+              <!-- Contract 40 follow-on: designated Approvers. Candidate pool for
+                   the manual gate-approver picker on initiatives in this Division.
+                   Does NOT change automatic gate routing. Chosen from members. -->
+              <div class="oi-zone">
+                <div class="oi-zone-title">Approvers ({{ approvers.length }})</div>
+                <div class="oi-zone-explain">
+                  People eligible to be picked as an initiative's approver in this Division.
+                  Automatic gate routing is unchanged — this only widens who a leader can choose.
+                </div>
+                <div *ngIf="loadingApprovers" style="font-size:12px;color:var(--triarq-color-text-secondary);">Loading…</div>
+                <div *ngIf="!loadingApprovers">
+                  <div *ngIf="approvers.length === 0" class="oi-zone-explain">No designated approvers.</div>
+                  <div *ngFor="let a of approvers" class="dm-member-row">
+                    <span class="dm-member-name">
+                      <span>{{ a.display_name }}</span>
+                      <span class="dm-role-pill" *ngIf="a.is_active === false">inactive</span>
+                    </span>
+                    <span>
+                      <button *ngIf="removingApproverId !== a.user_id"
+                              style="background:none;border:none;color:var(--triarq-color-primary);cursor:pointer;font-size:12px;"
+                              (click)="removeApprover(a)">Remove</button>
+                      <ion-spinner *ngIf="removingApproverId === a.user_id" name="crescent" style="width:14px;height:14px;"></ion-spinner>
+                    </span>
+                  </div>
+
+                  <div style="margin-top:8px;">
+                    <button class="oi-btn-secondary"
+                            *ngIf="!addApproverPickerOpen"
+                            (click)="openAddApproverPicker()"
+                            [disabled]="selectedDivision.active_status === false"
+                            [title]="selectedDivision.active_status === false ? 'Division is inactive' : ''">
+                      Add Approver
+                    </button>
+                    <div *ngIf="addApproverPickerOpen" style="margin-top:8px;border:1px solid var(--triarq-color-border);border-radius:5px;padding:6px;max-height:220px;overflow-y:auto;">
+                      <input type="text" class="oi-input" placeholder="Filter members…"
+                             [value]="addApproverSearch" (input)="onAddApproverSearch($event)" />
+                      <label class="oi-picker-row" *ngFor="let u of selectableApprovers">
+                        <span style="display:flex;align-items:center;gap:6px;">
+                          <input type="checkbox" [checked]="false" (change)="addApprover(u)" />
+                          <span>{{ u.display_name }}</span>
+                        </span>
+                      </label>
+                      <div *ngIf="selectableApprovers.length === 0" class="oi-zone-explain" style="padding:6px;">
+                        No members available. Add members first — approvers must be members of this Division.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="oi-err" *ngIf="approverError">{{ approverError }}</div>
+                </div>
+              </div>
+
               <!-- Contract 32 (WS5): Initiative Update Cycle — cadence config
                    section (CC-32: spec §4.7 "tab" → section; panel has no tab
                    strip). Extracted child component per S-030 / D-252. -->
@@ -780,6 +831,16 @@ export class DivisionsComponent implements OnInit {
   removingMemberId: string | null = null;
   pendingRemoveMember: User | null = null;
   memberError          = '';
+
+  // Contract 40 follow-on: designated Approvers (picker-only pool). Chosen from
+  // the division's members. Does not affect automatic gate resolution (D-557).
+  approvers: DivisionApprover[] = [];
+  loadingApprovers          = false;
+  addApproverPickerOpen     = false;
+  addApproverSearch         = '';
+  addingApproverId: string | null   = null;
+  removingApproverId: string | null = null;
+  approverError             = '';
 
   readonly skeletonRows = [1, 2, 3, 4, 5];
 
@@ -1081,7 +1142,11 @@ export class DivisionsComponent implements OnInit {
     this.addPickerOpen      = false;
     this.addPickerSearch    = '';
     this.pendingRemoveMember = null;
+    this.approverError       = '';
+    this.addApproverPickerOpen = false;
+    this.addApproverSearch   = '';
     this.loadMembers(div.id);
+    this.loadApprovers(div.id);
     this.cdr.markForCheck();
   }
 
@@ -1497,6 +1562,88 @@ export class DivisionsComponent implements OnInit {
       error: (err: { error?: string }) => {
         this.memberError = err.error ?? 'Could not remove member.';
         this.removingMemberId = null;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  // ── Approvers (Contract 40 follow-on) ──────────────────────────────────────
+  private loadApprovers(divisionId: string): void {
+    this.loadingApprovers = true;
+    this.cdr.markForCheck();
+    this.mcp.call<DivisionApprover[]>('division', 'list_division_approvers', { division_id: divisionId }).subscribe({
+      next: (res) => {
+        this.approvers = res.success && Array.isArray(res.data) ? res.data : [];
+        this.loadingApprovers = false;
+        this.cdr.markForCheck();
+      },
+      error: () => { this.approvers = []; this.loadingApprovers = false; this.cdr.markForCheck(); }
+    });
+  }
+
+  openAddApproverPicker(): void {
+    this.addApproverPickerOpen = true;
+    this.addApproverSearch = '';
+    this.approverError = '';
+    this.cdr.markForCheck();
+  }
+
+  onAddApproverSearch(ev: Event): void {
+    this.addApproverSearch = (ev.target as HTMLInputElement).value.toLowerCase();
+    this.cdr.markForCheck();
+  }
+
+  /** Members not already designated approvers, optionally filtered. Approvers
+   *  must be members of the Division (enforced server-side too). */
+  get selectableApprovers(): User[] {
+    const approverIds = new Set(this.approvers.map(a => a.user_id));
+    const q = this.addApproverSearch.trim().toLowerCase();
+    return this.members.filter(m =>
+      m.is_active &&
+      !approverIds.has(m.id) &&
+      (!q || m.display_name.toLowerCase().includes(q))
+    );
+  }
+
+  addApprover(user: User): void {
+    if (!this.selectedDivisionId) { return; }
+    this.addingApproverId = user.id;
+    this.approverError = '';
+    this.cdr.markForCheck();
+    this.mcp.call<unknown>('division', 'set_division_approver', {
+      user_id: user.id, division_id: this.selectedDivisionId
+    }).subscribe({
+      next: (res) => {
+        if (res.success) { this.loadApprovers(this.selectedDivisionId!); }
+        else { this.approverError = res.error ?? 'Could not add approver.'; }
+        this.addingApproverId = null;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.approverError = err.error ?? 'Could not add approver.';
+        this.addingApproverId = null;
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  removeApprover(a: DivisionApprover): void {
+    if (!this.selectedDivisionId) { return; }
+    this.removingApproverId = a.user_id;
+    this.approverError = '';
+    this.cdr.markForCheck();
+    this.mcp.call<unknown>('division', 'remove_division_approver', {
+      user_id: a.user_id, division_id: this.selectedDivisionId
+    }).subscribe({
+      next: (res) => {
+        if (res.success) { this.loadApprovers(this.selectedDivisionId!); }
+        else { this.approverError = res.error ?? 'Could not remove approver.'; }
+        this.removingApproverId = null;
+        this.cdr.markForCheck();
+      },
+      error: (err: { error?: string }) => {
+        this.approverError = err.error ?? 'Could not remove approver.';
+        this.removingApproverId = null;
         this.cdr.markForCheck();
       }
     });

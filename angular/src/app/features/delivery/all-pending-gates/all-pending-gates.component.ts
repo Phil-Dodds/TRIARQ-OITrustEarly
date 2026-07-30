@@ -1,26 +1,25 @@
 // all-pending-gates.component.ts — Pathways OI Trust
-// Contract G8 (D-560) + Contract 40 follow-on (CC-40-P/Q). Every gate awaiting
-// approval in the widest scope the viewer is allowed (IE/Admin/Phil = all
-// divisions; Division Leader = their division(s)). Filter to narrow; reassign
-// the approver inline (CC-40-O routes the gate to the new person). Rows drill
-// into the gate panel. Pull-only; push obligations stay in My Actions.
+// Contract G8 (D-560) + Contract 40 follow-on. Every gate awaiting approval in
+// the widest scope the viewer is allowed (IE/Admin/Phil = all divisions;
+// Division Leader = their division(s)). Filter to narrow. Rows drill into the
+// gate panel. Reassignment lives on the initiative detail (Set approver…), not
+// here (Phil 2026-07-29). Pull-only; push obligations stay in My Actions.
+//
+// Reskinned onto the standard card + grid surface (Phil 2026-07-29) — token
+// colors, card container, zebra rows — to match the Initiative list.
 
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { DeliveryService, AllPendingGateRow } from '../../../core/services/delivery.service';
-import {
-  ReassignApproverDialogComponent, ReassignApproverDialogData
-} from '../../../shared/components/reassign-approver-dialog/reassign-approver-dialog.component';
 
 type ApgSort = 'days' | 'initiative' | 'division' | 'level' | 'approver';
 
 @Component({
   selector: 'app-all-pending-gates',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, MatDialogModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="apg-page">
@@ -28,8 +27,8 @@ type ApgSort = 'days' | 'initiative' | 'division' | 'level' | 'approver';
         <h2>All Pending Gates</h2>
         <div class="apg-desc">
           Every gate awaiting approval in your scope — rows past
-          {{ agingThresholdDays }} days are highlighted. Reassign routes the gate
-          to the new approver's queue immediately and notifies the trio.
+          {{ agingThresholdDays }} days are highlighted. To change an approver,
+          open the initiative and use “Set approver…”.
         </div>
       </div>
 
@@ -62,61 +61,61 @@ type ApgSort = 'days' | 'initiative' | 'division' | 'level' | 'approver';
         No gates match these filters.
       </div>
 
-      <table *ngIf="!loading && visibleRows.length > 0" class="apg-table">
-        <thead>
-          <tr>
-            <th class="apg-sortable" (click)="setSort('initiative')">Initiative {{ arrow('initiative') }}</th>
-            <th>Gate</th>
-            <th class="apg-sortable" (click)="setSort('division')">Division {{ arrow('division') }}</th>
-            <th class="apg-sortable" (click)="setSort('level')">Level {{ arrow('level') }}</th>
-            <th class="apg-sortable" (click)="setSort('approver')">Approver {{ arrow('approver') }}</th>
-            <th class="apg-sortable" (click)="setSort('days')">Days {{ arrow('days') }}</th>
-            <th>Waiting on</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let r of visibleRows" class="apg-row" [class.apg-row--aging]="r.aging" (click)="open(r)">
-            <td>{{ r.cycle_title }}</td>
-            <td>{{ r.gate_name_display }}</td>
-            <td>{{ r.division_display_name_short || '—' }}</td>
-            <td>{{ r.effective_level ? 'L' + r.effective_level : '—' }}</td>
-            <td>{{ r.approver_display_name || (r.effective_level === 1 ? 'Trio (Level 1)' : 'Unassigned') }}</td>
-            <td [style.fontWeight]="r.aging ? '700' : '400'">{{ r.days_waiting }}</td>
-            <td class="apg-waiting">{{ r.waiting_on?.line || '—' }}</td>
-            <td>
-              <!-- Reassign only meaningful for a single-approver (L2/L3) gate. -->
-              <button *ngIf="r.effective_level !== 1" type="button" class="apg-reassign"
-                      (click)="$event.stopPropagation(); reassign(r)">Reassign…</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div *ngIf="!loading && visibleRows.length > 0" class="apg-card">
+        <table class="apg-table">
+          <thead>
+            <tr>
+              <th class="apg-sortable" (click)="setSort('initiative')">Initiative {{ arrow('initiative') }}</th>
+              <th>Gate</th>
+              <th class="apg-sortable" (click)="setSort('division')">Division {{ arrow('division') }}</th>
+              <th class="apg-sortable" (click)="setSort('level')">Level {{ arrow('level') }}</th>
+              <th class="apg-sortable" (click)="setSort('approver')">Approver {{ arrow('approver') }}</th>
+              <th class="apg-sortable apg-num" (click)="setSort('days')">Days {{ arrow('days') }}</th>
+              <th>Waiting on</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of visibleRows" class="apg-row" [class.apg-row--aging]="r.aging" (click)="open(r)">
+              <td class="apg-strong">{{ r.cycle_title }}</td>
+              <td>{{ r.gate_name_display }}</td>
+              <td>{{ r.division_display_name_short || '—' }}</td>
+              <td>{{ r.effective_level ? 'L' + r.effective_level : '—' }}</td>
+              <td>{{ r.approver_display_name || (r.effective_level === 1 ? 'Trio (Level 1)' : 'Unassigned') }}</td>
+              <td class="apg-num" [style.fontWeight]="r.aging ? '700' : '400'">{{ r.days_waiting }}</td>
+              <td class="apg-waiting">{{ r.waiting_on?.line || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   `,
   styles: [`
-    .apg-page { padding: 24px; }
-    .apg-header h2 { margin: 0 0 4px 0; font: 500 22px Roboto, sans-serif; color: #00274E; }
-    .apg-desc { font: italic 11px Roboto, sans-serif; color: #5A5A5A; margin-bottom: 14px; }
+    .apg-page { padding: var(--triarq-space-lg, 24px); }
+    .apg-header h2 { margin: 0 0 4px 0; font-family: Roboto, sans-serif; font-weight: 500; font-size: 22px; color: var(--triarq-color-deep-navy, #00274E); }
+    .apg-desc { font: italic 11px Roboto, sans-serif; color: var(--triarq-color-text-secondary, #5A5A5A); margin-bottom: 14px; }
     .apg-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
-    .apg-f { border: 1px solid #B9C4CE; border-radius: 5px; padding: 5px 8px; font: 400 12px Roboto; }
+    .apg-f { border: 1px solid var(--triarq-color-border, #B9C4CE); border-radius: var(--triarq-radius-input, 5px); padding: 5px 8px; font: 400 12px Roboto; }
     .apg-check { font: 400 12px Roboto; color: #1E1E1E; display: inline-flex; align-items: center; gap: 5px; }
-    .apg-clear { background: none; border: none; color: #257099; font: 500 12px Roboto; cursor: pointer; text-decoration: underline; }
-    .apg-count { font: italic 11px Roboto; color: #5A5A5A; margin-left: auto; }
-    .apg-empty { font: italic 12px Roboto, sans-serif; color: #5A5A5A; padding: 24px 0; }
+    .apg-clear { background: none; border: none; color: var(--triarq-color-primary, #257099); font: 500 12px Roboto; cursor: pointer; text-decoration: underline; }
+    .apg-count { font: italic 11px Roboto; color: var(--triarq-color-text-secondary, #5A5A5A); margin-left: auto; }
+    .apg-empty { font: italic 12px Roboto, sans-serif; color: var(--triarq-color-text-secondary, #5A5A5A); padding: 24px 0; }
     .apg-error { border: 2px solid #d32f2f; border-radius: 5px; padding: 8px 12px; font-size: 12px; color: #d32f2f; }
+    /* Standard card surface (radius 10, token border) — matches Initiative list. */
+    .apg-card { background: #fff; border: 1px solid var(--triarq-color-border, #DDE5EA); border-radius: var(--triarq-radius-card, 10px); overflow: hidden; }
     .apg-table { width: 100%; border-collapse: collapse; font: 400 13px Roboto, sans-serif; }
-    .apg-table th { text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #5A5A5A; border-bottom: 1px solid #DDE5EA; }
+    .apg-table th { text-align: left; padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--triarq-color-text-secondary, #5A5A5A); background: #F7FAFC; border-bottom: 1px solid var(--triarq-color-border, #DDE5EA); }
+    .apg-num { text-align: right; }
     .apg-sortable { cursor: pointer; user-select: none; }
-    .apg-sortable:hover { color: #257099; }
-    .apg-row td { padding: 10px 12px; border-bottom: 1px solid #EEF3F6; color: #1a1a1a; }
+    .apg-sortable:hover { color: var(--triarq-color-primary, #257099); }
+    .apg-row td { padding: 11px 14px; border-bottom: 1px solid #EEF3F6; color: #1a1a1a; }
+    .apg-row:last-child td { border-bottom: none; }
     .apg-row { cursor: pointer; }
-    .apg-row:hover td { background: #F7FAFC; }
-    .apg-row--aging td { background: rgba(242, 166, 32, 0.08); border-left: none; }
-    .apg-row--aging td:first-child { border-left: 3px solid #F2A620; }
-    .apg-waiting { font-style: italic; color: #5A5A5A; }
-    .apg-reassign { background: none; border: 1px solid #B9C4CE; border-radius: 5px; padding: 3px 10px; font: 500 11px Roboto; color: #257099; cursor: pointer; white-space: nowrap; }
-    .apg-reassign:hover { background: rgba(37,112,153,0.08); }
+    .apg-row:nth-child(even) td { background: #FBFDFE; }
+    .apg-row:hover td { background: rgba(37,112,153,0.06); }
+    .apg-strong { font-weight: 600; }
+    .apg-row--aging td { background: rgba(242, 166, 32, 0.08); }
+    .apg-row--aging td:first-child { border-left: 3px solid var(--triarq-color-warning, #F2A620); }
+    .apg-waiting { font-style: italic; color: var(--triarq-color-text-secondary, #5A5A5A); }
   `]
 })
 export class AllPendingGatesComponent implements OnInit {
@@ -138,7 +137,6 @@ export class AllPendingGatesComponent implements OnInit {
   constructor(
     private readonly delivery: DeliveryService,
     private readonly router: Router,
-    private readonly dialog: MatDialog,
     readonly cdr: ChangeDetectorRef
   ) {}
 
@@ -207,20 +205,6 @@ export class AllPendingGatesComponent implements OnInit {
   open(r: AllPendingGateRow): void {
     this.router.navigate(['/initiatives', r.delivery_cycle_id], {
       queryParams: { gate: r.gate_name, returnTo: 'all-pending-gates' }
-    });
-  }
-
-  reassign(r: AllPendingGateRow): void {
-    this.dialog.open(ReassignApproverDialogComponent, {
-      data: {
-        delivery_cycle_id: r.delivery_cycle_id,
-        cycle_title: r.cycle_title,
-        gate_name_display: r.gate_name_display,
-        current_approver_name: r.approver_display_name
-      } as ReassignApproverDialogData,
-      width: '420px', maxWidth: '92vw'
-    }).afterClosed().subscribe(result => {
-      if (result?.reassigned) { this.load(); }   // refresh — the row moved queues
     });
   }
 }

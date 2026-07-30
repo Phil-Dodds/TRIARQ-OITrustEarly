@@ -51,10 +51,6 @@ import { StageTrackComponent }  from '../stage-track/stage-track.component';
 import { GateWaitChipComponent } from '../../../shared/components/gate-wait-chip/gate-wait-chip.component';
 import { RaciGlyphsComponent } from '../../../shared/components/raci-glyphs/raci-glyphs.component';
 import { MyRaciEntry } from '../../../core/services/delivery.service';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import {
-  ReassignApproverDialogComponent, ReassignApproverDialogData
-} from '../../../shared/components/reassign-approver-dialog/reassign-approver-dialog.component';
 import { LoadingOverlayComponent } from '../../../shared/components/loading-overlay/loading-overlay.component';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 // D-290: Create Cycle form moved to right panel component. Source: D-290.
@@ -114,7 +110,7 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
   selector: 'app-delivery-cycle-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, RouterModule, FormsModule, IonicModule, MatDialogModule, StageTrackComponent, GateWaitChipComponent, RaciGlyphsComponent, LoadingOverlayComponent, DeliveryCycleDetailComponent, DeliveryCycleCreatePanelComponent],
+  imports: [CommonModule, RouterModule, FormsModule, IonicModule, StageTrackComponent, GateWaitChipComponent, RaciGlyphsComponent, LoadingOverlayComponent, DeliveryCycleDetailComponent, DeliveryCycleCreatePanelComponent],
   template: `
     <!-- S-006: flex container — grid left, detail panel right when cycle selected -->
     <div style="display:flex;align-items:flex-start;min-height:100%;">
@@ -983,7 +979,8 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   style="color:#9E9E9E;font-style:italic;font-size:11px;">—</span>
           </div>
 
-          <!-- Col 7 (CC-40-Q): Approver initials + reassign — only while filtering by approver. -->
+          <!-- Col 7 (CC-40-Q): Approver initials — only while filtering by approver.
+               Reassignment moved to the initiative detail (Phil 2026-07-29). -->
           <div *ngIf="showApproverColumn" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px;">
             <span *ngIf="approverInitials(cycle) as ini"
                   [title]="raciByCycle.get(cycle.delivery_cycle_id)?.a_approver_display_name || ''"
@@ -992,12 +989,6 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
               {{ ini }}
             </span>
             <span *ngIf="!approverInitials(cycle)" style="color:#9E9E9E;font-size:11px;">—</span>
-            <button type="button"
-                    (click)="$event.stopPropagation(); reassignApprover(cycle)"
-                    title="Reassign approver"
-                    style="background:none;border:none;color:#257099;font:500 10px Roboto;cursor:pointer;text-decoration:underline;padding:0;">
-              Reassign
-            </button>
           </div>
 
         </div>
@@ -1300,7 +1291,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     private readonly route:        ActivatedRoute,
     private readonly router:       Router,
     private readonly screenState:  ScreenStateService,
-    private readonly dialog:       MatDialog,
     private readonly cdr:          ChangeDetectorRef
   ) {}
 
@@ -1327,20 +1317,6 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     const name = this.raciByCycle.get(cycle.delivery_cycle_id)?.a_approver_display_name;
     if (!name) { return ''; }
     return name.split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
-  }
-  reassignApprover(cycle: DeliveryCycle): void {
-    const raci = this.raciByCycle.get(cycle.delivery_cycle_id);
-    this.dialog.open(ReassignApproverDialogComponent, {
-      data: {
-        delivery_cycle_id: cycle.delivery_cycle_id,
-        cycle_title: cycle.cycle_title,
-        gate_name_display: raci?.a_gate_name ?? null,
-        current_approver_name: raci?.a_approver_display_name ?? null
-      } as ReassignApproverDialogData,
-      width: '420px', maxWidth: '92vw'
-    }).afterClosed().subscribe(result => {
-      if (result?.reassigned) { this.loadMyRaci(); }   // refresh the resolved approver
-    });
   }
 
   ngOnInit(): void {

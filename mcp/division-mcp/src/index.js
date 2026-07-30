@@ -44,6 +44,10 @@ const { reactivate_api_key }       = require('./tools/reactivate_api_key');
 const { save_division_status_config }  = require('./tools/save_division_status_config');
 const { get_division_status_config }   = require('./tools/get_division_status_config');
 const { clear_division_status_config } = require('./tools/clear_division_status_config');
+// Contract 40 follow-on: designated per-division Approvers (picker-only pool).
+const { set_division_approver }        = require('./tools/set_division_approver');
+const { list_division_approvers }      = require('./tools/list_division_approvers');
+const { remove_division_approver }     = require('./tools/remove_division_approver');
 // Easter Egg Hunt (spec docs/easter-egg-spec.md).
 const easterEggs                       = require('./tools/easter_eggs');
 // Bottom news banner feed.
@@ -108,6 +112,9 @@ app.post('/tools/:toolName', async (req, res) => {
     save_division_status_config,
     get_division_status_config,
     clear_division_status_config,
+    set_division_approver,
+    list_division_approvers,
+    remove_division_approver,
     find_egg:              easterEggs.find_egg,
     get_my_egg_basket:     easterEggs.get_my_egg_basket,
     get_recent_egg_finds:  easterEggs.get_recent_egg_finds,
@@ -193,6 +200,9 @@ app.get('/tools', (req, res) => {
       { name: 'save_division_status_config',  method: 'POST', path: '/tools/save_division_status_config' },
       { name: 'get_division_status_config',   method: 'POST', path: '/tools/get_division_status_config' },
       { name: 'clear_division_status_config', method: 'POST', path: '/tools/clear_division_status_config' },
+      { name: 'set_division_approver',        method: 'POST', path: '/tools/set_division_approver' },
+      { name: 'list_division_approvers',      method: 'POST', path: '/tools/list_division_approvers' },
+      { name: 'remove_division_approver',     method: 'POST', path: '/tools/remove_division_approver' },
       { name: 'find_egg',                     method: 'POST', path: '/tools/find_egg' },
       { name: 'get_my_egg_basket',            method: 'POST', path: '/tools/get_my_egg_basket' },
       { name: 'get_recent_egg_finds',         method: 'POST', path: '/tools/get_recent_egg_finds' },

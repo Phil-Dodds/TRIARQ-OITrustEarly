@@ -56,6 +56,7 @@ const { record_consultation_response }   = require('./tools/record_consultation_
 const { list_gate_consultations }        = require('./tools/list_gate_consultations');
 const { set_gate_approver }              = require('./tools/set_gate_approver');
 const { get_gate_approver_configs }      = require('./tools/get_gate_approver_configs');
+const { list_eligible_approvers }        = require('./tools/list_eligible_approvers');
 const { delete_gate_approver_config }    = require('./tools/delete_gate_approver_config');
 // Contract 24 — approved gate queries (D-430, D-431).
 const { list_approved_gates }            = require('./tools/list_approved_gates');
@@ -182,6 +183,7 @@ const TOOLS = {
   set_gate_approver,
   get_gate_approver_configs,
   delete_gate_approver_config,
+  list_eligible_approvers,
   // Contract 24 — approved gate analytical views (D-430, D-431).
   list_approved_gates,
   list_my_completed_gates,

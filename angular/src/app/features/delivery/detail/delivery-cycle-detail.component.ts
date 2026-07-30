@@ -76,7 +76,8 @@ import {
   GateDateRuleType,
   SprintAnchor,
   SprintRow,
-  GateDateShift
+  GateDateShift,
+  EligibleApprover
 } from '../../../core/types/database';
 import {
   resolveSprintRule,
@@ -793,10 +794,16 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     <button type="button" *ngIf="cycle.oversight_user_id" style="background:none;border:none;padding:0;margin-top:4px;font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;" [disabled]="govBusy" (click)="clearApprover()">Clear</button>
                   </div>
                   <div *ngIf="showApproverEdit" style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">
-                    <select [(ngModel)]="approverEditUserId" style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:12px;">
-                      <option value="">Select a person…</option>
-                      <option *ngFor="let u of activeUsersForApprover" [value]="u.id">{{ u.display_name }}</option>
+                    <!-- Contract 40 follow-on: picker limited to the eligible pool
+                         (IEs + division leader + ancestor leaders + this
+                         division's designated approvers), not all users. -->
+                    <select [(ngModel)]="approverEditUserId" [disabled]="loadingEligible" style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:12px;">
+                      <option value="">{{ loadingEligible ? 'Loading eligible approvers…' : 'Select a person…' }}</option>
+                      <option *ngFor="let u of eligibleApprovers" [value]="u.user_id">{{ u.display_name }}{{ eligibleSourceLabel(u) }}</option>
                     </select>
+                    <div *ngIf="!loadingEligible && eligibleApprovers.length === 0" style="font-size:10px;color:#8a5b00;">
+                      No eligible approvers for this Division. Add Division Approvers or a Division Leader in Admin → Divisions.
+                    </div>
                     <div style="display:flex;gap:6px;">
                       <button type="button" style="background:#257099;border:none;border-radius:5px;padding:4px 10px;font-size:12px;color:#fff;cursor:pointer;" [disabled]="!approverEditUserId || govBusy" (click)="saveApprover()">{{ govBusy ? 'Saving…' : 'Save' }}</button>
                       <button type="button" style="background:none;border:1px solid #B9C4CE;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;" [disabled]="govBusy" (click)="showApproverEdit=false">Cancel</button>
@@ -3862,9 +3869,18 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   showApproverEdit = false;
   approverEditUserId = '';
   govBusy = false;
+  // Contract 40 follow-on: eligible-approver pool for the picker (loaded lazily
+  // when the editor opens). Replaces the former all-users list.
+  eligibleApprovers: EligibleApprover[] = [];
+  loadingEligible = false;
 
-  get activeUsersForApprover(): User[] {
-    return (this.allUsers ?? []).filter(u => u.is_active !== false);
+  /** Small "(Leader)" / "(IE)" hint appended to a picker option. */
+  eligibleSourceLabel(u: EligibleApprover): string {
+    if (u.sources.includes('division_leader')) { return ' — Division Leader'; }
+    if (u.sources.includes('parent_leader'))   { return ' — Parent Leader'; }
+    if (u.sources.includes('initiative_executive')) { return ' — Initiative Exec'; }
+    if (u.sources.includes('division_approver')) { return ' — Approver'; }
+    return '';
   }
 
   startLevelEdit(): void {
@@ -3897,9 +3913,20 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     }).subscribe({ next: () => this.govReload(), error: () => { this.govBusy = false; this.cdr.markForCheck(); } });
   }
   startApproverEdit(): void {
-    this.approverEditUserId = this.cycle?.oversight_user_id ?? '';
+    if (!this.cycle) { return; }
+    this.approverEditUserId = this.cycle.oversight_user_id ?? '';
     this.showApproverEdit = true;
+    this.loadingEligible = true;
+    this.eligibleApprovers = [];
     this.cdr.markForCheck();
+    this.delivery.listEligibleApprovers({ delivery_cycle_id: this.cycle.delivery_cycle_id }).subscribe({
+      next: res => {
+        this.eligibleApprovers = (res.success && res.data) ? res.data.filter(u => u.is_active) : [];
+        this.loadingEligible = false;
+        this.cdr.markForCheck();
+      },
+      error: () => { this.loadingEligible = false; this.cdr.markForCheck(); }
+    });
   }
   saveApprover(): void {
     if (!this.cycle || !this.approverEditUserId || this.govBusy) { return; }

@@ -38,6 +38,7 @@ import {
   GateConsultation,
   GateApproverConfig,
   GateApproverConfigRow,
+  EligibleApprover,
   // Contract 37 (D-549–D-553)
   EffectiveSprintCalendar,
   GateDateRuleType,
@@ -1002,6 +1003,16 @@ export class DeliveryService {
     Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>(
       'delivery', 'clear_oversight', params as unknown as Record<string, unknown>
+    );
+  }
+
+  /** Contract 40 follow-on: candidate pool for the manual approver picker
+   *  (IEs + division leader + ancestor leaders + division's designated
+   *  approvers). Picker-only — does not change automatic resolution. */
+  listEligibleApprovers(params: { delivery_cycle_id: string }):
+    Observable<McpResponse<EligibleApprover[]>> {
+    return this.mcp.call<EligibleApprover[]>(
+      'delivery', 'list_eligible_approvers', params as unknown as Record<string, unknown>
     );
   }
 

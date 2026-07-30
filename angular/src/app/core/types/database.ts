@@ -750,6 +750,30 @@ export interface GateApproverConfig {
   updated_by_user_id: string | null;
 }
 
+// ── Contract 40 follow-on — Division Approvers (picker-only pool) ────────────
+// Designated per-division approvers (migration 094). Candidate pool for the
+// manual gate-approver picker; does NOT feed automatic gate resolution (D-557
+// unchanged). Members-only — enforced by set_division_approver.
+export interface DivisionApprover {
+  id:            string;
+  division_id:   string;
+  user_id:       string;
+  assigned_by:   string | null;
+  assigned_at:   string;
+  // Joined projection for the admin editor.
+  display_name?: string;
+  is_active?:    boolean;
+}
+
+/** One candidate the eligible-approver picker offers for a cycle. `sources`
+ *  explains why they qualify (grouping/label in the UI). */
+export interface EligibleApprover {
+  user_id:      string;
+  display_name: string;
+  is_active:    boolean;
+  sources:      Array<'initiative_executive' | 'division_leader' | 'parent_leader' | 'division_approver'>;
+}
+
 // ── Contract G1 (D-555–D-569) — governance redesign schema foundation ────────
 // Four primitives: sizing, level (columns on DeliveryCycle/User above),
 // participation, gate events. Migrations 080–083. MCP tools on
