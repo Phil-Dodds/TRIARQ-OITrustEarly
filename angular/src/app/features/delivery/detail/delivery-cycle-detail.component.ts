@@ -806,9 +806,12 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                       No eligible approvers for this Division. Add Division Approvers or a Division Leader in Admin → Divisions.
                     </div>
                     <!-- Load failure — distinct from an empty pool; offer retry. -->
-                    <div *ngIf="!loadingEligible && eligibleError" style="font-size:11px;color:#d32f2f;display:flex;align-items:center;gap:8px;">
-                      Couldn't load eligible approvers.
-                      <button type="button" style="background:none;border:none;padding:0;font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;" (click)="startApproverEdit()">Try again</button>
+                    <div *ngIf="!loadingEligible && eligibleError" style="font-size:11px;color:#d32f2f;display:flex;flex-direction:column;gap:2px;">
+                      <span style="display:flex;align-items:center;gap:8px;">
+                        Couldn't load eligible approvers.
+                        <button type="button" style="background:none;border:none;padding:0;font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;" (click)="startApproverEdit()">Try again</button>
+                      </span>
+                      <span *ngIf="eligibleErrorText" style="font-size:10px;color:#8a5b00;">{{ eligibleErrorText }}</span>
                     </div>
                     <div style="display:flex;gap:6px;">
                       <button type="button" style="background:#257099;border:none;border-radius:5px;padding:4px 10px;font-size:12px;color:#fff;cursor:pointer;" [disabled]="!approverEditUserId || govBusy" (click)="saveApprover()">{{ govBusy ? 'Saving…' : 'Save' }}</button>
@@ -3880,6 +3883,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   eligibleApprovers: EligibleApprover[] = [];
   loadingEligible = false;
   eligibleError = false;
+  eligibleErrorText = '';
 
   /** Small "(Leader)" / "(IE)" hint appended to a picker option. */
   eligibleSourceLabel(u: EligibleApprover): string {
@@ -3925,6 +3929,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.showApproverEdit = true;
     this.loadingEligible = true;
     this.eligibleError = false;
+    this.eligibleErrorText = '';
     this.eligibleApprovers = [];
     this.cdr.markForCheck();
     this.delivery.listEligibleApprovers({ delivery_cycle_id: this.cycle.delivery_cycle_id }).subscribe({
@@ -3933,11 +3938,16 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
           this.eligibleApprovers = res.data.filter(u => u.is_active);
         } else {
           this.eligibleError = true;   // tool returned an error — distinct from an empty pool
+          this.eligibleErrorText = res.error ?? '';
         }
         this.loadingEligible = false;
         this.cdr.markForCheck();
       },
-      error: () => { this.eligibleError = true; this.loadingEligible = false; this.cdr.markForCheck(); }
+      error: (err: { error?: string }) => {
+        this.eligibleError = true;
+        this.eligibleErrorText = err?.error ?? '';
+        this.loadingEligible = false; this.cdr.markForCheck();
+      }
     });
   }
   saveApprover(): void {
