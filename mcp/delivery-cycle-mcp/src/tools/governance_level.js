@@ -13,6 +13,52 @@ const { supabase } = require('../db');
 const { recomputeBaselineForCycle } = require('../lib/governance-derivation');
 // Contract G3 (D-562/AC#6): displaced-approver notification on level-lowering set.
 const { sendGateNotificationEmail } = require('./helpers/notification-email');
+// CC-40-O: re-route in-flight gate approvals on an oversight change.
+const { GATE_LABELS } = require('../lib/gate-resolution');
+const { resolveGateApproverV2 } = require('./helpers/approver');
+
+/**
+ * CC-40-O (Phil 2026-07-28): re-route every in-flight (awaiting_approval) gate on
+ * a cycle to `toUserId`, so a reassignment lands in the new approver's queue
+ * immediately and leaves the displaced approver's. Only single-approver gates
+ * (L2/L3 — approver_user_id set) are re-routed; L1 trio-consensus gates
+ * (approver_user_id null) are left untouched. In-app only: the new approver
+ * gets it via their queue; the trio + displaced approver learn via a gate-thread
+ * post + activity event. (Email is a future-design item per Phil.)
+ * @param {string} toUserId — the new approver (already validated active)
+ * @param {string} toDisplayName
+ */
+async function rerouteAwaitingGates(delivery_cycle_id, toUserId, toDisplayName, caller_user_id) {
+  const { data: awaiting } = await supabase
+    .from('gate_records')
+    .select('gate_record_id, gate_name, approver_user_id')
+    .eq('delivery_cycle_id', delivery_cycle_id)
+    .eq('gate_status', 'awaiting_approval')
+    .not('approver_user_id', 'is', null)
+    .is('deleted_at', null);
+  for (const g of (awaiting || [])) {
+    if (g.approver_user_id === toUserId) { continue; }   // already the approver
+    await supabase.from('gate_records')
+      .update({ approver_user_id: toUserId })
+      .eq('gate_record_id', g.gate_record_id);
+    await supabase.from('cycle_event_log').insert({
+      delivery_cycle_id,
+      event_type:        'gate_approver_reassigned',
+      event_description: `${GATE_LABELS[g.gate_name] || g.gate_name} approver reassigned to ${toDisplayName}.`,
+      actor_user_id:     caller_user_id,
+      event_metadata:    { gate_record_id: g.gate_record_id, gate_name: g.gate_name, from_user_id: g.approver_user_id, to_user_id: toUserId }
+    });
+    // Gate-thread post so the trio + displaced approver see it in-app (D-565).
+    const { error: threadErr } = await supabase.from('gate_thread_messages').insert({
+      gate_record_id: g.gate_record_id, user_id: caller_user_id,
+      message_text:   `Approver reassigned to ${toDisplayName}.`
+    });
+    if (threadErr) {
+      console.error(JSON.stringify({ tool_name: 'rerouteAwaitingGates', step: 'thread', gate_record_id: g.gate_record_id, error: threadErr.message }));
+    }
+  }
+  return (awaiting || []).length;
+}
 
 /** Load cycle + resolve whether caller is DL of its Division or Phil. */
 async function loadCycleWithLeadershipCheck(delivery_cycle_id, caller_user_id) {
@@ -276,7 +322,10 @@ async function set_oversight(params, caller_user_id) {
     event_metadata:    { oversight_user_id: user_id, set_via }
   });
 
-  return { success: true, data: updated };
+  // CC-40-O: re-route any in-flight gate to the new approver immediately.
+  const rerouted = await rerouteAwaitingGates(delivery_cycle_id, user_id, overseer.display_name, caller_user_id);
+
+  return { success: true, data: { ...updated, rerouted_gate_count: rerouted } };
 }
 
 /**
@@ -332,6 +381,38 @@ async function clear_oversight(params, caller_user_id) {
       clear_note:              String(note).trim()
     }
   });
+
+  // CC-40-O: re-route in-flight gates back to the D-557 default approver now
+  // that oversight is cleared. Resolve per gate (division/config/DL/IE/Phil).
+  const clearedCycle = {
+    delivery_cycle_id,
+    division_id:       ctx.cycle.division_id,
+    baseline_level:    ctx.cycle.baseline_level,
+    set_level:         ctx.cycle.set_level,
+    oversight_user_id: null
+  };
+  const { data: awaitingC } = await supabase
+    .from('gate_records')
+    .select('gate_record_id, gate_name, approver_user_id')
+    .eq('delivery_cycle_id', delivery_cycle_id)
+    .eq('gate_status', 'awaiting_approval')
+    .not('approver_user_id', 'is', null)
+    .is('deleted_at', null);
+  for (const g of (awaitingC || [])) {
+    const res = await resolveGateApproverV2({ cycle: clearedCycle, gate_name: g.gate_name });
+    const defaultApprover = res?.approver_user_id ?? null;
+    if (defaultApprover === g.approver_user_id) { continue; }
+    await supabase.from('gate_records')
+      .update({ approver_user_id: defaultApprover })
+      .eq('gate_record_id', g.gate_record_id);
+    await supabase.from('cycle_event_log').insert({
+      delivery_cycle_id,
+      event_type:        'gate_approver_reassigned',
+      event_description: `${GATE_LABELS[g.gate_name] || g.gate_name} approver reset to the default routing (oversight cleared).`,
+      actor_user_id:     caller_user_id,
+      event_metadata:    { gate_record_id: g.gate_record_id, gate_name: g.gate_name, from_user_id: g.approver_user_id, to_user_id: defaultApprover, reason: 'oversight_cleared' }
+    });
+  }
 
   return { success: true, data: updated };
 }

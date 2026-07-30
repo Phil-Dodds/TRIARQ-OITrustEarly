@@ -100,12 +100,25 @@ async function list_all_pending_gates(_params, caller_user_id) {
   if (callerErr || !caller || !caller.is_active) {
     return { success: false, error: 'Caller user record not found or inactive.' };
   }
-  if (caller.is_initiative_executive !== true && caller.is_super_admin !== true && caller.is_admin !== true) {
-    return {
-      success: false,
-      error: 'The All Pending Gates view is for Initiative Executives and Admins. ' +
-             'Your personal obligations live in My Actions.'
-    };
+  // CC-40-P: widest scope the caller is allowed. IE / Admin / Phil → all
+  // divisions. A Division Leader (owns ≥1 division) → their own division(s).
+  // Everyone else → their personal My Actions queue, not this view.
+  const isWide = caller.is_initiative_executive === true || caller.is_super_admin === true || caller.is_admin === true;
+  let ownedDivisionIds = null;
+  if (!isWide) {
+    const { data: owned } = await supabase
+      .from('divisions')
+      .select('id')
+      .eq('owner_user_id', caller_user_id)
+      .is('deleted_at', null);
+    ownedDivisionIds = new Set((owned || []).map(d => d.id));
+    if (ownedDivisionIds.size === 0) {
+      return {
+        success: false,
+        error: 'The All Pending Gates view is for Initiative Executives, Admins, and Division Leaders. ' +
+               'Your personal obligations live in My Actions.'
+      };
+    }
   }
 
   const { data: gates, error: gatesErr } = await supabase
@@ -149,6 +162,8 @@ async function list_all_pending_gates(_params, caller_user_id) {
 
   const pending_gates = gates
     .filter(g => cyclesById[g.delivery_cycle_id])   // drop soft-deleted initiatives
+    // CC-40-P: Division-Leader scope — only their own division(s).
+    .filter(g => isWide || ownedDivisionIds.has(cyclesById[g.delivery_cycle_id].division_id))
     .map(g => {
       const c = cyclesById[g.delivery_cycle_id];
       const d = c.division_id ? (divisionMap[c.division_id] || {}) : {};
