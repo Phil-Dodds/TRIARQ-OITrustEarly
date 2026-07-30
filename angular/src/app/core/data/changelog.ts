@@ -39,6 +39,11 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
         audience:    'Trio',
         surface:     'Context Brief no longer blocks Go to Build',
         description: 'A missing Context Brief no longer stops a Go to Build submission. Instead it shows as an amber "recommended document not attached" warning on the gate — at Brief Review, Go to Build, and Go to Deploy — and stops warning after that. Scenario Journeys works the same way from Go to Build. Both the person submitting and the person approving see the same warning while the gate is open, so an omission is a conversation rather than a wall.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Sizing — "Not sure" removed from Q4 and Q5',
+        description: 'The "Not sure" chip is gone from Q4 (Security impact) and Q5 (UX involvement). It could never hold a value on those two questions, so it highlighted the wrong chip and looked broken. Choose Yes or Critical directly — that raises the same Security or UX specialist suggestion. Questions 1–3 keep "I don\'t know", which is a real stored answer there.'
       }
     ]
   },
