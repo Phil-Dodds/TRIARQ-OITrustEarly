@@ -31,8 +31,8 @@ async function list_eligible_approvers(params, caller_user_id) {
   // Cycle → division.
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
-    .select('id, division_id')
-    .eq('id', delivery_cycle_id)
+    .select('delivery_cycle_id, division_id')
+    .eq('delivery_cycle_id', delivery_cycle_id)
     .is('deleted_at', null)
     .maybeSingle();
 
