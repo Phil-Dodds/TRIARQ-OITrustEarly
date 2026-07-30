@@ -3911,7 +3911,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   clearApprover(): void {
     if (!this.cycle || this.govBusy) { return; }
     this.govBusy = true; this.cdr.markForCheck();
-    this.delivery.clearOversight({ delivery_cycle_id: this.cycle.delivery_cycle_id })
+    this.delivery.clearOversight({ delivery_cycle_id: this.cycle.delivery_cycle_id, note: 'Approver cleared — back to default routing.' })
       .subscribe({ next: () => this.govReload(), error: () => { this.govBusy = false; this.cdr.markForCheck(); } });
   }
 

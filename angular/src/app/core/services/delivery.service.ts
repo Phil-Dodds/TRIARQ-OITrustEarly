@@ -987,15 +987,18 @@ export class DeliveryService {
   }
 
   // ── Per-initiative approver (oversight, D-561; CC-40-N) — DL/IE/Phil ────────
-  /** Name the initiative's approver (oversight). Also marks it as overseen. */
-  setOversight(params: { delivery_cycle_id: string; user_id: string }):
-    Observable<McpResponse<DeliveryCycle>> {
-    return this.mcp.call<DeliveryCycle>(
-      'delivery', 'set_oversight', params as unknown as Record<string, unknown>
+  /** Name the initiative's approver (oversight). Also marks it as overseen and
+   *  (CC-40-O) re-routes any in-flight gate to that person. set_via defaults to
+   *  'manual' (a deliberate reassignment). */
+  setOversight(params: { delivery_cycle_id: string; user_id: string; set_via?: 'default' | 'manual' }):
+    Observable<McpResponse<DeliveryCycle & { rerouted_gate_count?: number }>> {
+    return this.mcp.call<DeliveryCycle & { rerouted_gate_count?: number }>(
+      'delivery', 'set_oversight',
+      { set_via: 'manual', ...params } as unknown as Record<string, unknown>
     );
   }
-  /** Clear the named approver — approval falls back to the D-557 defaults. */
-  clearOversight(params: { delivery_cycle_id: string }):
+  /** Clear the named approver — approval falls back to the D-557 defaults. Note required. */
+  clearOversight(params: { delivery_cycle_id: string; note: string }):
     Observable<McpResponse<DeliveryCycle>> {
     return this.mcp.call<DeliveryCycle>(
       'delivery', 'clear_oversight', params as unknown as Record<string, unknown>
