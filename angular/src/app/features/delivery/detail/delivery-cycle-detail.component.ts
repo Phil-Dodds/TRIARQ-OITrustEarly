@@ -797,12 +797,18 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                     <!-- Contract 40 follow-on: picker limited to the eligible pool
                          (IEs + division leader + ancestor leaders + this
                          division's designated approvers), not all users. -->
-                    <select [(ngModel)]="approverEditUserId" [disabled]="loadingEligible" style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:12px;">
+                    <select *ngIf="!eligibleError" [(ngModel)]="approverEditUserId" [disabled]="loadingEligible" style="border:1px solid #B9C4CE;border-radius:5px;padding:4px 6px;font-size:12px;">
                       <option value="">{{ loadingEligible ? 'Loading eligible approvers…' : 'Select a person…' }}</option>
                       <option *ngFor="let u of eligibleApprovers" [value]="u.user_id">{{ u.display_name }}{{ eligibleSourceLabel(u) }}</option>
                     </select>
-                    <div *ngIf="!loadingEligible && eligibleApprovers.length === 0" style="font-size:10px;color:#8a5b00;">
+                    <!-- Empty pool — actionable guidance. -->
+                    <div *ngIf="!loadingEligible && !eligibleError && eligibleApprovers.length === 0" style="font-size:10px;color:#8a5b00;">
                       No eligible approvers for this Division. Add Division Approvers or a Division Leader in Admin → Divisions.
+                    </div>
+                    <!-- Load failure — distinct from an empty pool; offer retry. -->
+                    <div *ngIf="!loadingEligible && eligibleError" style="font-size:11px;color:#d32f2f;display:flex;align-items:center;gap:8px;">
+                      Couldn't load eligible approvers.
+                      <button type="button" style="background:none;border:none;padding:0;font-size:11px;color:#257099;cursor:pointer;text-decoration:underline;" (click)="startApproverEdit()">Try again</button>
                     </div>
                     <div style="display:flex;gap:6px;">
                       <button type="button" style="background:#257099;border:none;border-radius:5px;padding:4px 10px;font-size:12px;color:#fff;cursor:pointer;" [disabled]="!approverEditUserId || govBusy" (click)="saveApprover()">{{ govBusy ? 'Saving…' : 'Save' }}</button>
@@ -3873,6 +3879,7 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
   // when the editor opens). Replaces the former all-users list.
   eligibleApprovers: EligibleApprover[] = [];
   loadingEligible = false;
+  eligibleError = false;
 
   /** Small "(Leader)" / "(IE)" hint appended to a picker option. */
   eligibleSourceLabel(u: EligibleApprover): string {
@@ -3917,15 +3924,20 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     this.approverEditUserId = this.cycle.oversight_user_id ?? '';
     this.showApproverEdit = true;
     this.loadingEligible = true;
+    this.eligibleError = false;
     this.eligibleApprovers = [];
     this.cdr.markForCheck();
     this.delivery.listEligibleApprovers({ delivery_cycle_id: this.cycle.delivery_cycle_id }).subscribe({
       next: res => {
-        this.eligibleApprovers = (res.success && res.data) ? res.data.filter(u => u.is_active) : [];
+        if (res.success && res.data) {
+          this.eligibleApprovers = res.data.filter(u => u.is_active);
+        } else {
+          this.eligibleError = true;   // tool returned an error — distinct from an empty pool
+        }
         this.loadingEligible = false;
         this.cdr.markForCheck();
       },
-      error: () => { this.loadingEligible = false; this.cdr.markForCheck(); }
+      error: () => { this.eligibleError = true; this.loadingEligible = false; this.cdr.markForCheck(); }
     });
   }
   saveApprover(): void {
