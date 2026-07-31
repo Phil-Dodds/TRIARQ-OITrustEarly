@@ -174,14 +174,24 @@ interface ApgSnapshot {
     /* Hover must stay legible on navy — lighten, never drop to the link blue. */
     .apg-table thead th.apg-sortable:hover { background: #1B355F; }
 
-    .apg-row td { padding: 11px 14px; border-bottom: 1px solid #E8E8E8; color: #1a1a1a; }
+    /* Row ground matches All Initiatives exactly: white, no zebra, #E8E8E8
+       separator, #F0F4F8 hover. The 2026-07-29 reskin added zebra striping the
+       Initiative grid does not have. */
+    .apg-row td { padding: 11px 14px; border-bottom: 1px solid #E8E8E8; color: #1a1a1a; background: #fff; }
     .apg-row:last-child td { border-bottom: none; }
     .apg-row { cursor: pointer; }
-    .apg-row:nth-child(even) td { background: #FBFDFE; }
     .apg-row:hover td { background: #F0F4F8; }
     .apg-strong { font-weight: 600; }
-    .apg-row--aging td { background: rgba(242, 166, 32, 0.08); }
+
+    /* Aging marks the row; it does not repaint it. The previous 8% amber row
+       wash was correct for one flagged row among many, but most gates here are
+       over the 7-day threshold, so it turned the whole grid amber and stopped
+       carrying any signal. Border plus the emphasised day count does the same
+       job and leaves the grid reading as a grid. */
     .apg-row--aging td:first-child { border-left: 3px solid var(--triarq-color-warning, #F2A620); }
+    /* #B87700 not the #F2A620 token — the token is a fill colour and fails
+       contrast as text. Same darker amber the Next Gates screen uses. */
+    .apg-row--aging .apg-num { color: #B87700; }
     /* The Initiative just acted on — selected treatment from the Initiative grid. */
     .apg-row--refreshed td { background: #E8F0FE; }
     .apg-row--refreshed td:first-child { border-left: 3px solid var(--triarq-color-primary, #257099); }
