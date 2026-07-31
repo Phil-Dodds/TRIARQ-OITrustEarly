@@ -17,13 +17,14 @@ const {
 } = require('../src/tools/helpers/artifact-warnings');
 
 // Convenience: build a candidate type
-function type({ id, name, primary, behavior, active = true, through = null }) {
+function type({ id, name, primary, behavior, active = true, through = null, onOpen = false }) {
   return {
     artifact_type_id:      id,
     artifact_type_name:    name,
     primary_gate:          primary,
     gate_warning_behavior: behavior,
     gate_warning_through:  through,
+    gate_warning_on_open:  onOpen,
     active_status:         active
   };
 }
@@ -187,5 +188,100 @@ describe('computeWarnings — gate_warning_through window', () => {
     assert.equal(computeWarnings([sj], new Set(), 'go_to_build').length, 1);
     assert.equal(computeWarnings([sj], new Set(), 'go_to_deploy').length, 1);
     assert.equal(computeWarnings([sj], new Set(), 'go_to_release').length, 0);
+  });
+});
+
+// ── Contract 41 (D-616, migration 097): the on-open scope ────────────────────
+// Regression guard for the twelve-bullet Go to Build panel. The other ~10
+// artifact types have carried primary_and_subsequent since Contract 25; adding
+// the read path surfaced all of them on modal open. onOpenOnly is the filter
+// that keeps the panel to Context Brief and Scenario Journeys, WITHOUT
+// silencing anyone's D-438 submit/decision-response warnings.
+describe('computeWarnings — onOpenOnly (Contract 41 / D-616)', () => {
+
+  // The two loud types per migrations 096 + 097.
+  const contextBrief = type({
+    id: 'cb', name: 'Context Brief', primary: 'brief_review',
+    behavior: 'primary_and_subsequent', through: 'go_to_deploy', onOpen: true
+  });
+  const scenarioJourneys = type({
+    id: 'sj', name: 'Scenario Journeys', primary: 'go_to_build',
+    behavior: 'primary_and_subsequent', through: 'go_to_deploy', onOpen: true
+  });
+
+  // A representative slice of the Contract 25 / migration 076 set that made the
+  // Go to Build panel twelve bullets long. All warning-configured, none loud.
+  const quietTypes = [
+    'Design session output', 'UI/UX mockup', 'Process flow diagram',
+    'User Stories', 'Jira Epic', 'Technical Specification', 'Cursor prompt',
+    'Architecture Decision Record', 'Agent Registry entry', 'AI Governance Spec',
+    'Compliance & Risk Assessment'
+  ].map((name, i) => type({
+    id: `q${i}`, name, primary: 'go_to_build',
+    behavior: 'primary_and_subsequent', through: null, onOpen: false
+  }));
+
+  const allTypes = [contextBrief, scenarioJourneys, ...quietTypes];
+
+  test('go_to_build on open yields exactly the two loud types', () => {
+    const names = computeWarnings(allTypes, new Set(), 'go_to_build', { onOpenOnly: true })
+      .map(w => w.artifact_type_name).sort();
+    assert.deepEqual(names, ['Context Brief', 'Scenario Journeys']);
+  });
+
+  test('the same input without onOpenOnly still yields all thirteen', () => {
+    // Proves the D-438 submit/decision path is untouched by this change —
+    // the quiet types keep warning after an action, just not before one.
+    const all = computeWarnings(allTypes, new Set(), 'go_to_build');
+    assert.equal(all.length, 13);
+  });
+
+  test('brief_review on open yields Context Brief only', () => {
+    // Scenario Journeys is deliberately not warned at Brief Review (mig 096).
+    const names = computeWarnings(allTypes, new Set(), 'brief_review', { onOpenOnly: true })
+      .map(w => w.artifact_type_name);
+    assert.deepEqual(names, ['Context Brief']);
+  });
+
+  test('go_to_release and close_review are silent on open', () => {
+    // Both loud types close their window at go_to_deploy — no Close Review nag.
+    for (const gate of ['go_to_release', 'close_review']) {
+      assert.deepEqual(
+        computeWarnings(allTypes, new Set(), gate, { onOpenOnly: true }), [],
+        `expected no on-open warnings at ${gate}`
+      );
+    }
+  });
+
+  test('an attached loud type drops out of the on-open panel', () => {
+    const names = computeWarnings(allTypes, new Set(['cb']), 'go_to_build', { onOpenOnly: true })
+      .map(w => w.artifact_type_name);
+    assert.deepEqual(names, ['Scenario Journeys']);
+  });
+
+  test('a missing gate_warning_on_open field reads as not-loud', () => {
+    // Guards the pre-migration row shape and any select that forgets the column:
+    // a type is never loud by accident.
+    const legacy = { ...contextBrief };
+    delete legacy.gate_warning_on_open;
+    assert.deepEqual(computeWarnings([legacy], new Set(), 'brief_review', { onOpenOnly: true }), []);
+  });
+
+  test('onOpenOnly false and omitted behave identically', () => {
+    const omitted = computeWarnings(allTypes, new Set(), 'go_to_build');
+    const explicit = computeWarnings(allTypes, new Set(), 'go_to_build', { onOpenOnly: false });
+    assert.deepEqual(omitted, explicit);
+  });
+
+  test('a loud type still obeys its behaviour window', () => {
+    // on_open is a scope filter, not an override — primary_only still means one gate.
+    const narrow = { ...contextBrief, gate_warning_behavior: 'primary_only' };
+    assert.equal(computeWarnings([narrow], new Set(), 'brief_review', { onOpenOnly: true }).length, 1);
+    assert.equal(computeWarnings([narrow], new Set(), 'go_to_build', { onOpenOnly: true }).length, 0);
+  });
+
+  test('an inactive loud type is silent on open', () => {
+    const retired = { ...scenarioJourneys, active_status: false };
+    assert.deepEqual(computeWarnings([retired], new Set(), 'go_to_build', { onOpenOnly: true }), []);
   });
 });

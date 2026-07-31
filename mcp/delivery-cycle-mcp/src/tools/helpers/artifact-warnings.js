@@ -43,18 +43,25 @@ const GATE_SEQUENCE = {
  * Exported separately from the DB-fetching wrapper so unit tests can exercise
  * the rule without a Supabase client.
  *
- * @param {Array<{artifact_type_id:string, artifact_type_name:string, primary_gate:string|null, gate_warning_behavior:string, active_status:boolean}>} artifactTypes
+ * @param {Array<{artifact_type_id:string, artifact_type_name:string, primary_gate:string|null, gate_warning_behavior:string, gate_warning_on_open:boolean, active_status:boolean}>} artifactTypes
  * @param {Set<string>} attachedTypeIds
  * @param {string} currentGateName
+ * @param {{onOpenOnly?:boolean}} [options] onOpenOnly restricts the result to
+ *        types flagged gate_warning_on_open (migration 097 / D-616). Default
+ *        false preserves the D-438 submit/decision-response behaviour exactly.
  * @returns {Array<{artifact_type_id:string, artifact_type_name:string}>}
  */
-function computeWarnings(artifactTypes, attachedTypeIds, currentGateName) {
+function computeWarnings(artifactTypes, attachedTypeIds, currentGateName, options) {
   const currentSeq = GATE_SEQUENCE[currentGateName];
   if (currentSeq === undefined) { return []; }
+  const onOpenOnly = options?.onOpenOnly === true;
 
   return (artifactTypes || [])
     .filter(t => t && t.active_status !== false)
     .filter(t => t.gate_warning_behavior && t.gate_warning_behavior !== 'none')
+    // Contract 41 (D-616): the modal-open panel carries only the loud types.
+    // Missing/undefined reads as false — a type is never loud by accident.
+    .filter(t => !onOpenOnly || t.gate_warning_on_open === true)
     .filter(t => !attachedTypeIds.has(t.artifact_type_id))
     .filter(t => {
       const primarySeq = GATE_SEQUENCE[t.primary_gate];
@@ -128,6 +135,14 @@ async function computeArtifactSuggestionWarnings(delivery_cycle_id, currentGateN
  * needs them on load. Computing per-gate would be five round trips; this
  * fetches once and evaluates the shared rule five times.
  *
+ * Contract 41 (Phil 2026-07-31, migration 097): scoped to types flagged
+ * gate_warning_on_open. The first cut of this function inherited the full
+ * D-438 set — twelve bullets at Go to Build — because most artifact types have
+ * carried gate_warning_behavior='primary_and_subsequent' since Contract 25 and
+ * nothing had ever surfaced them before an action. D-616 intended exactly two:
+ * Context Brief and Scenario Journeys. Those types keep contributing to the
+ * submit and decision responses via computeArtifactSuggestionWarnings.
+ *
  * @param {string} delivery_cycle_id
  * @returns {Promise<Record<string, string[]>>} gate_name → artifact_type_name[]
  */
@@ -139,9 +154,10 @@ async function computeArtifactWarningsByGate(delivery_cycle_id) {
 
   const { data: types, error: typesErr } = await supabase
     .from('cycle_artifact_types')
-    .select('artifact_type_id, artifact_type_name, primary_gate, gate_warning_behavior, gate_warning_through, active_status')
+    .select('artifact_type_id, artifact_type_name, primary_gate, gate_warning_behavior, gate_warning_through, gate_warning_on_open, active_status')
     .eq('active_status', true)
-    .neq('gate_warning_behavior', 'none');
+    .neq('gate_warning_behavior', 'none')
+    .eq('gate_warning_on_open', true);
   if (typesErr || !types || types.length === 0) { return empty; }
 
   const { data: attached, error: attachedErr } = await supabase
@@ -155,7 +171,11 @@ async function computeArtifactWarningsByGate(delivery_cycle_id) {
   const attachedTypeIds = new Set((attached || []).map(a => a.artifact_type_id));
   const out = {};
   for (const gate of Object.keys(empty)) {
-    out[gate] = computeWarnings(types, attachedTypeIds, gate).map(w => w.artifact_type_name);
+    // onOpenOnly is belt-and-braces alongside the .eq() above: the FIFO test
+    // mock ignores column names on .eq(), so the query filter alone is not
+    // something a unit test can prove (CLAUDE.md Standing Note 2).
+    out[gate] = computeWarnings(types, attachedTypeIds, gate, { onOpenOnly: true })
+      .map(w => w.artifact_type_name);
   }
   return out;
 }

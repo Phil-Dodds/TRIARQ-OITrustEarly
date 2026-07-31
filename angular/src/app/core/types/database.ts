@@ -604,6 +604,13 @@ export interface CycleArtifactType {
   gate_required:         boolean;
   primary_gate:          GateName | null;
   gate_warning_behavior: GateWarningBehavior;
+  // Contract 40 follow-on (migration 096): optional upper bound on the gate
+  // range a 'primary_and_subsequent' warning fires across. null = unbounded.
+  gate_warning_through?:  GateName | null;
+  // Contract 41 (D-616, migration 097): true = a missing artifact of this type
+  // appears in the amber panel on gate-modal OPEN, before the user acts. false
+  // = still advisory in the submit/decision response (D-438), silent on open.
+  gate_warning_on_open?:  boolean;
 }
 
 export interface CycleArtifact {
