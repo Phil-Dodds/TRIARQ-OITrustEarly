@@ -32,6 +32,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-07-31',
+    contractLabel: 'Contract 41 — RACI Home Card, All Pending Gates, Warning Scope',
+    items: [
+      {
+        audience:    'All',
+        surface:     'My RACI Gates card on Home',
+        description: 'A new Home card for the Initiatives where you are Responsible, Consulted, or Informed. It shows their gates awaiting approval, then the ones approved in the last 14 days, with a small R / C / I marker on each row telling you why that Initiative is on your card. Approvals you personally owe are not repeated here — those stay in My Actions.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'Gate warnings trimmed back to two documents',
+        description: 'The gate approval panel was listing every recommended document as missing — twelve of them at Go to Build. It now names only the two that were meant to be loud: Context Brief and Scenario Journeys. The other document types still get mentioned after you submit or decide, as they always have.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'All Pending Gates',
+        description: 'The grid now matches the All Initiatives list, with the same navy column header. You can see who submitted each gate and filter or sort by submitter. Returning from a gate you have just submitted or returned refreshes only that Initiative rather than reloading the whole queue, and highlights the row. The Back link from a gate opened here also works again — it had been going to a dead page.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-30',
     contractLabel: 'Contract 40 follow-on — Framing Documents as Loud Suggestions',
     items: [
