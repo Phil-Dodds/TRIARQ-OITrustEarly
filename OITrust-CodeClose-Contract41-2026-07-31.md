@@ -46,8 +46,9 @@ All entries are in `docs/cc-decisions-active.md` per Rule 46, appended as made.
 | CC-41-E | Targeted return refresh via a transient snapshot, not a full reload | `6c3fc87` |
 | CC-41-F | A separate discovery tool rather than a parameter on `get_my_raci` | `afc7800` |
 | CC-41-G | Reuse `RaciGlyphsComponent` with an additive `readonly` input | `afc7800` |
+| CC-41-H | Aging marks the row rather than repainting it | `fa32fac` |
 
-Sequence A→G, no gaps.
+Sequence A→H, no gaps.
 
 ---
 
@@ -117,7 +118,11 @@ No spec document exists; the acceptance criteria are Phil's four instruction ite
 2. **`MyRaciGatesCardComponent`** — row rendering, aging threshold, label helpers. No test.
 3. **`RaciGlyphsComponent` `readonly` branch** — no test (component had none before either).
 
-Reason for all three: `ng test` is broken on this setup and has been since before Contract 37. These are Angular component tests, so the ratchet cannot be satisfied without first fixing the harness. **Flagged as CLAUDE.md candidate #1 below.** The MCP half of every one of these features does carry unit coverage.
+4. **`AllPendingGatesComponent` row colour rules (CC-41-H)** — CSS only, no logic. View-only template/style change, exempt under Rule 29(3).
+
+Reason for items 1–3: `ng test` is broken on this setup and has been since before Contract 37. These are Angular component tests, so the ratchet cannot be satisfied without first fixing the harness. **Flagged as CLAUDE.md candidate #1 below.** The MCP half of every one of these features does carry unit coverage.
+
+> **Phil's acknowledgment, 2026-07-31: "acknowledged."** D-442 satisfied — the untested-item list above was presented and acknowledged before CodeClose completion. Phil declined to commission a test-harness fix this contract; it remains an open item.
 
 Note on what the passing MCP tests do *not* prove: per Standing Note 2 the FIFO mock ignores `.select()` and `.eq()` column names, so neither the `gate_warning_on_open = true` filter nor the `delivery_cycle_id` filter is proven by a green test. The `onOpenOnly` guard in the pure rule is the real protection for the first; the second is UAT-verified only.
 
@@ -280,9 +285,29 @@ Trigger: diagnosing item 5.
 
 ---
 
+## 9b. Post-Deployment Addendum — 2026-07-31
+
+**Deployment completed in full after the CodeClose was first written.** Migration 097 executed by Phil, `delivery-cycle-mcp` redeployed in Render, Angular deployed to gh-pages. `origin/master` `dbf1bd5`; `gh-pages` `71e5d1c`; live `version.json` = `fa32fac`. §4(8) above described the held state and is superseded by this section.
+
+**CC-41-H arose from post-deploy review of the live screen.** CC-41-C fixed the grid *header* background and left the *row* treatment untouched — which was the half Phil was still seeing. Two deviations from All Initiatives remained: zebra striping the Initiative grid does not have, and the aging highlight painting whole rows at 8% amber. With 19 of 25 live gates past the 7-day threshold the wash covered nearly the entire grid, so the highlight carried no signal. Fixed: white ground, no zebra, aging reduced to a 3px amber left border plus the day count in `#B87700`.
+
+**The `—` Level column is not a defect.** Verified against the code: `baseline_level, set_level` are still selected and `effective_level` is unchanged by this contract. Phil confirmed the cause — those Initiatives predate sizing. Newer ones (1–4 days old) correctly show L2. No action.
+
+**UAT: skipped at Phil's instruction, 2026-07-31.** The §7 checklist was produced and offered; Phil elected not to run it. Three behaviours therefore ship unexercised by anyone: the Back-link fix, the targeted refresh, and the new Home card. Recorded here rather than left implicit, because the Back link is a defect that survived Contract G8 and a Contract 40 reskin precisely by never being exercised.
+
+---
+
 ## 10. Open Items for Design
 
-1. **`get_my_raci_gate_summary` needs D-numbers** for CC-41-B through CC-41-G, and a decision on whether the new card and **My Completed Gates (D-430)** should merge. They overlap: D-430 is trio-only over 28 days, the new card adds C and I over 14 days and pairs completions with pending. Two cards showing overlapping completions is a Design call, not a Code one — I did not merge them.
+**Phil 2026-07-31: all items below deferred to a later Design session — recorded here, not actioned this contract.**
+
+0. **D-numbers for CC-41-A through CC-41-H** (eight). Registry `v3.68` says next available is **D-625**.
+
+0b. **Row-tint warnings invert when most rows qualify.** The 8% amber row wash is correct per D-200 Pattern 2, but Pattern 2 assumes a flagged row among unflagged ones. At 19-of-25 the exception becomes the ground and the signal disappears — which is what CC-41-H fixed on one screen. Any row-level warning tint on a surface where most rows qualify has this problem. Raised as a Standards question rather than a CLAUDE.md rule, because the fix is judgement about the data distribution, not a mechanical test.
+
+0c. **`ng test` harness.** Phil declined to commission a fix this contract. Until it is fixed no Angular component change can satisfy the Rule 29(3) ratchet, and each contract adds to the untested surface. Three components this contract; the same gap has recurred silently since before Contract 37.
+
+1. **`get_my_raci_gate_summary` needs D-numbers** for CC-41-B through CC-41-H, and a decision on whether the new card and **My Completed Gates (D-430)** should merge. They overlap: D-430 is trio-only over 28 days, the new card adds C and I over 14 days and pairs completions with pending. Two cards showing overlapping completions is a Design call, not a Code one — I did not merge them.
 2. **`c_provisional` is not carried by the card.** The D-593 provisional-Consulted distinction needs Go to Build cast state the summary does not fetch, so a Consulted stake renders solid on the card and dashed on the Initiative grid. Either accept the inconsistency or accept the extra query.
 3. **Migration 097 leaves the other ten artifact types loud on the submit/decision response.** If Phil wants them quiet there too, that is a separate data decision — say so and it is a one-line migration.
 4. **`AllPendingGatesComponent` is 399 lines** against a 300 threshold. Snapshot logic is the extraction candidate.
