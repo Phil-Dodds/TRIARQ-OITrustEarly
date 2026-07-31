@@ -19,6 +19,8 @@ import {
   JiraLink,
   GateName,
   GateStatus,
+  // Contract 41: carried on MyRaciGateRow so the card can show the stage.
+  LifecycleStage,
   DateStatus,
   PointerStatus,
   DeliverySummary,
@@ -1040,6 +1042,15 @@ export class DeliveryService {
    * refresh after a gate submission or return — the screen re-queries that
    * Initiative's rows and splices them in, instead of reloading the queue.
    */
+  /**
+   * Contract 41: the caller's R/C/I Initiatives with their pending and recently
+   * completed gates. Server discovers the Initiative set — unlike getMyRaci,
+   * which maps letters onto a list the caller already has.
+   */
+  getMyRaciGateSummary(): Observable<McpResponse<MyRaciGateSummary>> {
+    return this.mcp.call<MyRaciGateSummary>('delivery', 'get_my_raci_gate_summary', {});
+  }
+
   listPendingGatesForCycle(deliveryCycleId: string): Observable<McpResponse<{
     pending_gates: AllPendingGateRow[]; aging_threshold_days: number;
   }>> {
@@ -1114,6 +1125,39 @@ export interface AllPendingGateRow {
   days_waiting:                number;
   aging:                       boolean;
   waiting_on:                  { state: string; line: string; days_waiting: number } | null;
+}
+
+// ── Contract 41: the R/C/I Home card ─────────────────────────────────────────
+/**
+ * One gate on an Initiative where the caller holds R, C, or I. Shared shape for
+ * both lists — pending carries days_waiting, completed carries
+ * days_since_approval, and only the relevant one is populated.
+ */
+export interface MyRaciGateRow {
+  gate_record_id:              string;
+  delivery_cycle_id:           string;
+  cycle_title:                 string;
+  current_lifecycle_stage:     LifecycleStage;
+  gate_name:                   GateName;
+  gate_name_display:           string;
+  division_id:                 string | null;
+  division_display_name_short: string;
+  approver_user_id:            string | null;
+  approver_display_name:       string | null;
+  submitted_by_display_name:   string | null;
+  submitted_at:                string | null;
+  approver_decision_at:        string | null;
+  /** The caller's own letters on this Initiative. A is absent by design — an
+   *  approval obligation is a push, and lives in My Actions. */
+  my_letters:                  { r: boolean; c: boolean; i: boolean };
+  days_waiting?:               number;
+  days_since_approval?:        number;
+}
+
+export interface MyRaciGateSummary {
+  pending_gates:      MyRaciGateRow[];
+  completed_gates:    MyRaciGateRow[];
+  recent_window_days: number;
 }
 
 // ── Contract G3 payload shapes ────────────────────────────────────────────────

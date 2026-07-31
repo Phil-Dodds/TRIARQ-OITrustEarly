@@ -48,11 +48,16 @@ import { MyRaciEntry } from '../../../core/services/delivery.service';
            : 'You are Consulted — tap to view participation.'">C</a>
 
       <!-- I — Informed. The only interactive letter: filled = following; the
-           ever-present hollow-i is the follow affordance on every row. -->
-      <button type="button" class="rg-glyph rg-i" [class.rg-i--filled]="raci?.i"
+           ever-present hollow-i is the follow affordance on every row.
+           Contract 41: readonly surfaces render I only when actually held —
+           the hollow follow affordance belongs on a grid you can act in, not on
+           a summary card. -->
+      <button *ngIf="!readonly" type="button" class="rg-glyph rg-i" [class.rg-i--filled]="raci?.i"
               [disabled]="busy"
               [title]="raci?.i ? 'You are Informed — tap to remove.' : 'Follow this Initiative (Informed).'"
               (click)="toggleI.emit()">i</button>
+      <span *ngIf="readonly && raci?.i" class="rg-glyph rg-i rg-i--filled"
+            title="You are Informed on this Initiative.">i</span>
     </span>
   `,
   styles: [`
@@ -80,6 +85,13 @@ export class RaciGlyphsComponent {
   @Input() raci: MyRaciEntry | null | undefined = null;
   @Input() deliveryCycleId!: string;
   @Input() busy = false;
+  /**
+   * Contract 41: display-only mode for summary surfaces (the R/C/I Home card).
+   * Suppresses the always-present hollow follow affordance so the row shows
+   * exactly the letters held. Defaults false — the three existing consumers
+   * (Initiative grid, My Initiative Status, My Initiatives card) are unchanged.
+   */
+  @Input() readonly = false;
   /** Emitted when the I glyph is tapped — parent adds/removes the Informed stake. */
   @Output() toggleI = new EventEmitter<void>();
 

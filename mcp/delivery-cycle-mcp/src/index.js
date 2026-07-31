@@ -29,6 +29,7 @@ const { update_delivery_cycle }          = require('./tools/update_delivery_cycl
 const { get_delivery_cycle }             = require('./tools/get_delivery_cycle');
 const { list_delivery_cycles }           = require('./tools/list_delivery_cycles');
 const { get_my_raci }                    = require('./tools/get_my_raci');
+const { get_my_raci_gate_summary }       = require('./tools/get_my_raci_gate_summary');
 const { advance_cycle_stage }            = require('./tools/advance_cycle_stage');
 const { reverse_cycle_stage }            = require('./tools/reverse_cycle_stage');
 const { set_cycle_on_hold }              = require('./tools/set_cycle_on_hold');
@@ -156,6 +157,8 @@ const TOOLS = {
   get_delivery_cycle,
   list_delivery_cycles,
   get_my_raci,
+  // Contract 41: Home card — discovers the caller's R/C/I Initiatives.
+  get_my_raci_gate_summary,
   advance_cycle_stage,
   reverse_cycle_stage,
   set_cycle_on_hold,

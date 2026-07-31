@@ -35,6 +35,12 @@
       [userId]="profile?.id ?? ''">
     </app-my-action-queue-card>
 
+    <!-- Contract 41: gates on the Initiatives where the viewer is R, C, or I.
+         Pull view — approvals owed stay in the Action Queue above. -->
+    <app-my-raci-gates-card
+      *ngIf="showDeliveryCycles">
+    </app-my-raci-gates-card>
+
     <!-- Contract G8 (D-560): IE-only pending-gates count. Pull summary —
          never merged with the Action Queue above. -->
     <app-all-pending-gates-card

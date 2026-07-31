@@ -17,6 +17,8 @@ import { AllPendingGatesCardComponent }  from './components/all-pending-gates-ca
 // Contract G10 (D-568 C): quarter deploy-goal card (standalone).
 import { QuarterDeployGoalCardComponent } from './components/quarter-deploy-goal-card.component';
 import { MyCompletedGatesCardComponent } from './components/my-completed-gates-card.component';
+// Contract 41: R/C/I pending + recently completed gates (standalone).
+import { MyRaciGatesCardComponent }      from './components/my-raci-gates-card.component';
 import { EmbeddedChatCardComponent }     from './components/embedded-chat-card.component';
 import { OnboardingMessageCardComponent } from './components/onboarding-message-card.component';
 import { MyEasterEggsCardComponent }     from '../easter-eggs/my-easter-eggs-card.component';
@@ -43,6 +45,7 @@ import { EggSpotComponent }              from '../easter-eggs/egg-spot.component
     AllPendingGatesCardComponent,
     QuarterDeployGoalCardComponent,
     MyCompletedGatesCardComponent,
+    MyRaciGatesCardComponent,
     MyEasterEggsCardComponent,
     CommunityEggsCardComponent,
     EggSpotComponent,
