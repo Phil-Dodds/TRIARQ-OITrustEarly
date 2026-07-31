@@ -46,7 +46,7 @@ otherwise, Rule 46's conformance test applies to Contract 41 forward only.
 
 | CC-letter | Title | Reasoning | Commit |
 |---|---|---|---|
-| CC-41-A | Ledger opens at Contract 41; Contracts 1–40 not backfilled | Rule 46 arrived with no ledger in the repository. Backfilling forty contracts of CC-decisions is a substantial reconstruction with real fabrication risk, and the source records already exist in the root `OITrust-CodeClose-*.md` files and the ratified D-numbers. Opening forward and stating the boundary explicitly is honest; a silently partial backfill is not. Escalated to Design rather than resolved unilaterally. | pending |
+| CC-41-A | Ledger opens at Contract 41; Contracts 1–40 not backfilled | Rule 46 arrived with no ledger in the repository. Backfilling forty contracts of CC-decisions is a substantial reconstruction with real fabrication risk, and the source records already exist in the root `OITrust-CodeClose-*.md` files and the ratified D-numbers. Opening forward and stating the boundary explicitly is honest; a silently partial backfill is not. Escalated to Design rather than resolved unilaterally. | 22251a9 |
 
 ---
 
