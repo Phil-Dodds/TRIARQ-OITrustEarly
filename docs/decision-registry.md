@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.67 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.68 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,9 +8,10 @@
 
 ## Next Available Decision Number
 
-**Next available: D-600**
+**Next available: D-625**
 (Note: the v1.0 governance spec's erroneous "D-575" citations read as D-572; D-575 is legitimately assigned to Continuous Multi-Contract Execution, locked 2026-07-23.)
 D-586 through D-599: allocated 2026-07-27 session (Contract 39 CC ratification + Contract 40 visibility/sizing/RACI). D-591–D-596 ratify Contract 39 CC-decisions and CLAUDE.md Candidate #1. D-597 superseded by D-599 same session (retained, not reused).
+D-600 through D-624: allocated 2026-07-30 session. D-600–D-603 ratify the Contract 40 follow-on (CC-40-R,S,T,V). D-604–D-614 ratify CC-40-G..Q, recovered by read-only reconstruction after the 2026-07-29 CodeClose incorrectly reported them as already closed; all eleven carry origin: code-adopted. D-613 is OPEN. D-615 renumbers CC-40-M2 to CC-40-Y, resolving a label collision with CC-40-M (D-610). D-616–D-617 ratify CC-40-W and CC-40-X. D-618 records migration 093, which shipped unlettered. D-619 demotes Workstream. D-620–D-624 lock retro items R1–R5.
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -420,7 +421,7 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-512 | Dashboard Meeting Run Model | 2026-07-12 | specced |
 | D-513 | Acknowledgment Visibility | 2026-07-12 | specced |
 | D-514 | Cadence-Named Helper Text | 2026-07-12 | specced |
-| D-515 | My Actions Tab Restructure (amends D-491) | 2026-07-12 | specced |
+| D-515 | My Actions Tab Restructure (amends D-491) | 2026-07-12 | built |
 | D-516 | Ack Window: Queue Membership vs. Action Availability | 2026-07-13 | built |
 | D-517 | Canonical Gate Label Source | 2026-07-13 | built |
 | D-518 | Pending Approval Dashboard Qualifier | 2026-07-13 | built |
@@ -504,6 +505,31 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-597 | Grid Participation Glyphs (superseded by D-599 same session) | 2026-07-27 | superseded |
 | D-598 | "I Don't Know" on Sizing Questions (amends D-558) | 2026-07-27 | specced |
 | D-599 | RACI Participation Glyphs (supersedes D-597) | 2026-07-27 | specced |
+| D-600 | Division Approvers (CC-40-R) | 2026-07-30 | LOCKED · built |
+| D-601 | Scoped eligible-approver picker (CC-40-S) | 2026-07-30 | LOCKED · built |
+| D-602 | Reassignment is detail-only; All Pending Gates reskin (CC-40-T) | 2026-07-30 | LOCKED · built |
+| D-603 | Initiative Executive setup (CC-40-V) | 2026-07-30 | LOCKED · built |
+| D-604 | My Role (RACI) filter on the Initiative grid (CC-40-G) | 2026-07-30 | LOCKED · built |
+| D-605 | Initiative list hides COMPLETE by default (CC-40-H) | 2026-07-30 | LOCKED · built |
+| D-606 | Stage advance: EPO floor replaces workstream-presence (CC-40-I) | 2026-07-30 | LOCKED · built |
+| D-607 | Drop the post-approval artifact reminder (CC-40-J) | 2026-07-30 | LOCKED · built |
+| D-608 | Custom Sprint picker (CC-40-K) | 2026-07-30 | LOCKED · built |
+| D-609 | Unify next-gate resolution on gate records (CC-40-L) | 2026-07-30 | LOCKED · built |
+| D-610 | Status History Accomplishment View (CC-40-M) | 2026-07-30 | LOCKED · built |
+| D-611 | Identity reorg; DL sets Level and Approver (CC-40-N) | 2026-07-30 | LOCKED · built |
+| D-612 | Approver reassignment re-routes in-flight gates (CC-40-O) | 2026-07-30 | LOCKED · built |
+| D-613 | Division Leader scope on All Pending Gates (CC-40-P) | 2026-07-30 | OPEN · built |
+| D-614 | Angular reassignment surfaces (CC-40-Q, survivors only) | 2026-07-30 | LOCKED · built (partially superseded) |
+| D-615 | Home card standard height (CC-40-Y, renumbered from CC-40-M2) | 2026-07-30 | LOCKED · built |
+| D-616 | Context Brief and Scenario Journeys become bounded warnings (CC-40-W, as amended) | 2026-07-30 | LOCKED · built — deployment pending |
+| D-617 | Remove "Not sure" from sizing Q4 and Q5 (CC-40-X) | 2026-07-30 | LOCKED · built and deployed |
+| D-618 | Migration 093: drop NOT NULL on retired tier_classification | 2026-07-30 | LOCKED · built and deployed |
+| D-619 | Workstream demoted to a non-gating attribute | 2026-07-30 | LOCKED · not-specced |
+| D-620 | CC-decisions require a running ledger (retro R1) | 2026-07-30 | LOCKED · not-specced |
+| D-621 | CodeClose leads with locked decisions touched (retro R2) | 2026-07-30 | LOCKED · not-specced |
+| D-622 | No migration executes unless committed first (retro R3) | 2026-07-30 | LOCKED · not-specced |
+| D-623 | Code produces a schema summary at close (retro R4) | 2026-07-30 | LOCKED · not-specced |
+| D-624 | Design states repo and deployment state from current sources only (retro R5) | 2026-07-30 | LOCKED · not-specced |
 
 ---
 

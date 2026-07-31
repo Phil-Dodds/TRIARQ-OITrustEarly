@@ -1,6 +1,5 @@
 
-
-# CLAUDE.md — Pathways OI Trust | v3.3 | June 2026 | CONFIDENTIAL
+# CLAUDE.md — Pathways OI Trust | v3.7 | July 2026 | CONFIDENTIAL
 
 ---
 
@@ -30,28 +29,23 @@ Read decision-registry.md for content lookup only. Never claim or assign a D-num
 Violating any of these is an error, not a style preference.
 
 ### Arch-1 — MCP-Only Database Access
-
 All database operations go through MCP servers. No direct Supabase client calls from Angular components or services.
 - NEVER: import @supabase/supabase-js in any Angular component or service
 - NEVER: bypass the MCP layer for "simple" reads
 
 **Authorized exceptions (Design-locked only):**
-- `system_config` — pre-auth maintenance mode read (D-MaintenanceMode). Scoped to `maintenance_mode` and `maintenance_message` columns only.
-- `user_screen_state` — pending MCP migration in Contract 17 (D-380). After migration this exception is closed.
+- `system_config` — pre-auth maintenance mode read (D-MaintenanceMode). **SUSPENDED 2026-07-30:** no such code exists. AC-29 is NOT BUILT; the Angular read this exception authorises has never been written. Reinstate when AC-29 ships. See ARCH-35.
 
 **Escalation rule (D-381):** Any direct Supabase access from Angular is an Arch-1 conflict under Rule 2. Flag and STOP — do not implement, do not rationalize, do not record as a CC-decision and proceed. Surface to Design before writing any code. Rule 30 autonomy does not apply to Arch-1 violations or any security boundary decision.
 
 ### Arch-2 — UI as Presentation Layer Only
-
 Angular components render what they receive. No business logic, prompts, or data access in components.
 - NEVER: put prompt text or business rules in any component or service
 
 ### Arch-3 — No Prompts in TypeScript
-
 NEVER put prompt text in TypeScript files, Angular components, or services.
 
 ### Arch-4 — Environment Variables Only
-
 All credentials, keys, and configuration are environment variables. Never hardcode them.
 
 Required environment variables (never in source code):
@@ -63,7 +57,6 @@ Required environment variables (never in source code):
 - NEVER: commit .env files or log environment variable values
 
 ### Arch-5 — JWT Validation on Every MCP Tool Call
-
 Every MCP server validates the Supabase JWT before executing any tool. No tool executes without a valid JWT.
 - Validate JWT as the first operation in every tool handler
 - Return 401 with clear error message on invalid JWT
@@ -71,7 +64,6 @@ Every MCP server validates the Supabase JWT before executing any tool. No tool e
 - NEVER: execute any database operation before JWT validation
 
 ### Arch-6 — Soft Delete Only
-
 Never hard delete records. Set deleted_at timestamp. Records with deleted_at are excluded from all queries by default.
 - Set deleted_at = now() for all delete operations
 - Add WHERE deleted_at IS NULL to every SELECT on soft-deletable tables
@@ -520,16 +512,48 @@ Conditions are durable (CC-0726-02): never auto-clear gate_conditions in any new
 
 **Exceptions:** None.
 
----
-
 ### Rule 45 — Skip-Delegate Parameter Pass-Through (D-596)
 
-Every submit-time parameter accepted by `submit_gate_for_approval` must be forwarded through the `confirm_gate_skip` delegate call. A skip-routed submission must be indistinguishable from a direct submission in every stored effect (submission note, assessment, cast confirmation, outcome verdict). When a new submit-time parameter is added to `submit_gate_for_approval`, it is added to the skip delegate forward in the same change.
+Any new submit-time parameter accepted by `submit_gate_for_approval` must also be forwarded through the `confirm_gate_skip` delegate call.
 
-**Conformance test:** Does every parameter read from `params` by `submit_gate_for_approval` appear in the `confirm_gate_skip` delegate forward? Yes = pass. Any accepted submit-time param absent from the forward = violation.
+**Conformance test:** Every parameter accepted at submission appears in the skip delegate forward.
 
 **Exceptions:** None.
 
+Source: D-596.
+
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | July 2026 | v3.6*
+### Rule 46 — Append every CC-decision to the running ledger at the moment it is made.
+Every CC-decision is appended to `docs/cc-decisions-active.md` when the decision is made, before the work implementing it is committed. Entry carries: CC-letter, one-line title, the reasoning, and the commit hash once known. The per-contract CodeClose summarises the ledger; it does not replace it.
+Conformance test: for every CC-letter named in a CodeClose, does a corresponding entry exist in `docs/cc-decisions-active.md`? Yes for all = pass.
+Exceptions: None.
+
+### Rule 47 — Every CodeClose opens by naming the locked decisions it touched.
+The first section of every CodeClose lists every locked decision, ARCH item, and Standard the session's work touched, before any other content. One line each: identifier, and what the work did to it (implements / extends / contradicts / supersedes).
+Conformance test: does the CodeClose contain a locked-decisions-touched section positioned before the CC-decisions section? Yes = pass.
+Exceptions: None. A session that touched nothing writes "None."
+
+### Rule 48 — No migration executes unless its file is committed to master first.
+No migration is run against any environment until its file exists on `master`. This applies to manual execution in the Supabase console as much as to scripted runs.
+Conformance test: for every schema object in the live database, does a committed migration create it? Yes for all = pass.
+Exceptions: None.
+
+### Rule 49 — Every CodeClose carries a schema summary.
+Every CodeClose includes `schema-summary.md` listing each table the session touched and that table's actual column names as read from the live schema or `types/database.ts`, not from build-c-spec.md.
+Conformance test: does the CodeClose include a schema-summary covering every table named in its CC-decisions? Yes = pass.
+Exceptions: Sessions that touched no table write "No schema surfaces touched."
+
+---
+
+## Standing Notes — Dispositioned CLAUDE.md Candidates
+
+Four dispositioned candidates carried from the Contract 40 CodeCloses (2026-07-30):
+1. `delivery_cycles` primary key is `delivery_cycle_id`, not `id`. Verify against `get_delivery_cycle` before any cycle query.
+2. The require-cache FIFO Supabase mock ignores `.select()` and `.eq()` column names — a wrong column passes unit tests and fails live. Rule 34 is the only guard; green tests are not evidence.
+3. Neither MCP service exposes `/health` or `/tools` without a JWT. Both apply `validateJwt` before mounting them, and the `(no JWT required)` comments in both `index.js` files are stale. Never conclude "tool not shipped" from a curl 401 — check the Render dashboard or call in-app.
+4. Never offer a UI option that has no representable stored state. If an option maps to another value on selection, the selected-state check will highlight the wrong control. Add the value to the schema or do not offer it. (Trigger: D-617.)
+
+---
+
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | July 2026 | v3.7*
