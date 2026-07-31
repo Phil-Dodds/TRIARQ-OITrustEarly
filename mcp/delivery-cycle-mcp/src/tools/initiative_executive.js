@@ -85,11 +85,21 @@ async function set_initiative_executive(params, caller_user_id) {
 
 /**
  * All Pending Gates — every gate awaiting approval, company-wide, with gate,
- * initiative, Division, assigned approver, days waiting, the G7 waiting-on
- * line, and the aging highlight. Pull-only; default-sorted by age (oldest
- * first). Auth: IE, Phil, or Admin (CC-G8 lean — admins run the system).
+ * initiative, Division, assigned approver, submitter, days waiting, the G7
+ * waiting-on line, and the aging highlight. Pull-only; default-sorted by age
+ * (oldest first). Auth: IE, Phil, or Admin (CC-G8 lean — admins run the system).
+ *
+ * Contract 41 (Phil 2026-07-31): optional params.delivery_cycle_id narrows the
+ * result to one Initiative. Used for the targeted refresh when the user returns
+ * from submitting or returning a gate — the screen re-queries that Initiative's
+ * rows only instead of reloading the whole queue. Scope authorisation is
+ * unchanged: a Division Leader passing another Division's cycle id still gets
+ * nothing, because the division filter below runs regardless.
  */
-async function list_all_pending_gates(_params, caller_user_id) {
+async function list_all_pending_gates(params, caller_user_id) {
+  const scopedCycleId = typeof params?.delivery_cycle_id === 'string' && params.delivery_cycle_id
+    ? params.delivery_cycle_id
+    : null;
   const { data: caller, error: callerErr } = await supabase
     .from('users')
     .select('is_initiative_executive, is_super_admin, is_admin, is_active')
@@ -121,11 +131,14 @@ async function list_all_pending_gates(_params, caller_user_id) {
     }
   }
 
-  const { data: gates, error: gatesErr } = await supabase
+  let gatesQuery = supabase
     .from('gate_records')
     .select('gate_record_id, delivery_cycle_id, gate_name, gate_status, approver_user_id, submitted_at, submitted_by_user_id')
     .eq('gate_status', 'awaiting_approval')
     .is('deleted_at', null);
+  // Contract 41: single-Initiative targeted refresh.
+  if (scopedCycleId) { gatesQuery = gatesQuery.eq('delivery_cycle_id', scopedCycleId); }
+  const { data: gates, error: gatesErr } = await gatesQuery;
   if (gatesErr) {
     return { success: false, error: `Failed to list pending gates: ${gatesErr.message}` };
   }
@@ -143,20 +156,25 @@ async function list_all_pending_gates(_params, caller_user_id) {
   (cycles || []).forEach(c => { cyclesById[c.delivery_cycle_id] = c; });
 
   const divisionIds = [...new Set((cycles || []).map(c => c.division_id).filter(Boolean))];
-  const approverIds = [...new Set(gates.map(g => g.approver_user_id).filter(Boolean))];
+  // Contract 41 (Phil 2026-07-31): submitters resolved in the same lookup as
+  // approvers — submitted_by_user_id was already selected above but never
+  // surfaced, so the grid could not show or filter by who submitted.
+  const personIds = [...new Set(
+    gates.flatMap(g => [g.approver_user_id, g.submitted_by_user_id]).filter(Boolean)
+  )];
 
-  const [{ data: divisions }, { data: approvers }] = await Promise.all([
+  const [{ data: divisions }, { data: people }] = await Promise.all([
     divisionIds.length
       ? supabase.from('divisions').select('id, division_name, display_name_short').in('id', divisionIds).is('deleted_at', null)
       : Promise.resolve({ data: [] }),
-    approverIds.length
-      ? supabase.from('users').select('id, display_name').in('id', approverIds).is('deleted_at', null)
+    personIds.length
+      ? supabase.from('users').select('id, display_name').in('id', personIds).is('deleted_at', null)
       : Promise.resolve({ data: [] })
   ]);
   const divisionMap = {};
   (divisions || []).forEach(d => { divisionMap[d.id] = d; });
-  const approverMap = {};
-  (approvers || []).forEach(u => { approverMap[u.id] = u.display_name; });
+  const personMap = {};
+  (people || []).forEach(u => { personMap[u.id] = u.display_name; });
 
   const waitingOnByGate = await computeWaitingOnBatch(gates, cyclesById);
 
@@ -179,8 +197,12 @@ async function list_all_pending_gates(_params, caller_user_id) {
         division_display_name_short: d.display_name_short || d.division_name || '',
         effective_level:             c.set_level ?? c.baseline_level ?? null,
         approver_user_id:            g.approver_user_id ?? null,
-        approver_display_name:       g.approver_user_id ? (approverMap[g.approver_user_id] ?? null) : null,
+        approver_display_name:       g.approver_user_id ? (personMap[g.approver_user_id] ?? null) : null,
         submitted_at:                g.submitted_at,
+        // Contract 41: who put this gate in the queue. Null for legacy rows
+        // submitted before submitted_by_user_id was recorded.
+        submitted_by_user_id:        g.submitted_by_user_id ?? null,
+        submitted_by_display_name:   g.submitted_by_user_id ? (personMap[g.submitted_by_user_id] ?? null) : null,
         days_waiting:                days,
         aging:                       days > ARCH33_APG_AGING_DAYS,
         waiting_on:                  waiting

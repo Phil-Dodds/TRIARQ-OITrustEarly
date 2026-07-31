@@ -1034,6 +1034,19 @@ export class DeliveryService {
       'delivery', 'list_all_pending_gates', {}
     );
   }
+
+  /**
+   * Contract 41: the same view narrowed to one Initiative. Backs the targeted
+   * refresh after a gate submission or return — the screen re-queries that
+   * Initiative's rows and splices them in, instead of reloading the queue.
+   */
+  listPendingGatesForCycle(deliveryCycleId: string): Observable<McpResponse<{
+    pending_gates: AllPendingGateRow[]; aging_threshold_days: number;
+  }>> {
+    return this.mcp.call<{ pending_gates: AllPendingGateRow[]; aging_threshold_days: number }>(
+      'delivery', 'list_all_pending_gates', { delivery_cycle_id: deliveryCycleId }
+    );
+  }
 }
 
 /** Contract G10 (D-566): a trio cancel request. */
@@ -1093,6 +1106,11 @@ export interface AllPendingGateRow {
   approver_user_id:            string | null;
   approver_display_name:       string | null;
   submitted_at:                string;
+  // Contract 41: who submitted the gate. Null on legacy rows recorded before
+  // gate_records.submitted_by_user_id was populated, and the display name is
+  // null when that user record is gone.
+  submitted_by_user_id:        string | null;
+  submitted_by_display_name:   string | null;
   days_waiting:                number;
   aging:                       boolean;
   waiting_on:                  { state: string; line: string; days_waiting: number } | null;
