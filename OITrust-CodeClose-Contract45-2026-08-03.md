@@ -128,7 +128,12 @@ Thirty-three, CC-45-A through CC-45-AG, all in `docs/cc-decisions-active.md` wit
 4. **`MyTeamService`** — including its fail-closed-to-empty-set behaviour.
 5. **The 14 call-site conversions individually** — the queue helper is well covered and the suites pass, but no test asserts per-site that a given tool now queues rather than sends.
 
-**Phil's acknowledgment of this list is required before CodeClose is complete (D-442). NOT YET GIVEN.**
+**D-442 acknowledgment — GIVEN. Phil 2026-08-03: "Skip testing."**
+Recorded as an explicit override: the five items above ship untested, acknowledged rather than
+overlooked. Rule 11's override clause applies ("Phil declares no test baseline needed — override
+logged in CodeClose"). No further tests were written for them, and the coverage gap is the
+declared list, not an unknown quantity. The 623 + 125 tests that DO exist all pass; nothing was
+skipped that was already covered.
 
 **(4) Pattern sweep** — a shared pattern was modified twice. First the notification send path: all 14 `email_type` sites now route through one helper; `record_consultation_response.js` still builds its own recipient block for `l1_gate_returned` and is flagged as a next-contract consolidation candidate. Second the scheduled-caller pattern: searched both services, found the Contract 38 precedent, and adopted it rather than inventing a parallel one.
 
@@ -292,10 +297,20 @@ No `devStatus` change proposed. **All Pending Gates** stays at `uat` — it gain
 
 ## 12. Session close
 
+**Closed at Phil's direction 2026-08-03:**
+- **D-442 acknowledgment — GIVEN** ("skip testing"). Override logged in §5.3. CodeClose is complete.
+- **Unit E (D-644) — deferral CONFIRMED** ("defer preference"). Still requires Design ratification,
+  since Code cannot drop a locked decision; the confirmation is Phil's, not Design's.
+
 **Outstanding:**
-1. **Phil's D-442 acknowledgment of the five untested items (§5.3).** CodeClose is not complete without it.
-2. Design ratification of the D-644 deferral and a ruling on D-648.
-3. UAT steps 14–20 wait on tomorrow's 06:00 run — the first unattended firing.
+1. Design ratification of the D-644 deferral and a ruling on D-648's widening.
+2. UAT steps 14–20 wait on the 06:00 run — the first unattended firing.
+3. **Branch hygiene, surfaced 2026-08-03:** `origin/main` is an abandoned deploy-artifact branch
+   (built bundles at root, no source directories), last touched 2026-04-07, sharing NO merge base
+   with `master`. Nothing in the pipeline reads it — gh-pages serves the front end, Render deploys
+   from `master`. Per D-352 `master` is the source of truth. Recommend Design decide whether to
+   delete `main` or repoint it; leaving a branch named `main` that is neither current nor source is
+   a standing trap for anyone new to the repository. No action taken.
 
 **Nothing to deploy. Nothing to migrate.** Repo, both MCP services, gh-pages, and the database are aligned.
 
