@@ -205,7 +205,15 @@ async function writeCommitmentChecks(now, dryRun) {
           })
           .map(id => ({ user_id: id, delivery_class: 'digest' }));
 
-        if (recipients.length === 0 || dryRun) { continue; }
+        if (recipients.length === 0) { continue; }
+
+        // Counted BEFORE the dry-run guard so `written` reports intent, not
+        // just action. A dry run whose counters all read zero cannot preview
+        // volume, which is the only reason to have one — and the digest path
+        // already reports `sent` as what it WOULD send, so counting here only
+        // after writing made the two halves of this job disagree.
+        result.written += recipients.length;
+        if (dryRun) { continue; }
 
         // No email addresses passed: these are digest-class by definition, so
         // enqueueNotifications writes rows and dispatches nothing.
@@ -215,7 +223,6 @@ async function writeCommitmentChecks(now, dryRun) {
           headline:      finding.headline,
           initiative_id: cycle.delivery_cycle_id
         });
-        result.written += recipients.length;
       }
     }
   } catch (err) {

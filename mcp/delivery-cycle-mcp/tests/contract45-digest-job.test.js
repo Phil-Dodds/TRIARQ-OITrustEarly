@@ -29,6 +29,7 @@ const chain = {
   is:     () => chain,
   in:     () => chain,
   not:    () => chain,
+  gte:    () => chain,   // D-649 recent-window query
   order:  () => chain,
   limit:  () => chain,
   update(patch) {
@@ -263,5 +264,82 @@ describe('pre-send suppression (D-643)', () => {
     const r = await run_daily_digest();
     assert.equal(r.data.suppressed, 0);
     assert.equal(sentEmails.length, 1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('D-649 commitment checks inside the job', () => {
+
+  const activeCycle = {
+    delivery_cycle_id: 'c1', cycle_title: 'Referral Leakage Analysis',
+    current_lifecycle_stage: 'BUILD',
+    assigned_dcs_user_id: DANA, assigned_epo_user_id: MAYA, assigned_dol_user_id: null
+  };
+
+  test('a dry run REPORTS the findings it would write, and writes nothing', async () => {
+    // The point of a dry run is previewing volume. Counters that read zero
+    // regardless would make it useless — and the digest half of this job
+    // already reports `sent` as what it would send.
+    queue = [
+      { data: [activeCycle], error: null },                 // active cycles
+      { data: [{ delivery_cycle_id: 'c1', gate_name: 'go_to_build',
+                 target_date: null, date_status: 'on_track',
+                 updated_at: '2026-08-01T00:00:00Z' }], error: null },  // milestones
+      { data: [], error: null },                            // gate records
+      { data: [], error: null },                            // recent state rows
+      { data: [], error: null }                             // queue claim — empty
+    ];
+
+    const r = await run_daily_digest({ dry_run: true });
+
+    assert.equal(r.success, true);
+    // no_commitment fires for both trio members (DOL unassigned).
+    assert.equal(r.data.commitment_checks_written, 2,
+      'reports intent — two trio members, one finding');
+    assert.equal(updates.length, 0, 'but nothing written');
+    assert.equal(sentEmails.length, 0, 'and nothing sent');
+  });
+
+  test('an Initiative with no trio assigned is skipped, not escalated', async () => {
+    queue = [
+      { data: [{ ...activeCycle, assigned_dcs_user_id: null, assigned_epo_user_id: null }], error: null },
+      { data: [{ delivery_cycle_id: 'c1', gate_name: 'go_to_build',
+                 target_date: null, date_status: 'on_track', updated_at: '2026-08-01T00:00:00Z' }], error: null },
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: [], error: null }
+    ];
+
+    const r = await run_daily_digest({ dry_run: true });
+    assert.equal(r.data.commitment_checks_written, 0, 'nobody to tell');
+  });
+
+  test('a finding already queued inside the weekly window is skipped (D-643)', async () => {
+    queue = [
+      { data: [activeCycle], error: null },
+      { data: [{ delivery_cycle_id: 'c1', gate_name: 'go_to_build',
+                 target_date: null, date_status: 'on_track', updated_at: '2026-08-01T00:00:00Z' }], error: null },
+      { data: [], error: null },
+      // Dana already got this exact line inside the window; Maya did not.
+      { data: [{ recipient_user_id: DANA, event_type: 'no_commitment', initiative_id: 'c1' }], error: null },
+      { data: [], error: null }
+    ];
+
+    const r = await run_daily_digest({ dry_run: true });
+    assert.equal(r.data.commitment_checks_skipped_recent, 1, 'Dana suppressed');
+    assert.equal(r.data.commitment_checks_written, 1, 'Maya still told');
+  });
+
+  test('a check failure does not stop the digest from sending existing rows', async () => {
+    queue = [
+      { data: null, error: { message: 'delivery_cycles unavailable' } },  // checks blow up
+      { data: [qrow()], error: null },                                    // queue still claimed
+      { data: [userRow(DANA, 'dana@x.com')], error: null }
+    ];
+
+    const r = await run_daily_digest();
+    assert.equal(r.success, true, 'the job still succeeds');
+    assert.equal(r.data.commitment_checks_written, 0);
+    assert.equal(sentEmails.length, 1, 'the queued digest still went out');
   });
 });
