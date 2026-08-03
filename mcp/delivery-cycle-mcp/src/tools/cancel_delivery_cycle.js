@@ -19,7 +19,7 @@
 const { supabase } = require('../db');
 // Contract G10 (D-566): severity-based cancel authority + C/I notifications.
 const { resolveCancelAuthority, participationHolderIds } = require('./helpers/cancel-authority');
-const { sendGateNotificationEmail } = require('./helpers/notification-email');
+const { enqueueNotifications } = require('./helpers/notification-queue');
 
 async function cancel_delivery_cycle(params, caller_user_id) {
   const { delivery_cycle_id } = params;
@@ -131,18 +131,29 @@ async function cancel_delivery_cycle(params, caller_user_id) {
         .select('id, display_name, email')
         .in('id', holderIds)
         .is('deleted_at', null);
+      // Contract 45 (D-642): queued rather than sent directly.
+      // IMMEDIATE even for Informed parties — D-647 moves Informed gate
+      // DECISIONS to the digest but keeps cancellation immediate, because a
+      // cancelled Initiative invalidates work in progress rather than
+      // reporting on it.
       const recipients = (holders || []).filter(u => u.email)
-        .map(u => ({ email: u.email, display_name: u.display_name }));
+        .map(u => ({
+          user_id:        u.id,
+          email:          u.email,
+          display_name:   u.display_name,
+          delivery_class: 'immediate'
+        }));
       if (recipients.length > 0) {
-        await sendGateNotificationEmail({
+        await enqueueNotifications({
+          event_type:      'cycle_cancelled',
           recipients,
-          subject:          `${cycle.cycle_title} — Initiative cancelled`,
-          initiativeName:   cycle.cycle_title,
-          gateNameDisplay:  'Cancellation',
-          contextParagraph: `${cycle.cycle_title} was cancelled (from ${priorStage}). ` +
-                            `You are notified as a Consulted or Informed party on the Initiative.`,
-          delivery_cycle_id,
-          email_type:       'cycle_cancelled'
+          subject:         `${cycle.cycle_title} — Initiative cancelled`,
+          initiativeName:  cycle.cycle_title,
+          gateNameDisplay: 'Cancellation',
+          headline:        `${cycle.cycle_title} was cancelled (from ${priorStage}).`,
+          detail:          'You are notified as a Consulted or Informed party on the Initiative.',
+          initiative_id:   delivery_cycle_id,
+          actor_user_id:   caller_user_id
         });
       }
     }

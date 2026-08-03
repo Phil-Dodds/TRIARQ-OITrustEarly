@@ -191,10 +191,15 @@ async function enqueueNotifications({
     .select('notification_id, recipient_user_id, delivery_class');
 
   if (writeErr) {
+    // Log and CARRY ON to the immediate dispatch below. Before Contract 45 the
+    // email went out with no queue involved at all, so returning here would let
+    // a queue-table problem silence a blocking notification — a regression
+    // introduced by the plumbing rather than by any decision. The digest rows
+    // are lost in this case, which is the lesser failure: they are awareness,
+    // and the queue error is in the log.
     console.error(JSON.stringify({
       helper: 'notification-queue', step: 'insert', event_type, error: writeErr.message
     }));
-    return result;
   }
   result.queued = (written || []).length;
 

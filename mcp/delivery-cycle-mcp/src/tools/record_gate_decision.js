@@ -54,7 +54,7 @@ const { countOpenConditions } = require('./helpers/gate-conditions');
 const { validateOrError: validateAssessmentOrError, saveAssessment, clearActiveAssessments, fetchAssessments, buildAssessmentRosterText } = require('./helpers/gate-assessments');
 // Contract G8 (D-560): board gates are untouchable by the IE override.
 const { isBoardTriggeredGate } = require('./helpers/board-trigger');
-const { sendGateNotificationEmail } = require('./helpers/notification-email');
+const { enqueueNotifications } = require('./helpers/notification-queue');
 
 // D-400: gates whose approval transitions a cycle INTO a counted WIP zone.
 // brief_review transitions BRIEF → DESIGN (pre_build), but Contract 20 spec §2.3
@@ -589,21 +589,24 @@ async function record_gate_decision(params, caller_user_id) {
     if (original_approver_user_id && original_approver_user_id !== caller_user_id) {
       const { data: displaced } = await supabase
         .from('users')
-        .select('display_name, email')
+        .select('id, display_name, email')
         .eq('id', original_approver_user_id)
         .is('deleted_at', null)
         .maybeSingle();
       if (displaced?.email) {
-        await sendGateNotificationEmail({
-          recipients:       [{ email: displaced.email, display_name: displaced.display_name }],
-          subject:          `${cycle.cycle_title} — ${gateNameDisplay} approved by Initiative Executive override`,
-          initiativeName:   cycle.cycle_title,
+        // Contract 45: LOUD exception (D-560) — helper forces immediate, no fan-out.
+        await enqueueNotifications({
+          event_type:      'ie_override',
+          recipients:      [{ user_id: displaced.id, email: displaced.email,
+                              display_name: displaced.display_name, delivery_class: 'immediate' }],
+          subject:         `${cycle.cycle_title} — ${gateNameDisplay} approved by Initiative Executive override`,
+          initiativeName:  cycle.cycle_title,
           gateNameDisplay,
-          contextParagraph: `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title} ` +
-                            `as an Initiative Executive override. You were the assigned approver. ` +
-                            `Reason: ${String(params.override_reason).trim()}`,
-          delivery_cycle_id,
-          email_type:       'ie_override'
+          headline:        `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title} as an Initiative Executive override. You were the assigned approver.`,
+          detail:          `Reason: ${String(params.override_reason).trim()}`,
+          initiative_id:   delivery_cycle_id,
+          gate_record_id:  gate_record.gate_record_id,
+          actor_user_id:   caller_user_id
         });
       }
     }
@@ -630,19 +633,22 @@ async function record_gate_decision(params, caller_user_id) {
     });
 
     // D-569 (3): returning parties notified with the approver's reasoning.
+    // Contract 45: LOUD exception (D-569) — helper forces immediate, no fan-out.
     const recipients = (returningRows || []).filter(u => u.email)
-      .map(u => ({ email: u.email, display_name: u.display_name }));
+      .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
+                   delivery_class: 'immediate' }));
     if (recipients.length > 0) {
-      await sendGateNotificationEmail({
+      await enqueueNotifications({
+        event_type:      'approved_over_returned_consultation',
         recipients,
-        subject:          `${cycle.cycle_title} — ${gateNameDisplay} approved over your returned consultation`,
-        initiativeName:   cycle.cycle_title,
+        subject:         `${cycle.cycle_title} — ${gateNameDisplay} approved over your returned consultation`,
+        initiativeName:  cycle.cycle_title,
         gateNameDisplay,
-        contextParagraph: `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title} over your ` +
-                          `returned consultation. Reasoning: ${overReason}. You may escalate to the Division ` +
-                          `Leader or an Initiative Executive, or seek consultation-required standing on the next gate.`,
-        delivery_cycle_id,
-        email_type:       'approved_over_returned_consultation'
+        headline:        `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title} over your returned consultation.`,
+        detail:          `Reasoning: ${overReason}. You may escalate to the Division Leader or an Initiative Executive, or seek consultation-required standing on the next gate.`,
+        initiative_id:   delivery_cycle_id,
+        gate_record_id:  gate_record.gate_record_id,
+        actor_user_id:   caller_user_id
       });
     }
 
@@ -660,21 +666,26 @@ async function record_gate_decision(params, caller_user_id) {
       if (division?.owner_user_id) {
         const { data: dl } = await supabase
           .from('users')
-          .select('display_name, email')
+          .select('id, display_name, email')
           .eq('id', division.owner_user_id)
           .is('deleted_at', null)
           .maybeSingle();
         if (dl?.email) {
-          await sendGateNotificationEmail({
-            recipients:       [{ email: dl.email, display_name: dl.display_name }],
-            subject:          `${cycle.cycle_title} — content-triggered consultation overridden at ${gateNameDisplay}`,
-            initiativeName:   cycle.cycle_title,
+          // Contract 45: IMMEDIATE. Not one of the frozen four, but it is the
+          // D-569(5) half of a loud event — batching the escalation notice
+          // while the override itself went out at once would be incoherent.
+          await enqueueNotifications({
+            event_type:      'dl_override_notification',
+            recipients:      [{ user_id: dl.id, email: dl.email,
+                                display_name: dl.display_name, delivery_class: 'immediate' }],
+            subject:         `${cycle.cycle_title} — content-triggered consultation overridden at ${gateNameDisplay}`,
+            initiativeName:  cycle.cycle_title,
             gateNameDisplay,
-            contextParagraph: `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title} over a ` +
-                              `returned content-triggered consultation (${returningNames}). You are notified as ` +
-                              `Division Leader (D-569 clause 5). Reasoning: ${overReason}`,
-            delivery_cycle_id,
-            email_type:       'dl_override_notification'
+            headline:        `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title} over a returned content-triggered consultation (${returningNames}).`,
+            detail:          `You are notified as Division Leader (D-569 clause 5). Reasoning: ${overReason}`,
+            initiative_id:   delivery_cycle_id,
+            gate_record_id:  gate_record.gate_record_id,
+            actor_user_id:   caller_user_id
           });
         }
       }
@@ -883,15 +894,20 @@ async function applyGateApprovalTransition({
       .is('deleted_at', null)
       .maybeSingle();
     if (displaced?.email) {
-      await sendGateNotificationEmail({
-        recipients:       [{ email: displaced.email, display_name: displaced.display_name }],
-        subject:          `${cycle.cycle_title} — ${gateNameDisplay} approved by ${callerDisplayName}`,
-        initiativeName:   cycle.cycle_title,
+      // Contract 45: IMMEDIATE. Their own instrument was taken over, and the
+      // message carries a live invitation (consulted standing) they can act on.
+      await enqueueNotifications({
+        event_type:      'approver_override',
+        recipients:      [{ user_id: displaced.id, email: displaced.email,
+                            display_name: displaced.display_name, delivery_class: 'immediate' }],
+        subject:         `${cycle.cycle_title} — ${gateNameDisplay} approved by ${callerDisplayName}`,
+        initiativeName:  cycle.cycle_title,
         gateNameDisplay,
-        contextParagraph: `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title}. ` +
-                          `You were the assigned approver and have been added as a consulted party — your review is still welcome.`,
-        delivery_cycle_id,
-        email_type:       'approver_override'
+        headline:        `${callerDisplayName} approved ${gateNameDisplay} for ${cycle.cycle_title}.`,
+        detail:          'You were the assigned approver and have been added as a consulted party — your review is still welcome.',
+        initiative_id:   delivery_cycle_id,
+        gate_record_id:  gate_record.gate_record_id,
+        actor_user_id:   caller_user_id
       });
     }
   }
@@ -908,21 +924,31 @@ async function applyGateApprovalTransition({
         .select('id, display_name, email')
         .in('id', informedIds)
         .is('deleted_at', null);
+      // ── Contract 45 (D-647) — CLASS HELD AT IMMEDIATE, DELIBERATELY ────────
+      // D-647 lifts D-458's deferral and routes Informed gate decisions to the
+      // DIGEST. Setting 'digest' here before the 06:00 job exists (Unit D)
+      // would send Informed parties nothing at all — strictly worse than
+      // current behaviour, and invisible, because the row would sit unsent in
+      // the queue looking healthy. The row is queued either way; only the
+      // class flips, and it flips in the same commit that ships the digest.
       const informedRecipients = (informedRows || []).filter(u => u.email && u.is_active !== false)
-        .map(u => ({ email: u.email, display_name: u.display_name }));
+        .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
+                     delivery_class: 'immediate' }));
       if (informedRecipients.length > 0) {
         // Inside the approval transition the decision is always 'approved'
         // (returns exit before this function — G5 refactor).
         const decisionWord = 'approved';
-        await sendGateNotificationEmail({
-          recipients:       informedRecipients,
-          subject:          `${cycle.cycle_title} — ${gateNameDisplay} ${decisionWord}`,
-          initiativeName:   cycle.cycle_title,
+        await enqueueNotifications({
+          event_type:      'informed_gate_decision',
+          recipients:      informedRecipients,
+          subject:         `${cycle.cycle_title} — ${gateNameDisplay} ${decisionWord}`,
+          initiativeName:  cycle.cycle_title,
           gateNameDisplay,
-          contextParagraph: `${callerDisplayName} ${decisionWord} ${gateNameDisplay} for ${cycle.cycle_title}. ` +
-                            `You are receiving this as an Informed party on the Initiative.`,
-          delivery_cycle_id,
-          email_type:       'informed_gate_decision'
+          headline:        `${callerDisplayName} ${decisionWord} ${gateNameDisplay} for ${cycle.cycle_title}.`,
+          detail:          'You are receiving this as an Informed party on the Initiative.',
+          initiative_id:   delivery_cycle_id,
+          gate_record_id:  gate_record.gate_record_id,
+          actor_user_id:   caller_user_id
         });
       }
     }
@@ -961,21 +987,27 @@ async function applyGateApprovalTransition({
         const nameById = {};
         (rosterUsers || []).forEach(u => { nameById[u.id] = u.display_name; });
         const roster = buildAssessmentRosterText(assessRows, nameById);
+        // Contract 45: IMMEDIATE. Arguably awareness, but the roster is the
+        // closing artefact of the Initiative and reads as a record people keep
+        // — folding it into a five-line digest section would lose the content.
         const recipients = (rosterUsers || [])
           .filter(u => recipientIds.includes(u.id) && u.email)
-          .map(u => ({ email: u.email, display_name: u.display_name }));
+          .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
+                       delivery_class: 'immediate' }));
         if (recipients.length > 0) {
-          await sendGateNotificationEmail({
+          await enqueueNotifications({
+            event_type:      'close_review_assessment_roster',
             recipients,
-            subject:          `${cycle.cycle_title} — Close Review approved · gate assessments`,
-            initiativeName:   cycle.cycle_title,
+            subject:         `${cycle.cycle_title} — Close Review approved · gate assessments`,
+            initiativeName:  cycle.cycle_title,
             gateNameDisplay,
-            contextParagraph: `${callerDisplayName} approved Close Review for ${cycle.cycle_title} — the Initiative closes. ` +
-                              `Gate assessments collected on this attempt:\n\n` +
-                              (roster || '(no assessments were collected on this gate)') +
-                              `\n\nThe full roster (including prior attempts) is on the gate record in OI Trust.`,
-            delivery_cycle_id,
-            email_type:       'close_review_assessment_roster'
+            headline:        `${callerDisplayName} approved Close Review for ${cycle.cycle_title} — the Initiative closes.`,
+            detail:          `Gate assessments collected on this attempt:\n\n` +
+                             (roster || '(no assessments were collected on this gate)') +
+                             `\n\nThe full roster (including prior attempts) is on the gate record in OI Trust.`,
+            initiative_id:   delivery_cycle_id,
+            gate_record_id:  gate_record.gate_record_id,
+            actor_user_id:   caller_user_id
           });
         }
       }
@@ -1179,9 +1211,12 @@ async function notifyGateReturned({
     .in('id', recipientIds)
     .is('deleted_at', null);
 
+  // Contract 45 (D-642): queued. IMMEDIATE — everyone here has to realign and
+  // resubmit, which is squarely the D-641 waiting-on test.
   const recipients = (userRows || [])
     .filter(u => u.email)
-    .map(u => ({ email: u.email, display_name: u.display_name }));
+    .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
+                 delivery_class: 'immediate' }));
 
   if (recipients.length === 0) { return; }
 
@@ -1189,16 +1224,16 @@ async function notifyGateReturned({
     ? ` ${conditionCount} condition${conditionCount === 1 ? '' : 's'} must be resolved before resubmission.`
     : '';
 
-  await sendGateNotificationEmail({
+  await enqueueNotifications({
+    event_type:      'gate_returned',
     recipients,
-    subject:          `${cycle.cycle_title} — ${gateNameDisplay} returned`,
-    initiativeName:   cycle.cycle_title,
+    subject:         `${cycle.cycle_title} — ${gateNameDisplay} returned`,
+    initiativeName:  cycle.cycle_title,
     gateNameDisplay,
-    contextParagraph: `${callerDisplayName} returned ${gateNameDisplay} for ${cycle.cycle_title}.` +
-                      conditionLine +
-                      ` Return note: ${approverNotes?.trim() ?? '(none)'}`,
-    delivery_cycle_id: cycle.delivery_cycle_id,
-    email_type:        'gate_returned'
+    headline:        `${callerDisplayName} returned ${gateNameDisplay} for ${cycle.cycle_title}.${conditionLine}`,
+    detail:          `Return note: ${approverNotes?.trim() ?? '(none)'}`,
+    initiative_id:   cycle.delivery_cycle_id,
+    actor_user_id:   caller_user_id
   });
 }
 

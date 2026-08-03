@@ -16,7 +16,7 @@
 
 const { supabase }                  = require('../db');
 const { getPhil }                   = require('./helpers/phil');
-const { sendGateNotificationEmail } = require('./helpers/notification-email');
+const { enqueueNotifications } = require('./helpers/notification-queue');
 const { GATE_NAME_DISPLAY } = require('./helpers/gates');
 // Contract G5 (D-557): L1 consensus — consulted responses carry gate force.
 const { isL1ConsensusGate, trioIdsOf, getL1CollectedState, clearGateApprovals } = require('./helpers/l1-consensus');
@@ -215,19 +215,23 @@ async function record_consultation_response(params, caller_user_id) {
             .select('id, display_name, email')
             .in('id', trioIds)
             .is('deleted_at', null);
+          // Contract 45 (D-642): queued. IMMEDIATE — the trio must realign and
+          // resubmit, which is the D-641 waiting-on test.
           const recipients = (trioRows || []).filter(u => u.email)
-            .map(u => ({ email: u.email, display_name: u.display_name }));
+            .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
+                         delivery_class: 'immediate' }));
           if (recipients.length > 0) {
-            await sendGateNotificationEmail({
+            await enqueueNotifications({
+              event_type:      'l1_gate_returned',
               recipients,
-              subject:          `${cycle.cycle_title} — ${gateNameDisplay} returned by a consulted party`,
-              initiativeName:   cycle.cycle_title,
+              subject:         `${cycle.cycle_title} — ${gateNameDisplay} returned by a consulted party`,
+              initiativeName:  cycle.cycle_title,
               gateNameDisplay,
-              contextParagraph: `${responderName} declined their consultation on ${gateNameDisplay} for ` +
-                                `${cycle.cycle_title}. At Level 1 a consulted return returns the gate entirely — ` +
-                                `all collected approvals were cleared.${notes?.trim() ? ` Notes: ${notes.trim()}` : ''}`,
-              delivery_cycle_id: gate_record.delivery_cycle_id,
-              email_type:        'l1_gate_returned'
+              headline:        `${responderName} declined their consultation on ${gateNameDisplay} for ${cycle.cycle_title}.`,
+              detail:          `At Level 1 a consulted return returns the gate entirely — all collected approvals were cleared.${notes?.trim() ? ` Notes: ${notes.trim()}` : ''}`,
+              initiative_id:   gate_record.delivery_cycle_id,
+              gate_record_id:  gate_record.gate_record_id,
+              actor_user_id:   caller_user_id
             });
           }
         }
@@ -291,22 +295,27 @@ async function record_consultation_response(params, caller_user_id) {
         .select('id, display_name, email')
         .in('id', recipientIds)
         .is('deleted_at', null);
+      // Contract 45 (D-642): IMMEDIATE — D-466 made this loud on purpose; a
+      // decline arriving after approval needs the approver's attention now.
       emailRecipients = (recipientRows || [])
         .filter(u => u.email)
-        .map(u => ({ email: u.email, display_name: u.display_name }));
+        .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
+                     delivery_class: 'immediate' }));
     }
 
     const notesSentence = (notes && notes.trim()) ? ` Notes: ${notes.trim()}` : '';
     if (emailRecipients.length > 0) {
-      await sendGateNotificationEmail({
-        recipients:       emailRecipients,
-        subject:          `${consultedName} recorded a post-approval decline — ${gateNameDisplay} on ${initiativeName}`,
+      await enqueueNotifications({
+        event_type:      'post_approval_decline',
+        recipients:      emailRecipients,
+        subject:         `${consultedName} recorded a post-approval decline — ${gateNameDisplay} on ${initiativeName}`,
         initiativeName,
         gateNameDisplay,
-        contextParagraph: `${consultedName} has recorded a post-approval decline on ${gateNameDisplay} for ` +
-                          `${initiativeName}.${notesSentence} This gate was approved on ${approvedOnDate}.`,
-        delivery_cycle_id: gate_record.delivery_cycle_id,
-        email_type:        'post_approval_decline'
+        headline:        `${consultedName} has recorded a post-approval decline on ${gateNameDisplay} for ${initiativeName}.`,
+        detail:          `${notesSentence.trim()} This gate was approved on ${approvedOnDate}.`.trim(),
+        initiative_id:   gate_record.delivery_cycle_id,
+        gate_record_id:  gate_record.gate_record_id,
+        actor_user_id:   caller_user_id
       });
     }
   }

@@ -141,7 +141,13 @@ describe('D-584: post-Go-to-Build Consulted removal heavy path', () => {
       { data: null, error: null },                                       // participation_removed event
       { data: { display_name: 'Remo Ver' }, error: null },               // remover lookup
       { data: { cycle_title: 'Init' }, error: null },                    // cycle lookup
-      { data: { display_name: 'Holly Holder', email: 'holly@x.com' }, error: null }, // holder lookup
+      { data: { id: 'holder-u', display_name: 'Holly Holder', email: 'holly@x.com' }, error: null }, // holder lookup
+      // Contract 45 (D-642): the notification now goes through the queue —
+      // manager lookup for the fan-out, then the queue insert. The immediate
+      // class still dispatches on write, so the assertion below is unchanged.
+      { data: [], error: null },                                         // resolveManagers — no manager
+      { data: [{ notification_id: 'nq-1', recipient_user_id: 'holder-u',
+                 delivery_class: 'immediate' }], error: null },          // queue insert
       { data: { gate_record_id: 'g-awaiting' }, error: null },           // awaiting gate
       { data: null, error: null }                                        // gate thread insert
     ];

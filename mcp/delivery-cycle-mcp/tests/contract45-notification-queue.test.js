@@ -243,6 +243,34 @@ describe('manager fan-out (D-642)', () => {
   });
 });
 
+describe('a queue write failure must not silence an immediate send', () => {
+  test('the email still goes out when the insert errors', async () => {
+    // Before Contract 45 the email went out with no queue involved. If a
+    // notification_queue problem could swallow a blocking message, the
+    // plumbing would have introduced a regression no decision asked for.
+    // The helper holds a reference to this same chain object, so swapping the
+    // method on it is enough — no module-cache surgery required.
+    const savedInsert = chain.insert;
+    chain.insert = () => ({
+      select: () => Promise.resolve({ data: null, error: { message: 'relation missing' } })
+    });
+
+    try {
+      const r = await enqueueNotifications({
+        event_type: 'gate_returned',
+        recipients: [person(DANA, 'Dana', 'dana@x.com', 'immediate')],
+        headline:   'Go to Build was returned.'
+      });
+
+      assert.equal(r.queued, 0, 'nothing persisted');
+      assert.equal(r.immediate, 1, 'but the blocking email still went out');
+      assert.equal(sentEmails.length, 1);
+    } finally {
+      chain.insert = savedInsert;
+    }
+  });
+});
+
 describe('headlines render at write time (D-463 pattern)', () => {
   test('the stored headline is the finished text, not ids to resolve later', async () => {
     await enqueueNotifications({

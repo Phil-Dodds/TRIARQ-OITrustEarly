@@ -14,7 +14,7 @@ const {
   recomputeBaselineForCycle
 } = require('../lib/governance-derivation');
 // Contract G3: displaced-approver notification on level-lowering edits.
-const { sendGateNotificationEmail } = require('./helpers/notification-email');
+const { enqueueNotifications } = require('./helpers/notification-queue');
 
 const DIRECT_ANSWER_COLUMNS = ['q1_investment', 'q2_novelty', 'q3_wrongness', 'q4_security_impact', 'q5_ux'];
 
@@ -289,19 +289,23 @@ async function upsert_initiative_sizing(params, caller_user_id) {
         .select('id, display_name, email')
         .in('id', approverIds)
         .is('deleted_at', null);
+      // Contract 45 (D-642): queued. This is one of the four LOUD exceptions
+      // (D-562) — the helper forces it immediate and blocks the manager
+      // fan-out from its own list, so the class here is not load-bearing.
       const recipients = (approverRows || []).filter(u => u.email)
-        .map(u => ({ email: u.email, display_name: u.display_name }));
+        .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
+                     delivery_class: 'immediate' }));
       if (recipients.length > 0) {
-        await sendGateNotificationEmail({
+        await enqueueNotifications({
+          event_type:      'governance_level_lowered',
           recipients,
-          subject:          `${cycle.cycle_title} — sizing edit lowered the governance level`,
-          initiativeName:   cycle.cycle_title,
-          gateNameDisplay:  'Governance level',
-          contextParagraph: `A sizing edit lowered the effective governance level on ${cycle.cycle_title} ` +
-                            `from Level ${oldEffectiveLevel} to Level ${recompute.effective_level}. ` +
-                            `You are notified as the approver of a gate currently awaiting approval.`,
-          delivery_cycle_id,
-          email_type:       'governance_level_lowered'
+          subject:         `${cycle.cycle_title} — sizing edit lowered the governance level`,
+          initiativeName:  cycle.cycle_title,
+          gateNameDisplay: 'Governance level',
+          headline:        `A sizing edit lowered the effective governance level on ${cycle.cycle_title} from Level ${oldEffectiveLevel} to Level ${recompute.effective_level}.`,
+          detail:          'You are notified as the approver of a gate currently awaiting approval.',
+          initiative_id:   delivery_cycle_id,
+          actor_user_id:   caller_user_id
         });
       }
     }

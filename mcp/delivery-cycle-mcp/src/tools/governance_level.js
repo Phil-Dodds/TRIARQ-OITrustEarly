@@ -12,7 +12,7 @@
 const { supabase } = require('../db');
 const { recomputeBaselineForCycle } = require('../lib/governance-derivation');
 // Contract G3 (D-562/AC#6): displaced-approver notification on level-lowering set.
-const { sendGateNotificationEmail } = require('./helpers/notification-email');
+const { enqueueNotifications } = require('./helpers/notification-queue');
 // CC-40-O: re-route in-flight gate approvals on an oversight change.
 const { GATE_LABELS } = require('../lib/gate-resolution');
 const { resolveGateApproverV2 } = require('./helpers/approver');
@@ -174,19 +174,23 @@ async function set_effective_level(params, caller_user_id) {
         .select('id, display_name, email')
         .in('id', approverIds)
         .is('deleted_at', null);
+      // Contract 45 (D-642): queued. This is one of the four LOUD exceptions
+      // (D-562) — the helper forces it immediate and blocks the manager
+      // fan-out from its own list, so the class here is not load-bearing.
       const recipients = (approverRows || []).filter(u => u.email)
-        .map(u => ({ email: u.email, display_name: u.display_name }));
+        .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
+                     delivery_class: 'immediate' }));
       if (recipients.length > 0) {
-        await sendGateNotificationEmail({
+        await enqueueNotifications({
+          event_type:      'governance_level_lowered',
           recipients,
-          subject:          `${ctx.cycle.cycle_title} — governance level lowered`,
-          initiativeName:   ctx.cycle.cycle_title,
-          gateNameDisplay:  'Governance level',
-          contextParagraph: `Leadership set the governance level on ${ctx.cycle.cycle_title} to ` +
-                            `Level ${level} (previously effective Level ${priorEffective}). ` +
-                            `You are notified as the approver of a gate currently awaiting approval.`,
-          delivery_cycle_id,
-          email_type:       'governance_level_lowered'
+          subject:         `${ctx.cycle.cycle_title} — governance level lowered`,
+          initiativeName:  ctx.cycle.cycle_title,
+          gateNameDisplay: 'Governance level',
+          headline:        `Leadership set the governance level on ${ctx.cycle.cycle_title} to Level ${level} (previously effective Level ${priorEffective}).`,
+          detail:          'You are notified as the approver of a gate currently awaiting approval.',
+          initiative_id:   delivery_cycle_id,
+          actor_user_id:   caller_user_id
         });
       }
     }

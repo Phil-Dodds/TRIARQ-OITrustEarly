@@ -9,7 +9,7 @@
 
 const { supabase } = require('../db');
 const { resolveCancelAuthority } = require('./helpers/cancel-authority');
-const { sendGateNotificationEmail } = require('./helpers/notification-email');
+const { enqueueNotifications } = require('./helpers/notification-queue');
 
 /**
  * @param {string} params.delivery_cycle_id
@@ -91,21 +91,30 @@ async function request_cancel(params, caller_user_id) {
       .select('id, display_name, email')
       .in('id', notifyIds)
       .is('deleted_at', null);
+    // Contract 45 (D-642): queued. IMMEDIATE — the recipient is the cancel
+    // authority and the request is blocked until they act, which is the
+    // D-641 waiting-on test.
     const recipients = (recipientsRows || []).filter(u => u.email)
-      .map(u => ({ email: u.email, display_name: u.display_name }));
+      .map(u => ({
+        user_id:        u.id,
+        email:          u.email,
+        display_name:   u.display_name,
+        delivery_class: 'immediate'
+      }));
     if (recipients.length > 0) {
-      await sendGateNotificationEmail({
+      await enqueueNotifications({
+        event_type:      'cancel_requested',
         recipients,
-        subject:          `${cycle.cycle_title} — cancellation requested`,
-        initiativeName:   cycle.cycle_title,
-        gateNameDisplay:  'Cancel request',
-        contextParagraph: `A trio member requested cancellation of ${cycle.cycle_title}. ` +
-                          `Reason: ${String(reason).trim()}. ` +
-                          (authority.mode === 'approver'
-                            ? 'You are the resolved cancel authority — execute or decline from the Initiative panel.'
-                            : 'Any trio member can execute the cancellation from the Initiative panel.'),
-        delivery_cycle_id,
-        email_type:       'cancel_requested'
+        subject:         `${cycle.cycle_title} — cancellation requested`,
+        initiativeName:  cycle.cycle_title,
+        gateNameDisplay: 'Cancel request',
+        headline:        `A trio member requested cancellation of ${cycle.cycle_title}.`,
+        detail:          `Reason: ${String(reason).trim()}. ` +
+                         (authority.mode === 'approver'
+                           ? 'You are the resolved cancel authority — execute or decline from the Initiative panel.'
+                           : 'Any trio member can execute the cancellation from the Initiative panel.'),
+        initiative_id:   delivery_cycle_id,
+        actor_user_id:   caller_user_id
       });
     }
   }
@@ -194,7 +203,7 @@ async function decline_cancel_request(params, caller_user_id) {
   // Notify the requester.
   const { data: requester } = await supabase
     .from('users')
-    .select('display_name, email')
+    .select('id, display_name, email')
     .eq('id', request.requested_by_user_id)
     .is('deleted_at', null)
     .maybeSingle();
@@ -204,14 +213,23 @@ async function decline_cancel_request(params, caller_user_id) {
       .select('cycle_title')
       .eq('delivery_cycle_id', request.delivery_cycle_id)
       .maybeSingle();
-    await sendGateNotificationEmail({
-      recipients:       [{ email: requester.email, display_name: requester.display_name }],
-      subject:          `${cycleRow?.cycle_title ?? 'Initiative'} — cancel request declined`,
-      initiativeName:   cycleRow?.cycle_title ?? 'Initiative',
-      gateNameDisplay:  'Cancel request',
-      contextParagraph: `Your cancellation request was declined. Note: ${String(note).trim()}`,
-      delivery_cycle_id: request.delivery_cycle_id,
-      email_type:       'cancel_request_declined'
+    // Contract 45 (D-642): queued. IMMEDIATE — a declined request is a direct
+    // answer to something this person asked for, and it unblocks their next move.
+    await enqueueNotifications({
+      event_type:      'cancel_request_declined',
+      recipients:      [{
+        user_id:        requester.id,
+        email:          requester.email,
+        display_name:   requester.display_name,
+        delivery_class: 'immediate'
+      }],
+      subject:         `${cycleRow?.cycle_title ?? 'Initiative'} — cancel request declined`,
+      initiativeName:  cycleRow?.cycle_title ?? 'Initiative',
+      gateNameDisplay: 'Cancel request',
+      headline:        'Your cancellation request was declined.',
+      detail:          `Note: ${String(note).trim()}`,
+      initiative_id:   request.delivery_cycle_id,
+      actor_user_id:   caller_user_id
     });
   }
 

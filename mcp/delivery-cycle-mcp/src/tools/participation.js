@@ -9,7 +9,7 @@
 
 const { supabase } = require('../db');
 // Contract 39 (D-584): post-Go-to-Build Consulted removal takes the heavy path.
-const { sendGateNotificationEmail } = require('./helpers/notification-email');
+const { enqueueNotifications } = require('./helpers/notification-queue');
 
 const VALID_LETTERS = ['C', 'I'];
 const VALID_SET_VIA = ['trio', 'self', 'rule', 'division_default', 'approver', 'leadership'];
@@ -309,13 +309,21 @@ async function remove_participation(params, caller_user_id) {
     if (record.holder_user_id && record.holder_user_id !== caller_user_id) {
       const { data: holderRow } = await supabase
         .from('users')
-        .select('display_name, email')
+        .select('id, display_name, email')
         .eq('id', record.holder_user_id)
         .maybeSingle();
       if (holderRow) {
         holderLabel = holderRow.display_name;
         if (holderRow.email) {
-          recipients.push({ email: holderRow.email, display_name: holderRow.display_name });
+          // Contract 45 (D-642/D-564): IMMEDIATE — losing a stake changes what
+          // this person is expected to do, and D-647 keeps stake removal out
+          // of the digest for exactly that reason.
+          recipients.push({
+            user_id:        holderRow.id,
+            email:          holderRow.email,
+            display_name:   holderRow.display_name,
+            delivery_class: 'immediate'
+          });
         }
       }
     } else if (record.holder_group_id) {
@@ -334,25 +342,33 @@ async function remove_participation(params, caller_user_id) {
       if (memberIds.length > 0) {
         const { data: memberRows } = await supabase
           .from('users')
-          .select('display_name, email')
+          .select('id, display_name, email')
           .in('id', memberIds)
           .is('deleted_at', null);
         for (const m of memberRows ?? []) {
-          if (m.email) { recipients.push({ email: m.email, display_name: m.display_name }); }
+          if (m.email) {
+            recipients.push({
+              user_id:        m.id,
+              email:          m.email,
+              display_name:   m.display_name,
+              delivery_class: 'immediate'
+            });
+          }
         }
       }
     }
 
     if (recipients.length > 0) {
-      await sendGateNotificationEmail({
+      await enqueueNotifications({
+        event_type:      'consulted_removed',
         recipients,
-        subject:          `${cycleTitle} — Consulted participation removed`,
-        initiativeName:   cycleTitle,
-        gateNameDisplay:  'Consultation cast',
-        contextParagraph: `${removerName} removed ${holderLabel} as a Consulted party on ${cycleTitle} ` +
-                          `after Go to Build.${trimmedNote ? ` Note: ${trimmedNote}` : ''}`,
-        delivery_cycle_id: record.delivery_cycle_id,
-        email_type:       'consulted_removed'
+        subject:         `${cycleTitle} — Consulted participation removed`,
+        initiativeName:  cycleTitle,
+        gateNameDisplay: 'Consultation cast',
+        headline:        `${removerName} removed ${holderLabel} as a Consulted party on ${cycleTitle} after Go to Build.`,
+        detail:          trimmedNote ? `Note: ${trimmedNote}` : null,
+        initiative_id:   record.delivery_cycle_id,
+        actor_user_id:   caller_user_id
       });
     }
 

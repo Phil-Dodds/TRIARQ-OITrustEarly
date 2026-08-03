@@ -48,7 +48,7 @@ const { validateOrError, saveAssessment } = require('./helpers/gate-assessments'
 // Contract G4 (D-564): Consulted set now derives from participation_records
 // (trio + C stakes with group expansion) — the D-458 array is retired.
 const { deriveConsultedUserIdsV2, setupGateConsultations } = require('./helpers/consultations');
-const { sendGateNotificationEmail } = require('./helpers/notification-email');
+const { enqueueNotifications } = require('./helpers/notification-queue');
 
 // Gate-name display strings — used in event_description and surfaced to UI text.
 // Source: gate-submission-flow-spec-2026-04-19 §3.1.
@@ -790,30 +790,41 @@ async function submit_gate_for_approval(params, caller_user_id) {
 
     // ── WS4 (D-467): gate submission email — approver + non-submitter consulted ──
     // Submitter excluded (they submitted it, AC #43). Same body for both roles.
+    // Contract 45 (D-642): queued. Every recipient here is IMMEDIATE — the
+    // gate is waiting on each of them, which is exactly the D-641 test.
     const emailRecipients = [];
     if (resolvedApproverId && byId[resolvedApproverId]?.email) {
       emailRecipients.push({
-        email:        byId[resolvedApproverId].email,
-        display_name: byId[resolvedApproverId].display_name
+        user_id:        resolvedApproverId,
+        email:          byId[resolvedApproverId].email,
+        display_name:   byId[resolvedApproverId].display_name,
+        delivery_class: 'immediate'
       });
     }
     for (const id of nonSubmitterConsultedUserIds) {
       if (byId[id]?.email) {
-        emailRecipients.push({ email: byId[id].email, display_name: byId[id].display_name });
+        emailRecipients.push({
+          user_id:        id,
+          email:          byId[id].email,
+          display_name:   byId[id].display_name,
+          delivery_class: 'immediate'
+        });
       }
     }
     if (emailRecipients.length > 0) {
-      await sendGateNotificationEmail({
-        recipients:       emailRecipients,
-        subject:          `${cycle.cycle_title} — ${gateNameDisplay} submitted for approval`,
-        initiativeName:   cycle.cycle_title,
+      await enqueueNotifications({
+        event_type:      'gate_submission',
+        recipients:      emailRecipients,
+        subject:         `${cycle.cycle_title} — ${gateNameDisplay} submitted for approval`,
+        initiativeName:  cycle.cycle_title,
         gateNameDisplay,
-        contextParagraph: `${callerDisplayName} has submitted ${gateNameDisplay} for ${cycle.cycle_title}. ` +
-                          (resolvedApproverId
-                            ? 'You have been notified as an approver or a consulted party.'
-                            : 'This gate passes when every collected party approves — your approval is one of them.'),
-        delivery_cycle_id,
-        email_type:       'gate_submission'
+        headline:        `${callerDisplayName} has submitted ${gateNameDisplay} for ${cycle.cycle_title}.`,
+        detail:          resolvedApproverId
+                           ? 'You have been notified as an approver or a consulted party.'
+                           : 'This gate passes when every collected party approves — your approval is one of them.',
+        initiative_id:   delivery_cycle_id,
+        gate_record_id:  gate_record.gate_record_id,
+        actor_user_id:   caller_user_id
       });
     }
   }
