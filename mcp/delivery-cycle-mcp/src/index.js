@@ -15,6 +15,9 @@ require('dotenv').config();
 const express    = require('express');
 const cors       = require('cors');
 const { validateJwt } = require('./middleware/jwt');
+// Contract 45 (D-643): scheduled-caller auth + the 06:00 digest job.
+const { requireInternalKey } = require('./middleware/internal-key');
+const { run_daily_digest }   = require('./tools/run_daily_digest');
 
 // ── Tool imports ──────────────────────────────────────────────────────────────
 const { create_delivery_workstream }     = require('./tools/create_delivery_workstream');
@@ -312,6 +315,38 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '1mb' }));
+
+// ── Scheduled-caller routes (Contract 45, D-643) ─────────────────────────────
+// Mounted BEFORE validateJwt because the 06:00 digest has no user: a JWT
+// belongs to a person and there is no person here. Guarded by
+// RENDER_INTERNAL_API_KEY (Arch-4, declared since Build C, implemented here).
+//
+// Deliberately NOT an alternative credential on the tool router — that would
+// make ~90 tools reachable with a static key. Each /internal/* route exposes
+// exactly one operation, and the key cannot reach /tools/:toolName at all.
+// Unset env var disables the route (404) rather than opening it.
+app.post('/internal/run-daily-digest', requireInternalKey, async (req, res) => {
+  const start = Date.now();
+  try {
+    const result = await run_daily_digest(req.body || {});
+    console.log(JSON.stringify({
+      tool_name: 'run_daily_digest', caller: 'scheduler',
+      timestamp: new Date().toISOString(),
+      duration_ms: Date.now() - start, success: result.success
+    }));
+    return res.status(result.success ? 200 : 400).json(result);
+  } catch (err) {
+    console.error(JSON.stringify({
+      tool_name: 'run_daily_digest', caller: 'scheduler',
+      timestamp: new Date().toISOString(),
+      duration_ms: Date.now() - start, error: err.message
+    }));
+    return res.status(500).json({
+      success: false,
+      error:   'An unexpected error occurred. The engineering team has been notified.'
+    });
+  }
+});
 
 // ── JWT validation on every request ──────────────────────────────────────────
 app.use(validateJwt);
