@@ -760,6 +760,14 @@ async function submit_gate_for_approval(params, caller_user_id) {
   }
 
   // ── Resolve approver + Consulted display names/emails in one lookup ────────
+  //
+  // Contract 44 (D-646/D-557) verification note — deliberately NOT changed:
+  // at Level 1 resolvedApproverId is null (no single approver), so this list
+  // looks as though it omits the trio. It does not. deriveConsultedUserIdsV2
+  // pushes the non-null trio into the Consulted set before any C stakes, so
+  // nonSubmitterConsultedUserIds already carries every remaining collected
+  // party — trio and Consulted — minus the submitter. Adding the trio again
+  // here would be dead code that the helper's dedupe silently absorbs.
   const lookupIds = [...new Set(
     [resolvedApproverId, ...nonSubmitterConsultedUserIds].filter(Boolean)
   )];
@@ -801,7 +809,9 @@ async function submit_gate_for_approval(params, caller_user_id) {
         initiativeName:   cycle.cycle_title,
         gateNameDisplay,
         contextParagraph: `${callerDisplayName} has submitted ${gateNameDisplay} for ${cycle.cycle_title}. ` +
-                          `You have been notified as an approver or a consulted party.`,
+                          (resolvedApproverId
+                            ? 'You have been notified as an approver or a consulted party.'
+                            : 'This gate passes when every collected party approves — your approval is one of them.'),
         delivery_cycle_id,
         email_type:       'gate_submission'
       });

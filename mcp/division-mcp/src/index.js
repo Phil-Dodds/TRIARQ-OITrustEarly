@@ -49,6 +49,9 @@ const { set_division_approver }        = require('./tools/set_division_approver'
 const { list_division_approvers }      = require('./tools/list_division_approvers');
 const { remove_division_approver }     = require('./tools/remove_division_approver');
 // Easter Egg Hunt (spec docs/easter-egg-spec.md).
+const { set_maintenance_mode }         = require('./tools/set_maintenance_mode');
+const { get_maintenance_mode }         = require('./tools/get_maintenance_mode');
+
 const easterEggs                       = require('./tools/easter_eggs');
 // Bottom news banner feed.
 const { get_news_ticker, toggle_news_banner_reaction } = require('./tools/news_ticker');
@@ -115,6 +118,8 @@ app.post('/tools/:toolName', async (req, res) => {
     set_division_approver,
     list_division_approvers,
     remove_division_approver,
+    set_maintenance_mode,
+    get_maintenance_mode,
     find_egg:              easterEggs.find_egg,
     get_my_egg_basket:     easterEggs.get_my_egg_basket,
     get_recent_egg_finds:  easterEggs.get_recent_egg_finds,
@@ -203,6 +208,8 @@ app.get('/tools', (req, res) => {
       { name: 'set_division_approver',        method: 'POST', path: '/tools/set_division_approver' },
       { name: 'list_division_approvers',      method: 'POST', path: '/tools/list_division_approvers' },
       { name: 'remove_division_approver',     method: 'POST', path: '/tools/remove_division_approver' },
+      { name: 'set_maintenance_mode',         method: 'POST', path: '/tools/set_maintenance_mode' },
+      { name: 'get_maintenance_mode',         method: 'POST', path: '/tools/get_maintenance_mode' },
       { name: 'find_egg',                     method: 'POST', path: '/tools/find_egg' },
       { name: 'get_my_egg_basket',            method: 'POST', path: '/tools/get_my_egg_basket' },
       { name: 'get_recent_egg_finds',         method: 'POST', path: '/tools/get_recent_egg_finds' },

@@ -13,6 +13,9 @@
 const { supabase } = require('../db');
 const { computeWaitingOnBatch } = require('../lib/waiting-on');
 const { GATE_NAME_DISPLAY } = require('./helpers/gates');
+// D-613 (Contract 43): the All Pending Gates Division-Leader scope is the same
+// function the approval path uses — see the note at the filter below.
+const { isLeadershipForCycle } = require('./helpers/approver');
 
 // ARCH-33 (named/valued at implementation per spec — CC-G8): gates awaiting
 // approval longer than this many days get the aging highlight.
@@ -110,19 +113,28 @@ async function list_all_pending_gates(params, caller_user_id) {
   if (callerErr || !caller || !caller.is_active) {
     return { success: false, error: 'Caller user record not found or inactive.' };
   }
-  // CC-40-P: widest scope the caller is allowed. IE / Admin / Phil → all
-  // divisions. A Division Leader (owns ≥1 division) → their own division(s).
-  // Everyone else → their personal My Actions queue, not this view.
+  // Contract 43 (D-613): widest scope the caller is allowed. IE / Admin / Phil
+  // → all divisions. Everyone else → the divisions they are LEADERSHIP for,
+  // resolved per Initiative below via isLeadershipForCycle.
+  //
+  // CC-40-P originally scoped a Division Leader to divisions they directly
+  // own. That was narrower than their approval authority: D-577 lets the owner
+  // of a parent division approve gates on Initiatives in child divisions via
+  // the ancestor-chain walk, so leaders held approval power over work this
+  // screen never showed them. One scope function, not two — the system already
+  // decided who leadership is for a cycle, and this screen now asks that same
+  // question rather than a different one.
   const isWide = caller.is_initiative_executive === true || caller.is_super_admin === true || caller.is_admin === true;
-  let ownedDivisionIds = null;
   if (!isWide) {
+    // Access gate (unchanged in substance): owning no division at all means
+    // this screen is not yours. Which of the visible Initiatives you may see
+    // is a separate, per-Division question answered further down.
     const { data: owned } = await supabase
       .from('divisions')
       .select('id')
       .eq('owner_user_id', caller_user_id)
       .is('deleted_at', null);
-    ownedDivisionIds = new Set((owned || []).map(d => d.id));
-    if (ownedDivisionIds.size === 0) {
+    if (!owned || owned.length === 0) {
       return {
         success: false,
         error: 'The All Pending Gates view is for Initiative Executives, Admins, and Division Leaders. ' +
@@ -176,12 +188,29 @@ async function list_all_pending_gates(params, caller_user_id) {
   const personMap = {};
   (people || []).forEach(u => { personMap[u.id] = u.display_name; });
 
+  // Contract 43 (D-613): resolve leadership ONCE per distinct Division rather
+  // than once per gate — isLeadershipForCycle walks the parent chain, so a
+  // per-gate call would re-walk the same chain for every gate in a Division.
+  let leadershipDivisionIds = null;
+  if (!isWide) {
+    leadershipDivisionIds = new Set();
+    await Promise.all(divisionIds.map(async (divisionId) => {
+      if (await isLeadershipForCycle(caller_user_id, divisionId)) {
+        leadershipDivisionIds.add(divisionId);
+      }
+    }));
+  }
+
   const waitingOnByGate = await computeWaitingOnBatch(gates, cyclesById);
 
   const pending_gates = gates
     .filter(g => cyclesById[g.delivery_cycle_id])   // drop soft-deleted initiatives
-    // CC-40-P: Division-Leader scope — only their own division(s).
-    .filter(g => isWide || ownedDivisionIds.has(cyclesById[g.delivery_cycle_id].division_id))
+    // D-613 (Contract 43): Division-Leader scope — every Division the caller is
+    // leadership for, own and descendant. Runs AFTER the delivery_cycle_id
+    // narrowing applied to gatesQuery above: Contract 41 placed the scope id
+    // first deliberately, so a leader passing a foreign cycle id still gets
+    // nothing. That ordering is load-bearing — do not move this filter earlier.
+    .filter(g => isWide || leadershipDivisionIds.has(cyclesById[g.delivery_cycle_id].division_id))
     .map(g => {
       const c = cyclesById[g.delivery_cycle_id];
       const d = c.division_id ? (divisionMap[c.division_id] || {}) : {};

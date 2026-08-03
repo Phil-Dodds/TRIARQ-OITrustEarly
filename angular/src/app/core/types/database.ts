@@ -46,6 +46,11 @@ export interface User {
   // "No Division" (0) / names comma-separated (1–2) / "N Divisions" (3+).
   division_count?:                       number;
   division_summary?:                     string;
+  // Contract 43 (D-613): DERIVED, never a column. True when this user owns at
+  // least one Division (divisions.owner_user_id), resolved server-side in
+  // list_users. Gates the All Pending Gates sidebar entry for Division Leaders.
+  // Deliberately not stored — see the note in list_users.js.
+  owns_division?:                        boolean;
 }
 
 export interface Division {

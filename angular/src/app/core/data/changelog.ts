@@ -32,6 +32,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-08-02',
+    contractLabel: 'Contracts 42–44 — Maintenance Mode, Division Leader Gate Queue, Return Notifications',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Gate returned notifications',
+        description: 'When a gate is returned you now get an email — the submitter and the whole trio, with the return reason and any conditions to resolve. Most returns previously sent nothing at all, so the only way to find out was to log in and look.'
+      },
+      {
+        audience:    'Trio',
+        surface:     'All Pending Gates',
+        description: 'Division Leaders can now reach this screen from the sidebar, and see pending gates across every Division they lead — including child Divisions, matching the gates they already had the authority to approve.'
+      },
+      {
+        audience:    'Admin',
+        surface:     'Maintenance mode',
+        description: 'During a deployment the application can now show a short "being updated" page instead of a half-updated app. It is switched on and off from the command line, not from a screen — a control inside the app could turn it on and would then be unable to turn it off.'
+      }
+    ]
+  },
+  {
     date:          '2026-07-31',
     contractLabel: 'Contract 41 — RACI Home Card, All Pending Gates, Warning Scope',
     items: [

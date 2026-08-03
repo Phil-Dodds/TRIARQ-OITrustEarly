@@ -63,11 +63,18 @@ describe('CC-40-O: set_oversight re-routes the in-flight gate', () => {
   });
 });
 
-describe('CC-40-P: All Pending Gates Division-Leader scope (source)', () => {
+// Contract 43 (D-613) SUPERSEDES the CC-40-P scope this block originally
+// asserted. The owned-divisions filter was narrower than the approval authority
+// D-577 grants a parent Division Leader, so the scope now runs the same
+// isLeadershipForCycle ancestor walk the approval path uses. The owner_user_id
+// query survives as the access gate — owning no Division at all still means the
+// screen is not yours. Behavioural coverage lives in contractG8-executive.test.js.
+describe('D-613: All Pending Gates Division-Leader scope (source)', () => {
   const src = fs.readFileSync(require.resolve('../src/tools/initiative_executive.js'), 'utf8');
-  test('DL sees their owned divisions; IE/Admin/Phil see all', () => {
+  test('DL scope is isLeadershipForCycle; IE/Admin/Phil see all', () => {
     assert.match(src, /owner_user_id.*caller_user_id|eq\('owner_user_id', caller_user_id\)/);
-    assert.match(src, /isWide \|\| ownedDivisionIds\.has/);
+    assert.match(src, /isWide \|\| leadershipDivisionIds\.has/);
+    assert.match(src, /isLeadershipForCycle/);
     assert.match(src, /is_initiative_executive === true \|\| caller\.is_super_admin === true \|\| caller\.is_admin === true/);
   });
 });

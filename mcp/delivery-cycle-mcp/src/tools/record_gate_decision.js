@@ -130,7 +130,11 @@ async function record_gate_decision(params, caller_user_id) {
   // ── Fetch gate record (includes approver_user_id for permission check) ────
   const { data: gate_record, error: gateErr } = await supabase
     .from('gate_records')
-    .select('gate_record_id, gate_status, approver_user_id, outcome_verdict')
+    // Contract 44 (D-646/D-345): submitted_by_user_id is selected so the return
+    // notification can reach the submitter. Added to the EXISTING select rather
+    // than as a new query — the query count is unchanged, so no FIFO fixture
+    // slot downstream shifts (Rule 40).
+    .select('gate_record_id, gate_status, approver_user_id, outcome_verdict, submitted_by_user_id')
     .eq('delivery_cycle_id', delivery_cycle_id)
     .eq('gate_name', gate_name)
     .is('deleted_at', null)
@@ -274,30 +278,18 @@ async function record_gate_decision(params, caller_user_id) {
       // Conditions loop: conditions attached to this L1 return are created open.
       await createReturnConditions(gate_record.gate_record_id, delivery_cycle_id, gate_name, params.conditions, caller_user_id);
 
-      // S-A2: trio notified (the returner excluded).
-      const notifyIds = trioIds.filter(id => id !== caller_user_id);
-      if (notifyIds.length > 0) {
-        const { data: trioRows } = await supabase
-          .from('users')
-          .select('id, display_name, email')
-          .in('id', notifyIds)
-          .is('deleted_at', null);
-        const recipients = (trioRows || []).filter(u => u.email)
-          .map(u => ({ email: u.email, display_name: u.display_name }));
-        if (recipients.length > 0) {
-          await sendGateNotificationEmail({
-            recipients,
-            subject:          `${cycle.cycle_title} — ${gateNameDisplay} returned`,
-            initiativeName:   cycle.cycle_title,
-            gateNameDisplay,
-            contextParagraph: `${callerDisplayName} returned ${gateNameDisplay} for ${cycle.cycle_title}. ` +
-                              `All collected approvals were cleared — the gate restarts on re-submission. ` +
-                              `Return note: ${approver_notes?.trim() ?? '(none)'}`,
-            delivery_cycle_id,
-            email_type:       'l1_gate_returned'
-          });
-        }
-      }
+      // S-A2 + Contract 44 (D-345): submitter and all trio, returner excluded.
+      // Was trio-only — an Admin submitting on behalf of the trio was never
+      // told their own submission had been returned.
+      await notifyGateReturned({
+        cycle,
+        gateNameDisplay,
+        callerDisplayName,
+        submittedByUserId: gate_record.submitted_by_user_id ?? null,
+        caller_user_id,
+        approverNotes:     approver_notes,
+        conditionCount:    Array.isArray(params.conditions) ? params.conditions.length : 0
+      });
 
       return { success: true, data: { gate_record: returnedGate, stage_advanced: false, l1_consensus: true } };
     }
@@ -494,6 +486,21 @@ async function record_gate_decision(params, caller_user_id) {
     // Conditions loop: "Return with Set Conditions" — attached conditions are
     // created open and survive until resolved or withdrawn.
     await createReturnConditions(gate_record.gate_record_id, delivery_cycle_id, gate_name, params.conditions, caller_user_id);
+
+    // ── Contract 44 (D-646/D-345): THE GAP. ──────────────────────────────────
+    // This path — every Level 2 and Level 3 return, i.e. the majority of
+    // returns — sent no notification of any kind. A submitter whose gate was
+    // returned found out by logging in. The L1 path below/above has notified
+    // since the governance redesign; this one was never revised to match.
+    await notifyGateReturned({
+      cycle,
+      gateNameDisplay,
+      callerDisplayName,
+      submittedByUserId: gate_record.submitted_by_user_id ?? null,
+      caller_user_id,
+      approverNotes:     approver_notes,
+      conditionCount:    Array.isArray(params.conditions) ? params.conditions.length : 0
+    });
 
     return { success: true, data: { gate_record: returned_gate, stage_advanced: false } };
   }
@@ -1131,6 +1138,70 @@ function prevStageOf(target_stage) {
  * Non-fatal: the return already stands; failures are server-logged.
  * @param {Array<{condition_text: string}>} conditions
  */
+/**
+ * Contract 44 (D-646) — notify on a gate return. D-345 sets the recipient list:
+ * the submitter and ALL trio, because a return means every one of them has to
+ * realign and resubmit. The actor is excluded — they just performed the return.
+ *
+ * Shared by BOTH return paths deliberately. Before this contract the L1
+ * consensus path notified the trio and the L2/L3 path notified nobody at all:
+ * the same event, two implementations, one of them empty. A single helper is
+ * what stops that recurring.
+ *
+ * Covers "Return with Set Conditions" (D-581) in the same send rather than a
+ * second email — the conditions are part of this return, and two messages
+ * about one action is noise, not signal.
+ *
+ * Fire-and-forget, like every other notification here: a return already stands
+ * before this runs and must never fail on email delivery.
+ *
+ * @param {object} cycle              — carries cycle_title + trio assignments
+ * @param {string} gateNameDisplay
+ * @param {string} callerDisplayName  — who returned it
+ * @param {string|null} submittedByUserId
+ * @param {string} caller_user_id
+ * @param {string|null} approverNotes — the required return reason
+ * @param {number} conditionCount
+ */
+async function notifyGateReturned({
+  cycle, gateNameDisplay, callerDisplayName, submittedByUserId,
+  caller_user_id, approverNotes, conditionCount = 0
+}) {
+  const recipientIds = [...new Set(
+    [submittedByUserId, ...trioIdsOf(cycle)].filter(Boolean)
+  )].filter(id => id !== caller_user_id);
+
+  if (recipientIds.length === 0) { return; }
+
+  const { data: userRows } = await supabase
+    .from('users')
+    .select('id, display_name, email')
+    .in('id', recipientIds)
+    .is('deleted_at', null);
+
+  const recipients = (userRows || [])
+    .filter(u => u.email)
+    .map(u => ({ email: u.email, display_name: u.display_name }));
+
+  if (recipients.length === 0) { return; }
+
+  const conditionLine = conditionCount > 0
+    ? ` ${conditionCount} condition${conditionCount === 1 ? '' : 's'} must be resolved before resubmission.`
+    : '';
+
+  await sendGateNotificationEmail({
+    recipients,
+    subject:          `${cycle.cycle_title} — ${gateNameDisplay} returned`,
+    initiativeName:   cycle.cycle_title,
+    gateNameDisplay,
+    contextParagraph: `${callerDisplayName} returned ${gateNameDisplay} for ${cycle.cycle_title}.` +
+                      conditionLine +
+                      ` Return note: ${approverNotes?.trim() ?? '(none)'}`,
+    delivery_cycle_id: cycle.delivery_cycle_id,
+    email_type:        'gate_returned'
+  });
+}
+
 async function createReturnConditions(gate_record_id, delivery_cycle_id, gate_name, conditions, caller_user_id) {
   if (!Array.isArray(conditions) || conditions.length === 0) { return; }
   const rows = conditions

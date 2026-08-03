@@ -27,7 +27,8 @@ interface NavItem {
   // CC-40-P: visible when the profile has ANY of these flags (OR). Used where a
   // surface serves several roles (e.g. All Pending Gates → IE / Admin / Phil).
   // 'is_super_admin' is a valid User flag though not part of RoleFlag's label set.
-  requiresAnyFlag?: (RoleFlag | 'is_super_admin')[];
+  // 'owns_division' (Contract 43, D-613) is a DERIVED profile field, not a column.
+  requiresAnyFlag?: (RoleFlag | 'is_super_admin' | 'owns_division')[];
   devStatus: DevStatus;
   // One level of sub-menu items, rendered indented under the parent.
   children?: NavItem[];
@@ -51,11 +52,13 @@ const NAV_ITEMS: NavItem[] = [
   // Initiative Tracking now (D-485 precedent) — the standalone nav item is
   // retired; the /initiatives/following route stays for deep links.
   // Contract G8 (D-560): IE pull-only monitoring — never merged with My Actions.
-  // CC-40-P: IE, Admin, and Phil (super_admin) all get the org-wide view. DLs
-  // are served by the tool (division-scoped) but have no is_division_leader
-  // profile flag yet — a DL-visible nav link is a division-mcp follow-up.
+  // CC-40-P: IE, Admin, and Phil (super_admin) all get the org-wide view.
+  // Contract 43 (D-613): Division Leaders now reach the screen too. The gate is
+  // `owns_division` — derived server-side from divisions.owner_user_id on the
+  // existing profile call, NOT a stored flag. A stored flag would duplicate a
+  // fact the divisions table owns and drift the moment ownership changed.
   { label: 'All Pending Gates',    route: '/initiatives/all-pending-gates',
-    requiresAnyFlag: ['is_initiative_executive', 'is_admin', 'is_super_admin'], devStatus: 'uat' },
+    requiresAnyFlag: ['is_initiative_executive', 'is_admin', 'is_super_admin', 'owns_division'], devStatus: 'uat' },
   // Contract 33 / D-490 + Tracks Phase A: Team Meetings — visible to ALL users.
   // Users without a series can create one (if permitted) or join a public series.
   // Badge = number of series the user participates in.

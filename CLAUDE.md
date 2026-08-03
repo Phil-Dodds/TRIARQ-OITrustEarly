@@ -1,5 +1,4 @@
-
-# CLAUDE.md — Pathways OI Trust | v3.7 | July 2026 | CONFIDENTIAL
+# CLAUDE.md — Pathways OI Trust | v3.8 | August 2026 | CONFIDENTIAL
 
 ---
 
@@ -29,23 +28,27 @@ Read decision-registry.md for content lookup only. Never claim or assign a D-num
 Violating any of these is an error, not a style preference.
 
 ### Arch-1 — MCP-Only Database Access
+
 All database operations go through MCP servers. No direct Supabase client calls from Angular components or services.
 - NEVER: import @supabase/supabase-js in any Angular component or service
 - NEVER: bypass the MCP layer for "simple" reads
 
 **Authorized exceptions (Design-locked only):**
-- `system_config` — pre-auth maintenance mode read (D-MaintenanceMode). **SUSPENDED 2026-07-30:** no such code exists. AC-29 is NOT BUILT; the Angular read this exception authorises has never been written. Reinstate when AC-29 ships. See ARCH-35.
+- `system_config` — pre-auth maintenance mode read (D-MaintenanceMode). **REINSTATED 2026-08-02 (Contract 42):** AC-29 shipped. The authorised read is `MaintenanceModeService.resolveMaintenanceModeAtBootstrap()` in `angular/src/app/core/services/maintenance-mode.service.ts`, called from the `APP_INITIALIZER` in `AppModule` before initial navigation. It is the ONLY direct Supabase read in the Angular application. Any other direct read remains an Arch-1 violation under D-381. See ARCH-35.
 
 **Escalation rule (D-381):** Any direct Supabase access from Angular is an Arch-1 conflict under Rule 2. Flag and STOP — do not implement, do not rationalize, do not record as a CC-decision and proceed. Surface to Design before writing any code. Rule 30 autonomy does not apply to Arch-1 violations or any security boundary decision.
 
 ### Arch-2 — UI as Presentation Layer Only
+
 Angular components render what they receive. No business logic, prompts, or data access in components.
 - NEVER: put prompt text or business rules in any component or service
 
 ### Arch-3 — No Prompts in TypeScript
+
 NEVER put prompt text in TypeScript files, Angular components, or services.
 
 ### Arch-4 — Environment Variables Only
+
 All credentials, keys, and configuration are environment variables. Never hardcode them.
 
 Required environment variables (never in source code):
@@ -57,6 +60,7 @@ Required environment variables (never in source code):
 - NEVER: commit .env files or log environment variable values
 
 ### Arch-5 — JWT Validation on Every MCP Tool Call
+
 Every MCP server validates the Supabase JWT before executing any tool. No tool executes without a valid JWT.
 - Validate JWT as the first operation in every tool handler
 - Return 401 with clear error message on invalid JWT
@@ -64,6 +68,7 @@ Every MCP server validates the Supabase JWT before executing any tool. No tool e
 - NEVER: execute any database operation before JWT validation
 
 ### Arch-6 — Soft Delete Only
+
 Never hard delete records. Set deleted_at timestamp. Records with deleted_at are excluded from all queries by default.
 - Set deleted_at = now() for all delete operations
 - Add WHERE deleted_at IS NULL to every SELECT on soft-deletable tables
@@ -352,10 +357,9 @@ Before producing the CodeClose output, run a mandatory verification pass. Report
 
 **(7) Structural health** — all components exceeding the 300-line threshold are declared with current line count.
 
-**(8) Deployment** — before producing a UAT Checklist, run the deployment
-sequence per build-c-spec.md Section 9 (maintenance mode on → migrations →
-deploy MCP to Render → deploy Angular to GitHub Pages → health checks →
-maintenance mode off). Report the result explicitly:
+**(8) Deployment** — Where AC-29 is met, run and report the build-c-spec §9 deployment sequence. Until AC-29 is met, report "deployment sequence not available — AC-29 open."
+
+Where the sequence is run, report the result explicitly:
 - If deployment succeeded: produce UAT Checklist normally.
 - If deployment failed: state failure reason explicitly, withhold UAT Checklist,
   state "UAT checklist withheld — deployment failed: [reason]."
@@ -553,7 +557,8 @@ Four dispositioned candidates carried from the Contract 40 CodeCloses (2026-07-3
 2. The require-cache FIFO Supabase mock ignores `.select()` and `.eq()` column names — a wrong column passes unit tests and fails live. Rule 34 is the only guard; green tests are not evidence.
 3. Neither MCP service exposes `/health` or `/tools` without a JWT. Both apply `validateJwt` before mounting them, and the `(no JWT required)` comments in both `index.js` files are stale. Never conclude "tool not shipped" from a curl 401 — check the Render dashboard or call in-app.
 4. Never offer a UI option that has no representable stored state. If an option maps to another value on selection, the selected-state check will highlight the wrong control. Add the value to the schema or do not offer it. (Trigger: D-617.)
+5. D-633 — when ratifying a CC-decision whose rationale is not recorded anywhere available, the balance_point reads "Not recorded — Code decided." Do not reconstruct. This is why CC-decisions must carry reasoning at the point of decision (Rule 46).
 
 ---
 
-*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | July 2026 | v3.7*
+*TRIARQ Health | Pathways OI Trust | CONFIDENTIAL | August 2026 | v3.8*

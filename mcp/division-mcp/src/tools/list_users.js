@@ -79,9 +79,31 @@ async function list_users(params, caller_user_id) {
     .is('revoked_at', null)
     .is('deleted_at', null);
 
+  // Contract 43 (D-613): derive Division ownership rather than storing it.
+  //   `owns_division` is a DERIVED field, never a column. A stored
+  //   is_division_leader flag would duplicate a fact the divisions table
+  //   already owns and would drift the moment division ownership changed —
+  //   silently costing someone access to their own queue. One batch query over
+  //   owner_user_id answers it for every user at once.
+  //   This is the fold-in point for the All Pending Gates sidebar entry: the
+  //   profile call the app already makes now carries the answer.
+  const { data: ownedDivisions } = await supabase
+    .from('divisions')
+    .select('owner_user_id')
+    .not('owner_user_id', 'is', null)
+    .is('deleted_at', null);
+  const ownerUserIds = new Set((ownedDivisions ?? []).map(d => d.owner_user_id));
+
   if (memErr) {
     // Membership enrichment is non-fatal — return users without the array.
-    return { success: true, data: users.map(u => ({ ...u, division_names: [] })) };
+    return {
+      success: true,
+      data: users.map(u => ({
+        ...u,
+        division_names: [],
+        owns_division:  ownerUserIds.has(u.id)
+      }))
+    };
   }
 
   // Group membership names by user_id.
@@ -114,7 +136,9 @@ async function list_users(params, caller_user_id) {
       ...u,
       division_names:   names,
       division_count:   count,
-      division_summary: summary
+      division_summary: summary,
+      // Contract 43 (D-613): derived, not stored. See the note above.
+      owns_division:    ownerUserIds.has(u.id)
     };
   });
 

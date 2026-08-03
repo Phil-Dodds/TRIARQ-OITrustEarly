@@ -1,5 +1,5 @@
 # Decision Registry — Pathways OI Trust
-# Pathways OI Trust | v3.68 | May 2026 | CONFIDENTIAL
+# Pathways OI Trust | v3.69 | May 2026 | CONFIDENTIAL
 # Authoritative source for decision number allocation.
 # Feed to Claude Chat at the start of any design session so it knows the current next-available number.
 # Claude Code reads this file to look up existing decision content only. D-number allocation is Claude Chat / Design Session only (D-317).
@@ -8,10 +8,11 @@
 
 ## Next Available Decision Number
 
-**Next available: D-625**
+**Next available: D-650**
 (Note: the v1.0 governance spec's erroneous "D-575" citations read as D-572; D-575 is legitimately assigned to Continuous Multi-Contract Execution, locked 2026-07-23.)
 D-586 through D-599: allocated 2026-07-27 session (Contract 39 CC ratification + Contract 40 visibility/sizing/RACI). D-591–D-596 ratify Contract 39 CC-decisions and CLAUDE.md Candidate #1. D-597 superseded by D-599 same session (retained, not reused).
-D-600 through D-624: allocated 2026-07-30 session. D-600–D-603 ratify the Contract 40 follow-on (CC-40-R,S,T,V). D-604–D-614 ratify CC-40-G..Q, recovered by read-only reconstruction after the 2026-07-29 CodeClose incorrectly reported them as already closed; all eleven carry origin: code-adopted. D-613 is OPEN. D-615 renumbers CC-40-M2 to CC-40-Y, resolving a label collision with CC-40-M (D-610). D-616–D-617 ratify CC-40-W and CC-40-X. D-618 records migration 093, which shipped unlettered. D-619 demotes Workstream. D-620–D-624 lock retro items R1–R5.
+D-600 through D-624: allocated 2026-07-30 session. D-600–D-603 ratify the Contract 40 follow-on (CC-40-R,S,T,V). D-604–D-614 ratify CC-40-G..Q, recovered by read-only reconstruction after the 2026-07-29 CodeClose incorrectly reported them as already closed; all eleven carry origin: code-adopted. D-613 was held OPEN at that session and was resolved in place on 2026-07-31 (LOCKED, no new number). D-615 renumbers CC-40-M2 to CC-40-Y, resolving a label collision with CC-40-M (D-610). D-616–D-617 ratify CC-40-W and CC-40-X. D-618 records migration 093, which shipped unlettered. D-619 demotes Workstream. D-620–D-624 lock retro items R1–R5.
+D-625 through D-649: allocated 2026-08-02 session. D-625–D-632 ratify the Contract 41 CC-decisions. D-633 locks the unrecorded-rationale marker. D-634 supersedes D-619. D-635–D-637 resolve the AC-29 Design blockers. D-638–D-649 cover in-line manager awareness and the message digest. D-613 was resolved in place this session (OPEN → LOCKED, no new number).
 
 Before claiming a number — Claude Chat only — confirm this field and claim the next sequential
 number. D-number assignment is exclusively a Design Session responsibility (D-317). Claude Code
@@ -518,7 +519,7 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-610 | Status History Accomplishment View (CC-40-M) | 2026-07-30 | LOCKED · built |
 | D-611 | Identity reorg; DL sets Level and Approver (CC-40-N) | 2026-07-30 | LOCKED · built |
 | D-612 | Approver reassignment re-routes in-flight gates (CC-40-O) | 2026-07-30 | LOCKED · built |
-| D-613 | Division Leader scope on All Pending Gates (CC-40-P) | 2026-07-30 | OPEN · built |
+| D-613 | Division Leader scope on All Pending Gates (CC-40-P) | 2026-07-30 | LOCKED · not-specced (resolved in place 2026-07-31; built version carries narrower scope, rework in Contract 43) |
 | D-614 | Angular reassignment surfaces (CC-40-Q, survivors only) | 2026-07-30 | LOCKED · built (partially superseded) |
 | D-615 | Home card standard height (CC-40-Y, renumbered from CC-40-M2) | 2026-07-30 | LOCKED · built |
 | D-616 | Context Brief and Scenario Journeys become bounded warnings (CC-40-W, as amended) | 2026-07-30 | LOCKED · built — deployment pending |
@@ -530,6 +531,31 @@ Every decision entry in `decisions-active.md` includes a source tag. Definitions
 | D-622 | No migration executes unless committed first (retro R3) | 2026-07-30 | LOCKED · not-specced |
 | D-623 | Code produces a schema summary at close (retro R4) | 2026-07-30 | LOCKED · not-specced |
 | D-624 | Design states repo and deployment state from current sources only (retro R5) | 2026-07-30 | LOCKED · not-specced |
+| D-625 | CC-decision ledger opens at Contract 41; no backfill | 2026-07-31 | LOCKED · built |
+| D-626 | Loud-on-open warnings get their own column | 2026-07-31 | LOCKED · built and deployed |
+| D-627 | Navy grid header on All Pending Gates | 2026-07-31 | LOCKED · built and deployed |
+| D-628 | Submitter resolved in the existing users lookup | 2026-07-31 | LOCKED · built and deployed |
+| D-629 | Targeted return refresh via transient snapshot | 2026-07-31 | LOCKED · built and deployed |
+| D-630 | Separate get_my_raci_gate_summary discovery tool | 2026-07-31 | LOCKED · built and deployed |
+| D-631 | RaciGlyphsComponent reused with additive readonly input | 2026-07-31 | LOCKED · built and deployed |
+| D-632 | Aging marks the row rather than repainting it | 2026-07-31 | LOCKED · built and deployed |
+| D-633 | Unrecorded rationale is declared, not reconstructed | 2026-07-31 | LOCKED · n/a (process) |
+| D-634 | Workstream not required, must be valid, warns on WIP | 2026-07-31 | LOCKED · not-specced |
+| D-635 | get_maintenance_mode is an authenticated admin read | 2026-07-31 | LOCKED · not-specced |
+| D-636 | Maintenance mode is an out-of-band control; no admin surface | 2026-07-31 | LOCKED · not-specced |
+| D-637 | build-c-spec §9 reconciled; Rule 29(8) conditional | 2026-07-31 | LOCKED · not-specced |
+| D-638 | In-line manager relation (manager_user_id) | 2026-08-02 | LOCKED · not-specced |
+| D-639 | "My team" is a filter value, not a screen | 2026-08-02 | LOCKED · not-specced |
+| D-640 | Awareness without authority | 2026-08-02 | LOCKED · not-specced |
+| D-641 | Notification delivery class follows the waiting-on line | 2026-08-02 | LOCKED · not-specced |
+| D-642 | Notification queue replaces direct Edge Function invocation | 2026-08-02 | LOCKED · not-specced |
+| D-643 | Daily digest: one email, severity-ordered, suppressed when empty | 2026-08-02 | LOCKED · not-specced |
+| D-644 | One notification preference | 2026-08-02 | LOCKED · not-specced |
+| D-645 | Notification infrastructure permitted in Build C window | 2026-08-02 | LOCKED · n/a |
+| D-646 | Trigger inventory rebuilt against current governance model | 2026-08-02 | LOCKED · not-specced |
+| D-647 | Informed notification deferral lifted | 2026-08-02 | LOCKED · not-specced |
+| D-648 | Division scope is convenience; "My team" widens by default | 2026-08-02 | LOCKED · not-specced |
+| D-649 | Commitment checks replace dormancy detection | 2026-08-02 | LOCKED · not-specced |
 
 ---
 

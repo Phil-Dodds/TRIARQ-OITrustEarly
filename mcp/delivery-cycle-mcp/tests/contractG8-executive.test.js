@@ -190,6 +190,74 @@ describe('list_all_pending_gates (D-560 pull view)', () => {
     assert.equal(r.data.pending_gates[0].submitted_by_display_name, 'Sam Submitter');
   });
 
+  // ── Contract 43 (D-613): Division Leader scope is isLeadershipForCycle ─────
+  // CC-40-P scoped a DL to divisions they directly own, which was narrower than
+  // the approval authority D-577 grants them over child divisions. The scope
+  // now runs the same ancestor walk the approval path uses.
+  //
+  // FIFO note (Rule 40): the leadership resolution queries live inside the
+  // `!isWide` branch, so no fixture in the IE / Admin / Phil tests above shifts.
+  test('a parent Division Leader sees gates on Initiatives in a CHILD Division', async () => {
+    const DL = 'dl-uuid';
+    queue = [
+      // caller lookup — not IE, not admin, not Phil
+      { data: { is_initiative_executive: false, is_super_admin: false, is_admin: false, is_active: true }, error: null },
+      // access gate: owns at least one division
+      { data: [{ id: 'div-parent' }], error: null },
+      // gates
+      { data: [
+          { gate_record_id: 'g-child', delivery_cycle_id: CYC, gate_name: 'go_to_build', gate_status: 'awaiting_approval', approver_user_id: APPROVER, submitted_at: new Date().toISOString(), submitted_by_user_id: OTHER }
+        ], error: null },
+      // cycles — the Initiative sits in the CHILD division, which the DL does
+      // not own directly. Under CC-40-P this row was filtered out.
+      { data: [cycleRow({ division_id: 'div-child' })], error: null },
+      // divisions display lookup
+      { data: [{ id: 'div-child', division_name: 'Child Division', display_name_short: 'Child' }], error: null },
+      // people lookup
+      { data: [{ id: APPROVER, display_name: 'Jane' }, { id: OTHER, display_name: 'Sam' }], error: null },
+      // isLeadershipForCycle(DL, 'div-child'): caller row, then the parent walk
+      { data: { id: DL, is_super_admin: false, is_initiative_executive: false }, error: null },
+      { data: { id: 'div-child',  owner_user_id: 'someone-else', parent_division_id: 'div-parent' }, error: null },
+      { data: { id: 'div-parent', owner_user_id: DL,             parent_division_id: null }, error: null },
+      // waiting-on batch
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: [{ id: APPROVER, display_name: 'Jane' }], error: null }
+    ];
+    const r = await list_all_pending_gates({}, DL);
+    assert.equal(r.success, true);
+    assert.equal(r.data.pending_gates.length, 1, 'child-division gate is visible to the parent DL');
+    assert.equal(r.data.pending_gates[0].division_display_name_short, 'Child');
+  });
+
+  test('a Division Leader who is leadership for NO visible Division sees nothing', async () => {
+    const DL = 'dl-uuid';
+    queue = [
+      { data: { is_initiative_executive: false, is_super_admin: false, is_admin: false, is_active: true }, error: null },
+      { data: [{ id: 'div-unrelated' }], error: null },
+      { data: [
+          { gate_record_id: 'g-foreign', delivery_cycle_id: CYC, gate_name: 'go_to_build', gate_status: 'awaiting_approval', approver_user_id: APPROVER, submitted_at: new Date().toISOString(), submitted_by_user_id: OTHER }
+        ], error: null },
+      { data: [cycleRow({ division_id: 'div-foreign' })], error: null },
+      { data: [{ id: 'div-foreign', division_name: 'Foreign', display_name_short: 'Foreign' }], error: null },
+      { data: [{ id: APPROVER, display_name: 'Jane' }, { id: OTHER, display_name: 'Sam' }], error: null },
+      // isLeadershipForCycle(DL, 'div-foreign') — walks out to a root the DL
+      // does not own. This is also the shape of the Contract 41 guarantee: a DL
+      // passing a foreign delivery_cycle_id gets an empty list, because the
+      // division filter runs regardless of the scope id.
+      { data: { id: DL, is_super_admin: false, is_initiative_executive: false }, error: null },
+      { data: { id: 'div-foreign', owner_user_id: 'someone-else', parent_division_id: null }, error: null },
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: [], error: null },
+      { data: [], error: null }
+    ];
+    const r = await list_all_pending_gates({ delivery_cycle_id: CYC }, DL);
+    assert.equal(r.success, true);
+    assert.deepEqual(r.data.pending_gates, [], 'no leadership for that Division = no rows');
+  });
+
   test('a blank delivery_cycle_id is treated as unscoped, not as a filter', async () => {
     queue = [
       { data: { is_initiative_executive: true, is_super_admin: false, is_admin: false, is_active: true }, error: null },

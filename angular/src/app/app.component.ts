@@ -15,6 +15,7 @@ import { UserProfileService }     from './core/services/user-profile.service';
 import { VersionCheckService }    from './core/services/version-check.service';
 import { BusyService }            from './core/services/busy.service';
 import { NewsTickerService }      from './core/services/news-ticker.service';
+import { MaintenanceModeService } from './core/services/maintenance-mode.service';
 import { filter, map }            from 'rxjs/operators';
 import { Observable }             from 'rxjs';
 
@@ -22,6 +23,17 @@ import { Observable }             from 'rxjs';
   selector:        'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    <!-- AC-29 (D-MaintenanceMode): when the flag is on the maintenance screen
+         is the ENTIRE application. No shell, no sidebar, no router-outlet, no
+         version banner, no news banner. The flag was resolved by the
+         APP_INITIALIZER before initial navigation, so this is a plain
+         synchronous read — there is no flash of the app shell. -->
+    <app-maintenance-screen
+      *ngIf="maintenanceActive; else appShell"
+      [maintenanceMessage]="maintenanceMessage">
+    </app-maintenance-screen>
+
+    <ng-template #appShell>
     <div class="oi-app-root" [class.oi-nb-open]="bannerVisible$ | async">
 
       <!-- Global activity bar — visible while any mutating MCP call is in
@@ -56,6 +68,7 @@ import { Observable }             from 'rxjs';
       <!-- Bottom news banner — positive activity, all screens when signed in -->
       <app-news-banner *ngIf="showSidebar$ | async"></app-news-banner>
     </div>
+    </ng-template>
   `,
   styles: [`
     .oi-app-root { display: flex; flex-direction: column; min-height: 100vh; }
@@ -127,10 +140,30 @@ export class AppComponent implements OnInit {
     private readonly profileService: UserProfileService,
     private readonly versionCheck:   VersionCheckService,
     private readonly busy:           BusyService,
-    private readonly newsTicker:     NewsTickerService
+    private readonly newsTicker:     NewsTickerService,
+    private readonly maintenance:    MaintenanceModeService
   ) {}
 
+  /** AC-29: true when the maintenance screen replaces the whole application. */
+  get maintenanceActive(): boolean {
+    return this.maintenance.isActive;
+  }
+
+  /** AC-29: optional operator message from system_config. */
+  get maintenanceMessage(): string | null {
+    return this.maintenance.message;
+  }
+
   ngOnInit(): void {
+    // AC-29: in maintenance mode the app does nothing else. No version polling,
+    // no news ticker, and above all no auth — build-c-spec §5.2 requires that
+    // the maintenance screen attempt no authentication. Returning here is the
+    // second half of that guarantee; the first is the emptied route table set
+    // by the APP_INITIALIZER in AppModule.
+    if (this.maintenance.isActive) {
+      return;
+    }
+
     this.showSidebar$ = this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
       map(e =>
