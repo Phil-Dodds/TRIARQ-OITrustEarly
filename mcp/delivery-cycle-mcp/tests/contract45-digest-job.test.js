@@ -68,7 +68,7 @@ const userRow = (id, email) => ({ id, display_name: 'Dana', email, is_active: tr
 beforeEach(() => { queue = []; updates = []; sentEmails.length = 0; });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('internal-key door (Arch-4 RENDER_INTERNAL_API_KEY)', () => {
+describe('internal-key door (Arch-4 DELIVERY_DIGEST_INTERNAL_CRON_KEY)', () => {
 
   const mockRes = () => {
     const r = { statusCode: null, body: null };
@@ -78,45 +78,45 @@ describe('internal-key door (Arch-4 RENDER_INTERNAL_API_KEY)', () => {
   };
 
   test('an UNSET env var DISABLES the route — it does not open it', () => {
-    delete process.env.RENDER_INTERNAL_API_KEY;
+    delete process.env.DELIVERY_DIGEST_INTERNAL_CRON_KEY;
     const res = mockRes();
     let nexted = false;
-    requireInternalKey({ headers: { 'x-internal-api-key': 'anything' } }, res, () => { nexted = true; });
+    requireInternalKey({ headers: { 'x-internal-key': 'anything' } }, res, () => { nexted = true; });
 
     assert.equal(nexted, false, 'must not pass through');
     assert.equal(res.statusCode, 404, 'missing config reads as no route, never as no auth');
   });
 
   test('a wrong key is rejected 401 without explaining why', () => {
-    process.env.RENDER_INTERNAL_API_KEY = 'correct-horse';
+    process.env.DELIVERY_DIGEST_INTERNAL_CRON_KEY = 'correct-horse';
     const res = mockRes();
     let nexted = false;
-    requireInternalKey({ headers: { 'x-internal-api-key': 'wrong' } }, res, () => { nexted = true; });
+    requireInternalKey({ headers: { 'x-internal-key': 'wrong' } }, res, () => { nexted = true; });
 
     assert.equal(nexted, false);
     assert.equal(res.statusCode, 401);
     assert.equal(res.body.error, 'Unauthorized.', 'no detail leaked');
-    delete process.env.RENDER_INTERNAL_API_KEY;
+    delete process.env.DELIVERY_DIGEST_INTERNAL_CRON_KEY;
   });
 
   test('a missing header is rejected', () => {
-    process.env.RENDER_INTERNAL_API_KEY = 'correct-horse';
+    process.env.DELIVERY_DIGEST_INTERNAL_CRON_KEY = 'correct-horse';
     const res = mockRes();
     let nexted = false;
     requireInternalKey({ headers: {} }, res, () => { nexted = true; });
     assert.equal(nexted, false);
     assert.equal(res.statusCode, 401);
-    delete process.env.RENDER_INTERNAL_API_KEY;
+    delete process.env.DELIVERY_DIGEST_INTERNAL_CRON_KEY;
   });
 
   test('the correct key passes through', () => {
-    process.env.RENDER_INTERNAL_API_KEY = 'correct-horse';
+    process.env.DELIVERY_DIGEST_INTERNAL_CRON_KEY = 'correct-horse';
     const res = mockRes();
     let nexted = false;
-    requireInternalKey({ headers: { 'x-internal-api-key': 'correct-horse' } }, res, () => { nexted = true; });
+    requireInternalKey({ headers: { 'x-internal-key': 'correct-horse' } }, res, () => { nexted = true; });
     assert.equal(nexted, true);
     assert.equal(res.statusCode, null, 'no response written — request continues');
-    delete process.env.RENDER_INTERNAL_API_KEY;
+    delete process.env.DELIVERY_DIGEST_INTERNAL_CRON_KEY;
   });
 
   test('comparison is length-safe and does not throw on mismatched lengths', () => {

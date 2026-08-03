@@ -319,13 +319,14 @@ app.use(express.json({ limit: '1mb' }));
 // ── Scheduled-caller routes (Contract 45, D-643) ─────────────────────────────
 // Mounted BEFORE validateJwt because the 06:00 digest has no user: a JWT
 // belongs to a person and there is no person here. Guarded by
-// RENDER_INTERNAL_API_KEY (Arch-4, declared since Build C, implemented here).
+// DELIVERY_DIGEST_INTERNAL_CRON_KEY, matching the Contract 38 precedent in
+// team-meetings-mcp (/internal/send_meeting_reminders). One purpose, one key.
 //
 // Deliberately NOT an alternative credential on the tool router — that would
 // make ~90 tools reachable with a static key. Each /internal/* route exposes
 // exactly one operation, and the key cannot reach /tools/:toolName at all.
 // Unset env var disables the route (404) rather than opening it.
-app.post('/internal/run-daily-digest', requireInternalKey, async (req, res) => {
+app.post('/internal/run_daily_digest', requireInternalKey, async (req, res) => {
   const start = Date.now();
   try {
     const result = await run_daily_digest(req.body || {});

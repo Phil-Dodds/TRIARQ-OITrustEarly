@@ -1,9 +1,13 @@
 // internal-key.js
 // Pathways OI Trust — delivery-cycle-mcp (Contract 45, D-643).
 //
-// Auth for SCHEDULED CALLERS ONLY. Implements RENDER_INTERNAL_API_KEY, which
-// CLAUDE.md Arch-4 has declared as "MCP server auth" since Build C but which
-// nothing had built until now.
+// Auth for SCHEDULED CALLERS ONLY. Implements DELIVERY_DIGEST_INTERNAL_CRON_KEY.
+//
+// Naming follows the convention Phil set on 2026-07-20 and Contract 38 used for
+// TEAM_MEETINGS_INTERNAL_CRON_KEY: ONE PURPOSE, ONE KEY. The generic
+// RENDER_INTERNAL_API_KEY that Arch-4 declares is deliberately not used — a
+// single shared secret across every scheduled job means rotating one job's
+// credential rotates them all, and a leak from any one exposes the rest.
 //
 // ── Why this exists at all ───────────────────────────────────────────────────
 // The 06:00 digest (D-643) has no user. Arch-5 requires a JWT on every tool
@@ -41,11 +45,11 @@ function safeEqual(a, b) {
 }
 
 /**
- * Express middleware. Requires header `x-internal-api-key` to match
- * process.env.RENDER_INTERNAL_API_KEY.
+ * Express middleware. Requires header `x-internal-key` (Contract 38 precedent) to match
+ * process.env.DELIVERY_DIGEST_INTERNAL_CRON_KEY.
  */
 function requireInternalKey(req, res, next) {
-  const expected = process.env.RENDER_INTERNAL_API_KEY;
+  const expected = process.env.DELIVERY_DIGEST_INTERNAL_CRON_KEY;
 
   // Unset env var → route disabled. Never open.
   if (!expected) {
@@ -55,7 +59,7 @@ function requireInternalKey(req, res, next) {
     });
   }
 
-  const provided = req.headers['x-internal-api-key'];
+  const provided = req.headers['x-internal-key'];
   if (!provided || !safeEqual(provided, expected)) {
     // Deliberately unspecific: a scheduled caller knows what it sent, and an
     // unauthorised one learns nothing about why it failed.

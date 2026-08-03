@@ -90,7 +90,7 @@ async function resolveSuppressions(rows) {
 }
 
 /**
- * Run the daily digest. Invoked by the scheduler via POST /internal/run-daily-digest.
+ * Run the daily digest. Invoked by the scheduler via POST /internal/run_daily_digest.
  *
  * @param {object} [params]
  * @param {boolean} [params.dry_run] — assemble and report, send and stamp nothing.
