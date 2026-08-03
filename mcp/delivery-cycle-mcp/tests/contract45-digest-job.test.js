@@ -65,6 +65,12 @@ const qrow = (over = {}) => ({
 });
 const userRow = (id, email) => ({ id, display_name: 'Dana', email, is_active: true });
 
+// Contract 45 (D-649): writeCommitmentChecks runs BEFORE the queue claim and
+// short-circuits when there are no active Initiatives. Every fixture below
+// leads with this so these tests exercise the digest path only — the checks
+// themselves are covered in contract45-commitment-checks.test.js.
+const NO_ACTIVE_CYCLES = { data: [], error: null };
+
 beforeEach(() => { queue = []; updates = []; sentEmails.length = 0; });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -130,7 +136,7 @@ describe('internal-key door (Arch-4 DELIVERY_DIGEST_INTERNAL_CRON_KEY)', () => {
 describe('run_daily_digest', () => {
 
   test('an empty queue sends nothing and reports zero', async () => {
-    queue = [{ data: [], error: null }];
+    queue = [NO_ACTIVE_CYCLES, { data: [], error: null }];
     const r = await run_daily_digest();
     assert.equal(r.success, true);
     assert.equal(r.data.recipients, 0);
@@ -139,6 +145,7 @@ describe('run_daily_digest', () => {
 
   test('one recipient gets one email, and their rows are stamped sent', async () => {
     queue = [
+      NO_ACTIVE_CYCLES,
       { data: [qrow(), qrow({ notification_id: 'n2', headline: 'Go to Deploy was approved.' })], error: null },
       { data: [userRow(DANA, 'dana@x.com')], error: null }
     ];
@@ -159,6 +166,7 @@ describe('run_daily_digest', () => {
 
   test('two recipients get two separate emails, never a shared one', async () => {
     queue = [
+      NO_ACTIVE_CYCLES,
       { data: [qrow(), qrow({ notification_id: 'n2', recipient_user_id: MAYA })], error: null },
       { data: [userRow(DANA, 'dana@x.com'), { ...userRow(MAYA, 'maya@x.com'), display_name: 'Maya' }], error: null }
     ];
@@ -169,6 +177,7 @@ describe('run_daily_digest', () => {
 
   test('dry_run assembles but sends and stamps nothing', async () => {
     queue = [
+      NO_ACTIVE_CYCLES,
       { data: [qrow()], error: null },
       { data: [userRow(DANA, 'dana@x.com')], error: null }
     ];
@@ -180,6 +189,7 @@ describe('run_daily_digest', () => {
 
   test('a recipient with no email address is stamped, not retried forever', async () => {
     queue = [
+      NO_ACTIVE_CYCLES,
       { data: [qrow()], error: null },
       { data: [{ id: DANA, display_name: 'Dana', email: null, is_active: true }], error: null }
     ];
@@ -191,6 +201,7 @@ describe('run_daily_digest', () => {
 
   test('a deactivated user is skipped', async () => {
     queue = [
+      NO_ACTIVE_CYCLES,
       { data: [qrow()], error: null },
       { data: [{ id: DANA, display_name: 'Dana', email: 'dana@x.com', is_active: false }], error: null }
     ];
@@ -204,6 +215,7 @@ describe('pre-send suppression (D-643)', () => {
 
   test('an at-risk line is suppressed when the Initiative is no longer overdue', async () => {
     queue = [
+      NO_ACTIVE_CYCLES,
       { data: [qrow({ event_type: 'initiative_at_risk', headline: 'Pre-Auth is at risk.' })], error: null },
       // resolveSuppressions → delivery_cycles lookup: resolved overnight
       { data: [{ delivery_cycle_id: 'init-1', current_lifecycle_stage: 'BUILD', status_overdue: false }], error: null },
@@ -219,6 +231,7 @@ describe('pre-send suppression (D-643)', () => {
 
   test('an at-risk line still standing is sent', async () => {
     queue = [
+      NO_ACTIVE_CYCLES,
       { data: [qrow({ event_type: 'initiative_at_risk', headline: 'Pre-Auth is at risk.' })], error: null },
       { data: [{ delivery_cycle_id: 'init-1', current_lifecycle_stage: 'BUILD', status_overdue: true }], error: null },
       { data: [userRow(DANA, 'dana@x.com')], error: null }
@@ -231,6 +244,7 @@ describe('pre-send suppression (D-643)', () => {
 
   test('a state line for a cancelled Initiative is suppressed', async () => {
     queue = [
+      NO_ACTIVE_CYCLES,
       { data: [qrow({ event_type: 'initiative_blocked', headline: 'Pre-Auth is blocked.' })], error: null },
       { data: [{ delivery_cycle_id: 'init-1', current_lifecycle_stage: 'CANCELLED', status_overdue: true }], error: null },
       { data: [userRow(DANA, 'dana@x.com')], error: null }
@@ -242,6 +256,7 @@ describe('pre-send suppression (D-643)', () => {
   test('historical facts are NEVER re-checked — a completed gate stays reported', async () => {
     // Only blocked/at_risk are state. An approval happened; it cannot un-happen.
     queue = [
+      NO_ACTIVE_CYCLES,
       { data: [qrow({ event_type: 'informed_gate_decision' })], error: null },
       { data: [userRow(DANA, 'dana@x.com')], error: null }
     ];

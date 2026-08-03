@@ -924,16 +924,22 @@ async function applyGateApprovalTransition({
         .select('id, display_name, email')
         .in('id', informedIds)
         .is('deleted_at', null);
-      // ── Contract 45 (D-647) — CLASS HELD AT IMMEDIATE, DELIBERATELY ────────
-      // D-647 lifts D-458's deferral and routes Informed gate decisions to the
-      // DIGEST. Setting 'digest' here before the 06:00 job exists (Unit D)
-      // would send Informed parties nothing at all — strictly worse than
-      // current behaviour, and invisible, because the row would sit unsent in
-      // the queue looking healthy. The row is queued either way; only the
-      // class flips, and it flips in the same commit that ships the digest.
+      // ── Contract 45 (D-647) — DIGEST class, flip completed ─────────────────
+      // D-647 lifts D-458's deferral: Informed parties receive gate decisions
+      // via the DIGEST, not immediately. Informed is an awareness stake — they
+      // are never waited on and never appear in the D-565(4) waiting-on line,
+      // which is precisely the D-641 test for digest class.
+      //
+      // Held at 'immediate' until the 06:00 job existed, because 'digest' with
+      // no job would have sent these parties nothing at all, invisibly. The job
+      // now runs (migration 100), so the flip is safe.
+      //
+      // Note what does NOT change: stake removal/downgrade and Initiative
+      // cancellation stay immediate (D-647 keeps both), and they are queued from
+      // participation.js and cancel_delivery_cycle.js respectively.
       const informedRecipients = (informedRows || []).filter(u => u.email && u.is_active !== false)
         .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
-                     delivery_class: 'immediate' }));
+                     delivery_class: 'digest' }));
       if (informedRecipients.length > 0) {
         // Inside the approval transition the decision is always 'approved'
         // (returns exit before this function — G5 refactor).
@@ -987,9 +993,11 @@ async function applyGateApprovalTransition({
         const nameById = {};
         (rosterUsers || []).forEach(u => { nameById[u.id] = u.display_name; });
         const roster = buildAssessmentRosterText(assessRows, nameById);
-        // Contract 45: IMMEDIATE. Arguably awareness, but the roster is the
-        // closing artefact of the Initiative and reads as a record people keep
-        // — folding it into a five-line digest section would lose the content.
+        // Contract 45: IMMEDIATE, and deliberately NOT flipped with D-647.
+        // The roster is the closing artefact of an Initiative — a multi-line
+        // record of who assessed what — and the digest caps sections at five
+        // single-line headlines. Folding it in would truncate the content this
+        // email exists to deliver. Flagged for Design rather than assumed.
         const recipients = (rosterUsers || [])
           .filter(u => recipientIds.includes(u.id) && u.email)
           .map(u => ({ user_id: u.id, email: u.email, display_name: u.display_name,
