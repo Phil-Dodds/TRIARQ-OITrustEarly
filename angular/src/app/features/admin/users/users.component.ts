@@ -158,6 +158,10 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
     .um-subline{font-size:11px;color:#5A5A5A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .um-no-div{font-style:italic}
     .um-pill{display:inline-flex;align-items:center;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:500;line-height:1.4}
+    /* S-015 zone explanation — 11px italic Stone. Contract 45 (D-638). */
+    .oi-zone-note{font-size:11px;font-style:italic;color:#5A5A5A;margin-bottom:8px}
+    /* S-025 Pattern 1 field guidance — below the input, no icon, no border. */
+    .oi-field-hint{font-size:11px;color:var(--triarq-color-stone,#5A5A5A);margin-top:4px}
     .um-role-pills{display:flex;flex-wrap:wrap;gap:4px}
     .um-empty{padding:var(--triarq-space-lg);text-align:center;color:var(--triarq-color-text-secondary);font-size:13px}
     .um-role-checkboxes{display:flex;flex-wrap:wrap;gap:6px}
@@ -520,6 +524,32 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                 </div>
               </div>
 
+              <!-- Reporting zone — Contract 45 (D-638). Read-only here by
+                   design: the relation is visible during any user review, and
+                   editable only from the Edit panel (S-005 — View never shows
+                   editable fields). D-640: this line grants visibility and
+                   voice, never authority. -->
+              <div class="oi-zone">
+                <div class="oi-zone-title">Reporting</div>
+                <div class="oi-zone-note">
+                  Managers see their reports' work in the daily digest. The relation carries no approval authority.
+                </div>
+                <div class="oi-field-row">
+                  <label class="oi-field-label">Manager</label>
+                  <span *ngIf="selectedUser.manager_display_name; else noManager"
+                        class="um-pill"
+                        style="background:var(--triarq-color-background-subtle);
+                               color:var(--triarq-color-text-primary);">
+                    {{ selectedUser.manager_display_name }}
+                  </span>
+                  <ng-template #noManager>
+                    <span style="font-size:13px;color:var(--triarq-color-text-secondary);">
+                      No manager set
+                    </span>
+                  </ng-template>
+                </div>
+              </div>
+
               <!-- Initiative Executive — Phil/super_admin only (D-560/D-464).
                    Company-wide leadership grant; set via delivery-cycle-mcp
                    set_initiative_executive, NOT update_user. Non-super-admins
@@ -721,6 +751,24 @@ function atLeastOneRoleValidator(group: AbstractControl): ValidationErrors | nul
                     Select at least one role.
                   </div>
                 </div>
+                <!-- Manager — Contract 45 (D-638). Single-user select rather
+                     than an S-022 EntityPicker: the choice is one scalar value
+                     from a flat list of colleagues with no attributes that
+                     disambiguate it, which is exactly the case S-022 reserves
+                     for a plain dropdown. Self is excluded here; deeper
+                     reporting loops are rejected server-side. -->
+                <div class="oi-field-row">
+                  <label class="oi-field-label">Manager</label>
+                  <select formControlName="manager_user_id" class="oi-input">
+                    <option [ngValue]="null">No manager</option>
+                    <option *ngFor="let u of managerOptions" [ngValue]="u.id">
+                      {{ u.display_name }}
+                    </option>
+                  </select>
+                  <div class="oi-field-hint">
+                    Managers see their reports' work in the daily digest. This grants no approval authority.
+                  </div>
+                </div>
                 <div class="oi-err" *ngIf="editError">{{ editError }}</div>
               </form>
             </div>
@@ -810,6 +858,18 @@ export class UsersComponent implements OnInit {
   viewedUserActivity:    InitiativeActivityEntry[] = [];
   loadingViewedActivity  = false;
 
+  /**
+   * Contract 45 (D-638): manager choices for the Edit panel — every active
+   * user except the one being edited. Self is excluded here so the commonest
+   * mistake is simply unavailable; deeper reporting loops (A→B→A) cannot be
+   * caught client-side without walking the chain, so update_user rejects those.
+   */
+  get managerOptions(): User[] {
+    return this.users
+      .filter(u => u.is_active === true && u.id !== this.selectedUserId)
+      .sort((a, b) => (a.display_name ?? '').localeCompare(b.display_name ?? ''));
+  }
+
   // Template-accessible constants.
   readonly ALL_ROLE_FLAGS = ALL_ROLE_FLAGS;
   readonly skeletonRows   = [1, 2, 3, 4, 5];
@@ -833,7 +893,10 @@ export class UsersComponent implements OnInit {
       is_dcs:       [false],
       is_epo:       [false],
       is_dol:       [false],
-      is_ce:        [false]
+      is_ce:        [false],
+      // Contract 45 (D-638). Nullable — "No manager" is a valid state and the
+      // default for every user until an Admin sets one.
+      manager_user_id: [null as string | null]
     }, { validators: atLeastOneRoleValidator });
 
     this.loadUsers();
@@ -1318,7 +1381,8 @@ export class UsersComponent implements OnInit {
       is_dcs:       u.is_dcs   === true,
       is_epo:       u.is_epo   === true,
       is_dol:       u.is_dol   === true,
-      is_ce:        u.is_ce    === true
+      is_ce:        u.is_ce    === true,
+      manager_user_id: u.manager_user_id ?? null
     });
     this.panelMode = 'edit';
     this.cdr.markForCheck();
@@ -1523,7 +1587,10 @@ export class UsersComponent implements OnInit {
           is_dcs:       v['is_dcs']   === true,
           is_epo:       v['is_epo']   === true,
           is_dol:       v['is_dol']   === true,
-          is_ce:        v['is_ce']    === true
+          is_ce:        v['is_ce']    === true,
+          // Contract 45 (D-638). Sent as an explicit null when cleared, so the
+          // server distinguishes "remove the manager" from "field untouched".
+          manager_user_id: (v['manager_user_id'] as string | null) ?? null
         }
       }).subscribe({
         next: (res) => {

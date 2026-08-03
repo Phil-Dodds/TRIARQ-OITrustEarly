@@ -51,6 +51,12 @@ export interface User {
   // list_users. Gates the All Pending Gates sidebar entry for Division Leaders.
   // Deliberately not stored — see the note in list_users.js.
   owns_division?:                        boolean;
+  // Contract 45 (D-638): in-line manager relation. Interim demo pattern per
+  // D-353 — replaced by the TRIARQ org model at port. Visibility and voice
+  // only; the relation carries no authority anywhere (D-640).
+  manager_user_id?:                      string | null;
+  // Resolved server-side in list_users for the User View panel. Not a column.
+  manager_display_name?:                 string | null;
 }
 
 export interface Division {

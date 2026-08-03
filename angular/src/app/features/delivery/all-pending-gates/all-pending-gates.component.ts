@@ -23,6 +23,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { DeliveryService, AllPendingGateRow } from '../../../core/services/delivery.service';
+import { MyTeamService, MY_TEAM_FILTER_VALUE } from '../../../core/services/my-team.service';
 
 type ApgSort = 'days' | 'initiative' | 'division' | 'level' | 'approver' | 'submitter';
 
@@ -77,6 +78,9 @@ interface ApgSnapshot {
         <!-- Contract 41: submitter filter, options derived from the loaded rows. -->
         <select class="apg-f" [(ngModel)]="filterSubmitter" (ngModelChange)="cdr.markForCheck()">
           <option value="">Submitted by: any</option>
+          <!-- Contract 45 (D-639): direct reports only. Offered only when the
+               viewer actually has reports. Sentinel value, never a name. -->
+          <option *ngIf="hasTeam" [value]="MY_TEAM_FILTER_VALUE">My team</option>
           <option *ngFor="let s of submitterOptions" [value]="s">{{ s }}</option>
         </select>
         <select class="apg-f" [(ngModel)]="filterLevel" (ngModelChange)="cdr.markForCheck()">
@@ -223,10 +227,23 @@ export class AllPendingGatesComponent implements OnInit {
     private readonly delivery: DeliveryService,
     private readonly router: Router,
     private readonly route: ActivatedRoute,
-    readonly cdr: ChangeDetectorRef
+    readonly cdr: ChangeDetectorRef,
+    private readonly myTeam: MyTeamService
   ) {}
 
+  // ── Contract 45 (D-639): "My team" submitter filter ────────────────────────
+  readonly MY_TEAM_FILTER_VALUE = MY_TEAM_FILTER_VALUE;
+  directReportIds: Set<string> = new Set<string>();
+  hasTeam = false;
+
   ngOnInit(): void {
+    // Contract 45: resolve direct reports once; non-blocking.
+    void this.myTeam.getDirectReportIds().then(ids => {
+      this.directReportIds = ids;
+      this.hasTeam         = ids.size > 0;
+      this.cdr.markForCheck();
+    });
+
     // Contract 41: ?refresh=<cycle id> means we came back from acting on a gate.
     const refreshId = this.route.snapshot.queryParamMap.get('refresh');
     const snapshot = this.readSnapshot();
@@ -362,7 +379,12 @@ export class AllPendingGatesComponent implements OnInit {
       (!q || r.cycle_title.toLowerCase().includes(q)) &&
       (!this.filterDivision || r.division_display_name_short === this.filterDivision) &&
       (!this.filterApprover || r.approver_display_name === this.filterApprover) &&
-      (!this.filterSubmitter || r.submitted_by_display_name === this.filterSubmitter) &&
+      // Contract 45 (D-639): the sentinel matches on submitter user id against
+      // direct reports; every other value is still a display-name match.
+      (!this.filterSubmitter
+        || (this.filterSubmitter === MY_TEAM_FILTER_VALUE
+              ? this.directReportIds.has(r.submitted_by_user_id ?? '')
+              : r.submitted_by_display_name === this.filterSubmitter)) &&
       (!this.filterLevel || String(r.effective_level ?? '') === this.filterLevel) &&
       (!this.filterAging || r.aging)
     );

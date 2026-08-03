@@ -67,6 +67,7 @@ import {
 } from '../../../core/types/database';
 import { themedTitle } from '../shared/theme-display.util';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
+import { MyTeamService, MY_TEAM_FILTER_VALUE } from '../../../core/services/my-team.service';
 // Contract G9 (D-563 Grade 1): interest profile matcher (OR-of-ANDs).
 import { InterestCondition, matchesInterestProfile, hasAnyField } from '../../../core/utils/governance-filter';
 // Contract 23 Item 2.2 / D-267: pure computeHeadline utility — 6-rule priority order.
@@ -477,6 +478,15 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
                   <input type="radio" name="personScopeRadio" [value]="'me_terminal'" [(ngModel)]="personScope"
                          (change)="stagedAssignedPerson='me'" />
                   Me
+                </label>
+                <!-- Contract 45 (D-639): "My team" = direct reports only.
+                     Hidden entirely when the viewer has no reports — an option
+                     that can only ever return nothing is not worth offering. -->
+                <label *ngIf="hasTeam"
+                       style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
+                  <input type="radio" name="personScopeRadio" [value]="'my_team_terminal'" [(ngModel)]="personScope"
+                         (change)="stagedAssignedPerson='my_team'" />
+                  My team
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;color:#1E1E1E;">
                   <input type="radio" name="personScopeRadio" [value]="'unassigned_dcs_terminal'" [(ngModel)]="personScope"
@@ -1154,7 +1164,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   // D-277: peer options scope selector for assigned person filter.
   // '' = no option selected. 'normal'|'bigger' = scope activators. Others = terminal radio values.
   // CC-Decision-2026-04-12-F: replaces assignedPersonOptions loop. Source: Contract 5 Block 3.2.
-  personScope: '' | 'normal' | 'bigger' | 'me_terminal' | 'unassigned_dcs_terminal' | 'unassigned_epo_terminal' | 'unassigned_dol_terminal' = '';
+  personScope: '' | 'normal' | 'bigger' | 'me_terminal' | 'my_team_terminal' | 'unassigned_dcs_terminal' | 'unassigned_epo_terminal' | 'unassigned_dol_terminal' = '';
 
   // Gate status filter: 'overdue' | 'pending' | 'approved' | ''
   filterGateStatus: string = '';
@@ -1291,7 +1301,8 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     private readonly route:        ActivatedRoute,
     private readonly router:       Router,
     private readonly screenState:  ScreenStateService,
-    private readonly cdr:          ChangeDetectorRef
+    private readonly cdr:          ChangeDetectorRef,
+    private readonly myTeam:       MyTeamService
   ) {}
 
   // ── CC-40-Q: Approver filter + narrow initials column + reassign ───────────
@@ -1319,7 +1330,22 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     return name.split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
   }
 
+  // ── Contract 45 (D-639): "My team" filter state ────────────────────────────
+  readonly MY_TEAM_FILTER_VALUE = MY_TEAM_FILTER_VALUE;
+  /** Direct reports of the signed-in user. Empty until resolved. */
+  directReportIds: Set<string> = new Set<string>();
+  /** Drives whether the "My team" option is offered at all. */
+  hasTeam = false;
+
   ngOnInit(): void {
+    // Contract 45 (D-639): resolve direct reports once. Async and non-blocking
+    // — the filter option appears when it resolves; nothing else waits on it.
+    void this.myTeam.getDirectReportIds().then(ids => {
+      this.directReportIds = ids;
+      this.hasTeam         = ids.size > 0;
+      this.cdr.markForCheck();
+    });
+
     // Post-GEnd (Phil 2026-07-24): my Informed stakes for the row Follow stars.
     this.loadMyFollowing();
     // D-175: read query params from summary view drill-down and apply as initial filters.
@@ -2135,6 +2161,14 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
           if (c.assigned_dcs_user_id !== userId &&
               c.assigned_epo_user_id !== userId &&
               c.assigned_dol_user_id !== userId) { return false; }
+        } else if (this.filterAssignedPerson === MY_TEAM_FILTER_VALUE) {
+          // Contract 45 (D-639): any trio seat held by a direct report.
+          // Direct reports only — no transitive walk. Note this intersects
+          // with the viewer's existing Division access rather than widening
+          // to all Divisions; see the D-648 divergence note in MyTeamService.
+          if (!this.directReportIds.has(c.assigned_dcs_user_id ?? '') &&
+              !this.directReportIds.has(c.assigned_epo_user_id ?? '') &&
+              !this.directReportIds.has(c.assigned_dol_user_id ?? '')) { return false; }
         } else if (this.filterAssignedPerson === 'unassigned_dcs') {
           if (c.assigned_dcs_user_id) { return false; }
         } else if (this.filterAssignedPerson === 'unassigned_epo') {
@@ -2257,6 +2291,7 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   assignedPersonChipLabel(value: string): string {
     switch (value) {
       case 'me':              return 'Me';
+      case MY_TEAM_FILTER_VALUE: return 'My team';
       case 'unassigned_dcs':  return 'Unassigned DCS';
       case 'unassigned_epo':  return 'Unassigned EPO';
       case 'unassigned_dol':  return 'Unassigned DOL';

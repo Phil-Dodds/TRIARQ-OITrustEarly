@@ -30,6 +30,7 @@ import { filter, take }         from 'rxjs/operators';
 import { DeliveryService }      from '../../../core/services/delivery.service';
 import { McpService }           from '../../../core/services/mcp.service';
 import { UserProfileService }   from '../../../core/services/user-profile.service';
+import { MyTeamService } from '../../../core/services/my-team.service';
 import { ScreenStateService, SCREEN_KEYS } from '../../../core/services/screen-state.service';
 import { DeliveryCycleDetailComponent } from '../detail/delivery-cycle-detail.component';
 import {
@@ -120,6 +121,18 @@ interface ScheduleRow {
                  [(ngModel)]="showMyDivisionsOnly"
                  (ngModelChange)="onToggleChange()" />
           Display only my Divisions
+        </label>
+
+        <!-- Contract 45 (D-639) — DEVIATION, recorded. §7 says "add an option
+             to the Person/Submitter filter", but this screen has no person
+             filter: its controls are a Divisions toggle and a gate select.
+             Rather than introduce a filter panel this screen does not have,
+             "My team" mirrors the existing toggle idiom directly beside it. -->
+        <label *ngIf="hasTeam" class="gs-toggle">
+          <input type="checkbox"
+                 [(ngModel)]="showMyTeamOnly"
+                 (ngModelChange)="onFilterChange()" />
+          Display only my team
         </label>
 
         <label class="gs-gate-filter">
@@ -413,10 +426,23 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
     private readonly profile:     UserProfileService,
     private readonly router:      Router,
     private readonly screenState: ScreenStateService,
-    private readonly cdr:         ChangeDetectorRef
+    private readonly cdr:         ChangeDetectorRef,
+    private readonly myTeam:      MyTeamService
   ) {}
 
+  // ── Contract 45 (D-639): "My team" toggle ──────────────────────────────────
+  showMyTeamOnly = false;
+  directReportIds: Set<string> = new Set<string>();
+  hasTeam = false;
+
   ngOnInit(): void {
+    // Contract 45 (D-639): resolve direct reports once; non-blocking.
+    void this.myTeam.getDirectReportIds().then(ids => {
+      this.directReportIds = ids;
+      this.hasTeam         = ids.size > 0;
+      this.cdr.markForCheck();
+    });
+
     this.profileSub.add(
       this.profile.profile$.pipe(
         filter((p): p is NonNullable<typeof p> => p !== null),
@@ -437,6 +463,9 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
           const filter = saved.filter_state ?? {};
           if (typeof filter['filterGate'] === 'string') {
             this.filterGate = filter['filterGate'] as GateName | '';
+          }
+          if (typeof filter['showMyTeamOnly'] === 'boolean') {
+            this.showMyTeamOnly = filter['showMyTeamOnly'] as boolean;
           }
           if (typeof filter['showMyDivisionsOnly'] === 'boolean') {
             this.showMyDivisionsOnly = filter['showMyDivisionsOnly'] as boolean;
@@ -461,7 +490,9 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
       SCREEN_KEYS.DELIVERY_GATES,
       {
         filterGate:          this.filterGate,
-        showMyDivisionsOnly: this.showMyDivisionsOnly
+        showMyDivisionsOnly: this.showMyDivisionsOnly,
+        // Contract 45 (D-639): persisted per D-171 under this screen's existing key.
+        showMyTeamOnly:      this.showMyTeamOnly
       },
       {}
     );
@@ -559,8 +590,19 @@ export class GatesSummaryComponent implements OnInit, OnDestroy {
 
   /** Filter helper applied to overdue/upcoming/other lists. */
   private applyGateFilter(rows: ScheduleRow[]): ScheduleRow[] {
-    if (!this.filterGate) return rows;
-    return rows.filter(r => r.nextGate === this.filterGate);
+    let out = rows;
+    // Contract 45 (D-639): "My team" — any trio seat held by a direct report.
+    // Direct reports only, no transitive walk. Intersects with existing
+    // Division access rather than widening (D-648 divergence — see
+    // MyTeamService).
+    if (this.showMyTeamOnly) {
+      out = out.filter(r =>
+        this.directReportIds.has(r.cycle.assigned_dcs_user_id ?? '') ||
+        this.directReportIds.has(r.cycle.assigned_epo_user_id ?? '') ||
+        this.directReportIds.has(r.cycle.assigned_dol_user_id ?? ''));
+    }
+    if (!this.filterGate) return out;
+    return out.filter(r => r.nextGate === this.filterGate);
   }
 
   get overdueRows(): ScheduleRow[] { return this.classifiedRows.filter(r => r.isOverdue); }

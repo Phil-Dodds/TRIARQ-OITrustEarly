@@ -44,6 +44,7 @@ import { DeliveryService }    from '../../../core/services/delivery.service';
 import { UserProfileService } from '../../../core/services/user-profile.service';
 import { orderDivisionsAsTree, DivisionTreeOption } from '../../../core/utils/division-tree.utils';
 import { McpService }         from '../../../core/services/mcp.service';
+import { MyTeamService }      from '../../../core/services/my-team.service';
 import {
   ScreenStateService,
   SCREEN_KEYS
@@ -269,6 +270,16 @@ const DEFAULT_FILTERS: AppliedFilters = {
                      class="ia-search"
                      placeholder="Search people…"
                      [(ngModel)]="personSearch" />
+              <!-- Contract 45 (D-639): "My team" stages every direct report
+                   into the existing multi-select rather than adding a parallel
+                   filter dimension. The person filter already answers "whose
+                   activity"; this just fills it in. Direct reports only. -->
+              <button *ngIf="hasTeam"
+                      type="button"
+                      class="ia-myteam"
+                      (click)="toggleMyTeam()">
+                {{ myTeamAllSelected ? 'Clear my team' : 'My team' }}
+              </button>
               <ng-container *ngIf="users.length === 0">
                 <ion-skeleton-text animated style="height:14px;"></ion-skeleton-text>
               </ng-container>
@@ -350,6 +361,19 @@ const DEFAULT_FILTERS: AppliedFilters = {
     }
     .ia-header { margin-bottom: var(--triarq-space-lg); }
     .ia-title { margin: 0 0 4px 0; }
+    /* Contract 45 (D-639) — "My team" quick-select. Recessed per D-198: it is
+       a shortcut into the person list, not a filter dimension of its own. */
+    .ia-myteam {
+      background: none;
+      border: 1px solid var(--triarq-color-fog, #D9DEE3);
+      border-radius: 999px;
+      padding: 3px 12px;
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      color: var(--triarq-color-primary, #257099);
+      cursor: pointer;
+    }
+    .ia-myteam:hover { background: var(--triarq-color-background-subtle, #F7FAFC); }
   `]
 })
 export class InitiativeActivityComponent implements OnInit {
@@ -387,11 +411,23 @@ export class InitiativeActivityComponent implements OnInit {
     private readonly screenState: ScreenStateService,
     private readonly cdr:         ChangeDetectorRef,
     private readonly route:       ActivatedRoute,
-    private readonly _router:     Router
+    private readonly _router:     Router,
+    private readonly myTeam:      MyTeamService
   ) {}
+
+  // ── Contract 45 (D-639): direct reports for the "My team" quick-select ─────
+  directReportIds: Set<string> = new Set<string>();
+  hasTeam = false;
 
   ngOnInit(): void {
     this.currentUserId = this.profile.getCurrentProfile()?.id ?? null;
+
+    // Contract 45 (D-639): resolve direct reports once; non-blocking.
+    void this.myTeam.getDirectReportIds().then(ids => {
+      this.directReportIds = ids;
+      this.hasTeam         = ids.size > 0;
+      this.cdr.markForCheck();
+    });
 
     const mineParam = this.route.snapshot.queryParamMap.get('mine');
     this.showOnlyMine = mineParam === '1' && !!this.currentUserId;
@@ -516,6 +552,28 @@ export class InitiativeActivityComponent implements OnInit {
   }
   togglePerson(id: string): void {
     this.pending = { ...this.pending, personIds: toggleId(this.pending.personIds, id) };
+  }
+
+  // ── Contract 45 (D-639): "My team" quick-select ────────────────────────────
+  /** True when every direct report is already staged. Drives the button label. */
+  get myTeamAllSelected(): boolean {
+    if (this.directReportIds.size === 0) { return false; }
+    return [...this.directReportIds].every(id => this.pending.personIds.includes(id));
+  }
+
+  /**
+   * Adds every direct report to the staged person selection, or removes them
+   * all if they are already there. Deliberately additive rather than
+   * replacing: a manager comparing their team against a peer has staged that
+   * peer for a reason, and clobbering the selection would undo it.
+   */
+  toggleMyTeam(): void {
+    const team = [...this.directReportIds];
+    const next = this.myTeamAllSelected
+      ? this.pending.personIds.filter(id => !this.directReportIds.has(id))
+      : [...new Set([...this.pending.personIds, ...team])];
+    this.pending = { ...this.pending, personIds: next };
+    this.cdr.markForCheck();
   }
   toggleEvent(t: string): void {
     this.pending = { ...this.pending, eventTypes: toggleId(this.pending.eventTypes, t) };

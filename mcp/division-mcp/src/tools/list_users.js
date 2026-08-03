@@ -57,7 +57,10 @@ async function list_users(params, caller_user_id) {
   // User View panel Login Activity zone.
   const { data: users, error } = await supabase
     .from('users')
-    .select('id, email, display_name, is_admin, is_dcs, is_epo, is_dol, is_ce, is_super_admin, is_active, allow_both_admin_and_functional_roles, created_at, last_login_at')
+    // Contract 45 (D-638): manager_user_id ships on the profile call so the
+    // User View panel can display the reporting line read-only, and so the
+    // "My team" filter can resolve direct reports without a second round trip.
+    .select('id, email, display_name, is_admin, is_dcs, is_epo, is_dol, is_ce, is_super_admin, is_active, allow_both_admin_and_functional_roles, created_at, last_login_at, manager_user_id')
     .is('deleted_at', null)
     .order('display_name');
 
@@ -94,14 +97,20 @@ async function list_users(params, caller_user_id) {
     .is('deleted_at', null);
   const ownerUserIds = new Set((ownedDivisions ?? []).map(d => d.owner_user_id));
 
+  // Contract 45 (D-638): resolve each manager's display name from the rows we
+  // already have. Managers are users, and this call returns every user, so a
+  // second query would be asking the database something it just told us.
+  const nameById = new Map(users.map(u => [u.id, u.display_name]));
+
   if (memErr) {
     // Membership enrichment is non-fatal — return users without the array.
     return {
       success: true,
       data: users.map(u => ({
         ...u,
-        division_names: [],
-        owns_division:  ownerUserIds.has(u.id)
+        division_names:       [],
+        owns_division:        ownerUserIds.has(u.id),
+        manager_display_name: u.manager_user_id ? (nameById.get(u.manager_user_id) ?? null) : null
       }))
     };
   }
@@ -138,7 +147,9 @@ async function list_users(params, caller_user_id) {
       division_count:   count,
       division_summary: summary,
       // Contract 43 (D-613): derived, not stored. See the note above.
-      owns_division:    ownerUserIds.has(u.id)
+      owns_division:    ownerUserIds.has(u.id),
+      // Contract 45 (D-638): read-only reporting line for the User View panel.
+      manager_display_name: u.manager_user_id ? (nameById.get(u.manager_user_id) ?? null) : null
     };
   });
 
