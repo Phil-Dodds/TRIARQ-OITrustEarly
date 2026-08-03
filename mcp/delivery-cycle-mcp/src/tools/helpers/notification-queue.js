@@ -179,7 +179,11 @@ async function enqueueNotifications({
         gate_record_id,
         actor_user_id,
         headline:          `${who} — ${r.headline || headline}`,
-        detail
+        detail,
+        // Migration 099: the digest splits "Waiting on you" from "Waiting on
+        // your team" on this flag. Deriving it from the headline prefix would
+        // break the first time someone rewords a headline.
+        manager_copy:      true
       });
       result.fannedOut += 1;
     }
