@@ -534,7 +534,7 @@ const LEVEL_LABELS: Record<number, string> = {
                       Add Approver
                     </button>
                     <div *ngIf="addApproverPickerOpen" style="margin-top:8px;border:1px solid var(--triarq-color-border);border-radius:5px;padding:6px;max-height:220px;overflow-y:auto;">
-                      <input type="text" class="oi-input" placeholder="Filter members…"
+                      <input type="text" class="oi-input" placeholder="Filter members and Admins…"
                              [value]="addApproverSearch" (input)="onAddApproverSearch($event)" />
                       <label class="oi-picker-row" *ngFor="let u of selectableApprovers">
                         <span style="display:flex;align-items:center;gap:6px;">
@@ -543,7 +543,7 @@ const LEVEL_LABELS: Record<number, string> = {
                         </span>
                       </label>
                       <div *ngIf="selectableApprovers.length === 0" class="oi-zone-explain" style="padding:6px;">
-                        No members available. Add members first — approvers must be members of this Division.
+                        No one available. Approvers are this Division's members, plus any Admin.
                       </div>
                     </div>
                   </div>
@@ -1595,14 +1595,39 @@ export class DivisionsComponent implements OnInit {
 
   /** Members not already designated approvers, optionally filtered. Approvers
    *  must be members of the Division (enforced server-side too). */
+  /**
+   * Approver candidates: this Division's active members, PLUS every active
+   * Admin regardless of membership.
+   *
+   * AMENDS D-600 / CC-40-R members-only. Phil 2026-08-04: "I do not want admins
+   * automatically available for all initiatives — but they should be options to
+   * be configured as Division Approvers." Recorded as CC-0804-07; Design
+   * ratification required.
+   *
+   * D-170 already grants Admins implicit access to every Division, so the old
+   * rule forced an Admin to be enrolled as a "member" purely to pass a check —
+   * recording a false organisational fact. Admins had standing everywhere and
+   * eligibility nowhere.
+   *
+   * This widens only who can be DESIGNATED here. It does not touch
+   * `list_eligible_approvers`, so being an Admin still puts nobody on an
+   * Initiative's approver dropdown; the `division_approvers` row does that,
+   * exactly as for any other approver.
+   */
   get selectableApprovers(): User[] {
     const approverIds = new Set(this.approvers.map(a => a.user_id));
     const q = this.addApproverSearch.trim().toLowerCase();
-    return this.members.filter(m =>
-      m.is_active &&
-      !approverIds.has(m.id) &&
-      (!q || m.display_name.toLowerCase().includes(q))
-    );
+
+    const memberIds = new Set(this.members.map(m => m.id));
+    const admins = this.allUsers.filter(u => u.is_admin === true && !memberIds.has(u.id));
+
+    return [...this.members, ...admins]
+      .filter(u =>
+        u.is_active &&
+        !approverIds.has(u.id) &&
+        (!q || u.display_name.toLowerCase().includes(q))
+      )
+      .sort((a, b) => (a.display_name ?? '').localeCompare(b.display_name ?? ''));
   }
 
   addApprover(user: User): void {

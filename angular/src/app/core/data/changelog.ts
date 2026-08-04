@@ -41,6 +41,11 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
         description: 'Filters set by drilling in from a role view — DCS, EPO, DOL, Next Gate — now appear as dismissible chips and count towards the Filters badge. Previously they were applied and remembered but invisible, so a drill-in could quietly narrow the grid on every later visit with nothing on screen to explain it.'
       },
       {
+        audience:    'Admin',
+        surface:     'Division Approvers',
+        description: 'Admins can now be picked as a Division Approver without first being added as a member of that Division. This does not put Admins on any Initiative approver list automatically — they still have to be designated for a specific Division first.'
+      },
+      {
         audience:    'All',
         surface:     'Clear All in the filter panel',
         description: 'Clear All now clears every filter, including the drill-in ones the panel had no row for. It also no longer looks greyed out — the old styling read as a disabled button.'

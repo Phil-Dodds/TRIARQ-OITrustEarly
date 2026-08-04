@@ -67,6 +67,32 @@ describe('set_division_approver', () => {
     assert.equal(r.success, false);
   });
 
+  // ── CC-0804-07: AMENDS D-600 / CC-40-R members-only ──────────────────────
+  // Phil 2026-08-04: Admins should be selectable as Division Approvers without
+  // being enrolled as members. D-170 already gives them implicit access to every
+  // Division, so members-only forced a false organisational fact to pass a check.
+  test('an ADMIN target needs no membership — the membership query is never consulted', async () => {
+    // No memberYes/memberNo fixture supplied: if the code consulted membership
+    // it would fall through to the default and fail. Its absence is the assertion.
+    queue = [adminOk, divActive,
+             { data: { id: USER, display_name: 'Craig Bickford', is_admin: true }, error: null },
+             noExisting,
+             { data: { id: 'da-2', division_id: DIV, user_id: USER }, error: null }];
+    const r = await set_division_approver({ division_id: DIV, user_id: USER }, ADMIN);
+    assert.equal(r.success, true, r.error);
+    assert.equal(r.data.user_id, USER);
+  });
+
+  test('a NON-admin non-member is still refused, with the unblock named (D-140)', async () => {
+    queue = [adminOk, divActive,
+             { data: { id: USER, display_name: 'Karly', is_admin: false }, error: null },
+             memberNo];
+    const r = await set_division_approver({ division_id: DIV, user_id: USER }, ADMIN);
+    assert.equal(r.success, false);
+    assert.match(r.error, /is not a member of/);
+    assert.match(r.error, /Add them as a member/, 'states what would unblock it');
+  });
+
   test('error — caller not admin', async () => {
     queue = [notAdmin];
     const r = await set_division_approver({ division_id: DIV, user_id: USER }, ADMIN);
