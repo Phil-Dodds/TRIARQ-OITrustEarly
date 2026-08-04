@@ -227,6 +227,44 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
             Division: {{ filterDivisionLabel }}
             <button (click)="filterDivision='';includeChildDivisions=true;onDivisionFilterChange()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
           </span>
+
+          <!-- ── Role drill-in chips (S-012, D-297) ────────────────────────────
+               filterDcs / filterEpo / filterDol / filterNextGate are set by
+               drill-in query params (CC-38-40 and the EPO views) and PERSIST to
+               user_screen_state. Until now they had no chip and were absent from
+               the Filters badge, so a drill-in silently narrowed the grid on
+               every later visit with nothing on screen to explain it or dismiss
+               it — indistinguishable from a broken screen. They are also not
+               rows in the filter panel, so Clear All could not reach them.
+               S-012 requires every active filter to be a dismissible chip. -->
+          <span *ngIf="filterDcs"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            DCS: {{ personDisplayName(filterDcs) }}
+            <button (click)="filterDcs='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <span *ngIf="filterEpo"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            EPO: {{ personDisplayName(filterEpo) }}
+            <button (click)="filterEpo='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <span *ngIf="filterDol"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            DOL: {{ personDisplayName(filterDol) }}
+            <button (click)="filterDol='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
+          <span *ngIf="filterNextGate"
+                style="display:inline-flex;align-items:center;gap:4px;background:#fff;
+                       border:1.5px solid #257099;color:#257099;border-radius:999px;
+                       padding:4px 12px;font-size:13px;white-space:nowrap;">
+            Next Gate: {{ nextGateChipLabel(filterNextGate) }}
+            <button (click)="filterNextGate='';applyFilters()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:16px;line-height:1;">×</button>
+          </span>
         </div>
 
         <!-- Right: Filters + New Cycle — flex-shrink:0, never wraps. Source: D-298. -->
@@ -745,10 +783,16 @@ const STAGE_LABEL_MAP: Partial<Record<LifecycleStage, string>> = {
 
         <!-- Footer: Apply + Clear All. S-011. -->
         <div style="padding:12px 20px;border-top:1px solid #E8E8E8;flex-shrink:0;display:flex;gap:8px;justify-content:space-between;align-items:center;">
-          <!-- Clear All: resets staged state only, no query, panel stays open. S-011. -->
+          <!-- Clear All: resets EVERY filter (including the role drill-ins that
+               have no panel row), no query, panel stays open. S-011.
+               Phil 2026-08-04: the previous #D0D0D0-on-#5A5A5A treatment read as
+               a disabled control — D-198's recessed-secondary taken far enough
+               that the button looked inert. Now carries the primary colour as an
+               outline button: still visibly secondary against the filled Apply,
+               but unmistakably live. -->
           <button (click)="clearStagedFilters()"
-                  style="background:#fff;border:1px solid #D0D0D0;color:#5A5A5A;border-radius:5px;
-                         padding:8px 16px;cursor:pointer;font-size:14px;">
+                  style="background:#fff;border:1.5px solid #257099;color:#257099;border-radius:5px;
+                         padding:8px 16px;cursor:pointer;font-size:14px;font-weight:500;">
             Clear All
           </button>
           <!-- Apply: copies staged → applied, runs query, closes panel. S-011. -->
@@ -2435,7 +2479,19 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     if (this.filterThemes.length)  { n++; }   // D-488
     if (this.filterMyRoles.length) { n++; }   // CC-40-G
     if (this.filterApprover)       { n++; }   // CC-40-Q
+    // Role drill-in filters (CC-38-40 / EPO views). Counted so the badge tells
+    // the truth about how many filters are narrowing the grid — previously a
+    // drill-in filter was applied and persisted but invisible in the count.
+    if (this.filterDcs)            { n++; }
+    if (this.filterEpo)            { n++; }
+    if (this.filterDol)            { n++; }
+    if (this.filterNextGate)       { n++; }
     return n;
+  }
+
+  /** Chip label for the Next Gate drill-in filter — canonical labels (Rule 36). */
+  nextGateChipLabel(gate: string): string {
+    return GATE_LABELS[gate as GateName] ?? gate;
   }
 
   // assignedPersonOptions getter removed — replaced by readonly field. Source: CC-Decision-2026-04-11-A.
@@ -2504,6 +2560,19 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
   }
 
   /** Clear staged filter state only — no query, panel stays open. S-011. */
+  /**
+   * Clear All — S-011: resets to defaults, fires NO query, panel stays open.
+   *
+   * Phil 2026-08-04: "make Clear All always clear everything." It now clears
+   * EVERY filter, not only the ones the panel has rows for.
+   *
+   * The role drill-in filters (DCS / EPO / DOL / Next Gate) have no staged
+   * counterpart because they have no panel row — they arrive from query params.
+   * So they are cleared directly. That is still S-011-conformant: no query is
+   * fired here and the panel stays open; the grid repaints when Apply commits.
+   * Before this, Clear All could not reach them at all, which is how a
+   * persisted drill-in filter survived every attempt to clear it.
+   */
   clearStagedFilters(): void {
     this.stagedStage          = '';
     this.stagedWorkstream     = '';
@@ -2517,6 +2586,12 @@ export class DeliveryCycleDashboardComponent implements OnInit, OnDestroy {
     this.openFilterRow        = '';
     this.wsScope              = '';  // CC-Decision-2026-04-12-E
     this.personScope          = '';  // CC-Decision-2026-04-12-F
+    // No panel row, no staged twin — cleared directly so "everything" means it.
+    this.filterDcs            = '';
+    this.filterEpo            = '';
+    this.filterDol            = '';
+    this.filterNextGate       = '';
+    this.drillDownFromQp      = false;
     this.cdr.markForCheck();
   }
 

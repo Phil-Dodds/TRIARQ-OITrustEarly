@@ -32,6 +32,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-08-04',
+    contractLabel: 'Filter visibility fix — Initiatives grid',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Initiatives grid filters',
+        description: 'Filters set by drilling in from a role view — DCS, EPO, DOL, Next Gate — now appear as dismissible chips and count towards the Filters badge. Previously they were applied and remembered but invisible, so a drill-in could quietly narrow the grid on every later visit with nothing on screen to explain it.'
+      },
+      {
+        audience:    'All',
+        surface:     'Clear All in the filter panel',
+        description: 'Clear All now clears every filter, including the drill-in ones the panel had no row for. It also no longer looks greyed out — the old styling read as a disabled button.'
+      }
+    ]
+  },
+  {
     date:          '2026-08-02',
     contractLabel: 'Contracts 42–44 — Maintenance Mode, Division Leader Gate Queue, Return Notifications',
     items: [
