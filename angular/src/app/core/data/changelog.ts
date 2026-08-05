@@ -36,6 +36,11 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
     contractLabel: 'Filter visibility fix — Initiatives grid',
     items: [
       {
+        audience:    'Admin',
+        surface:     'Skipping the Deploy gate',
+        description: 'Phil can now skip the Deploy gate when closing an Initiative whose gates were never completed here. The Deploy gate stays unskippable for everyone else. Previously the flow offered to skip it and then refused, showing an error code with no way forward.'
+      },
+      {
         audience:    'All',
         surface:     'Initiatives grid filters',
         description: 'Filters set by drilling in from a role view — DCS, EPO, DOL, Next Gate — now appear as dismissible chips and count towards the Filters badge. Previously they were applied and remembered but invisible, so a drill-in could quietly narrow the grid on every later visit with nothing on screen to explain it.'

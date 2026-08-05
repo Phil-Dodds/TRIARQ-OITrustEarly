@@ -964,6 +964,16 @@ const GATE_LABELS: Record<GateName, string> = {
                       (click)="onCloseDeployBlocked()">
                 Close
               </button>
+              <!-- CC-0804-10: Phil-only override. The backend has allowed this
+                   since 2026-07-24; there was simply no control to arm it from
+                   here, so the flow dead-ended. -->
+              <button *ngIf="viewerIsPhil"
+                      class="grm-btn-primary"
+                      type="button"
+                      [disabled]="processing"
+                      (click)="onPhilOverrideSkip()">
+                Skip anyway (override)…
+              </button>
             </div>
           </div>
         </div>
@@ -2037,6 +2047,18 @@ export class GateRecordModalComponent {
           this.pendingSkipGates = [];
           this.endProcessing();
           this.onGateActionComplete('full');
+        } else if (res.error === 'DEPLOY_GATE_SKIP_BLOCKED') {
+          // CC-0804-10: previously this dumped the raw error code into the
+          // interstitial, leaving the user staring at DEPLOY_GATE_SKIP_BLOCKED
+          // above a Skip & Submit button that could never succeed. Route it to
+          // the explanatory state instead, which names the way through and —
+          // for Phil — offers the override.
+          const payload = (res.data ?? {}) as Partial<DeployGateSkipBlockedPayload>;
+          this.deployBlockedGates = (payload.gates_requiring_action ?? this.pendingSkipGates
+            .filter(g => g === 'go_to_deploy')) as GateName[];
+          this.endProcessing();
+          this.confirmMode = 'deploy-blocked';
+          this.cdr.markForCheck();
         } else {
           this.endProcessing(res.error ?? 'Skip confirmation failed. Please try again.');
         }
@@ -2045,6 +2067,21 @@ export class GateRecordModalComponent {
         this.endProcessing(err.error ?? 'Skip confirmation failed. Please try again.');
       }
     });
+  }
+
+  /**
+   * CC-0804-10 — Phil-only: arm the override and retry the skip.
+   *
+   * submit_gate_for_approval has relaxed the D-450 deploy block for Phil since
+   * 2026-07-24, but confirm_gate_skip did not, and no UI path armed the override
+   * from this state — "Submit anyway (override)…" renders only inside the
+   * hardStops block, and a deploy-skip block is not a hard stop. So the override
+   * existed and was unreachable.
+   */
+  onPhilOverrideSkip(): void {
+    this.philOverrideArmed = true;
+    this.confirmMode       = 'skip-interstitial';
+    this.onConfirmSkip();
   }
 
   onCancelSkip(): void {

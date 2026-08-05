@@ -33,6 +33,8 @@
 
 const { supabase } = require('../db');
 const { submit_gate_for_approval } = require('./submit_gate_for_approval');
+// Phil override on the deploy-skip block — mirrors submit_gate_for_approval.
+const { isPhil } = require('./helpers/phil');
 
 const GATE_NAME_DISPLAY = {
   brief_review:  'Brief Review',
@@ -80,16 +82,30 @@ async function confirm_gate_skip(params, caller_user_id) {
     };
   }
 
-  // ── D-450: go_to_deploy is never skippable (backend enforcement) ─────────
-  if (gates_to_skip.includes('go_to_deploy')) {
+  // ── D-450: go_to_deploy is never skippable — EXCEPT under Phil override ───
+  // Fix 2026-08-04 (CC-0804-10). submit_gate_for_approval has relaxed this
+  // block for Phil since 2026-07-24, and says so in terms: "Phil override: the
+  // deploy-skip block relaxes to the normal skip confirmation — Phil may skip
+  // any gate, Deploy included." This delegate never honoured it, so the two
+  // halves of a two-call flow disagreed: submit offered the skip interstitial,
+  // the user accepted, and the call that performs the skip refused. A dead end
+  // with no way through and nothing explaining why.
+  //
+  // phil_override was already being forwarded here correctly (Rule 45 / D-596)
+  // — it was simply ignored by this one check. The caller is re-verified as
+  // Phil rather than trusted from the parameter, exactly as submit does.
+  const philSkipOverride =
+    params.phil_override === true && (await isPhil(caller_user_id));
+
+  if (gates_to_skip.includes('go_to_deploy') && !philSkipOverride) {
     return {
       success: false,
       error: 'DEPLOY_GATE_SKIP_BLOCKED',
       data: {
         code: 'DEPLOY_GATE_SKIP_BLOCKED',
         message:
-          'The Deploy gate cannot be skipped. confirm_gate_skip rejects any ' +
-          'gates_to_skip array that includes go_to_deploy.'
+          'The Deploy gate cannot be skipped. Complete or backdate it first — ' +
+          'backdating records the real date for work done outside OI Trust.'
       }
     };
   }
