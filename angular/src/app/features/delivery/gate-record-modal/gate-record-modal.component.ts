@@ -1976,14 +1976,9 @@ export class GateRecordModalComponent {
           return;
         }
         // D-450: Deploy gate cannot be skipped — error response with code.
-        if (!res.success && res.error === 'DEPLOY_GATE_SKIP_BLOCKED') {
-          const payload = (res.data ?? {}) as Partial<DeployGateSkipBlockedPayload>;
-          this.deployBlockedGates = (payload.gates_requiring_action ?? []) as GateName[];
-          this.endProcessing();
-          this.confirmMode = 'deploy-blocked';
-          this.cdr.markForCheck();
-          return;
-        }
+        // CC-0806-04: also handled in error() below, which is the branch that
+        // actually fires (success:false → HTTP 400 → thrown body).
+        if (this.handleDeploySkipBlocked(res)) { return; }
         if (res.success) {
           // Contract 29 WS3 (D-463/AC-32): show the resolved approver before
           // closing, so the submitter sees who the gate routed to. The submit
@@ -2000,8 +1995,11 @@ export class GateRecordModalComponent {
           this.endProcessing(res.error ?? 'Submission failed. Please try again.');
         }
       },
-      error: (err: { error?: string }) => {
-        this.endProcessing(err.error ?? 'Submission failed. Please try again.');
+      error: (err: unknown) => {
+        if (this.handleDeploySkipBlocked(err)) { return; }
+        const msg = (err as { error?: string })?.error;
+        this.endProcessing(
+          typeof msg === 'string' ? msg : 'Submission failed. Please try again.');
       }
     });
   }
@@ -2047,26 +2045,43 @@ export class GateRecordModalComponent {
           this.pendingSkipGates = [];
           this.endProcessing();
           this.onGateActionComplete('full');
-        } else if (res.error === 'DEPLOY_GATE_SKIP_BLOCKED') {
-          // CC-0804-10: previously this dumped the raw error code into the
-          // interstitial, leaving the user staring at DEPLOY_GATE_SKIP_BLOCKED
-          // above a Skip & Submit button that could never succeed. Route it to
-          // the explanatory state instead, which names the way through and —
-          // for Phil — offers the override.
-          const payload = (res.data ?? {}) as Partial<DeployGateSkipBlockedPayload>;
-          this.deployBlockedGates = (payload.gates_requiring_action ?? this.pendingSkipGates
-            .filter(g => g === 'go_to_deploy')) as GateName[];
-          this.endProcessing();
-          this.confirmMode = 'deploy-blocked';
-          this.cdr.markForCheck();
-        } else {
+        } else if (!this.handleDeploySkipBlocked(res)) {
           this.endProcessing(res.error ?? 'Skip confirmation failed. Please try again.');
         }
       },
-      error: (err: { error?: string }) => {
-        this.endProcessing(err.error ?? 'Skip confirmation failed. Please try again.');
+      // CC-0806-04: this is the branch that actually fires for a blocked skip.
+      // confirm_gate_skip returns { success:false }, index.js maps that to HTTP
+      // 400, and mcp.service rethrows the parsed body — so the error lands here,
+      // not in next(). The CC-0804-10 handling sat in next() only, which for a
+      // success:false response is unreachable, and the raw DEPLOY_GATE_SKIP_BLOCKED
+      // code went on rendering in the interstitial exactly as before the fix.
+      error: (err: unknown) => {
+        if (this.handleDeploySkipBlocked(err)) { return; }
+        const msg = (err as { error?: string })?.error;
+        this.endProcessing(
+          typeof msg === 'string' ? msg : 'Skip confirmation failed. Please try again.');
       }
     });
+  }
+
+  /**
+   * D-450 deploy-skip block → the explanatory state, from either subscribe
+   * callback. Returns true when it recognised and handled the response.
+   *
+   * Shared deliberately: the same payload can arrive as a next() value or as a
+   * thrown body depending on the HTTP status, and the user-visible behaviour
+   * must not depend on which.
+   */
+  private handleDeploySkipBlocked(res: unknown): boolean {
+    const body = res as { error?: string; data?: Partial<DeployGateSkipBlockedPayload> };
+    if (body?.error !== 'DEPLOY_GATE_SKIP_BLOCKED') { return false; }
+
+    this.deployBlockedGates = (body.data?.gates_requiring_action
+      ?? this.pendingSkipGates.filter(g => g === 'go_to_deploy')) as GateName[];
+    this.endProcessing();
+    this.confirmMode = 'deploy-blocked';
+    this.cdr.markForCheck();
+    return true;
   }
 
   /**
@@ -2271,15 +2286,8 @@ export class GateRecordModalComponent {
     }).subscribe({
       next: (res) => {
         // G8 (D-569): a returned consultation demands reasoning — prompt and retry.
-        if (!res.success && res.error === 'RETURNED_CONSULTATION_REQUIRES_REASON') {
-          const payload = (res.data ?? {}) as { returned_consultation_user_ids?: string[] };
-          this.overReturnedParties = (payload.returned_consultation_user_ids ?? [])
-            .map(id => this.approverDisplayName(id));
-          this.endProcessing();
-          this.confirmMode = 'over-returned-reason';
-          this.cdr.markForCheck();
-          return;
-        }
+        // CC-0806-04: handled in error() too — that is the branch that fires.
+        if (this.handleOverReturnedRequired(res)) { return; }
         if (res.success) {
           this.endProcessing();
           // Contract 24 (AC-18 / D-437): hold the modal open for the WIP alert
@@ -2307,10 +2315,29 @@ export class GateRecordModalComponent {
           );
         }
       },
-      error: (err: { error?: string }) => {
-        this.endProcessing(err.error ?? 'Decision record failed.');
+      error: (err: unknown) => {
+        if (this.handleOverReturnedRequired(err)) { return; }
+        const msg = (err as { error?: string })?.error;
+        this.endProcessing(typeof msg === 'string' ? msg : 'Decision record failed.');
       }
     });
+  }
+
+  /**
+   * D-569 over-returned reason prompt, from either subscribe callback.
+   * Returns true when it recognised and handled the response. See
+   * handleDeploySkipBlocked for why both callbacks must be covered.
+   */
+  private handleOverReturnedRequired(res: unknown): boolean {
+    const body = res as { error?: string; data?: { returned_consultation_user_ids?: string[] } };
+    if (body?.error !== 'RETURNED_CONSULTATION_REQUIRES_REASON') { return false; }
+
+    this.overReturnedParties = (body.data?.returned_consultation_user_ids ?? [])
+      .map(id => this.approverDisplayName(id));
+    this.endProcessing();
+    this.confirmMode = 'over-returned-reason';
+    this.cdr.markForCheck();
+    return true;
   }
 
   /** Contract 24 (AC-18): approver acknowledges the post-approval warning
