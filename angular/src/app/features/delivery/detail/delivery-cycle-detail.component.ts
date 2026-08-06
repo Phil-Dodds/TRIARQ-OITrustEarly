@@ -2400,8 +2400,17 @@ export class DeliveryCycleDetailComponent implements OnInit, OnChanges {
     return !!this.cycle && !terminal.includes(this.cycle.current_lifecycle_stage);
   }
 
+  /**
+   * CC-0806-01: COMPLETE removed from the blocked list.
+   *
+   * BRIEF has nothing before it. ON_HOLD resumes. CANCELLED un-cancels back to
+   * its pre-cancel stage. COMPLETE had no exit at all — once an Initiative
+   * closed, nothing in the application could reopen it, and Force-Close made
+   * that state reachable in two clicks. Regressing COMPLETE targets OUTCOME and
+   * resets close_review to pending, which is what un-completing means.
+   */
   get canRegress(): boolean {
-    const blocked: LifecycleStage[] = ['BRIEF', 'COMPLETE', 'CANCELLED', 'ON_HOLD'];
+    const blocked: LifecycleStage[] = ['BRIEF', 'CANCELLED', 'ON_HOLD'];
     return !!this.cycle && !blocked.includes(this.cycle.current_lifecycle_stage);
   }
 

@@ -32,6 +32,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date:          '2026-08-06',
+    contractLabel: 'Reopening a completed Initiative',
+    items: [
+      {
+        audience:    'All',
+        surface:     'Regress Stage on a completed Initiative',
+        description: 'A completed Initiative can now be reopened with Regress Stage — it returns to Outcome and the Close Review gate goes back to pending. Previously nothing could reopen a completed Initiative, which mattered once Force-Close made closing one a two-click action. Cancelled Initiatives are still reopened with Un-cancel instead, which restores the stage they were at before.'
+      }
+    ]
+  },
+  {
     date:          '2026-08-04',
     contractLabel: 'Filter visibility fix — Initiatives grid',
     items: [

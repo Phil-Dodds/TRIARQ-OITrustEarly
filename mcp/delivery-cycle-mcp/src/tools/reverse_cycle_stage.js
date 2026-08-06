@@ -12,13 +12,24 @@
 // This allows the gate workflow to be re-run after the stage returns to that position.
 //
 // Cannot regress from BRIEF (nothing before it), CANCELLED, or ON_HOLD.
+//
+// COMPLETE IS regressable (CC-0806-01, 2026-08-06). It was blocked because the
+// guard tested TERMINAL_STAGES, which is ['COMPLETE','CANCELLED'] — so COMPLETE
+// was caught by a list that exists to describe WIP exclusion, not reversibility.
+// This header always said COMPLETE was not blocked; the code disagreed.
+//
+// The two terminal states are not alike. CANCELLED has an exit —
+// uncancel_delivery_cycle restores the pre-cancel stage. COMPLETE had none, so
+// once an Initiative closed, nothing could reopen it. Force-Close (2026-07-24)
+// made that reachable in two clicks, turning a rare edge case into a trap.
+// Regressing COMPLETE targets OUTCOME and resets close_review to pending, which
+// is precisely what un-completing means.
 // Source: D-108, D-179, ARCH-12
 
 'use strict';
 
 const { supabase } = require('../db');
 const {
-  TERMINAL_STAGES,
   prevStage,
   gatesResetOnRegressionTo
 } = require('../lifecycle');
@@ -50,11 +61,17 @@ async function reverse_cycle_stage(params, caller_user_id) {
 
   const { current_lifecycle_stage } = cycle;
 
-  // ── Guard: cannot regress from terminal or pause states ───────────────────
-  if (TERMINAL_STAGES.includes(current_lifecycle_stage)) {
+  // ── Guard: cannot regress from CANCELLED or pause states ──────────────────
+  // CC-0806-01: was TERMINAL_STAGES, which also caught COMPLETE. CANCELLED
+  // stays blocked because it has its own exit (uncancel_delivery_cycle) that
+  // restores the pre-cancel stage; regressing it one step would instead drop it
+  // into an arbitrary lifecycle position. COMPLETE has no such exit, which is
+  // why it must be regressable.
+  if (current_lifecycle_stage === 'CANCELLED') {
     return {
       success: false,
-      error: `This cycle is ${current_lifecycle_stage} and cannot be regressed.`
+      error: 'This Initiative is CANCELLED. Use Un-cancel to restore it to its previous stage — ' +
+             'regressing would move it to an unrelated stage instead.'
     };
   }
 
