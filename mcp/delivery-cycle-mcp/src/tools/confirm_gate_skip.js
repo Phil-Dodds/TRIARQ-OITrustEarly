@@ -110,7 +110,7 @@ async function confirm_gate_skip(params, caller_user_id) {
     };
   }
 
-  // ── Fetch cycle for authority check (D-447 — TRIO only) ──────────────────
+  // ── Fetch cycle for the authority check ──────────────────────────────────
   const { data: cycle, error: cycleErr } = await supabase
     .from('delivery_cycles')
     .select('delivery_cycle_id, cycle_title, assigned_dcs_user_id, assigned_epo_user_id, assigned_dol_user_id')
@@ -122,28 +122,48 @@ async function confirm_gate_skip(params, caller_user_id) {
     return { success: false, error: 'Initiative not found or has been deleted.' };
   }
 
-  const isAssignedDcs = cycle.assigned_dcs_user_id === caller_user_id;
-  const isAssignedEpo = cycle.assigned_epo_user_id === caller_user_id;
-  const isAssignedDol = cycle.assigned_dol_user_id === caller_user_id;
-
-  if (!isAssignedDcs && !isAssignedEpo && !isAssignedDol) {
-    return {
-      success: false,
-      error:
-        'Only the assigned Domain Capability Strategist, Engineering Product Owner, ' +
-        'or Domain Outcome Lead can confirm a gate skip on this Initiative. ' +
-        'Admins cannot confirm skips on behalf of the TRIO.'
-    };
-  }
-
-  // ── Fetch caller display name for event_description ──────────────────────
+  // ── Fetch caller: display name for event_description, is_admin for authority
+  // (query order unchanged — cycle then caller — so FIFO fixtures are unmoved,
+  // Rule 40. Only the authority check moved below it, and the select widened.)
   const { data: caller } = await supabase
     .from('users')
-    .select('display_name')
+    .select('is_admin, display_name')
     .eq('id', caller_user_id)
     .is('deleted_at', null)
     .single();
   const callerDisplayName = caller?.display_name ?? 'A user';
+
+  // ── Authority: Admin, or the Initiative's assigned DCS / EPO / DOL ────────
+  //
+  // CC-0813-01. This was trio-only, attributed in a comment to "D-447 — TRIO
+  // only". D-447 says no such thing: it defines the `skipped` gate state, its
+  // diamond, and the backdate reversal. The Contract 28 spec that specced it
+  // mentions neither Admins nor acting on behalf. Both the restriction and the
+  // asserted sentence denying Admins this action were invented here in bee65b6,
+  // from a descriptive line about when the interstitial fires, then carried a
+  // D-number and read as locked.
+  //
+  // The governing rule is D-369: any Admin may act on behalf of an Initiative,
+  // which submit_gate_for_approval already implements (see its line 129). So a
+  // trio-only delegate did not enforce D-447 — it contradicted D-369, and made
+  // the skip path unreachable for the very callers submit had just let through.
+  // record_gate_decision had the identical over-restriction and already dropped
+  // it. Level makes this worse, not better: a designated L2/L3 approver can
+  // approve the gate outright yet could not confirm a skip on it.
+  const isAdmin       = caller?.is_admin === true;
+  const isAssignedDcs = cycle.assigned_dcs_user_id === caller_user_id;
+  const isAssignedEpo = cycle.assigned_epo_user_id === caller_user_id;
+  const isAssignedDol = cycle.assigned_dol_user_id === caller_user_id;
+
+  if (!isAdmin && !isAssignedDcs && !isAssignedEpo && !isAssignedDol) {
+    return {
+      success: false,
+      error:
+        'Only an Admin or the assigned Domain Capability Strategist, Engineering ' +
+        'Product Owner, or Domain Outcome Lead can confirm a gate skip on this ' +
+        'Initiative. Ask one of them to confirm the skip.'
+    };
+  }
 
   // ── Apply skip transitions, in gates_to_skip order ───────────────────────
   const skipped_gates = [];

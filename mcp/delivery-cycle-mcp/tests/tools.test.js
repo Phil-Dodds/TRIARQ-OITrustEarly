@@ -497,17 +497,25 @@ describe('confirm_gate_skip', () => {
     assert.equal(typeof mod.confirm_gate_skip, 'function');
   });
 
-  test('source: rejects non-TRIO callers (D-447) — DCS, EPO, or DOL only', () => {
+  // CC-0813-01: this test previously asserted the OPPOSITE — that `is_admin`
+  // must not appear, "TRIO only per D-447". D-447 defines the skipped gate
+  // state and says nothing about who may confirm a skip; the restriction was
+  // invented in bee65b6 and this test pinned it in place, which is why it
+  // survived. D-369 governs: any Admin may act on behalf of an Initiative.
+  // Behavioural coverage lives in contract0813-admin-skip-authority.test.js —
+  // this source check only guards the shape of the caller set.
+  test('source: authority is Admin OR the assigned DCS / EPO / DOL (D-369)', () => {
     const src = require('fs').readFileSync(
       require('path').join(__dirname, '../src/tools/confirm_gate_skip.js'),
       'utf8'
     );
-    // The authority check must exclude Admin — only TRIO members can confirm.
     assert.ok(/isAssignedDcs/.test(src));
     assert.ok(/isAssignedEpo/.test(src));
     assert.ok(/isAssignedDol/.test(src));
-    assert.ok(!/is_admin/.test(src),
-      'confirm_gate_skip must NOT delegate to Admin authority — TRIO only per D-447');
+    assert.ok(/is_admin/.test(src),
+      'an Admin may confirm a skip on behalf of the Initiative (D-369)');
+    assert.ok(!/cannot confirm skips on behalf/.test(src),
+      'the invented restriction must not return');
   });
 
   test('source: writes gate_skipped events with required metadata fields', () => {
