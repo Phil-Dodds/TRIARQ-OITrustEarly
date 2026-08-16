@@ -81,7 +81,7 @@ describe('computeHeadline', () => {
       current_lifecycle_stage: 'BRIEF',
       milestone_dates: [{ gate_name: 'brief_review', target_date: '2026-06-18', actual_date: null }],
       gate_records:    []
-    } as Partial<DeliveryCycle>);
+    } as unknown as Partial<DeliveryCycle>);
     const result = computeHeadline(cycle, FROZEN_NOW);
     expect(result.text).toBe('Next: Brief Review in 6 days');
     expect(result.color).toBe('sunray');

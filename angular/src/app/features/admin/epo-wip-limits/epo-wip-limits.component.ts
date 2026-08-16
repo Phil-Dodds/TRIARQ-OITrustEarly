@@ -41,7 +41,10 @@ type SortColumn = 'display_name' | 'pre_build_limit' | 'build_limit' | 'post_dep
 type SortDir    = 'asc' | 'desc';
 type LimitField = 'pre_build_limit' | 'build_limit' | 'post_deploy_limit';
 
-interface EpoRowView extends EpoWipLimitRow {
+// Exported so the spec can type its fixture: an untyped literal infers
+// `error_field: null`, which made every assertion against a field name a
+// compile error and took the whole Karma suite down with it.
+export interface EpoRowView extends EpoWipLimitRow {
   // Per-row edit state — drives the auto-save UI.
   saving_field:    LimitField | null;
   saved_field:     LimitField | null;    // briefly true after success — fades in template

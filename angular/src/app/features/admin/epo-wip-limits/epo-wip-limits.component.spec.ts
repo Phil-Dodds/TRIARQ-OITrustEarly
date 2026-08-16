@@ -14,10 +14,10 @@
  */
 
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { Router }                    from '@angular/router';
+import { Router, ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of }                        from 'rxjs';
 
-import { EpoWipLimitsComponent }     from './epo-wip-limits.component';
+import { EpoWipLimitsComponent, EpoRowView } from './epo-wip-limits.component';
 import { DeliveryService }           from '../../../core/services/delivery.service';
 import { UserProfileService }        from '../../../core/services/user-profile.service';
 import { ScreenStateService }        from '../../../core/services/screen-state.service';
@@ -62,7 +62,13 @@ describe('EpoWipLimitsComponent — synchronous logic', () => {
         { provide: DeliveryService,    useValue: deliverySpy },
         { provide: UserProfileService, useValue: profileSpy },
         { provide: ScreenStateService, useValue: screenStateSpy },
-        { provide: Router,             useValue: routerSpy }
+        { provide: Router,             useValue: routerSpy },
+        // The component injects ActivatedRoute (via routerLink in its template).
+        // Absent, every test in this suite died on NullInjectorError before
+        // reaching its assertion.
+        { provide: ActivatedRoute,     useValue: { snapshot: { paramMap: convertToParamMap({}) },
+                                                   paramMap: of(convertToParamMap({})),
+                                                   queryParamMap: of(convertToParamMap({})) } }
       ]
     }).compileComponents();
 
@@ -73,7 +79,7 @@ describe('EpoWipLimitsComponent — synchronous logic', () => {
 
   // ── Inline-edit validation (D-200 Pattern 3) ──────────────────────────────
 
-  function buildRow(overrides: Partial<{ pre_build_limit: number; build_limit: number; post_deploy_limit: number }> = {}) {
+  function buildRow(overrides: Partial<{ pre_build_limit: number; build_limit: number; post_deploy_limit: number }> = {}): EpoRowView {
     return {
       user_id:                 'epo-1',
       display_name:            'Sample EPO',
