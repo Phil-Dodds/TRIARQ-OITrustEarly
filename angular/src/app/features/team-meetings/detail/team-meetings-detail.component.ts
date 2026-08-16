@@ -25,6 +25,7 @@ import { EGG_KEYS }                      from '../../../core/constants/easter-eg
 import {
   TeamMeeting, TeamMeetingSection, TeamMeetingBullet, MeetingPresenceEntry
 } from '../../../core/types/team-meetings';
+import { buildMeetingExport, meetingExportFilename } from './team-meetings-export.utils';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 
@@ -94,6 +95,12 @@ interface InitiativeSearchResult {
                         [style.background]="presenceColor(p.user_id)"
                         [title]="p.display_name + ' is viewing this meeting'">{{ initials(p.display_name) }}</span>
                 </span>
+                <button class="tmd-series-btn" type="button"
+                        title="Copy this meeting as Markdown — paste straight into an email or an AI prompt"
+                        (click)="copyExport()">{{ exportCopied ? '✓ Copied' : '⧉ Copy' }}</button>
+                <button class="tmd-series-btn" type="button"
+                        title="Download this meeting as a Markdown file"
+                        (click)="downloadExport()">↓ .md</button>
                 <button *ngIf="meeting.track?.is_leader"
                         class="tmd-series-btn" type="button"
                         title="Series settings — sections, members, invites"
@@ -1239,6 +1246,40 @@ export class TeamMeetingsDetailComponent implements OnInit, OnDestroy {
   }
 
   // ── Title editing (fix 3) ───────────────────────────────────────────────────
+  // ── Export (2026-08-13): one Markdown string, two ways out ───────────────
+  //
+  // Copy and Download consume the same buildMeetingExport() output, so the two
+  // can never drift. Markdown serves both stated uses unchanged — it pastes
+  // into an email as readable text and is the native input format for a model.
+  //
+  // ARCH-3: content only. Any prompt framing belongs in /skills/, not here.
+
+  exportCopied = false;
+
+  copyExport(): void {
+    if (!this.meeting) { return; }
+    navigator.clipboard?.writeText(buildMeetingExport(this.meeting)).then(() => {
+      this.exportCopied = true;
+      this.cdr.markForCheck();
+      // Transient acknowledgement of a completed local action, not optimistic
+      // state awaiting a server confirmation — matches copyUrl() in
+      // track-settings. Flagged against the optimistic-reversion rule; see
+      // CC-0813-04.
+      setTimeout(() => { this.exportCopied = false; this.cdr.markForCheck(); }, 2000);
+    });
+  }
+
+  downloadExport(): void {
+    if (!this.meeting) { return; }
+    const blob = new Blob([buildMeetingExport(this.meeting)], { type: 'text/markdown;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = meetingExportFilename(this.meeting);
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   startEditTitle(): void {
     if (!this.meeting) return;
     this.titleDraft  = this.meeting.title;
