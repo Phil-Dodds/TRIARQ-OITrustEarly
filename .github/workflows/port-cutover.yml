@@ -1,0 +1,158 @@
+name: Port — cutover redirect
+
+# Replaces the OITrustEarly application on gh-pages with the static redirect to
+# oi-trust.myqone.com.
+#
+# THREE GUARDS, all machine-checkable, none requiring anyone to be present:
+#   1. PORT_HOLD file on master  -> abort. This is the kill switch.
+#   2. oi-trust.myqone.com must answer HTTP 200-399 -> otherwise abort and retry
+#      on the next hourly run. Never redirects users at a system that is down.
+#   3. PORT_DONE file on gh-pages -> abort. Makes the run idempotent, so the
+#      hourly retries stop once the cutover has landed.
+#
+# Retries hourly from 07:00 to 16:00 UTC on 19 Aug 2026 (03:00-12:00 ET,
+# 12:30-21:30 IST). First eligible run is ~4h after the freeze, matching the
+# expected migration duration. If the health check never passes, the redirect
+# never ships and Early simply stays read-only.
+#
+# To fire early from a Claude Code session:
+#   gh workflow run port-cutover.yml --ref master
+# To stop all runs from a Claude Code session:
+#   git commit --allow-empty -m "hold" && touch PORT_HOLD && git add PORT_HOLD \
+#     && git commit -m "Port: HOLD cutover" && git push origin master
+#
+# Runbook: docs/Runbook-Port-Freeze-And-Cutover.md
+
+on:
+  schedule:
+    - cron: '0 7-16 19 8 *'
+  workflow_dispatch:
+    inputs:
+      skip_health_check:
+        description: 'Ship the redirect even if myqone fails the health check'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: port-gh-pages
+  cancel-in-progress: false
+
+env:
+  TARGET_URL: https://oi-trust.myqone.com
+
+jobs:
+  cutover:
+    runs-on: ubuntu-latest
+    # PORT SAFETY — read before changing.
+    # Copied into the myqone production repo, this workflow would delete the
+    # production gh-pages deployment and replace it with a redirect to
+    # oi-trust.myqone.com — i.e. the site redirecting to itself, with the app
+    # gone. The myqone health check would PASS in that world, so Guard 2 offers
+    # no protection. Repository-pinned so the port delta can carry it safely.
+    if: github.repository == 'Phil-Dodds/TRIARQ-OITrustEarly'
+    steps:
+      - name: Check out master (source of the redirect page)
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 1
+          path: src
+
+      - name: Guard 1 — abort if PORT_HOLD is present
+        run: |
+          set -euo pipefail
+          if [ -f src/PORT_HOLD ]; then
+            echo "::error::PORT_HOLD present on master — cutover aborted."
+            cat src/PORT_HOLD || true
+            exit 1
+          fi
+          echo "No hold in place."
+
+      - name: Guard 2 — health check oi-trust.myqone.com
+        if: ${{ inputs.skip_health_check != true }}
+        run: |
+          set -euo pipefail
+          echo "Probing ${TARGET_URL} ..."
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 25 "${TARGET_URL}" || echo "000")
+          echo "HTTP ${CODE}"
+          if [ "$CODE" = "000" ] || [ "$CODE" -ge 400 ]; then
+            echo "::error::${TARGET_URL} returned ${CODE} — not healthy. Aborting; will retry next hour."
+            exit 1
+          fi
+          echo "Target is healthy."
+
+      - name: Check out gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+          path: pages
+
+      - name: Guard 3 — abort if cutover already done
+        run: |
+          set -euo pipefail
+          if [ -f pages/PORT_DONE ]; then
+            echo "Cutover already completed:"
+            cat pages/PORT_DONE
+            echo "Nothing to do."
+            exit 1
+          fi
+          echo "Cutover not yet applied."
+
+      - name: Verify the redirect page exists and names the target
+        run: |
+          set -euo pipefail
+          test -f src/docs/port-redirect/index.html \
+            || { echo "::error::docs/port-redirect/index.html missing on master."; exit 1; }
+          grep -q "oi-trust.myqone.com" src/docs/port-redirect/index.html \
+            || { echo "::error::Redirect page does not reference oi-trust.myqone.com."; exit 1; }
+          echo "Redirect page looks correct."
+
+      - name: Replace the application with the redirect
+        run: |
+          set -euo pipefail
+          cd pages
+
+          # Purge the built application. Keep .git, and keep nothing else:
+          # a stale chunk left behind can still be fetched by a cached index.
+          git rm -rqf . || true
+
+          cp ../src/docs/port-redirect/index.html index.html
+          # 404.html must be the same page: deep links into the old Angular
+          # routes (/delivery/..., /admin/...) all resolve through it.
+          cp index.html 404.html
+          # .nojekyll — without it GitHub Pages ignores underscore-prefixed paths.
+          touch .nojekyll
+
+          STAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          printf '{\n  "build_version": "port-cutover-%s",\n  "built_at": "%s"\n}\n' \
+            "$(date -u +%Y%m%dT%H%M%SZ)" "${STAMP}" > version.json
+          printf 'Cutover to oi-trust.myqone.com completed %s\n' "${STAMP}" > PORT_DONE
+
+          ls -la
+
+      - name: Commit and push the redirect
+        run: |
+          set -euo pipefail
+          cd pages
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Port cutover: redirect OITrustEarly to oi-trust.myqone.com"
+          git push origin gh-pages
+
+      - name: Confirm the redirect is serving
+        run: |
+          set -euo pipefail
+          echo "Waiting 45s for GitHub Pages to publish ..."
+          sleep 45
+          PAGE_URL="https://phil-dodds.github.io/TRIARQ-OITrustEarly/"
+          BODY=$(curl -sS -L --max-time 25 "${PAGE_URL}" || true)
+          if echo "${BODY}" | grep -q "oi-trust.myqone.com"; then
+            echo "Redirect is live at ${PAGE_URL}"
+          else
+            echo "::warning::Redirect not yet visible at ${PAGE_URL} — Pages can take a few minutes. Verify manually."
+          fi

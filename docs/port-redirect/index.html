@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<!--
+  OI Trust — post-port redirect page.
+  Deployed to the gh-pages branch as BOTH index.html and 404.html at cutover,
+  replacing the Angular application. See docs/Runbook-Port-Freeze-And-Cutover.md.
+
+  Self-contained by design: no external CSS, no fonts, no scripts, nothing that
+  can fail. Roboto is requested but degrades to system sans-serif.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pathways OI Trust has moved</title>
+  <meta http-equiv="refresh" content="8;url=https://oi-trust.myqone.com">
+  <link rel="canonical" href="https://oi-trust.myqone.com">
+  <style>
+    :root {
+      --triarq-color-primary: #257099;
+      --triarq-color-navy: #16283c;
+      --triarq-color-text: #16283c;
+      --triarq-color-muted: #5a6b7d;
+      --triarq-color-surface: #ffffff;
+      --triarq-color-page: #f4f6f8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: var(--triarq-color-page);
+      color: var(--triarq-color-text);
+      font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      background: var(--triarq-color-surface);
+      border-radius: 10px;
+      border-top: 4px solid var(--triarq-color-primary);
+      box-shadow: 0 2px 16px rgba(22, 40, 60, 0.10);
+      max-width: 560px;
+      width: 100%;
+      padding: 48px 40px 40px;
+      text-align: center;
+    }
+    .eyebrow {
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--triarq-color-primary);
+      margin: 0 0 20px;
+      font-weight: 500;
+    }
+    h1 {
+      font-size: 30px;
+      line-height: 1.25;
+      font-weight: 500;
+      margin: 0 0 16px;
+      color: var(--triarq-color-navy);
+    }
+    p {
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--triarq-color-muted);
+      margin: 0 0 28px;
+    }
+    a.cta {
+      display: inline-block;
+      background: var(--triarq-color-primary);
+      color: #fff;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 500;
+      padding: 14px 32px;
+      border-radius: 5px;
+    }
+    a.cta:hover, a.cta:focus { background: #1d5b7d; }
+    .fallback {
+      margin: 28px 0 0;
+      font-size: 14px;
+      color: var(--triarq-color-muted);
+    }
+    .fallback a { color: var(--triarq-color-primary); }
+    .footer {
+      margin: 32px 0 0;
+      padding-top: 20px;
+      border-top: 1px solid #e4e8ec;
+      font-size: 12px;
+      color: var(--triarq-color-muted);
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <p class="eyebrow">TRIARQ Health</p>
+    <h1>Pathways OI Trust has moved</h1>
+    <p>
+      OI Trust now runs at its permanent address. Your data has been migrated —
+      sign in at the new address to pick up where you left off. This page will
+      take you there automatically.
+    </p>
+    <a class="cta" href="https://oi-trust.myqone.com">Go to OI Trust</a>
+    <p class="fallback">
+      If you are not redirected, go to
+      <a href="https://oi-trust.myqone.com">oi-trust.myqone.com</a>
+      and update any saved bookmarks.
+    </p>
+    <p class="footer">
+      Pathways OI Trust &middot; TRIARQ Health &middot; Confidential
+    </p>
+  </main>
+</body>
+</html>

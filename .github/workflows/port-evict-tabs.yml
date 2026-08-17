@@ -1,0 +1,79 @@
+name: Port — evict open tabs
+
+# Bumps build_version in version.json on gh-pages so that every browser tab
+# still open raises the S-033 update banner and reloads into the frozen,
+# read-only application.
+#
+# VersionCheckService polls version.json every 5 minutes and on every
+# NavigationEnd, so an open tab self-evicts without any code change and without
+# anyone being present.
+#
+# Fires 03:05 UTC on 19 Aug 2026, five minutes after the pg_cron 'port-freeze'
+# job (db/migrations/101_port_freeze_schedule.sql). Ordering matters: evicting
+# before the freeze lands would reload tabs into a still-writable app.
+#
+# Runbook: docs/Runbook-Port-Freeze-And-Cutover.md
+
+on:
+  schedule:
+    # 03:05 UTC Wed 19 Aug = 23:05 ET Tue 18 Aug = 08:35 IST Wed 19 Aug.
+    # GitHub delays scheduled runs under load — commonly 5-15 min, sometimes
+    # more. Harmless here: late eviction only means a tab lingers a little
+    # longer in a read-only app.
+    - cron: '5 3 19 8 *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: port-gh-pages
+  cancel-in-progress: false
+
+jobs:
+  evict:
+    runs-on: ubuntu-latest
+    # PORT SAFETY: this workflow must never run anywhere but the Early repo.
+    # Copied into the myqone production repo it would force every production
+    # user's tab to reload on 19 August, annually. Repository-pinned so the
+    # port delta can carry it harmlessly.
+    if: github.repository == 'Phil-Dodds/TRIARQ-OITrustEarly'
+    steps:
+      - name: Check out gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+
+      - name: Abort if HOLD is present on master
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin master
+          if git cat-file -e origin/master:PORT_HOLD 2>/dev/null; then
+            echo "::error::PORT_HOLD present on master — eviction aborted."
+            exit 1
+          fi
+          echo "No hold in place. Proceeding."
+
+      - name: Bump build_version
+        run: |
+          set -euo pipefail
+          if [ ! -f version.json ]; then
+            echo "::error::version.json not found on gh-pages — nothing to bump."
+            exit 1
+          fi
+          echo "Before: $(cat version.json)"
+          STAMP="port-freeze-$(date -u +%Y%m%dT%H%M%SZ)"
+          printf '{\n  "build_version": "%s",\n  "built_at": "%s"\n}\n' \
+            "$STAMP" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" > version.json
+          echo "After:  $(cat version.json)"
+
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          git commit -m "Port freeze: bump build_version to evict open tabs"
+          git push origin gh-pages
+          echo "Open tabs will prompt a reload within ~5 minutes."
