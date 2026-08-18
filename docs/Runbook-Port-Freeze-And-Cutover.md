@@ -42,7 +42,8 @@ Established by audit, 2026-08-17 — read this before relying on any lever:
 | Lever | Stops writes? | Notes |
 |---|---|---|
 | `maintenance_mode = true` | **No** | Bootstrap-only gate. `resolveMaintenanceModeAtBootstrap()` is called once from the `APP_INITIALIZER` and cached; no guard, no interceptor, no poll. Open tabs are unaffected for the life of the tab. No MCP tool consults it. |
-| `service_role` read-only | **Yes** | Closes every app write path — open tabs, all MCP tools, Edge Functions. One statement, reversible. |
+| `service_role` read-only | **No** | Rehearsed 2026-08-18, writes still succeeded. Role settings load at session login, but PostgREST logs in as `authenticator` and does `SET ROLE` per request; and PostgREST sets transaction access mode per HTTP method, overriding any default. **Abandoned as the freeze mechanism** — retained in migration 102 only as belt-and-braces for direct `psql` connections. |
+| REVOKE write privileges | **Yes** | Enforced per statement, so it applies to already-open connections with no pool cycling and no Render redeploy. `SELECT` is not revoked, so reads keep working. This is the freeze. See `db/migrations/102_port_freeze_via_revoke.sql`. |
 | Unscheduling pg_cron | **Yes, for the jobs** | Required separately: jobs run as the job owner, not `service_role`, so the role flag does not touch them. |
 | Stopping Render services | Yes, but | Also kills reads. Rejected: incompatible with a read-only posture. |
 
@@ -50,14 +51,16 @@ The freeze is the database role flag plus the cron unschedule. Maintenance mode 
 
 ## Pre-flight — T minus 1 day
 
-1. **Rehearse the read-only flag.** In the Supabase SQL editor:
+1. **Rehearse the freeze.** Done 2026-08-18. The `ALTER ROLE` approach was rehearsed and **failed** — writes still succeeded, because PostgREST connects as `authenticator` and sets transaction mode per request. Replaced by the REVOKE in migration 102. Rehearse that instead, in a transaction you roll back:
    ```sql
-   ALTER ROLE service_role SET default_transaction_read_only = on;
-   -- verify from the app: attempt one known write, expect failure; confirm reads still render
-   ALTER ROLE service_role SET default_transaction_read_only = off;
+   BEGIN;
+   REVOKE INSERT, UPDATE, DELETE, TRUNCATE
+       ON ALL TABLES IN SCHEMA public
+     FROM service_role, anon, authenticated;
+   -- attempt one save in the app: it must fail. Load a screen: it must render.
+   ROLLBACK;
    ```
-   If the `ALTER ROLE` is refused on this project, fall back to revoking write grants on `public` from `service_role` — determine this now, not on the day.
-   Note: existing pooled connections may keep their old setting until they cycle. Confirm the flag takes effect on a live session during the rehearsal; if it does not, plan a Render restart of both services immediately after setting it.
+   The REVOKE holds locks until the `ROLLBACK`, so test one save and roll back promptly rather than exploring the UI with the transaction open.
 
 2. **Capture the cron job definitions before touching them.** The live `command` strings hold the only copy of the MCP base URLs and both cron keys:
    ```sql
@@ -88,7 +91,12 @@ The freeze is the database role flag plus the cron unschedule. Maintenance mode 
 ## Freeze — automatic, Wed 03:00 UTC
 
 Executed by the pg_cron job `port-freeze`, armed by
-`db/migrations/101_port_freeze_schedule.sql`. In order, unattended:
+`db/migrations/101_port_freeze_schedule.sql`, with the freeze mechanism itself
+replaced by `db/migrations/102_port_freeze_via_revoke.sql`. The cron job calls
+`public.execute_port_freeze()` by name, so 102 replacing the function body is
+sufficient — no re-registration, Section 3 of 101 does not need re-running.
+
+In order, unattended:
 
 1. Captures all three cron job definitions to `port_freeze_log` — the `command`
    strings hold the only copy of the MCP URLs and both cron keys, so this
@@ -96,9 +104,19 @@ Executed by the pg_cron job `port-freeze`, armed by
 2. Unschedules `refresh-initiative-status`, `send-meeting-reminders`, and
    `run-daily-digest` by name. These write with no user present, and run as the
    job owner rather than `service_role`, so step 3 would not stop them.
-3. `ALTER ROLE service_role SET default_transaction_read_only = on` — closes
-   open tabs, every MCP tool, and the Edge Function mail relay at once.
-4. Unschedules itself, last, so a failure leaves it armed for inspection.
+3. Records every `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` privilege held by
+   `service_role`, `anon`, and `authenticated` on `public` into
+   `port_freeze_grants` — the sole basis for rollback.
+4. **Revokes those privileges.** Enforced per statement, so it closes open tabs,
+   every MCP tool, and the Edge Function mail relay immediately, with no pool
+   cycling and no Render redeploy. `SELECT` is untouched, so reads keep working.
+5. Revokes `EXECUTE` on `refresh_initiative_status_overdue()` — a
+   `SECURITY DEFINER` function owned by `postgres` runs with the owner's
+   privileges and would otherwise still write, and the app can reach it through
+   the `trigger_status_refresh` tool.
+6. Sets `service_role` read-only as belt-and-braces for direct `psql` sessions.
+   Not load-bearing: PostgREST overrides it per request.
+7. Unschedules itself, last, so a failure leaves it armed for inspection.
 
 Failures are recorded in `port_freeze_log` and re-raised, because pg_cron
 otherwise buries them in `cron.job_run_details` where nobody is reading at
