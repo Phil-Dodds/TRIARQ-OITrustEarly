@@ -205,7 +205,11 @@ Then restore the previous `index.html` and `version.json` on gh-pages. After myq
 
 ## Known gaps, accepted
 
-1. **No clean in-app blocked message during the freeze.** Read-only surfaces raw errors, not a Decision-140 message. Mitigated by out-of-band comms plus the version-banner eviction. Closing it properly would need a maintenance check in both MCP services and a Render redeploy of each — deliberately not attempted this close to the date.
+1. ~~No clean in-app blocked message during the freeze.~~ **Closed 2026-08-18 by the trigger mechanism.** Rehearsed on `delivery_cycles`: the exception message from `port_freeze_block()` propagates through PostgREST and the MCP layer into the UI verbatim —
+
+   > Failed to update Initiative: OI Trust is frozen for migration to oi-trust.myqone.com. Data is readable but cannot be changed.
+
+   This is a Decision-140-shaped message (what is blocked, and where to go instead) at no additional cost. No MCP middleware and no Render redeploy needed. The wording lives in `port_freeze_block()` in migration 103 — edit it there if the message should change.
 2. **The news banner cannot carry an operational notice.** Its text is synthesized in `news_ticker.js` from activity templates, there is no content table, and dismissal persists indefinitely in `localStorage` under `oi.newsBanner.hidden`. Not a usable channel.
 3. **A user who dismissed the news banner and never navigates** will still be reached by the version-check poll, which is interval-based and independent of the banner.
 
