@@ -51,16 +51,21 @@ The freeze is the database role flag plus the cron unschedule. Maintenance mode 
 
 ## Pre-flight — T minus 1 day
 
-1. **Rehearse the freeze.** Done 2026-08-18. The `ALTER ROLE` approach was rehearsed and **failed** — writes still succeeded, because PostgREST connects as `authenticator` and sets transaction mode per request. Replaced by the REVOKE in migration 102. Rehearse that instead, in a transaction you roll back:
+1. **Rehearse the freeze.** Two attempts on 2026-08-18 were inconclusive or wrong; the mechanism is now the triggers in migration 103. History, because it matters for anyone reviewing this:
+   - `ALTER ROLE service_role SET default_transaction_read_only = on` — **does not work.** The setting was confirmed present in `pg_roles.rolconfig` and writes still succeeded. Role settings load at session login; PostgREST logs in as `authenticator` and issues `SET ROLE` per request, and sets transaction access mode per HTTP method regardless.
+   - `REVOKE` inside `BEGIN … ROLLBACK` — **proved nothing.** An uncommitted privilege change is invisible to other sessions, and the Supabase SQL editor does not hold a transaction across runs. Grant audit later confirmed write privileges sit only on `service_role`, `anon`, `authenticated`, `postgres` with no `PUBLIC` grant, so a *committed* REVOKE would in fact work. It is retained in 103 as the secondary layer.
+
+   Rehearse the trigger on one table, which commits and is therefore conclusive:
    ```sql
-   BEGIN;
-   REVOKE INSERT, UPDATE, DELETE, TRUNCATE
-       ON ALL TABLES IN SCHEMA public
-     FROM service_role, anon, authenticated;
-   -- attempt one save in the app: it must fail. Load a screen: it must render.
-   ROLLBACK;
+   CREATE TRIGGER zzz_port_freeze
+     BEFORE INSERT OR UPDATE OR DELETE ON public.delivery_cycles
+     FOR EACH STATEMENT EXECUTE FUNCTION public.port_freeze_block();
    ```
-   The REVOKE holds locks until the `ROLLBACK`, so test one save and roll back promptly rather than exploring the UI with the transaction open.
+   Edit an initiative and save — must fail. Initiative screens must still load. Then:
+   ```sql
+   DROP TRIGGER zzz_port_freeze ON public.delivery_cycles;
+   ```
+   Confirm saving works again. If the save *succeeds* while the trigger is on, stop and escalate: the write is not reaching `public.delivery_cycles` and the model of where writes land is wrong.
 
 2. **Capture the cron job definitions before touching them.** The live `command` strings hold the only copy of the MCP base URLs and both cron keys:
    ```sql
