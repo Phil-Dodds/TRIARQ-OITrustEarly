@@ -44,12 +44,14 @@ import { Observable }             from 'rxjs';
       <!-- CC-20-09: deploy-update banner. Sticky top, full width. Sits
            above the sidebar+main shell so it is visible regardless of
            which route is loaded. -->
-      <div *ngIf="updateAvailable$ | async" class="oi-update-banner">
+      <div *ngIf="(updateAvailable$ | async) || (versionMessage$ | async)"
+           class="oi-update-banner">
         <span class="oi-update-text">
-          A new version of OI Trust is available.
+          {{ (versionMessage$ | async) || 'A new version of OI Trust is available.' }}
         </span>
         <button type="button"
                 class="oi-update-btn"
+                *ngIf="updateAvailable$ | async"
                 (click)="reloadNow()">
           Reload
         </button>
@@ -131,6 +133,11 @@ import { Observable }             from 'rxjs';
 export class AppComponent implements OnInit {
   showSidebar$!:     Observable<boolean>;
   updateAvailable$!: Observable<boolean>;
+
+  /** Operator broadcast from version.json. Shows in the same top banner, and
+   *  persists across reloads — unlike the update prompt, which clears once the
+   *  user is on the current build. */
+  versionMessage$!: Observable<string | null>;
   busy$!:            Observable<boolean>;
   bannerVisible$!:   Observable<boolean>;
 
@@ -175,6 +182,7 @@ export class AppComponent implements OnInit {
     // first response, then compares every 5 minutes and on every
     // NavigationEnd. Banner appears when build_version differs.
     this.updateAvailable$ = this.versionCheck.updateAvailable$;
+    this.versionMessage$  = this.versionCheck.message$;
     this.versionCheck.init();
 
     // Processing Feedback standard: activity bar mirrors BusyService.

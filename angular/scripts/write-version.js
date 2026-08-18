@@ -48,6 +48,18 @@ function main() {
     build_version: buildVersion(),
     built_at:      new Date().toISOString()
   };
+
+  // Optional operator broadcast, rendered in the top banner by
+  // VersionCheckService. Set VERSION_MESSAGE at build time to ship a build that
+  // already carries an announcement; otherwise the field is omitted and the
+  // banner falls back to the default update copy.
+  //
+  // For an announcement AFTER a deploy, edit version.json on gh-pages directly
+  // — no rebuild needed, and the running app picks it up within 5 minutes.
+  // Omitted rather than set to null so a message is never accidentally
+  // published as the string "null".
+  const message = (process.env.VERSION_MESSAGE || '').trim();
+  if (message) { payload.message = message; }
   const target = path.join(DIST_BROWSER, 'version.json');
   fs.writeFileSync(target, JSON.stringify(payload, null, 2) + '\n', 'utf8');
   process.stdout.write(`[write-version] wrote ${target} (build_version=${payload.build_version})\n`);

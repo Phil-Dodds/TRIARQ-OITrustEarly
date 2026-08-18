@@ -43,6 +43,13 @@ const VERSION_JSON_PATH = 'version.json';
 interface VersionPayload {
   build_version: string;
   built_at:      string;
+  /** Optional operator broadcast. Renders in the top banner in place of the
+   *  default update copy. Server-driven on purpose: the banner is rendered by
+   *  the bundle the user has ALREADY loaded, so hardcoded copy can only be
+   *  changed for people who have already reloaded — useless for announcing
+   *  anything to people currently in the app. Added 2026-08-18 for the port
+   *  freeze; see docs/Runbook-Port-Freeze-And-Cutover.md. */
+  message?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -50,6 +57,12 @@ export class VersionCheckService implements OnDestroy {
 
   private readonly updateAvailable = new BehaviorSubject<boolean>(false);
   readonly updateAvailable$: Observable<boolean> = this.updateAvailable.asObservable();
+
+  /** Operator broadcast from version.json, or null when none is set.
+   *  Independent of updateAvailable: a message must keep showing after the user
+   *  reloads, and a reload clears the version mismatch. */
+  private readonly message = new BehaviorSubject<string | null>(null);
+  readonly message$: Observable<string | null> = this.message.asObservable();
 
   private bootVersion: string | null = null;
   private bootCaptured              = false;
@@ -91,6 +104,12 @@ export class VersionCheckService implements OnDestroy {
       if (!res.ok) { return; }
       const payload = (await res.json()) as VersionPayload;
       if (!payload?.build_version) { return; }
+
+      // Set before the boot-capture return: a message present at bootstrap must
+      // show immediately, not wait for the first 5-minute poll.
+      const msg = (payload.message || '').trim();
+      const next = msg.length ? msg : null;
+      if (next !== this.message.value) { this.message.next(next); }
 
       if (!this.bootCaptured) {
         this.bootVersion  = payload.build_version;
