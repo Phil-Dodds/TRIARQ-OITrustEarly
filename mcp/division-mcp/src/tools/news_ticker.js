@@ -183,6 +183,28 @@ async function get_news_ticker(params, caller_user_id) {
     for (const item of shown) item.reactions = [];
   }
 
+  // Pinned operator notice, always first in the feed. Set NEWS_TICKER_NOTICE to
+  // announce something to everyone currently in the app — a freeze window, a
+  // migration, a planned outage. Unset it to remove.
+  //
+  // Text lives in an env var rather than the database because there is no
+  // content table behind this banner: every other item is synthesised from
+  // activity. Added for the 2026-08-19 port freeze announcement.
+  //
+  // Prepended AFTER the reaction pass so the notice is never sent to
+  // news_banner_reactions — it has no news_item_key to react to.
+  const notice = (process.env.NEWS_TICKER_NOTICE || '').trim();
+  if (notice) {
+    shown.unshift({
+      kind:          'notice',
+      news_item_key: 'notice:pinned',
+      text:          notice,
+      asset_ref:     null,
+      occurred_at:   new Date().toISOString(),
+      reactions:     []
+    });
+  }
+
   return { success: true, data: { items: shown } };
 }
 

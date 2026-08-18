@@ -15,7 +15,10 @@ export interface NewsReaction {
 }
 
 export interface NewsTickerItem {
-  kind: 'gate' | 'meeting' | 'egg' | 'user' | 'status' | 'ack';
+  // 'notice' is a pinned operator announcement driven by the NEWS_TICKER_NOTICE
+  // env var on division-mcp, not synthesised from activity like the others.
+  // It always sorts first and carries no reactions.
+  kind: 'gate' | 'meeting' | 'egg' | 'user' | 'status' | 'ack' | 'notice';
   news_item_key: string;
   text: string;
   asset_ref?: string | null;

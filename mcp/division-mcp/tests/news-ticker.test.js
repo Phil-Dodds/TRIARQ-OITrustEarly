@@ -79,6 +79,42 @@ describe('get_news_ticker', () => {
   });
 });
 
+describe('get_news_ticker pinned notice (NEWS_TICKER_NOTICE)', () => {
+  const NOTICE = 'OI Trust moves to oi-trust.myqone.com tonight.';
+
+  test('absent env var → no notice item', async () => {
+    delete process.env.NEWS_TICKER_NOTICE;
+    const r = await get_news_ticker({}, USER);
+    assert.equal(r.success, true);
+    assert.equal(r.data.items.some(i => i.kind === 'notice'), false);
+  });
+
+  test('whitespace-only env var is ignored', async () => {
+    process.env.NEWS_TICKER_NOTICE = '   ';
+    const r = await get_news_ticker({}, USER);
+    assert.equal(r.data.items.some(i => i.kind === 'notice'), false);
+    delete process.env.NEWS_TICKER_NOTICE;
+  });
+
+  test('set env var → notice is first, on an otherwise empty feed', async () => {
+    process.env.NEWS_TICKER_NOTICE = NOTICE;
+    const r = await get_news_ticker({}, USER);
+    assert.equal(r.success, true);
+    assert.equal(r.data.items[0].kind, 'notice');
+    assert.equal(r.data.items[0].text, NOTICE);
+    assert.deepEqual(r.data.items[0].reactions, []);
+    assert.equal(r.data.items[0].news_item_key, 'notice:pinned');
+    delete process.env.NEWS_TICKER_NOTICE;
+  });
+
+  test('notice is trimmed', async () => {
+    process.env.NEWS_TICKER_NOTICE = `  ${NOTICE}  `;
+    const r = await get_news_ticker({}, USER);
+    assert.equal(r.data.items[0].text, NOTICE);
+    delete process.env.NEWS_TICKER_NOTICE;
+  });
+});
+
 describe('toggle_news_banner_reaction', () => {
   test('rejects an invalid emoji', async () => {
     const r = await toggle_news_banner_reaction({ news_item_key: 'gate:g1', emoji: 'thumbsdown' }, USER);
