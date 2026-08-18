@@ -35,6 +35,45 @@ migration estimate, and retries every hour until the health check passes. If it
 never passes, the redirect never ships and Early stays read-only — the failure
 mode is "users see a frozen old system", never "users see a broken new one".
 
+## Announcing to users in the app
+
+Three channels, in descending order of reach. Deployed 2026-08-18.
+
+**1. Top banner (primary).** `version.json` on `gh-pages` carries an optional
+`message` field, rendered full-width at the top of every screen by
+`VersionCheckService`, which polls it every 5 minutes and on every navigation.
+Not dismissible. To change or clear the announcement, edit `version.json` on
+`gh-pages` — no rebuild, no Render redeploy:
+
+```json
+{
+  "build_version": "…",
+  "built_at": "…",
+  "message": "Your announcement here. Remove this field to clear the banner."
+}
+```
+
+The banner shows whenever a message is present, independently of the version
+mismatch — otherwise the message would disappear the moment anyone reloaded.
+The Reload button appears only when there is genuinely a newer build.
+
+Useful again at cutover: set the message to name the new URL before the
+redirect lands, so people are told rather than moved without warning.
+
+**2. News ticker (supplementary).** Set `NEWS_TICKER_NOTICE` on division-mcp and
+redeploy; it pins an item to the head of the bottom ticker. Weaker: the ticker's
+dismissal persists indefinitely in `localStorage` under `oi.newsBanner.hidden`,
+and a hidden banner renders nothing at all, so anyone who dismissed it in the
+past will never see the notice.
+
+**3. The freeze message itself (reactive).** Anyone who attempts a save during
+the window gets the `port_freeze_block()` text in the app's own error surface.
+Catches people who ignored both banners, but only at the moment they try to
+write.
+
+None of these reach someone who is not in the app. The email announcement
+remains the only channel that does.
+
 ## What does and does not stop writes
 
 Established by audit, 2026-08-17 — read this before relying on any lever:
